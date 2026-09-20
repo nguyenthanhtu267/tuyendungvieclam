@@ -40,7 +40,6 @@ import {
   SkillLevel,
 } from './entities/candidate-sections.entity';
 import * as entities from './entities';
-import { isProduction } from '../config/env-guard';
 
 const entityList = Object.values(entities).filter((e) => typeof e === 'function') as any[];
 
@@ -48,13 +47,16 @@ const entityList = Object.values(entities).filter((e) => typeof e === 'function'
 // script này tự mở 1 kết nối CSDL RIÊNG (không đi qua app.module.ts), nên trước đó luôn cố định
 // synchronize: false bất kể môi trường — khiến các cột được thêm ở đợt trước (ví dụ legal_doc_data,
 // đợt 7) nhưng chưa từng triển khai lên CSDL thật không được tự tạo ra trước khi insert dữ liệu ảo.
-// Nay đổi để khớp đúng quy tắc chung của app.module.ts (chỉ đồng bộ khi NODE_ENV khác 'production'),
-// giúp CSDL thật tự vá đủ cột thiếu trong lần chạy seed:bulk đầu tiên (khi NODE_ENV tạm chưa đặt).
+// Đợt 12h (21/09/2026): thử đổi theo !isProduction() vẫn còn thiếu cột (do NODE_ENV lúc chạy thực
+// tế vẫn là 'production') — script bảo trì chạy tay 1 lần này không phải server chính phục vụ
+// người dùng, nên KHÔNG có lý do phụ thuộc NODE_ENV: luôn ép đồng bộ cấu trúc bảng trước khi sinh
+// dữ liệu ảo, để chắc chắn hết thiếu cột dù chạy trong hoàn cảnh nào.
+console.log(`[seed-bulk] NODE_ENV hiện tại: ${process.env.NODE_ENV ?? '(chưa đặt)'} — sẽ luôn đồng bộ cấu trúc bảng trước khi chạy.`);
 const dataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
   entities: entityList,
-  synchronize: !isProduction(),
+  synchronize: true,
 });
 
 // ---------------------------------------------------------------------------------------------
