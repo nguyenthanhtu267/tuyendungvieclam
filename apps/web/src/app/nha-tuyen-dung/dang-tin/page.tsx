@@ -11,6 +11,7 @@ import { MultiSelectPopover } from '@/components/search/MultiSelectPopover';
 import {
   EMPLOYMENT_TYPES,
   EXPERIENCE_LEVELS,
+  GENDER_OPTIONS,
   INDUSTRIES,
   LEVELS,
   PINNED_PROVINCES,
@@ -38,6 +39,10 @@ interface FormState {
   experienceLevel: string;
   provinces: string[];
   district: string;
+  address: string;
+  gender: string;
+  ageRange: string;
+  workSchedule: string;
   isUrgent: boolean;
   salaryMin: string;
   salaryMax: string;
@@ -57,6 +62,10 @@ const INITIAL: FormState = {
   experienceLevel: EXPERIENCE_LEVELS[3],
   provinces: [],
   district: '',
+  address: '',
+  gender: GENDER_OPTIONS[0],
+  ageRange: '',
+  workSchedule: '',
   isUrgent: false,
   salaryMin: '',
   salaryMax: '',
@@ -105,6 +114,10 @@ export default function DangTinPage() {
         location: form.provinces.length ? form.provinces.join(', ') : undefined,
         provinces: form.provinces.length ? form.provinces : undefined,
         district: form.district || undefined,
+        address: form.address.trim() || undefined,
+        gender: form.gender || undefined,
+        ageRange: form.ageRange.trim() || undefined,
+        workSchedule: form.workSchedule.trim() || undefined,
         experienceLevel: form.experienceLevel || undefined,
         isUrgent: form.isUrgent,
         salaryMin: form.negotiable || !form.salaryMin ? undefined : Number(form.salaryMin),
@@ -263,6 +276,40 @@ export default function DangTinPage() {
                   />
                 </Field>
               )}
+              {/* Đợt 12k (21/09/2026) — khối "Địa điểm làm việc" (địa chỉ chi tiết) và "Thông tin
+                  khác" (Giới tính, Độ tuổi, Thời gian làm việc) hiện trên trang chi tiết tin, theo
+                  mẫu careerviet.vn. Đều không bắt buộc. */}
+              <Field label="Địa chỉ chi tiết" hint="không bắt buộc">
+                <input
+                  className="tvl-input"
+                  value={form.address}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  placeholder="VD: KCN Lê Minh Xuân 3, Bình Chánh, Hồ Chí Minh"
+                />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Giới tính">
+                  <select className="tvl-input" value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
+                    {GENDER_OPTIONS.map((o) => <option key={o}>{o}</option>)}
+                  </select>
+                </Field>
+                <Field label="Độ tuổi" hint="không bắt buộc">
+                  <input
+                    className="tvl-input"
+                    value={form.ageRange}
+                    onChange={(e) => setForm({ ...form, ageRange: e.target.value })}
+                    placeholder="VD: Không giới hạn tuổi, 22-35 tuổi"
+                  />
+                </Field>
+              </div>
+              <Field label="Thời gian làm việc" hint="không bắt buộc">
+                <input
+                  className="tvl-input"
+                  value={form.workSchedule}
+                  onChange={(e) => setForm({ ...form, workSchedule: e.target.value })}
+                  placeholder="VD: Làm việc theo ca và hành chính"
+                />
+              </Field>
             </>
           )}
 

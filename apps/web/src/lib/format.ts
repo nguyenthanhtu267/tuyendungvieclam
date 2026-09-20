@@ -15,6 +15,26 @@ export function formatSalaryTag(min?: number, max?: number): string {
   return `Đến ${max} Tr VND`;
 }
 
+// Đợt 12k (21/09/2026) — khối "Địa điểm làm việc" / "Thông tin khác" trên trang chi tiết tin
+// (theo mẫu careerviet.vn). Tin cũ chưa có dữ liệu (address/gender/ageRange/workSchedule) vẫn hiện
+// giá trị mặc định hợp lý thay vì để trống — theo lựa chọn của người dùng, không ghi đè vào CSDL.
+export function jobAddressDisplay(address?: string, locationFallback?: string): string {
+  if (address && address.trim()) return address.trim();
+  return locationFallback && locationFallback.trim() ? locationFallback.trim() : 'Đang cập nhật';
+}
+
+export function jobGenderDisplay(gender?: string): string {
+  return gender && gender.trim() ? gender.trim() : 'Không yêu cầu';
+}
+
+export function jobAgeRangeDisplay(ageRange?: string): string {
+  return ageRange && ageRange.trim() ? ageRange.trim() : 'Không giới hạn tuổi';
+}
+
+export function jobWorkScheduleDisplay(workSchedule?: string): string {
+  return workSchedule && workSchedule.trim() ? workSchedule.trim() : 'Thoả thuận';
+}
+
 export function isNewJob(createdAt?: string): boolean {
   if (!createdAt) return false;
   const days = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24);

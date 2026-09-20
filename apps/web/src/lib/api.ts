@@ -120,6 +120,11 @@ export interface JobPosting {
   requirements?: string;
   benefits?: string[];
   deadline?: string;
+  // Đợt 12k (21/09/2026) — khối "Địa điểm làm việc" (địa chỉ chi tiết) và "Thông tin khác".
+  address?: string;
+  gender?: string;
+  ageRange?: string;
+  workSchedule?: string;
   approvalStatus?: JobApprovalStatus;
   createdAt: string;
   updatedAt?: string;
@@ -202,6 +207,18 @@ export const jobsApi = {
     return request<DistrictFacet[]>(`/jobs/district-facets?province=${encodeURIComponent(province)}${sep}${qs}`);
   },
   featuredEmployers: () => request<FeaturedEmployer[]>('/jobs/featured-employers'),
+};
+
+// Đợt 12k (21/09/2026) — trang công ty công khai /cong-ty/[id]: thông tin công ty + toàn bộ tin
+// đang tuyển khác của công ty đó, bấm vào từ tên công ty trong trang chi tiết tin tuyển dụng.
+export interface CompanyProfileResponse {
+  company: Company;
+  jobs: JobPosting[];
+  totalJobs: number;
+}
+
+export const companiesApi = {
+  getProfile: (id: string) => request<CompanyProfileResponse>(`/companies/${id}`),
 };
 
 export type ProfileVisibility = 'locked' | 'public' | 'urgent';
@@ -556,6 +573,11 @@ export interface CreateJobPayload {
   requirements?: string;
   benefits?: string[];
   deadline?: string;
+  // Đợt 12k (21/09/2026) — khối "Địa điểm làm việc" (địa chỉ chi tiết) và "Thông tin khác".
+  address?: string;
+  gender?: string;
+  ageRange?: string;
+  workSchedule?: string;
 }
 
 // ===== B5 — Tài khoản & Hồ sơ công ty =====

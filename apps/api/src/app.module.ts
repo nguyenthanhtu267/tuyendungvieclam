@@ -8,6 +8,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { JobsModule } from './jobs/jobs.module';
+import { CompaniesModule } from './companies/companies.module';
 import { CandidatesModule } from './candidates/candidates.module';
 import { ApplicationsModule } from './applications/applications.module';
 import { EmployerModule } from './employer/employer.module';
@@ -99,6 +100,7 @@ const entities = [
     AuthModule,
     UsersModule,
     JobsModule,
+    CompaniesModule,
     CandidatesModule,
     ApplicationsModule,
     EmployerModule,

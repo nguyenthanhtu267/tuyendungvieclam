@@ -71,4 +71,22 @@ export class CreateJobDto {
   @IsOptional()
   @IsString()
   deadline?: string;
+
+  // Đợt 12k (21/09/2026) — khối "Địa điểm làm việc" (địa chỉ chi tiết) và "Thông tin khác" trên
+  // trang chi tiết tin, theo mẫu careerviet.vn. Đều không bắt buộc.
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  gender?: string;
+
+  @IsOptional()
+  @IsString()
+  ageRange?: string;
+
+  @IsOptional()
+  @IsString()
+  workSchedule?: string;
 }

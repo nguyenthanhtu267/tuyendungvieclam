@@ -111,6 +111,22 @@ export class JobPosting {
   @Column({ name: 'deadline', type: 'date', nullable: true })
   deadline?: string;
 
+  // Đợt 12k (21/09/2026) — bổ sung khối "Địa điểm làm việc" (địa chỉ chi tiết) và "Thông tin khác"
+  // (Giới tính, Độ tuổi, Thời gian làm việc) trên trang chi tiết tin, theo mẫu careerviet.vn. Tất cả
+  // đều không bắt buộc — tin cũ (chưa có dữ liệu) sẽ hiện giá trị mặc định ở phía frontend, không ghi
+  // đè giá trị mặc định vào CSDL (xem jobDetailDefaults() trong lib/format.ts).
+  @Column({ nullable: true })
+  address?: string;
+
+  @Column({ nullable: true })
+  gender?: string;
+
+  @Column({ name: 'age_range', nullable: true })
+  ageRange?: string;
+
+  @Column({ name: 'work_schedule', nullable: true })
+  workSchedule?: string;
+
   @Column({
     type: 'enum',
     enum: JobApprovalStatus,

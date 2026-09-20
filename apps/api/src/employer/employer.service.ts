@@ -185,6 +185,10 @@ export class EmployerService {
       requirements: job.requirements,
       benefits: job.benefits,
       deadline: job.deadline,
+      address: job.address,
+      gender: job.gender,
+      ageRange: job.ageRange,
+      workSchedule: job.workSchedule,
       approvalStatus: JobApprovalStatus.PENDING,
       isPaused: false,
     });
@@ -215,6 +219,10 @@ export class EmployerService {
       requirements: dto.requirements,
       benefits: dto.benefits,
       deadline: dto.deadline,
+      address: dto.address,
+      gender: dto.gender,
+      ageRange: dto.ageRange,
+      workSchedule: dto.workSchedule,
       approvalStatus: JobApprovalStatus.PENDING,
     });
     return this.jobRepo.save(job);

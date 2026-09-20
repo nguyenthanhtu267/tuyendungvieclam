@@ -6,7 +6,16 @@ import Link from 'next/link';
 import SiteHeader from '@/components/SiteHeader';
 import { jobsApi, candidatesApi, applicationsApi, ApiError, type JobPosting, type CV } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { companyInitials, formatDate, formatSalary } from '@/lib/format';
+import {
+  companyInitials,
+  formatDate,
+  formatSalary,
+  formatSalaryTag,
+  jobAddressDisplay,
+  jobAgeRangeDisplay,
+  jobGenderDisplay,
+  jobWorkScheduleDisplay,
+} from '@/lib/format';
 
 type Tab = 'details' | 'company';
 
@@ -158,7 +167,9 @@ function JobDetailInner() {
                 </span>
               )}
             </div>
-            <div className="text-white/75 text-[13px] mt-1">{job.company.name}</div>
+            <Link href={`/cong-ty/${job.company.id}`} className="text-white/75 text-[13px] mt-1 inline-block hover:text-white hover:underline">
+              {job.company.name}
+            </Link>
           </div>
           <div className="flex gap-2 items-center">
             <button
@@ -287,6 +298,39 @@ function JobDetailInner() {
                     <Detail label="👥 Số lượng" value={String(job.headcount)} />
                   </div>
 
+                  {/* Đợt 12k (21/09/2026) — khối "Địa điểm làm việc" (địa chỉ chi tiết) + "Thông
+                      tin khác" (Giới tính, Độ tuổi, Thời gian làm việc, Lương), theo mẫu
+                      careerviet.vn. Tin cũ chưa có dữ liệu vẫn hiện giá trị mặc định hợp lý. */}
+                  <div className="mt-5">
+                    <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">
+                      Địa điểm làm việc
+                    </div>
+                    <div className="text-[12.8px] font-bold text-ink">
+                      {job.provinces?.length ? job.provinces.join(' | ') : job.location ?? 'Đang cập nhật'}
+                    </div>
+                    <div className="text-[12.5px] text-ink-muted mt-1 flex items-start gap-1.5">
+                      <span>📍</span>
+                      <span>
+                        {jobAddressDisplay(
+                          job.address,
+                          job.provinces?.length ? job.provinces.join(' | ') : job.location,
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">
+                      Thông tin khác
+                    </div>
+                    <ul className="text-[12.8px] text-ink-muted leading-loose list-disc pl-5">
+                      <li>Giới tính: {jobGenderDisplay(job.gender)}</li>
+                      <li>Độ tuổi: {jobAgeRangeDisplay(job.ageRange)}</li>
+                      <li>Thời gian làm việc: {jobWorkScheduleDisplay(job.workSchedule)}</li>
+                      <li>Lương: {formatSalaryTag(job.salaryMin, job.salaryMax)}</li>
+                    </ul>
+                  </div>
+
                   {job.benefits && job.benefits.length > 0 && (
                     <div className="mt-5">
                       <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Phúc lợi</div>
@@ -327,13 +371,23 @@ function JobDetailInner() {
                       {companyInitials(job.company.name)}
                     </div>
                     <div>
-                      <div className="font-bold text-ink text-sm">{job.company.name}</div>
+                      <Link href={`/cong-ty/${job.company.id}`} className="font-bold text-ink text-sm hover:text-primary hover:underline">
+                        {job.company.name}
+                      </Link>
                       <div className="text-ink-faint text-xs">Mã số thuế: {job.company.taxCode}</div>
                     </div>
                   </div>
                   {job.company.industry && <div>Lĩnh vực: {job.company.industry}</div>}
                   {job.company.size && <div>Quy mô: {job.company.size}</div>}
                   {job.company.website && <div>Website: {job.company.website}</div>}
+                  {/* Đợt 12k (21/09/2026) — bấm tên công ty ở trên hoặc vào đây để xem tất cả tin
+                      đang tuyển khác của công ty này (trang /cong-ty/[id]). */}
+                  <Link
+                    href={`/cong-ty/${job.company.id}`}
+                    className="tvl-btn-ghost !w-auto px-4 self-start mt-1"
+                  >
+                    Xem tất cả tin đang tuyển của công ty này →
+                  </Link>
                 </div>
               )}
             </div>
@@ -345,7 +399,9 @@ function JobDetailInner() {
                 <div className="w-10 h-10 rounded-lg bg-primary-tint text-primary flex items-center justify-center font-bold text-xs">
                   {companyInitials(job.company.name)}
                 </div>
-                <div className="font-bold text-[13px]">{job.company.name}</div>
+                <Link href={`/cong-ty/${job.company.id}`} className="font-bold text-[13px] hover:text-primary hover:underline">
+                  {job.company.name}
+                </Link>
               </div>
               <button className="tvl-btn-ghost mt-3">+ Theo dõi</button>
             </div>

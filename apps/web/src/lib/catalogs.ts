@@ -140,3 +140,7 @@ export const EXPERIENCE_LEVELS: string[] = [
   'Từ 7 đến 10 năm',
   'Từ 11 năm',
 ];
+
+// Đợt 12k (21/09/2026) — cho ô "Giới tính" trong form Đăng tin (khối "Thông tin khác" ở trang chi
+// tiết tin, theo mẫu careerviet.vn).
+export const GENDER_OPTIONS: string[] = ['Không yêu cầu', 'Nam', 'Nữ'];
