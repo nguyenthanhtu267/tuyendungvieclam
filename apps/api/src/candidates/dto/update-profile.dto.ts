@@ -34,4 +34,17 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsBoolean()
   allowJobNotifications?: boolean;
+
+  // Đợt 8
+  @IsOptional()
+  @IsString()
+  profileTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  careerObjective?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  hideContactInfo?: boolean;
 }

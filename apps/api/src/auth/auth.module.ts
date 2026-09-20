@@ -10,6 +10,7 @@ import { UsersModule } from '../users/users.module';
 import { Company } from '../database/entities/company.entity';
 import { CompanyUser } from '../database/entities/company-user.entity';
 import { User } from '../database/entities/user.entity';
+import { resolveJwtSecret } from '../config/env-guard';
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { User } from '../database/entities/user.entity';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET') ?? 'dev-secret-change-me-in-production',
+        secret: resolveJwtSecret(configService.get<string>('JWT_SECRET')),
         signOptions: { expiresIn: configService.get<string>('JWT_EXPIRES_IN') ?? '7d' },
       }),
     }),

@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // Ứng với màn B2 (Đăng tin tuyển dụng) trong mockup — wizard 4 bước, gửi 1 lần khi hoàn tất.
@@ -13,6 +13,22 @@ export class CreateJobDto {
   @IsOptional()
   @IsString()
   location?: string;
+
+  @IsOptional()
+  @IsArray()
+  provinces?: string[];
+
+  @IsOptional()
+  @IsString()
+  district?: string;
+
+  @IsOptional()
+  @IsString()
+  experienceLevel?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isUrgent?: boolean;
 
   @IsOptional()
   @Type(() => Number)

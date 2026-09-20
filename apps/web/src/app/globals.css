@@ -6,6 +6,14 @@
   .text-balance {
     text-wrap: balance;
   }
+  /* Đợt 11 — ẩn thanh cuộn ngang cho hàng chip (quận/huyện đợt 10, mega-menu đợt 11) mà vẫn cuộn được. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @layer components {

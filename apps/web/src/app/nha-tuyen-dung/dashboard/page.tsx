@@ -83,7 +83,7 @@ export default function EmployerDashboardPage() {
               <div className="rounded-xl bg-white border border-border p-5">
                 <div className="flex justify-between items-center mb-3">
                   <h2 className="font-bold text-sm">Tin đăng gần đây</h2>
-                  <Link href="/nha-tuyen-dung/ung-vien" className="text-xs font-semibold text-primary">
+                  <Link href="/nha-tuyen-dung/tin-dang" className="text-xs font-semibold text-primary">
                     Quản lý tất cả
                   </Link>
                 </div>

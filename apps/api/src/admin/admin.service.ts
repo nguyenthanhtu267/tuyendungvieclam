@@ -1,6 +1,8 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as argon2 from 'argon2';
+import * as crypto from 'crypto';
 import { Company, CompanyApprovalStatus } from '../database/entities/company.entity';
 import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
 import { User, UserRole } from '../database/entities/user.entity';
@@ -80,6 +82,26 @@ export class AdminService {
     if (!company) throw new NotFoundException('Không tìm thấy công ty');
     company.approvalStatus = status;
     return this.companyRepo.save(company);
+  }
+
+  // ===== Đợt 12a (20/09/2026) — Admin hỗ trợ đặt lại mật khẩu =====
+  // Giai đoạn 1 không có email/SMS (quyết định phạm vi ban đầu) nên không tự phục vụ "quên mật
+  // khẩu" qua email được — thay vào đó Admin tra cứu tài khoản theo email rồi đặt lại mật khẩu
+  // tạm, tự báo cho người dùng qua kênh ngoài hệ thống (điện thoại, gặp trực tiếp...). Người dùng
+  // nên đổi lại mật khẩu ngay sau khi đăng nhập bằng mật khẩu tạm (xem AuthService.changePassword).
+  async findUserByEmail(email: string) {
+    const user = await this.userRepo.findOne({ where: { email } });
+    if (!user) throw new NotFoundException('Không tìm thấy tài khoản với email này');
+    return { id: user.id, email: user.email, fullName: user.fullName, role: user.role, status: user.status };
+  }
+
+  async resetUserPassword(id: string) {
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
+    const tempPassword = crypto.randomBytes(6).toString('base64url'); // 8 ký tự, đủ ngẫu nhiên cho mật khẩu tạm
+    user.passwordHash = await argon2.hash(tempPassword);
+    await this.userRepo.save(user);
+    return { email: user.email, tempPassword };
   }
 
   // ===== B4 — Xác nhận thanh toán đơn hàng (Hợp đồng + hoá đơn VAT) =====

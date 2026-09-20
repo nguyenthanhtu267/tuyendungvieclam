@@ -6,6 +6,8 @@ import EmployerHeader from '@/components/EmployerHeader';
 import { useAuth } from '@/lib/auth-context';
 import { employerApi, ApiError, type Company, type TeamMember } from '@/lib/api';
 import { formatDate } from '@/lib/format';
+import ChangePasswordCard from '@/components/ChangePasswordCard';
+import FacebookConnectCard from '@/components/FacebookConnectCard';
 
 const LEGAL_DOC_MAX_BYTES = 3 * 1024 * 1024;
 
@@ -69,6 +71,8 @@ export default function TaiKhoanPage() {
             <CompanyInfoCard token={token} company={company} onSaved={loadAll} onToast={notify} />
             <LegalDocCard token={token} company={company} onSaved={loadAll} onToast={notify} />
             <TeamCard token={token} team={team} onSaved={loadAll} onToast={notify} />
+            <ChangePasswordCard token={token} />
+            <FacebookConnectCard />
           </>
         )}
       </div>

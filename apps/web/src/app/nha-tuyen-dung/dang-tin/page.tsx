@@ -2,25 +2,32 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import EmployerHeader from '@/components/EmployerHeader';
 import { useAuth } from '@/lib/auth-context';
 import { employerApi, ApiError } from '@/lib/api';
 import { formatSalary } from '@/lib/format';
+import { MultiSelectPopover } from '@/components/search/MultiSelectPopover';
+import {
+  EMPLOYMENT_TYPES,
+  EXPERIENCE_LEVELS,
+  INDUSTRIES,
+  LEVELS,
+  PINNED_PROVINCES,
+  PROVINCE_REGIONS,
+} from '@/lib/catalogs';
 
 const STEPS = ['Thông tin vị trí', 'Mô tả & yêu cầu', 'Phúc lợi & hạn nộp', 'Xem trước & gửi'];
-const INDUSTRY_OPTIONS = [
-  'Kinh doanh / Bán hàng',
-  'CNTT / Phần mềm',
-  'Marketing',
-  'Dịch vụ khách hàng',
-  'Y tế / Dược',
-  'Sản xuất / Cơ khí',
-  'Logistics',
-  'Nhà hàng / Khách sạn',
+// Đợt 10 — dùng chung danh mục ngành nghề/cấp bậc/hình thức việc làm/kinh nghiệm với thanh lọc tìm
+// việc (lib/catalogs.ts) để tin đăng khớp đúng giá trị mà FilterBar lọc theo (job.level = ... v.v).
+const PROVINCE_GROUPS = [
+  { label: undefined, options: PINNED_PROVINCES },
+  ...PROVINCE_REGIONS.map((r) => ({ label: r.region, options: r.provinces })),
 ];
+const INDUSTRY_GROUPS = [{ label: undefined, options: INDUSTRIES }];
+// Quận/huyện hiện chỉ có dữ liệu mẫu cho Hồ Chí Minh — chỉ hiện ô nhập quận khi chọn tỉnh có hỗ trợ.
+const DISTRICT_SUPPORTED_PROVINCES = ['Hồ Chí Minh', 'Hà Nội'];
 const BENEFIT_OPTIONS = ['Bảo hiểm sức khỏe', 'Thưởng KPI', 'Laptop', 'Du lịch hằng năm', 'Tăng lương định kỳ', 'Đào tạo chuyên môn'];
-const LEVEL_OPTIONS = ['Thực tập sinh', 'Nhân viên', 'Giám sát / Trưởng nhóm', 'Quản lý', 'Trưởng phòng trở lên'];
-const EMPLOYMENT_TYPE_OPTIONS = ['Toàn thời gian', 'Bán thời gian', 'Thực tập', 'Thời vụ'];
 
 interface FormState {
   title: string;
@@ -28,7 +35,10 @@ interface FormState {
   industries: string[];
   level: string;
   employmentType: string;
-  location: string;
+  experienceLevel: string;
+  provinces: string[];
+  district: string;
+  isUrgent: boolean;
   salaryMin: string;
   salaryMax: string;
   negotiable: boolean;
@@ -42,9 +52,12 @@ const INITIAL: FormState = {
   title: '',
   headcount: '1',
   industries: [],
-  level: LEVEL_OPTIONS[1],
-  employmentType: EMPLOYMENT_TYPE_OPTIONS[0],
-  location: '',
+  level: LEVELS[2],
+  employmentType: EMPLOYMENT_TYPES[0],
+  experienceLevel: EXPERIENCE_LEVELS[3],
+  provinces: [],
+  district: '',
+  isUrgent: false,
   salaryMin: '',
   salaryMax: '',
   negotiable: false,
@@ -89,7 +102,11 @@ export default function DangTinPage() {
       await employerApi.createJob(token, {
         title: form.title,
         industry: form.industries[0],
-        location: form.location || undefined,
+        location: form.provinces.length ? form.provinces.join(', ') : undefined,
+        provinces: form.provinces.length ? form.provinces : undefined,
+        district: form.district || undefined,
+        experienceLevel: form.experienceLevel || undefined,
+        isUrgent: form.isUrgent,
         salaryMin: form.negotiable || !form.salaryMin ? undefined : Number(form.salaryMin),
         salaryMax: form.negotiable || !form.salaryMax ? undefined : Number(form.salaryMax),
         employmentType: form.employmentType,
@@ -117,6 +134,16 @@ export default function DangTinPage() {
           <h1 className="font-extrabold text-lg">Đã gửi tin để duyệt!</h1>
           <p className="text-sm text-ink-faint">
             Tin tuyển dụng &quot;{form.title}&quot; đã được gửi cho Admin xét duyệt. Tin sẽ hiển thị trong tìm kiếm việc làm ngay sau khi được duyệt (thường trong vòng 24 giờ).
+          </p>
+          {/* Đợt 12e (21/09/2026) — chia sẻ Facebook: link công khai chỉ xem được sau khi Admin
+              duyệt, nên chưa mở popup chia sẻ ngay ở đây (link sẽ báo "không tìm thấy") — hướng
+              NTD quay lại trang Quản lý tin đăng để chia sẻ khi tin đã thật sự "Đang đăng". */}
+          <p className="text-xs text-info bg-info-tint rounded-lg px-3.5 py-2.5">
+            📣 Sau khi tin được duyệt, vào{' '}
+            <Link href="/nha-tuyen-dung/tin-dang" className="font-bold underline">
+              Quản lý tin đăng
+            </Link>{' '}
+            để chia sẻ tin lên Facebook cá nhân — giúp tiếp cận thêm nhiều ứng viên.
           </p>
           <div className="flex gap-3 mt-2">
             <button className="tvl-btn-ghost !w-auto px-5" onClick={() => { setForm(INITIAL); setStep(0); setSuccess(false); }}>
@@ -170,29 +197,51 @@ export default function DangTinPage() {
                 </Field>
               </div>
               <Field label="Ngành nghề" hint="chọn tối đa 3">
-                <div className="flex flex-wrap gap-2">
-                  {INDUSTRY_OPTIONS.map((opt) => (
-                    <Chip key={opt} active={form.industries.includes(opt)} onClick={() => setForm({ ...form, industries: toggle(form.industries, opt, 3) })}>
-                      {opt}
-                    </Chip>
-                  ))}
-                </div>
+                <MultiSelectPopover
+                  label="Ngành nghề"
+                  placeholder="Chọn ngành nghề"
+                  groups={INDUSTRY_GROUPS}
+                  selected={form.industries}
+                  onChange={(v) => setForm({ ...form, industries: v.slice(0, 3) })}
+                  emptyText="Vui lòng chọn ngành nghề"
+                />
               </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Cấp bậc">
                   <select className="tvl-input" value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })}>
-                    {LEVEL_OPTIONS.map((o) => <option key={o}>{o}</option>)}
+                    {LEVELS.map((o) => <option key={o}>{o}</option>)}
                   </select>
                 </Field>
                 <Field label="Hình thức làm việc">
                   <select className="tvl-input" value={form.employmentType} onChange={(e) => setForm({ ...form, employmentType: e.target.value })}>
-                    {EMPLOYMENT_TYPE_OPTIONS.map((o) => <option key={o}>{o}</option>)}
+                    {EMPLOYMENT_TYPES.map((o) => <option key={o}>{o}</option>)}
                   </select>
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Địa điểm làm việc">
-                  <input className="tvl-input" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="VD: Q.1, Hồ Chí Minh" />
+                <Field label="Kinh nghiệm làm việc">
+                  <select className="tvl-input" value={form.experienceLevel} onChange={(e) => setForm({ ...form, experienceLevel: e.target.value })}>
+                    {EXPERIENCE_LEVELS.map((o) => <option key={o}>{o}</option>)}
+                  </select>
+                </Field>
+                <Field label="Việc làm khẩn cấp">
+                  <div className="flex items-center h-[42px]">
+                    <Chip active={form.isUrgent} onClick={() => setForm({ ...form, isUrgent: !form.isUrgent })}>
+                      {form.isUrgent ? '🔥 Khẩn cấp' : 'Đánh dấu khẩn cấp'}
+                    </Chip>
+                  </div>
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Tỉnh, Thành Phố" hint="có thể chọn nhiều">
+                  <MultiSelectPopover
+                    label="Tỉnh, Thành Phố"
+                    placeholder="Chọn tỉnh, thành phố"
+                    groups={PROVINCE_GROUPS}
+                    selected={form.provinces}
+                    onChange={(v) => setForm({ ...form, provinces: v, district: v.length === 1 ? form.district : '' })}
+                    emptyText="Chọn địa điểm làm việc"
+                  />
                 </Field>
                 <Field label="Mức lương (triệu)">
                   <div className="flex gap-2 items-center">
@@ -204,6 +253,16 @@ export default function DangTinPage() {
                   </div>
                 </Field>
               </div>
+              {form.provinces.length === 1 && DISTRICT_SUPPORTED_PROVINCES.includes(form.provinces[0]) && (
+                <Field label="Quận / Huyện" hint="không bắt buộc">
+                  <input
+                    className="tvl-input"
+                    value={form.district}
+                    onChange={(e) => setForm({ ...form, district: e.target.value })}
+                    placeholder="VD: Quận 1"
+                  />
+                </Field>
+              )}
             </>
           )}
 
@@ -244,9 +303,18 @@ export default function DangTinPage() {
             <>
               <h2 className="font-bold text-sm">Xem trước tin tuyển dụng</h2>
               <div className="rounded-lg bg-surface-alt p-4">
-                <div className="font-extrabold text-sm">{form.title || '(Chưa nhập chức danh)'}</div>
+                <div className="font-extrabold text-sm flex items-center gap-2 flex-wrap">
+                  {form.title || '(Chưa nhập chức danh)'}
+                  {form.isUrgent && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-critical-tint text-critical align-middle">
+                      KHẨN CẤP
+                    </span>
+                  )}
+                </div>
                 <div className="text-xs text-ink-faint mt-1">
-                  {form.location || 'Chưa rõ địa điểm'} · {form.negotiable ? 'Thoả thuận' : formatSalary(Number(form.salaryMin) || undefined, Number(form.salaryMax) || undefined)} · {form.employmentType} · {form.headcount} vị trí
+                  {form.provinces.length ? form.provinces.join(' | ') : 'Chưa rõ địa điểm'}
+                  {form.district ? ` (${form.district})` : ''} ·{' '}
+                  {form.negotiable ? 'Thoả thuận' : formatSalary(Number(form.salaryMin) || undefined, Number(form.salaryMax) || undefined)} · {form.employmentType} · {form.headcount} vị trí
                 </div>
                 <div className="flex flex-wrap gap-1.5 mt-2.5">
                   {[...form.industries, ...form.benefits].map((tag) => (

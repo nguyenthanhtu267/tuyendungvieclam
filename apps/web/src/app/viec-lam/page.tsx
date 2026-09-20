@@ -4,57 +4,109 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import SiteHeader from '@/components/SiteHeader';
 import { JobCard } from '@/components/JobCard';
-import { jobsApi, type JobFacets, type JobListResponse } from '@/lib/api';
+import { FilterBar } from '@/components/search/FilterBar';
+import { DistrictChips } from '@/components/search/DistrictChips';
+import { jobsApi, type JobFacets, type JobListParams, type JobListResponse, type DistrictFacet } from '@/lib/api';
+
+// Đợt 10 — trang tìm việc làm nâng cao đầy đủ (claude/06-spec-tim-kiem-nang-cao.md): thanh lọc
+// FilterBar (tỉnh/thành + ngành nghề multi-select, 5 dropdown đơn, khẩn cấp, doanh nghiệp yêu thích),
+// hàng chip quận/huyện khi chỉ chọn đúng 1 tỉnh/thành, danh sách JobCard kiểu careerviet.vn.
+
+function arr(v: string | null): string[] | undefined {
+  if (!v) return undefined;
+  const parts = v.split(',').filter(Boolean);
+  return parts.length > 0 ? parts : undefined;
+}
 
 function JobSearchPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const q = searchParams.get('q') ?? '';
-  const location = searchParams.get('location') ?? '';
-  const industry = searchParams.get('industry') ?? '';
+  const filters: JobListParams = {
+    q: searchParams.get('q') ?? undefined,
+    location: searchParams.get('location') ?? undefined,
+    provinces: arr(searchParams.get('provinces')),
+    district: searchParams.get('district') ?? undefined,
+    industries: arr(searchParams.get('industries')),
+    salaryTier: searchParams.get('salaryTier') ? Number(searchParams.get('salaryTier')) : undefined,
+    level: searchParams.get('level') ?? undefined,
+    postedWithin: searchParams.get('postedWithin') ?? undefined,
+    employmentType: searchParams.get('employmentType') ?? undefined,
+    experienceLevel: searchParams.get('experienceLevel') ?? undefined,
+    urgentOnly: searchParams.get('urgentOnly') === '1' || undefined,
+    featuredEmployerOnly: searchParams.get('featuredEmployerOnly') === '1' || undefined,
+  };
   const page = Number(searchParams.get('page') ?? '1');
 
-  const [qInput, setQInput] = useState(q);
-  const [locationInput, setLocationInput] = useState(location);
+  const [qInput, setQInput] = useState(filters.q ?? '');
   const [result, setResult] = useState<JobListResponse | null>(null);
   const [facets, setFacets] = useState<JobFacets | null>(null);
+  const [districts, setDistricts] = useState<DistrictFacet[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setQInput(q);
-    setLocationInput(location);
-  }, [q, location]);
+    setQInput(filters.q ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.q]);
 
   useEffect(() => {
     setLoading(true);
     jobsApi
-      .list({ q, location, industry, page, pageSize: 8 })
+      .list({ ...filters, page, pageSize: 8 })
       .then(setResult)
       .catch(() => setResult({ items: [], total: 0, page: 1, pageSize: 8, totalPages: 1 }))
       .finally(() => setLoading(false));
-  }, [q, location, industry, page]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     jobsApi
-      .facets()
+      .facets(filters)
       .then(setFacets)
       .catch(() => setFacets(null));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
-  function updateParams(next: Record<string, string | undefined>) {
+  useEffect(() => {
+    const provinces = filters.provinces;
+    if (!provinces || provinces.length !== 1) {
+      setDistricts([]);
+      return;
+    }
+    jobsApi
+      .districtFacets(provinces[0], filters)
+      .then(setDistricts)
+      .catch(() => setDistricts([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  function updateParams(next: Partial<JobListParams>) {
     const params = new URLSearchParams(searchParams.toString());
-    Object.entries(next).forEach(([k, v]) => {
-      if (v) params.set(k, v);
-      else params.delete(k);
-    });
+    const patched: Record<string, unknown> = { ...filters, ...next };
+    (['q', 'location', 'provinces', 'district', 'industries', 'salaryTier', 'level', 'postedWithin', 'employmentType', 'experienceLevel', 'urgentOnly', 'featuredEmployerOnly'] as const).forEach(
+      (key) => {
+        const v = patched[key];
+        params.delete(key);
+        if (v === undefined || v === '' || v === false) return;
+        if (Array.isArray(v)) {
+          if (v.length > 0) params.set(key, v.join(','));
+          return;
+        }
+        params.set(key, v === true ? '1' : String(v));
+      },
+    );
     params.delete('page');
     router.push(`/viec-lam?${params.toString()}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function handleSearchSubmit(e: React.FormEvent) {
     e.preventDefault();
-    updateParams({ q: qInput, location: locationInput });
+    updateParams({ q: qInput });
+  }
+
+  function handleClearFilters() {
+    router.push(qInput ? `/viec-lam?q=${encodeURIComponent(qInput)}` : '/viec-lam');
   }
 
   function goToPage(p: number) {
@@ -64,67 +116,36 @@ function JobSearchPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  const heading = industry
-    ? `Việc làm ngành ${industry}`
-    : location
-      ? `Việc làm tại ${location}`
-      : q
-        ? `Kết quả tìm kiếm cho "${q}"`
-        : 'Tất cả việc làm';
+  const heading = qInput ? `Kết quả tìm kiếm cho "${qInput}"` : 'Tất cả việc làm';
 
   return (
     <main className="min-h-screen">
       <SiteHeader />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
-        <form
-          onSubmit={handleSearchSubmit}
-          className="rounded-xl border border-border bg-white p-3.5 flex gap-2.5 flex-wrap"
-        >
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col gap-3">
+        <form onSubmit={handleSearchSubmit} className="rounded-xl border border-border bg-white p-3.5 flex gap-2.5 flex-wrap">
           <input
-            className="tvl-input flex-[2] min-w-[160px]"
+            className="tvl-input flex-[2] min-w-[200px]"
             placeholder="Chức danh, kỹ năng, tên công ty"
             value={qInput}
             onChange={(e) => setQInput(e.target.value)}
-          />
-          <input
-            className="tvl-input flex-1 min-w-[140px]"
-            placeholder="Địa điểm"
-            value={locationInput}
-            onChange={(e) => setLocationInput(e.target.value)}
           />
           <button type="submit" className="tvl-btn-primary !w-auto px-6">
             🔎 Tìm
           </button>
         </form>
 
-        {facets && facets.industries.length > 0 && (
-          <div className="flex gap-2 flex-wrap mt-3">
-            <button
-              onClick={() => updateParams({ industry: undefined })}
-              className={`text-[11.5px] font-semibold px-3 py-1.5 rounded-full border transition-colors ${
-                !industry ? 'bg-primary text-white border-primary' : 'border-border-strong text-ink-muted'
-              }`}
-            >
-              Tất cả ({facets.total})
-            </button>
-            {facets.industries.slice(0, 6).map((f) => (
-              <button
-                key={f.industry}
-                onClick={() => updateParams({ industry: f.industry })}
-                className={`text-[11.5px] font-semibold px-3 py-1.5 rounded-full border transition-colors ${
-                  industry === f.industry
-                    ? 'bg-primary text-white border-primary'
-                    : 'border-border-strong text-ink-muted hover:border-primary'
-                }`}
-              >
-                {f.industry} ({f.count})
-              </button>
-            ))}
-          </div>
+        <FilterBar value={filters} onChange={updateParams} onClear={handleClearFilters} />
+
+        {districts.length > 0 && (
+          <DistrictChips
+            districts={districts}
+            selected={filters.district}
+            onSelect={(d) => updateParams({ district: d })}
+          />
         )}
 
-        <div className="grid lg:grid-cols-[1fr_280px] gap-5 mt-5 items-start">
+        <div className="grid lg:grid-cols-[1fr_280px] gap-5 mt-2 items-start">
           <div>
             <div className="flex items-center justify-between mb-3">
               <h1 className="font-extrabold text-lg">
@@ -134,7 +155,7 @@ function JobSearchPage() {
 
             {!loading && result?.items.length === 0 && (
               <div className="rounded-xl border border-border bg-white p-8 text-center text-ink-muted text-sm">
-                Không tìm thấy tin tuyển dụng phù hợp. Thử từ khoá hoặc địa điểm khác.
+                Không tìm thấy tin tuyển dụng phù hợp. Thử từ khoá hoặc bộ lọc khác.
               </div>
             )}
 
@@ -186,6 +207,24 @@ function JobSearchPage() {
                       className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full border border-border-strong text-ink-muted hover:border-primary transition-colors"
                     >
                       {f.location} ({f.count})
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {facets && facets.industries.length > 0 && (
+              <div className="rounded-xl border border-border bg-white p-4">
+                <div className="text-[11px] font-bold text-primary uppercase tracking-wide mb-2.5">
+                  Ngành nghề phổ biến
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {facets.industries.map((f) => (
+                    <button
+                      key={f.industry}
+                      onClick={() => updateParams({ industries: [f.industry] })}
+                      className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full border border-border-strong text-ink-muted hover:border-primary transition-colors"
+                    >
+                      {f.industry} ({f.count})
                     </button>
                   ))}
                 </div>

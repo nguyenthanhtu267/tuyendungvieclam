@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import SiteHeader from '@/components/SiteHeader';
 import { jobsApi, candidatesApi, applicationsApi, ApiError, type JobPosting, type CV } from '@/lib/api';
@@ -10,13 +10,15 @@ import { companyInitials, formatDate, formatSalary } from '@/lib/format';
 
 type Tab = 'details' | 'company';
 
-export default function JobDetailPage() {
+function JobDetailInner() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const { me, token } = useAuth();
   const [job, setJob] = useState<JobPosting | null | undefined>(undefined);
   const [related, setRelated] = useState<JobPosting[]>([]);
   const [tab, setTab] = useState<Tab>('details');
   const [saved, setSaved] = useState(false);
+  const autoApplyTriggered = useRef(false);
 
   const [applyOpen, setApplyOpen] = useState(false);
   const [cvs, setCvs] = useState<CV[] | null>(null);
@@ -76,6 +78,17 @@ export default function JobDetailPage() {
       }
     }
   }
+
+  // Đợt 10 — nút "ỨNG TUYỂN NGAY" trên thẻ việc làm (JobCard) điều hướng tới đây kèm ?apply=1 để mở
+  // sẵn khối nộp hồ sơ, không cần người dùng bấm lại "Nộp Đơn Ứng Tuyển".
+  useEffect(() => {
+    if (autoApplyTriggered.current) return;
+    if (!job) return;
+    if (searchParams.get('apply') !== '1') return;
+    autoApplyTriggered.current = true;
+    handleApplyClick();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job, searchParams]);
 
   async function submitApply() {
     if (!token || !selectedCvId) return;
@@ -137,7 +150,14 @@ export default function JobDetailPage() {
 
         <div className="rounded-2xl bg-primary p-6 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div className="text-white text-xl font-extrabold">{job.title}</div>
+            <div className="text-white text-xl font-extrabold flex items-center gap-2 flex-wrap">
+              {job.title}
+              {job.isUrgent && (
+                <span className="text-[10.5px] font-bold px-2 py-0.5 rounded bg-white/20 text-white align-middle">
+                  KHẨN CẤP
+                </span>
+              )}
+            </div>
             <div className="text-white/75 text-[13px] mt-1">{job.company.name}</div>
           </div>
           <div className="flex gap-2 items-center">
@@ -252,12 +272,17 @@ export default function JobDetailPage() {
               {tab === 'details' ? (
                 <>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-[12.5px]">
-                    <Detail label="📍 Địa điểm" value={job.location ?? '—'} />
-                    <Detail label="🕒 Cập nhật" value={formatDate(job.createdAt)} />
+                    <Detail
+                      label="📍 Địa điểm"
+                      value={job.provinces?.length ? job.provinces.join(' | ') : job.location ?? '—'}
+                    />
+                    {job.district && <Detail label="🏙️ Quận/Huyện" value={job.district} />}
+                    <Detail label="🕒 Cập nhật" value={formatDate(job.updatedAt ?? job.createdAt)} />
                     <Detail label="🏷️ Ngành nghề" value={job.industry ?? '—'} />
                     <Detail label="💼 Hình thức" value={job.employmentType ?? '—'} />
                     <Detail label="💰 Lương" value={formatSalary(job.salaryMin, job.salaryMax)} />
                     <Detail label="🎖️ Cấp bậc" value={job.level ?? '—'} />
+                    {job.experienceLevel && <Detail label="📊 Kinh nghiệm" value={job.experienceLevel} />}
                     <Detail label="⏳ Hạn nộp" value={job.deadline ? formatDate(job.deadline) : '—'} />
                     <Detail label="👥 Số lượng" value={String(job.headcount)} />
                   </div>
@@ -355,5 +380,13 @@ function Detail({ label, value }: { label: string; value: string }) {
       <div className="text-ink-faint text-[11px]">{label}</div>
       <div className="font-semibold mt-0.5">{value}</div>
     </div>
+  );
+}
+
+export default function JobDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <JobDetailInner />
+    </Suspense>
   );
 }

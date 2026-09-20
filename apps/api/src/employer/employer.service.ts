@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as argon2 from 'argon2';
@@ -13,6 +13,8 @@ import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CreateSubAccountDto } from './dto/create-sub-account.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { EmployerJobStatus } from './dto/list-jobs-query.dto';
+import { ListApplicantsQueryDto } from './dto/list-applicants-query.dto';
 
 const LEGAL_DOC_MAX_BYTES = 3 * 1024 * 1024; // 3MB — theo Mục 9 SRS
 
@@ -92,15 +94,101 @@ export class EmployerService {
     };
   }
 
-  async listMyJobs(userId: string) {
+  // Đợt 11b — Mục #4 ATS: 4 trạng thái tin do NTD tự quản lý, tính từ approvalStatus (Admin duyệt)
+  // + isPaused (NTD tự tạm ngưng) + deadline (tự hết hạn theo ngày) — không thêm enum trạng thái
+  // riêng để tránh 2 nguồn sự thật trùng nhau. "khac" gom draft/rejected (không thuộc 4 tab spec).
+  private computeEmployerStatus(job: JobPosting): EmployerJobStatus {
+    if (job.approvalStatus === JobApprovalStatus.PENDING) return 'cho_dang';
+    if (job.approvalStatus === JobApprovalStatus.APPROVED) {
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      if (job.deadline && new Date(job.deadline) < startOfToday) return 'het_han';
+      if (job.isPaused) return 'tam_ngung';
+      return 'dang_dang';
+    }
+    if (job.approvalStatus === JobApprovalStatus.EXPIRED) return 'het_han';
+    return 'khac';
+  }
+
+  async listMyJobs(userId: string, status?: EmployerJobStatus) {
     const companyId = await this.getCompanyIdForUser(userId);
     const jobs = await this.jobRepo.find({ where: { companyId }, order: { createdAt: 'DESC' } });
-    return Promise.all(
+    const withCounts = await Promise.all(
       jobs.map(async (job) => ({
         ...job,
         applicationCount: await this.applicationRepo.count({ where: { jobPostingId: job.id } }),
+        employerStatus: this.computeEmployerStatus(job),
       })),
     );
+    return status ? withCounts.filter((j) => j.employerStatus === status) : withCounts;
+  }
+
+  // Đếm số tin theo từng trạng thái — dùng cho số trên tab (giống mockup NTD-02/04: "4 tab trạng
+  // thái, cột CV GỢI Ý"), tính 1 lần trên toàn bộ tin của công ty để 4 tab luôn khớp tổng.
+  async countMyJobsByStatus(userId: string) {
+    const companyId = await this.getCompanyIdForUser(userId);
+    const jobs = await this.jobRepo.find({ where: { companyId } });
+    const counts: Record<EmployerJobStatus, number> = {
+      dang_dang: 0,
+      cho_dang: 0,
+      tam_ngung: 0,
+      het_han: 0,
+      khac: 0,
+    };
+    jobs.forEach((job) => {
+      counts[this.computeEmployerStatus(job)]++;
+    });
+    return counts;
+  }
+
+  async pauseJob(userId: string, jobId: string) {
+    const job = await this.getOwnedJob(userId, jobId);
+    if (this.computeEmployerStatus(job) !== 'dang_dang') {
+      throw new BadRequestException('Chỉ tạm ngưng được tin đang ở trạng thái "Đang đăng"');
+    }
+    job.isPaused = true;
+    return this.jobRepo.save(job);
+  }
+
+  async resumeJob(userId: string, jobId: string) {
+    const job = await this.getOwnedJob(userId, jobId);
+    const current = this.computeEmployerStatus(job);
+    if (current === 'het_han') {
+      throw new BadRequestException('Tin đã hết hạn — vui lòng sao chép tin để đăng lại với hạn nộp mới');
+    }
+    if (current !== 'tam_ngung') {
+      throw new BadRequestException('Chỉ đăng lại được tin đang ở trạng thái "Tạm ngưng"');
+    }
+    job.isPaused = false;
+    return this.jobRepo.save(job);
+  }
+
+  // Sao chép tin (mục #4 ATS) — tin sao chép luôn về trạng thái "chờ đăng" (PENDING), chờ Admin duyệt
+  // lại như tin mới hoàn toàn, không copy applications.
+  async duplicateJob(userId: string, jobId: string) {
+    const job = await this.getOwnedJob(userId, jobId);
+    const clone = this.jobRepo.create({
+      companyId: job.companyId,
+      title: `${job.title} (Bản sao)`,
+      industry: job.industry,
+      location: job.location,
+      provinces: job.provinces,
+      district: job.district,
+      experienceLevel: job.experienceLevel,
+      isUrgent: job.isUrgent,
+      salaryMin: job.salaryMin,
+      salaryMax: job.salaryMax,
+      employmentType: job.employmentType,
+      level: job.level,
+      headcount: job.headcount,
+      description: job.description,
+      requirements: job.requirements,
+      benefits: job.benefits,
+      deadline: job.deadline,
+      approvalStatus: JobApprovalStatus.PENDING,
+      isPaused: false,
+    });
+    return this.jobRepo.save(clone);
   }
 
   // Quyết định 18/09/2026 (đợt 4, cập nhật đợt 5): nay đã có module Admin (C1) kiểm duyệt, nên
@@ -114,6 +202,10 @@ export class EmployerService {
       title: dto.title,
       industry: dto.industry,
       location: dto.location,
+      provinces: dto.provinces,
+      district: dto.district,
+      experienceLevel: dto.experienceLevel,
+      isUrgent: dto.isUrgent ?? false,
       salaryMin: dto.salaryMin,
       salaryMax: dto.salaryMax,
       employmentType: dto.employmentType,
@@ -142,32 +234,111 @@ export class EmployerService {
     return this.getOwnedJob(userId, jobId);
   }
 
-  async listApplicants(userId: string, jobId: string, status?: ApplicationStatus) {
+  // Đợt 11b — Mục #4 ATS: bộ lọc nâng cao (trạng thái, thư mục, đánh giá tối thiểu, từ khoá, khoảng
+  // ngày nộp). Mặc định KHÔNG lấy hồ sơ đã vào thùng rác (soft-delete) — xem listTrashedApplicants().
+  async listApplicants(userId: string, jobId: string, filters: ListApplicantsQueryDto = {}) {
     await this.getOwnedJob(userId, jobId);
     const qb = this.applicationRepo
       .createQueryBuilder('app')
       .leftJoinAndSelect('app.cv', 'cv')
       .leftJoinAndSelect('cv.candidateProfile', 'candidateProfile')
       .where('app.job_posting_id = :jobId', { jobId })
+      .andWhere('app.deleted_at IS NULL')
       .orderBy('app.applied_at', 'DESC');
-    if (status) {
-      qb.andWhere('app.status = :status', { status });
+    if (filters.status) qb.andWhere('app.status = :status', { status: filters.status });
+    if (filters.folder) qb.andWhere('app.folder = :folder', { folder: filters.folder });
+    if (filters.ratingMin != null) qb.andWhere('app.rating >= :ratingMin', { ratingMin: filters.ratingMin });
+    if (filters.q) {
+      qb.andWhere('(candidateProfile.fullName ILIKE :q OR candidateProfile.desiredPosition ILIKE :q)', {
+        q: `%${filters.q}%`,
+      });
     }
+    if (filters.dateFrom) qb.andWhere('app.applied_at >= :dateFrom', { dateFrom: filters.dateFrom });
+    if (filters.dateTo) qb.andWhere('app.applied_at <= :dateTo', { dateTo: filters.dateTo });
     return qb.getMany();
   }
 
-  async updateApplicationStatus(userId: string, applicationId: string, status: ApplicationStatus) {
+  // Danh sách thư mục đang dùng trong toàn công ty — để giao diện gợi ý thay vì gõ lại từ đầu.
+  async listFolders(userId: string) {
+    const companyId = await this.getCompanyIdForUser(userId);
+    const rows = await this.applicationRepo
+      .createQueryBuilder('app')
+      .innerJoin('app.jobPosting', 'job')
+      .where('job.company_id = :companyId', { companyId })
+      .andWhere('app.folder IS NOT NULL')
+      .andWhere('app.deleted_at IS NULL')
+      .select('DISTINCT app.folder', 'folder')
+      .getRawMany<{ folder: string }>();
+    return rows.map((r) => r.folder).sort((a, b) => a.localeCompare(b, 'vi'));
+  }
+
+  // Thùng rác — hồ sơ ứng tuyển NTD đã "xoá" khỏi danh sách quản lý (không xoá đơn ứng tuyển thật
+  // của ứng viên, xem ghi chú .withDeleted() ở applications.service.ts listOwn()).
+  async listTrashedApplicants(userId: string, jobId: string) {
+    await this.getOwnedJob(userId, jobId);
+    return this.applicationRepo
+      .createQueryBuilder('app')
+      .withDeleted()
+      .leftJoinAndSelect('app.cv', 'cv')
+      .leftJoinAndSelect('cv.candidateProfile', 'candidateProfile')
+      .where('app.job_posting_id = :jobId', { jobId })
+      .andWhere('app.deleted_at IS NOT NULL')
+      .orderBy('app.deleted_at', 'DESC')
+      .getMany();
+  }
+
+  private async getOwnedApplication(userId: string, applicationId: string, withDeleted = false): Promise<Application> {
     const companyId = await this.getCompanyIdForUser(userId);
     const application = await this.applicationRepo.findOne({
       where: { id: applicationId },
       relations: { jobPosting: true, cv: { candidateProfile: true } },
+      withDeleted,
     });
     if (!application) throw new NotFoundException('Không tìm thấy đơn ứng tuyển');
     if (application.jobPosting.companyId !== companyId) {
       throw new ForbiddenException('Bạn không có quyền truy cập đơn ứng tuyển này');
     }
+    return application;
+  }
+
+  async updateApplicationStatus(userId: string, applicationId: string, status: ApplicationStatus) {
+    const application = await this.getOwnedApplication(userId, applicationId);
     application.status = status;
     return this.applicationRepo.save(application);
+  }
+
+  async rateApplication(userId: string, applicationId: string, rating: number) {
+    const application = await this.getOwnedApplication(userId, applicationId);
+    application.rating = rating;
+    return this.applicationRepo.save(application);
+  }
+
+  async setApplicationFolder(userId: string, applicationId: string, folder?: string) {
+    const application = await this.getOwnedApplication(userId, applicationId);
+    application.folder = folder && folder.trim().length > 0 ? folder.trim() : null;
+    return this.applicationRepo.save(application);
+  }
+
+  async trashApplication(userId: string, applicationId: string) {
+    const application = await this.getOwnedApplication(userId, applicationId);
+    await this.applicationRepo.softDelete(application.id);
+    return { success: true };
+  }
+
+  async restoreApplication(userId: string, applicationId: string) {
+    const application = await this.getOwnedApplication(userId, applicationId, true);
+    await this.applicationRepo.restore(application.id);
+    return { success: true };
+  }
+
+  // Xoá vĩnh viễn — chỉ cho phép với hồ sơ ĐÃ ở trong thùng rác (bước xoá 2 lần, tránh xoá nhầm).
+  async permanentlyDeleteApplication(userId: string, applicationId: string) {
+    const application = await this.getOwnedApplication(userId, applicationId, true);
+    if (!application.deletedAt) {
+      throw new BadRequestException('Chỉ xoá vĩnh viễn được hồ sơ đang ở trong thùng rác');
+    }
+    await this.applicationRepo.delete(application.id);
+    return { success: true };
   }
 
   // ===== B5 — Tài khoản & Hồ sơ công ty =====
@@ -190,8 +361,12 @@ export class EmployerService {
     const companyId = await this.getCompanyIdForUser(userId);
     const company = await this.companyRepo.findOne({ where: { id: companyId } });
     if (!company) throw new NotFoundException('Không tìm thấy công ty');
-    company.legalDocUrl = `/uploads/legal/${file.filename}`;
+    // Lưu buffer thẳng vào CSDL thay vì ổ đĩa (đợt 7, 18/09/2026) — id công ty đã biết trước nên
+    // đặt luôn được legalDocUrl trỏ vào route phục vụ tệp (FilesController), không cần lưu 2 lần.
+    company.legalDocUrl = `/files/legal-doc/${company.id}`;
     company.legalDocOriginalFileName = file.originalname;
+    company.legalDocData = file.buffer;
+    company.legalDocMimeType = file.mimetype;
     // Lưu ý TypeORM: gán `undefined` khiến save() BỎ QUA cột đó (không xoá giá trị cũ trong DB) —
     // phải gán `null` mới thực sự xoá link cũ khi chuyển từ "dán link" sang "tải tệp lên".
     company.legalDocExternalLink = null;
@@ -206,6 +381,8 @@ export class EmployerService {
     // Như trên: dùng `null` (không phải `undefined`) để thực sự xoá tệp đã tải lên trước đó.
     company.legalDocUrl = null;
     company.legalDocOriginalFileName = null;
+    company.legalDocData = null;
+    company.legalDocMimeType = null;
     return this.companyRepo.save(company);
   }
 

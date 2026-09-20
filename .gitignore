@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+apps/api/dist/
+apps/web/.next/
+apps/web/out/
+
+# Environment variables (chứa mật khẩu CSDL, JWT secret...)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Uploads cũ (đã chuyển sang lưu CSDL từ đợt 7 — thư mục này không còn dùng
+# nhưng loại trừ phòng khi còn sót tệp cũ trên máy dev)
+apps/api/uploads/
+
+# OS / editor
+.DS_Store
+*.swp
+
+# Playwright
+test-results/
+playwright-report/

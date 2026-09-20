@@ -259,6 +259,41 @@ async function run() {
     }
   }
 
+  // Đợt 10 — bù dữ liệu tỉnh/thành, quận/huyện, khẩn cấp, doanh nghiệp yêu thích cho các bản ghi
+  // đợt 7 sẵn có (an toàn chạy nhiều lần — chỉ set khi còn trống).
+  const HCM_DISTRICTS = ['Quận 1', 'Quận 3', 'Quận 7', 'Thành phố Thủ Đức'];
+  const allJobs = await jobRepo.find();
+  let backfilledJobs = 0;
+  for (let i = 0; i < allJobs.length; i++) {
+    const job = allJobs[i];
+    let changed = false;
+    if (!job.provinces && job.location) {
+      job.provinces = job.location.split(/[,|]/).map((s) => s.trim()).filter(Boolean);
+      changed = true;
+    }
+    if (!job.district && job.location?.includes('Hồ Chí Minh')) {
+      job.district = HCM_DISTRICTS[i % HCM_DISTRICTS.length];
+      changed = true;
+    }
+    if (!job.experienceLevel) {
+      job.experienceLevel = job.level === 'Nhân viên' ? 'Từ 1 đến 4 năm' : 'Không yêu cầu kinh nghiệm';
+      changed = true;
+    }
+    if (i < 2 && !job.isUrgent) {
+      job.isUrgent = true;
+      changed = true;
+    }
+    if (changed) {
+      await jobRepo.save(job);
+      backfilledJobs++;
+    }
+  }
+
+  const featuredNames = ['Công ty TNHH Giải pháp Số Việt', 'Tập đoàn Bán lẻ Hoa Mai', 'FinTech Ánh Dương'];
+  for (const name of featuredNames) {
+    await companyRepo.update({ name }, { isFeaturedEmployer: true });
+  }
+
   // Tài khoản Admin mẫu (dev-only) — dùng để đăng nhập trang /admin/dashboard và duyệt
   // công ty/tin tuyển dụng. Đổi mật khẩu này trước khi triển khai thật.
   const userRepo = dataSource.getRepository(User);
@@ -295,6 +330,7 @@ async function run() {
   }
 
   console.log(`Đã tạo ${createdCompanies} công ty mới, ${createdJobs} tin tuyển dụng mới, ${createdPackages} gói dịch vụ mới.`);
+  console.log(`Đã bù dữ liệu đợt 10 (tỉnh/thành, khẩn cấp...) cho ${backfilledJobs} tin, đánh dấu ${featuredNames.length} doanh nghiệp yêu thích.`);
   console.log(
     createdAdmin
       ? `Đã tạo tài khoản Admin mẫu: ${adminEmail} / Admin@123 (đổi mật khẩu trước khi triển khai thật).`

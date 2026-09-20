@@ -38,6 +38,15 @@ export class CV {
   @Column({ name: 'original_file_name', nullable: true })
   originalFileName?: string;
 
+  // Nội dung tệp lưu trực tiếp trong CSDL (thay vì ổ đĩa máy chủ) — để không bị mất khi triển khai
+  // lên máy chủ miễn phí (không có ổ đĩa cố định). Tệp đã giới hạn ≤2MB nên phù hợp lưu dạng bytea.
+  // `select: false` để không tự động tải theo mỗi lần truy vấn danh sách CV — chỉ lấy khi tải xuống.
+  @Column({ name: 'file_data', type: 'bytea', nullable: true, select: false })
+  fileData?: Buffer;
+
+  @Column({ name: 'file_mime_type', nullable: true })
+  fileMimeType?: string;
+
   @Column({ name: 'external_link_url', nullable: true })
   externalLinkUrl?: string;
 

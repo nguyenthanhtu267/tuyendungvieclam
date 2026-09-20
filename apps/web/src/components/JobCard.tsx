@@ -1,24 +1,104 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { JobPosting } from '@/lib/api';
-import { companyInitials, formatDate, formatSalary } from '@/lib/format';
+import { candidatesApi, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
+import { benefitIcon } from '@/lib/benefit-icons';
+import { companyInitials, formatDate, formatSalaryTag, isNewJob } from '@/lib/format';
 
-export function JobCard({ job }: { job: JobPosting }) {
+// Đợt 10 — thẻ việc làm theo mục 4 đặc tả: tiêu đề đậm + badge (MỚI) chữ đỏ trong ngoặc (không phải
+// pill), dòng lương đỏ, nhiều tỉnh ngăn bởi "|", hạn nộp/cập nhật, tag phúc lợi có icon, nút đỏ
+// "ỨNG TUYỂN NGAY" + icon tim lưu việc.
+export function JobCard({
+  job,
+  saved,
+  onToggleSaved,
+}: {
+  job: JobPosting;
+  saved?: boolean;
+  onToggleSaved?: (jobId: string, nowSaved: boolean) => void;
+}) {
+  const router = useRouter();
+  const { me, token } = useAuth();
+  const [isSaved, setIsSaved] = useState(!!saved);
+  const [busy, setBusy] = useState(false);
+
+  const locationText = job.provinces?.length ? job.provinces.join(' | ') : job.location;
+
+  async function handleToggleSave(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!me || !token) {
+      router.push('/dang-nhap');
+      return;
+    }
+    setBusy(true);
+    try {
+      if (isSaved) {
+        await candidatesApi.unsaveJob(token, job.id);
+        setIsSaved(false);
+        onToggleSaved?.(job.id, false);
+      } else {
+        await candidatesApi.saveJob(token, job.id);
+        setIsSaved(true);
+        onToggleSaved?.(job.id, true);
+      }
+    } catch (err) {
+      if (!(err instanceof ApiError)) throw err;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleApplyNow(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    router.push(`/viec-lam/${job.id}?apply=1`);
+  }
+
   return (
     <Link
       href={`/viec-lam/${job.id}`}
-      className="flex gap-3 rounded-xl border border-border bg-white p-4 hover:border-primary hover:shadow-sm transition-all"
+      className="relative flex gap-3 rounded-xl border border-border bg-white p-4 hover:border-primary hover:shadow-sm transition-all"
     >
+      <button
+        type="button"
+        onClick={handleToggleSave}
+        disabled={busy}
+        aria-label={isSaved ? 'Bỏ lưu việc làm' : 'Lưu việc làm'}
+        className={`absolute top-3 right-3 text-base leading-none ${isSaved ? 'text-critical' : 'text-ink-faint hover:text-critical'}`}
+      >
+        {isSaved ? '♥' : '♡'}
+      </button>
+
       <div className="w-11 h-11 shrink-0 rounded-lg bg-primary-tint text-primary flex items-center justify-center font-bold text-xs">
         {companyInitials(job.company.name)}
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="font-bold text-[13.5px] text-ink truncate">{job.title}</div>
-        <div className="text-xs text-ink-muted mt-0.5 truncate">{job.company.name}</div>
-        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[11.5px] text-ink-faint">
-          <span>💰 {formatSalary(job.salaryMin, job.salaryMax)}</span>
-          {job.location && <span>📍 {job.location}</span>}
-          {job.deadline && <span>🕒 Hạn nộp {formatDate(job.deadline)}</span>}
+      <div className="flex-1 min-w-0 pr-6">
+        <div className="font-bold text-[13.5px] text-ink">
+          {job.title}
+          {isNewJob(job.createdAt) && <span className="text-critical font-extrabold ml-1.5">(MỚI)</span>}
+          {job.isUrgent && (
+            <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-critical-tint text-critical align-middle">
+              KHẨN CẤP
+            </span>
+          )}
         </div>
+        <div className="text-xs text-ink-muted mt-0.5 truncate">{job.company.name}</div>
+
+        <div className="text-critical font-bold text-[12.5px] mt-1.5">
+          $ {formatSalaryTag(job.salaryMin, job.salaryMax)}
+        </div>
+
+        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-[11.5px] text-ink-faint">
+          {locationText && <span>📍 {locationText}</span>}
+          {job.deadline && <span>Hạn nộp: {formatDate(job.deadline)}</span>}
+          <span>Cập nhật: {formatDate(job.updatedAt ?? job.createdAt)}</span>
+        </div>
+
         {job.benefits && job.benefits.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {job.benefits.slice(0, 3).map((b) => (
@@ -26,11 +106,21 @@ export function JobCard({ job }: { job: JobPosting }) {
                 key={b}
                 className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-surface-alt text-ink-muted"
               >
-                {b}
+                {benefitIcon(b)} {b}
               </span>
             ))}
           </div>
         )}
+
+        <div className="mt-2.5">
+          <button
+            type="button"
+            onClick={handleApplyNow}
+            className="inline-block bg-critical text-white text-[11.5px] font-extrabold tracking-wide rounded-lg px-4 py-1.5 hover:brightness-95"
+          >
+            ỨNG TUYỂN NGAY
+          </button>
+        </div>
       </div>
     </Link>
   );

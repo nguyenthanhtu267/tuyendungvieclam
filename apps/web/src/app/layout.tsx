@@ -8,6 +8,7 @@ import '@fontsource/ibm-plex-mono/500.css';
 import '@fontsource/ibm-plex-mono/600.css';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
+import Footer from '@/components/Footer';
 
 // Font Inter (to, rõ, sắc nét — quyết định 18/09/2026) + IBM Plex Mono cho số liệu dạng bảng,
 // nạp qua @fontsource (đóng gói sẵn file font) vì fonts.googleapis.com bị chặn bởi chính sách
@@ -24,8 +25,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi">
-      <body className="font-sans antialiased bg-bg text-ink">
-        <AuthProvider>{children}</AuthProvider>
+      <body className="font-sans antialiased bg-bg text-ink flex flex-col min-h-screen">
+        <AuthProvider>
+          <div className="flex-1 flex flex-col">{children}</div>
+          <Footer />
+        </AuthProvider>
       </body>
     </html>
   );

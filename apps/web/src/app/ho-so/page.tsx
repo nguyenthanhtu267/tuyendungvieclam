@@ -18,6 +18,7 @@ import {
   type JobPosting,
 } from '@/lib/api';
 import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatSalary } from '@/lib/format';
+import ChangePasswordCard from '@/components/ChangePasswordCard';
 
 const NAV_ITEMS = [
   { id: 'overview', label: '👤 Quản lý hồ sơ' },
@@ -385,9 +386,17 @@ function OverviewCard({
           )}
         </div>
         {!editing ? (
-          <button onClick={() => setEditing(true)} className="tvl-btn-primary !w-auto px-5 self-start">
-            Cập nhật hồ sơ
-          </button>
+          <div className="flex flex-col gap-2 self-start shrink-0">
+            <button onClick={() => setEditing(true)} className="tvl-btn-primary !w-auto px-5">
+              Cập nhật hồ sơ
+            </button>
+            <Link href="/ho-so/truc-tuyen" className="tvl-btn-ghost !w-auto px-5 text-center">
+              📋 Hồ sơ trực tuyến
+            </Link>
+            <Link href="/ho-so/cv" className="tvl-btn-ghost !w-auto px-5 text-center">
+              📄 Tạo CV
+            </Link>
+          </div>
         ) : (
           <div className="flex gap-2 self-start">
             <button onClick={() => setEditing(false)} className="tvl-btn-ghost !w-auto px-4">
@@ -488,9 +497,14 @@ function CvSection({
 
   return (
     <div id="cvs" className="rounded-xl border border-border bg-white p-[18px] scroll-mt-20">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h2 className="font-extrabold text-[15px]">CV &amp; tệp đính kèm</h2>
-        <span className="text-[11px] text-ink-faint">Tối đa 2MB (PDF/DOC) — hoặc dán link Google Drive</span>
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] text-ink-faint">Tối đa 2MB (PDF/DOC) — hoặc dán link Google Drive</span>
+          <Link href="/ho-so/cv" className="text-[11.5px] font-bold text-primary hover:underline shrink-0">
+            Tạo CV từ hồ sơ →
+          </Link>
+        </div>
       </div>
 
       {cvs.length > 0 && (
@@ -675,6 +689,8 @@ function SettingsSection({
           {blocked.length === 0 && <span className="text-[11.5px] text-ink-faint">Chưa chặn công ty nào</span>}
         </div>
       </div>
+
+      <ChangePasswordCard token={token} />
     </div>
   );
 }

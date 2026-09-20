@@ -13,3 +13,5 @@ export * from './order.entity';
 export * from './payment.entity';
 export * from './invoice.entity';
 export * from './notification.entity';
+export * from './candidate-sections.entity';
+export * from './unlocked-profile.entity';

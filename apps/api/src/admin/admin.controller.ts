@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -46,6 +46,16 @@ export class AdminController {
   @Patch('companies/:id/reject')
   rejectCompany(@Param('id') id: string) {
     return this.adminService.setCompanyStatus(id, CompanyApprovalStatus.REJECTED);
+  }
+
+  @Get('users')
+  findUserByEmail(@Query('email') email: string) {
+    return this.adminService.findUserByEmail(email);
+  }
+
+  @Patch('users/:id/reset-password')
+  resetUserPassword(@Param('id') id: string) {
+    return this.adminService.resetUserPassword(id);
   }
 
   @Get('orders/pending')

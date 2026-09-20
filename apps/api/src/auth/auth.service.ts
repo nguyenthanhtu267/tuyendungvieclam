@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -99,6 +99,22 @@ export class AuthService {
     }
 
     return this.buildAuthResponse(user.id, user.email, user.role);
+  }
+
+  // Bảo mật (đợt 12a, 20/09/2026) — cho phép người dùng đã đăng nhập tự đổi mật khẩu. Đây là cách
+  // thực tế để đóng rủi ro "mật khẩu Admin mẫu lộ trong seed script": sau khi triển khai, đăng
+  // nhập bằng mật khẩu mẫu rồi đổi ngay qua endpoint này. Giai đoạn 1 không có email/SMS (quyết
+  // định phạm vi ban đầu) nên không làm luồng "quên mật khẩu" tự phục vụ qua email — xem
+  // adminResetPassword() ở admin/admin.service.ts cho trường hợp người dùng bị khoá tài khoản.
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new UnauthorizedException('Không tìm thấy tài khoản');
+    const ok = await argon2.verify(user.passwordHash, currentPassword);
+    if (!ok) throw new BadRequestException('Mật khẩu hiện tại không đúng');
+    if (newPassword.length < 6) throw new BadRequestException('Mật khẩu mới phải có ít nhất 6 ký tự');
+    user.passwordHash = await argon2.hash(newPassword);
+    await this.userRepo.save(user);
+    return { success: true };
   }
 
   private async buildAuthResponse(userId: string, email: string, role: string) {

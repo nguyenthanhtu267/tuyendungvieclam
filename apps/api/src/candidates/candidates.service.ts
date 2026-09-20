@@ -67,11 +67,15 @@ export class CandidatesService {
     const cv = this.cvRepo.create({
       candidateProfileId: profile.id,
       type: CvType.UPLOAD,
-      fileUrl: `/uploads/cv/${file.filename}`,
       originalFileName: file.originalname,
+      fileData: file.buffer,
+      fileMimeType: file.mimetype,
       isPrimary: isFirst,
     });
     const saved = await this.cvRepo.save(cv);
+    // fileUrl trỏ vào route phục vụ tệp từ CSDL (FilesController) — chỉ đặt được sau khi có id.
+    saved.fileUrl = `/files/cv/${saved.id}`;
+    await this.cvRepo.save(saved);
     await this.refreshCompletion(profile.id);
     return saved;
   }

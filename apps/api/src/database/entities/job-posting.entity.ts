@@ -7,6 +7,7 @@ import {
   ManyToOne,
   JoinColumn,
   OneToMany,
+  Index,
 } from 'typeorm';
 import { Company } from './company.entity';
 import { Application } from './application.entity';
@@ -20,11 +21,16 @@ export enum JobApprovalStatus {
   EXPIRED = 'expired',
 }
 
+// Đợt 12a (20/09/2026) — đánh index cho các cột hay lọc/sắp xếp trong jobs.service.ts baseQuery()/
+// applyFilters(), quan trọng khi dữ liệu tăng lên quy mô lớn (~1245 tin theo đợt sinh dữ liệu ảo).
+// Composite (approval_status, is_paused) khớp đúng điều kiện WHERE luôn đi cùng nhau ở baseQuery().
+@Index(['approvalStatus', 'isPaused'])
 @Entity({ name: 'job_postings' })
 export class JobPosting {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index()
   @Column({ name: 'company_id' })
   companyId: string;
 
@@ -35,11 +41,39 @@ export class JobPosting {
   @Column()
   title: string;
 
+  @Index()
   @Column({ nullable: true })
   industry?: string;
 
   @Column({ nullable: true })
   location?: string;
+
+  // Đợt 10 — nhiều tỉnh/thành cho 1 tin (hiển thị "Hồ Chí Minh | Đà Nẵng" trên thẻ việc làm), dùng
+  // cho popover lọc "Tỉnh, Thành Phố". `location` giữ lại để tương thích ngược các tin đợt 7.
+  @Column({ type: 'simple-array', nullable: true })
+  provinces?: string[];
+
+  @Index()
+  @Column({ nullable: true })
+  district?: string;
+
+  // Đợt 10 — khoảng kinh nghiệm yêu cầu theo danh mục cố định (claude/06-spec-tim-kiem-nang-cao.md
+  // mục 2), lưu nguyên nhãn để lọc khớp chính xác thay vì suy luận từ số năm.
+  @Index()
+  @Column({ name: 'experience_level', nullable: true })
+  experienceLevel?: string;
+
+  // Đợt 10 — "Việc làm khẩn cấp" (nhãn đỏ, ưu tiên hiển thị) — nhà tuyển dụng tự đánh dấu khi đăng tin.
+  @Column({ name: 'is_urgent', default: false })
+  isUrgent: boolean;
+
+  // Đợt 11b — NTD tự tạm ngưng tin đang đăng (không hiện trong tìm kiếm việc làm công khai nữa)
+  // mà không cần Admin duyệt lại; "đăng lại" chỉ đặt lại cờ này. Trạng thái hiển thị cho NTD (4 tab:
+  // đang đăng/chờ đăng/tạm ngưng/hết hạn) được tính từ approvalStatus + isPaused + deadline, xem
+  // computeEmployerStatus() trong employer.service.ts — không thêm enum riêng để tránh trùng lặp với
+  // approvalStatus (vốn là trạng thái duyệt của Admin, khác khái niệm).
+  @Column({ name: 'is_paused', default: false })
+  isPaused: boolean;
 
   @Column({ name: 'salary_min', type: 'int', nullable: true })
   salaryMin?: number;
@@ -47,9 +81,11 @@ export class JobPosting {
   @Column({ name: 'salary_max', type: 'int', nullable: true })
   salaryMax?: number;
 
+  @Index()
   @Column({ name: 'employment_type', nullable: true })
   employmentType?: string;
 
+  @Index()
   @Column({ nullable: true })
   level?: string;
 
@@ -71,6 +107,7 @@ export class JobPosting {
   @Column({ name: 'banner_image_external_link', nullable: true })
   bannerImageExternalLink?: string;
 
+  @Index()
   @Column({ name: 'deadline', type: 'date', nullable: true })
   deadline?: string;
 
@@ -88,6 +125,7 @@ export class JobPosting {
   @OneToMany(() => SavedJob, (savedJob) => savedJob.jobPosting)
   savedByCandidates?: SavedJob[];
 
+  @Index()
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

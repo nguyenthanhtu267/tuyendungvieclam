@@ -12,9 +12,7 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { randomUUID } from 'crypto';
+import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { CandidatesService } from './candidates.service';
@@ -51,12 +49,9 @@ export class CandidatesController {
   @Post('me/cvs/upload')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: join(process.cwd(), 'uploads', 'cv'),
-        filename: (_req, file, cb) => {
-          cb(null, `${randomUUID()}${extname(file.originalname)}`);
-        },
-      }),
+      // Lưu vào bộ nhớ (không ghi ổ đĩa) — service sẽ lưu buffer thẳng vào CSDL, xem lý do trong
+      // cv.entity.ts (đợt 7, 18/09/2026: máy chủ miễn phí không có ổ đĩa cố định).
+      storage: memoryStorage(),
       limits: { fileSize: 2 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
         if (!ALLOWED_CV_MIME.has(file.mimetype)) {

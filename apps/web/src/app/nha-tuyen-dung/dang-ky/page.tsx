@@ -57,8 +57,10 @@ export default function DangKyNtdPage() {
               <path d="M4 14.5L10 8.5L14 12.5L20 6.5" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
-          <span className="text-lg font-bold">
-            tuyển dụng<b>việc làm</b>
+          {/* Đợt 12c (21/09/2026) — đồng bộ chữ logo "ĐĂNG TUYỂN MIỄN PHÍ" với header; trang này
+              đón NTD ngay khi họ chuẩn bị đăng ký, nên lời kêu gọi càng có ý nghĩa. */}
+          <span className="text-lg font-extrabold tracking-tight">
+            ĐĂNG TUYỂN <span className="text-accent">MIỄN PHÍ</span>
           </span>
         </Link>
         <div>

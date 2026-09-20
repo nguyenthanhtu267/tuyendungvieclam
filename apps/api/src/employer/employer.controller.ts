@@ -13,9 +13,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { randomUUID } from 'crypto';
+import { memoryStorage } from 'multer';
 import { EmployerService } from './employer.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateApplicationStatusDto } from './dto/update-application-status.dto';
@@ -23,9 +21,12 @@ import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CreateLegalDocLinkDto } from './dto/create-legal-doc-link.dto';
 import { CreateSubAccountDto } from './dto/create-sub-account.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { ListJobsQueryDto } from './dto/list-jobs-query.dto';
+import { ListApplicantsQueryDto } from './dto/list-applicants-query.dto';
+import { RateApplicationDto } from './dto/rate-application.dto';
+import { SetApplicationFolderDto } from './dto/set-application-folder.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { ApplicationStatus } from '../database/entities/application.entity';
 
 const ALLOWED_LEGAL_DOC_MIME = new Set([
   'application/pdf',
@@ -53,12 +54,9 @@ export class EmployerController {
   @Post('employer/company/legal-doc/upload')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: join(process.cwd(), 'uploads', 'legal'),
-        filename: (_req, file, cb) => {
-          cb(null, `${randomUUID()}${extname(file.originalname)}`);
-        },
-      }),
+      // Lưu vào bộ nhớ (không ghi ổ đĩa) — service lưu buffer thẳng vào CSDL, xem lý do trong
+      // company.entity.ts (đợt 7, 18/09/2026: máy chủ miễn phí không có ổ đĩa cố định).
+      storage: memoryStorage(),
       limits: { fileSize: 3 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
         if (!ALLOWED_LEGAL_DOC_MIME.has(file.mimetype)) {
@@ -114,8 +112,15 @@ export class EmployerController {
   }
 
   @Get('employer/jobs')
-  listJobs(@CurrentUser() user: { userId: string }) {
-    return this.employerService.listMyJobs(user.userId);
+  listJobs(@CurrentUser() user: { userId: string }, @Query() query: ListJobsQueryDto) {
+    return this.employerService.listMyJobs(user.userId, query.status);
+  }
+
+  // Route tĩnh — phải khai báo TRƯỚC 'employer/jobs/:id' cùng cấp, nếu không Nest sẽ khớp nhầm
+  // 'status-counts' vào tham số :id (bài học đã rút ra từ các đợt trước).
+  @Get('employer/jobs/status-counts')
+  countMyJobsByStatus(@CurrentUser() user: { userId: string }) {
+    return this.employerService.countMyJobsByStatus(user.userId);
   }
 
   @Post('employer/jobs')
@@ -128,13 +133,38 @@ export class EmployerController {
     return this.employerService.getJob(user.userId, id);
   }
 
+  @Patch('employer/jobs/:id/pause')
+  pauseJob(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.employerService.pauseJob(user.userId, id);
+  }
+
+  @Patch('employer/jobs/:id/resume')
+  resumeJob(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.employerService.resumeJob(user.userId, id);
+  }
+
+  @Post('employer/jobs/:id/duplicate')
+  duplicateJob(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.employerService.duplicateJob(user.userId, id);
+  }
+
   @Get('employer/jobs/:id/applicants')
   listApplicants(
     @CurrentUser() user: { userId: string },
     @Param('id') id: string,
-    @Query('status') status?: ApplicationStatus,
+    @Query() query: ListApplicantsQueryDto,
   ) {
-    return this.employerService.listApplicants(user.userId, id, status);
+    return this.employerService.listApplicants(user.userId, id, query);
+  }
+
+  @Get('employer/jobs/:id/applicants/trash')
+  listTrashedApplicants(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.employerService.listTrashedApplicants(user.userId, id);
+  }
+
+  @Get('employer/folders')
+  listFolders(@CurrentUser() user: { userId: string }) {
+    return this.employerService.listFolders(user.userId);
   }
 
   @Patch('employer/applications/:id/status')
@@ -144,5 +174,38 @@ export class EmployerController {
     @Body() dto: UpdateApplicationStatusDto,
   ) {
     return this.employerService.updateApplicationStatus(user.userId, id, dto.status);
+  }
+
+  @Patch('employer/applications/:id/rating')
+  rateApplication(
+    @CurrentUser() user: { userId: string },
+    @Param('id') id: string,
+    @Body() dto: RateApplicationDto,
+  ) {
+    return this.employerService.rateApplication(user.userId, id, dto.rating);
+  }
+
+  @Patch('employer/applications/:id/folder')
+  setApplicationFolder(
+    @CurrentUser() user: { userId: string },
+    @Param('id') id: string,
+    @Body() dto: SetApplicationFolderDto,
+  ) {
+    return this.employerService.setApplicationFolder(user.userId, id, dto.folder);
+  }
+
+  @Post('employer/applications/:id/trash')
+  trashApplication(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.employerService.trashApplication(user.userId, id);
+  }
+
+  @Post('employer/applications/:id/restore')
+  restoreApplication(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.employerService.restoreApplication(user.userId, id);
+  }
+
+  @Delete('employer/applications/:id')
+  permanentlyDeleteApplication(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.employerService.permanentlyDeleteApplication(user.userId, id);
   }
 }

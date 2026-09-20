@@ -3,9 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import SiteHeader from '@/components/SiteHeader';
+import OnlineBanner from '@/components/OnlineBanner';
 import { JobCard } from '@/components/JobCard';
-import { jobsApi, type JobFacets, type JobPosting } from '@/lib/api';
+import { jobsApi, type JobFacets, type JobPosting, type FeaturedEmployer } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { companyInitials } from '@/lib/format';
+import { PINNED_PROVINCES } from '@/lib/catalogs';
 
 export default function Home() {
   const router = useRouter();
@@ -13,6 +16,7 @@ export default function Home() {
   const [keyword, setKeyword] = useState('');
   const [jobs, setJobs] = useState<JobPosting[] | null>(null);
   const [facets, setFacets] = useState<JobFacets | null>(null);
+  const [featured, setFeatured] = useState<FeaturedEmployer[] | null>(null);
 
   useEffect(() => {
     jobsApi
@@ -23,6 +27,10 @@ export default function Home() {
       .facets()
       .then(setFacets)
       .catch(() => setFacets(null));
+    jobsApi
+      .featuredEmployers()
+      .then(setFeatured)
+      .catch(() => setFeatured([]));
   }, []);
 
   function handleSearch(e: React.FormEvent) {
@@ -35,6 +43,7 @@ export default function Home() {
   return (
     <main className="min-h-screen">
       <SiteHeader />
+      <OnlineBanner />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-8">
         <div className="grid md:grid-cols-2 gap-5 items-stretch">
@@ -64,6 +73,26 @@ export default function Home() {
                   className="tvl-btn-ghost !w-auto px-5"
                 >
                   Tìm kiếm nâng cao
+                </button>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap text-[11.5px]">
+                <span className="text-ink-faint">Nổi bật:</span>
+                {PINNED_PROVINCES.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => router.push(`/viec-lam?provinces=${encodeURIComponent(p)}`)}
+                    className="font-semibold px-2.5 py-1 rounded-full border border-border-strong text-ink-muted hover:border-primary hover:text-primary transition-colors"
+                  >
+                    {p}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => router.push('/viec-lam?urgentOnly=1')}
+                  className="font-semibold px-2.5 py-1 rounded-full border border-critical/40 text-critical hover:border-critical transition-colors"
+                >
+                  Việc làm khẩn cấp
                 </button>
               </div>
             </form>
@@ -132,11 +161,39 @@ export default function Home() {
               {facets.industries.map((f) => (
                 <a
                   key={f.industry}
-                  href={`/viec-lam?industry=${encodeURIComponent(f.industry)}`}
+                  href={`/viec-lam?industries=${encodeURIComponent(f.industry)}`}
                   className="flex items-center justify-between rounded-lg border border-border bg-white px-3.5 py-2.5 text-[12.5px] font-semibold hover:border-primary transition-colors"
                 >
                   <span>{f.industry}</span>
                   <b className="font-mono tabular-nums text-ink-faint">{f.count}</b>
+                </a>
+              ))}
+            </div>
+          </>
+        )}
+
+        {featured && featured.length > 0 && (
+          <>
+            <div className="flex items-center justify-between mt-9 mb-3">
+              <h2 className="font-extrabold text-lg">💛 Doanh nghiệp yêu thích</h2>
+              <a href="/viec-lam?featuredEmployerOnly=1" className="text-primary text-xs font-bold">
+                Xem tất cả →
+              </a>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {featured.map((c) => (
+                <a
+                  key={c.id}
+                  href={`/viec-lam?q=${encodeURIComponent(c.name)}`}
+                  className="rounded-xl border border-border bg-white p-4 flex items-center gap-3 hover:border-primary hover:shadow-sm transition-all"
+                >
+                  <div className="w-10 h-10 shrink-0 rounded-lg bg-primary-tint text-primary flex items-center justify-center font-bold text-xs">
+                    {companyInitials(c.name)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-bold text-[12.5px] truncate">{c.name}</div>
+                    <div className="text-ink-faint text-[11px]">{c.jobCount} việc làm đang tuyển</div>
+                  </div>
                 </a>
               ))}
             </div>

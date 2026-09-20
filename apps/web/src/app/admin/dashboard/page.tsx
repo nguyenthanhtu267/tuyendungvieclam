@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { adminApi, type AdminDashboard, type JobPosting, type Company, type Order } from '@/lib/api';
+import { adminApi, ApiError, type AdminDashboard, type JobPosting, type Company, type Order } from '@/lib/api';
 import { formatDate, formatSalary, formatCurrency, PAYMENT_METHOD_LABEL } from '@/lib/format';
 
 const NAV_ITEMS = [
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { id: 'jobs', label: '🗂 Duyệt tin' },
   { id: 'companies', label: '🏢 Duyệt công ty' },
   { id: 'orders', label: '💰 Đơn hàng' },
+  { id: 'users', label: '👤 Người dùng' },
 ];
 
 export default function AdminDashboardPage() {
@@ -90,7 +91,7 @@ export default function AdminDashboardPage() {
     }
   }
 
-  if (!me || (me.role !== 'admin' && me.role !== 'moderator')) return null;
+  if (!me || (me.role !== 'admin' && me.role !== 'moderator') || !token) return null;
 
   return (
     <main className="min-h-screen bg-bg grid md:grid-cols-[200px_1fr]">
@@ -242,7 +243,7 @@ export default function AdminDashboardPage() {
               </div>
             )}
           </>
-        ) : (
+        ) : tab === 'orders' ? (
           <>
             <h1 className="font-bold text-base mb-4">Đơn hàng chờ xác nhận thanh toán</h1>
             <div className="text-xs text-ink-faint -mt-2.5 mb-4">
@@ -293,9 +294,112 @@ export default function AdminDashboardPage() {
               </div>
             )}
           </>
+        ) : (
+          <UsersCard token={token} />
         )}
       </div>
     </main>
+  );
+}
+
+// Đợt 12a (20/09/2026) — Admin tra cứu tài khoản theo email và đặt lại mật khẩu tạm, thay cho
+// "quên mật khẩu" tự phục vụ qua email (Giai đoạn 1 không có email/SMS). Mật khẩu tạm chỉ hiển thị
+// 1 lần ngay sau khi tạo — Admin cần tự báo cho người dùng qua kênh ngoài hệ thống.
+function UsersCard({ token }: { token: string }) {
+  const [email, setEmail] = useState('');
+  const [user, setUser] = useState<{ id: string; email: string; fullName?: string; role: string; status: string } | null>(
+    null,
+  );
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setUser(null);
+    setTempPassword(null);
+    if (!email.trim()) return;
+    setLoading(true);
+    try {
+      const found = await adminApi.findUserByEmail(token, email.trim());
+      setUser(found);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Không tìm thấy tài khoản');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleReset() {
+    if (!user) return;
+    setLoading(true);
+    setError('');
+    try {
+      const result = await adminApi.resetUserPassword(token, user.id);
+      setTempPassword(result.tempPassword);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Không thể đặt lại mật khẩu');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <>
+      <h1 className="font-bold text-base mb-4">Tra cứu tài khoản & đặt lại mật khẩu</h1>
+      <div className="text-xs text-ink-faint -mt-2.5 mb-4 max-w-2xl">
+        Dùng khi người dùng quên mật khẩu và không tự đặt lại được (Giai đoạn 1 chưa gửi email/SMS).
+        Tìm tài khoản theo email, đặt lại thành mật khẩu tạm, rồi tự báo mật khẩu này cho người dùng qua kênh khác
+        (điện thoại, gặp trực tiếp...). Người dùng nên đổi lại mật khẩu ngay trong phần Cài đặt sau khi đăng nhập.
+      </div>
+      <div className="rounded-xl bg-white border border-border p-5 max-w-md">
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <input
+            type="email"
+            required
+            placeholder="Email tài khoản…"
+            className="tvl-input text-sm"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <button type="submit" disabled={loading} className="tvl-btn-primary !w-auto px-4 whitespace-nowrap">
+            Tìm
+          </button>
+        </form>
+        {error && <div className="text-critical text-xs font-semibold mt-3">{error}</div>}
+        {user && (
+          <div className="mt-4 text-xs flex flex-col gap-2">
+            <div>
+              <span className="text-ink-faint">Họ tên: </span>
+              <span className="font-bold">{user.fullName ?? '—'}</span>
+            </div>
+            <div>
+              <span className="text-ink-faint">Vai trò: </span>
+              <span className="font-bold">{user.role}</span>
+            </div>
+            <div>
+              <span className="text-ink-faint">Trạng thái: </span>
+              <span className="font-bold">{user.status}</span>
+            </div>
+            <button
+              onClick={handleReset}
+              disabled={loading}
+              className="tvl-btn-primary !w-auto px-4 mt-1.5 self-start"
+            >
+              Đặt lại mật khẩu (tạm)
+            </button>
+          </div>
+        )}
+        {tempPassword && (
+          <div className="mt-4 rounded-lg bg-warning-tint text-warning text-xs font-semibold px-3.5 py-2.5">
+            Mật khẩu tạm cho {user?.email}: <span className="font-mono">{tempPassword}</span>
+            <br />
+            Chỉ hiển thị 1 lần — hãy sao chép và báo ngay cho người dùng.
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 

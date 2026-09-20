@@ -14,6 +14,10 @@ export default function DangNhapPage() {
   const [tab, setTab] = useState<Tab>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Đợt 12a — "Quên mật khẩu?" trước đây là link chết (href="#"). Giai đoạn 1 không có email/SMS
+  // (quyết định phạm vi ban đầu) nên chưa có luồng tự phục vụ qua email; thay vào đó hướng dẫn
+  // liên hệ Admin để được đặt lại mật khẩu tạm (xem AdminService.resetUserPassword).
+  const [showForgotHelp, setShowForgotHelp] = useState(false);
 
   // Đăng nhập
   const [loginEmail, setLoginEmail] = useState('');
@@ -78,8 +82,9 @@ export default function DangNhapPage() {
               />
             </svg>
           </span>
-          <span className="text-lg font-bold">
-            tuyển dụng<b>việc làm</b>
+          {/* Đợt 12c (21/09/2026) — đồng bộ chữ logo "ĐĂNG TUYỂN MIỄN PHÍ" với header. */}
+          <span className="text-lg font-extrabold tracking-tight">
+            ĐĂNG TUYỂN <span className="text-accent">MIỄN PHÍ</span>
           </span>
         </div>
         <div>
@@ -155,10 +160,21 @@ export default function DangNhapPage() {
                 />
               </Field>
               <div className="text-right -mt-2">
-                <a className="text-xs font-semibold text-primary" href="#">
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-primary"
+                  onClick={() => setShowForgotHelp((v) => !v)}
+                >
                   Quên mật khẩu?
-                </a>
+                </button>
               </div>
+              {showForgotHelp && (
+                <div className="-mt-2 rounded-lg bg-surface-alt text-ink-muted text-xs px-3 py-2.5">
+                  Hệ thống hiện chưa hỗ trợ tự đặt lại mật khẩu qua email. Vui lòng liên hệ Admin (qua
+                  hotline/email hỗ trợ của công ty) để được cấp mật khẩu tạm, sau đó đổi lại mật khẩu
+                  ngay trong phần Cài đặt tài khoản sau khi đăng nhập.
+                </div>
+              )}
               <button type="submit" disabled={loading} className="tvl-btn-primary">
                 {loading ? 'Đang đăng nhập…' : 'Đăng nhập'}
               </button>

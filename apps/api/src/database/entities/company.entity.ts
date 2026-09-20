@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  Index,
 } from 'typeorm';
 import { CompanyUser } from './company-user.entity';
 import { JobPosting } from './job-posting.entity';
@@ -38,6 +39,7 @@ export class Company {
   @Column({ nullable: true })
   website?: string;
 
+  @Index()
   @Column({
     type: 'enum',
     enum: CompanyApprovalStatus,
@@ -54,6 +56,19 @@ export class Company {
 
   @Column({ name: 'legal_doc_external_link', nullable: true })
   legalDocExternalLink?: string;
+
+  // Nội dung tệp lưu trực tiếp trong CSDL (thay vì ổ đĩa máy chủ) — lý do giống CV.entity.ts:
+  // tránh mất tệp khi triển khai lên máy chủ miễn phí không có ổ đĩa cố định (đợt 7, 18/09/2026).
+  @Column({ name: 'legal_doc_data', type: 'bytea', nullable: true, select: false })
+  legalDocData?: Buffer;
+
+  @Column({ name: 'legal_doc_mime_type', nullable: true })
+  legalDocMimeType?: string;
+
+  // Đợt 10 — "Doanh nghiệp yêu thích" (toggle lọc + khối nổi bật trang chủ). Admin đánh dấu thủ công.
+  @Index()
+  @Column({ name: 'is_featured_employer', default: false })
+  isFeaturedEmployer: boolean;
 
   @OneToMany(() => CompanyUser, (companyUser) => companyUser.company)
   companyUsers?: CompanyUser[];

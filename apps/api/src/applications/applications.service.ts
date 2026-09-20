@@ -49,8 +49,12 @@ export class ApplicationsService {
   async listOwn(userId: string) {
     const profile = await this.profileRepo.findOne({ where: { userId } });
     if (!profile) return [];
+    // Đợt 11b — .withDeleted(): NTD "chuyển vào thùng rác" ở ATS của họ (mục #4) chỉ là cách họ tự
+    // sắp xếp hồ sơ ứng tuyển nhận được, KHÔNG được làm mất lịch sử ứng tuyển thật của ứng viên —
+    // ứng viên phải luôn thấy đơn mình đã nộp trong "Việc làm của tôi" dù NTD có xoá mềm phía họ.
     return this.applicationRepo
       .createQueryBuilder('application')
+      .withDeleted()
       .leftJoinAndSelect('application.jobPosting', 'job')
       .leftJoinAndSelect('job.company', 'company')
       .leftJoinAndSelect('application.cv', 'cv')
