@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { adminApi, ApiError, type AdminDashboard, type JobPosting, type Company, type Order } from '@/lib/api';
 import { formatDate, formatSalary, formatCurrency, PAYMENT_METHOD_LABEL } from '@/lib/format';
 import ChangePasswordCard from '@/components/ChangePasswordCard';
+import { scanJobContent } from '@/lib/content-moderation';
 
 // Đợt 12f (21/09/2026) — bổ sung mục "Đổi mật khẩu" tự phục vụ cho Admin, còn thiếu sót ở Đợt
 // 12a (lúc đó chỉ làm cho Ứng viên và Nhà tuyển dụng). Trước khi có mục này, Admin chỉ có thể
@@ -173,13 +174,45 @@ export default function AdminDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {pendingJobs.map((job) => (
-                        <tr key={job.id} className="border-t border-border">
-                          <td className="py-3 px-4 font-bold">{job.title}</td>
+                      {pendingJobs.map((job) => {
+                        const scan = scanJobContent(job.title, job.description, job.requirements);
+                        return (
+                        <tr key={job.id} className="border-t border-border align-top">
+                          <td className="py-3 px-4 font-bold">
+                            {job.title}
+                            {(scan.hasLink || scan.sensitiveHits.length > 0) && (
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {scan.hasLink && (
+                                  <span
+                                    className="font-semibold text-[10px] rounded-full bg-critical-tint text-critical px-2 py-0.5"
+                                    title={`Phát hiện link: ${scan.links.join(', ')}`}
+                                  >
+                                    ⚠ Có link
+                                  </span>
+                                )}
+                                {scan.sensitiveHits.length > 0 && (
+                                  <span
+                                    className="font-semibold text-[10px] rounded-full bg-warning-tint text-warning px-2 py-0.5"
+                                    title={`Từ khoá nghi vấn: ${scan.sensitiveHits.join(', ')}`}
+                                  >
+                                    ⚠ Từ khoá nhạy cảm ({scan.sensitiveHits.length})
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </td>
                           <td className="py-3 px-3 text-ink-faint">{job.company?.name}</td>
                           <td className="py-3 px-3 tabular-nums">{formatSalary(job.salaryMin, job.salaryMax)}</td>
                           <td className="py-3 px-3 tabular-nums whitespace-nowrap">{formatDate(job.createdAt)}</td>
                           <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <a
+                              href={`/admin/xem-tin/${job.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-block text-[11px] font-bold rounded-md bg-surface-alt text-ink px-2.5 py-1.5 mr-1.5"
+                            >
+                              Xem trước
+                            </a>
                             <button
                               disabled={busyId === job.id}
                               onClick={() => handleJobDecision(job.id, 'approve')}
@@ -196,7 +229,8 @@ export default function AdminDashboardPage() {
                             </button>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

@@ -733,6 +733,9 @@ export const adminApi = {
   dashboard: (token: string) => request<AdminDashboard>('/admin/dashboard', { headers: authHeaders(token) }),
   listPendingJobs: (token: string) =>
     request<JobPosting[]>('/admin/jobs/pending', { headers: authHeaders(token) }),
+  // Đợt 12i — xem trước đúng nội dung tin (kể cả tin CHƯA duyệt) trước khi Duyệt/Từ chối.
+  getJobForReview: (token: string, id: string) =>
+    request<JobPosting>(`/admin/jobs/${id}`, { headers: authHeaders(token) }),
   approveJob: (token: string, id: string) =>
     request<JobPosting>(`/admin/jobs/${id}/approve`, { method: 'PATCH', headers: authHeaders(token) }),
   rejectJob: (token: string, id: string) =>

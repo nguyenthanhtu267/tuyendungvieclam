@@ -71,16 +71,9 @@ export default function DangNhapPage() {
       {/* Trái: panel thương hiệu — theo màn A4 mockup */}
       <div className="hidden md:flex flex-col justify-between bg-primary text-white p-12">
         <div className="flex items-center gap-3">
+          {/* Đợt 12j (21/09/2026) — đổi biểu tượng logo từ icon dấu tích sang chữ "V" đơn giản. */}
           <span className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M4 14.5L10 8.5L14 12.5L20 6.5"
-                stroke="#fff"
-                strokeWidth="2.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <span className="text-white font-extrabold text-base leading-none select-none">V</span>
           </span>
           {/* Đợt 12c (21/09/2026) — đồng bộ chữ logo "ĐĂNG TUYỂN MIỄN PHÍ" với header. */}
           <span className="text-lg font-extrabold tracking-tight">

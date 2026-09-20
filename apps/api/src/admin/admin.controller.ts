@@ -23,6 +23,11 @@ export class AdminController {
     return this.adminService.listPendingJobs();
   }
 
+  @Get('jobs/:id')
+  getJobForReview(@Param('id') id: string) {
+    return this.adminService.getJobForReview(id);
+  }
+
   @Patch('jobs/:id/approve')
   approveJob(@Param('id') id: string) {
     return this.adminService.setJobStatus(id, JobApprovalStatus.APPROVED);

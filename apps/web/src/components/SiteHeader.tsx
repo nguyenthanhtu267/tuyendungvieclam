@@ -32,16 +32,10 @@ export default function SiteHeader() {
     <>
       <div className="flex items-center gap-4 px-4 sm:px-6 lg:px-10 h-16 border-b border-border bg-surface sticky top-0 z-30">
         <Link href="/" className="flex items-center gap-2 shrink-0">
+          {/* Đợt 12j (21/09/2026) — đổi biểu tượng logo từ icon dấu tích sang chữ "V" đơn giản
+              theo yêu cầu người dùng. */}
           <span className="w-7 h-7 rounded-md bg-primary flex items-center justify-center">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M4 14.5L10 8.5L14 12.5L20 6.5"
-                stroke="#fff"
-                strokeWidth="2.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <span className="text-white font-extrabold text-sm leading-none select-none">V</span>
           </span>
           {/* Đợt 12c (21/09/2026) — đổi chữ logo hiển thị thành lời kêu gọi "ĐĂNG TUYỂN MIỄN PHÍ"
               (quyết định người dùng: kích thích doanh nghiệp đăng tin tuyển dụng). Tên đăng ký thật

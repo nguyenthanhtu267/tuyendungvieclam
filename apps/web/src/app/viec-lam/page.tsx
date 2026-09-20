@@ -43,6 +43,13 @@ function JobSearchPage() {
   const [facets, setFacets] = useState<JobFacets | null>(null);
   const [districts, setDistricts] = useState<DistrictFacet[]>([]);
   const [loading, setLoading] = useState(true);
+  // Đợt 12i (21/09/2026) — "Địa điểm phổ biến" chỉ hiện Top 15-20 tỉnh nhiều tin nhất kèm nút
+  // "Xem thêm", tránh liệt kê tràn lan hết ~63 tỉnh (giống careerviet.vn). Sau khi sửa lỗi đếm gộp
+  // "Hà Nội | Hồ Chí Minh", số mục trả về đúng bằng số tỉnh thực có tin — cần giới hạn hiển thị.
+  const [showAllLocations, setShowAllLocations] = useState(false);
+  const [showAllIndustries, setShowAllIndustries] = useState(false);
+  const LOCATIONS_PREVIEW_COUNT = 18;
+  const INDUSTRIES_PREVIEW_COUNT = 18;
 
   useEffect(() => {
     setQInput(filters.q ?? '');
@@ -200,16 +207,26 @@ function JobSearchPage() {
                   Địa điểm phổ biến
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {facets.locations.map((f) => (
-                    <button
-                      key={f.location}
-                      onClick={() => updateParams({ location: f.location })}
-                      className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full border border-border-strong text-ink-muted hover:border-primary transition-colors"
-                    >
-                      {f.location} ({f.count})
-                    </button>
-                  ))}
+                  {(showAllLocations ? facets.locations : facets.locations.slice(0, LOCATIONS_PREVIEW_COUNT)).map(
+                    (f) => (
+                      <button
+                        key={f.location}
+                        onClick={() => updateParams({ location: f.location })}
+                        className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full border border-border-strong text-ink-muted hover:border-primary transition-colors"
+                      >
+                        {f.location} ({f.count})
+                      </button>
+                    ),
+                  )}
                 </div>
+                {facets.locations.length > LOCATIONS_PREVIEW_COUNT && (
+                  <button
+                    onClick={() => setShowAllLocations((v) => !v)}
+                    className="text-[11.5px] font-bold text-primary mt-2.5 hover:underline"
+                  >
+                    {showAllLocations ? 'Thu gọn' : `Xem thêm (${facets.locations.length - LOCATIONS_PREVIEW_COUNT})`}
+                  </button>
+                )}
               </div>
             )}
             {facets && facets.industries.length > 0 && (
@@ -218,16 +235,28 @@ function JobSearchPage() {
                   Ngành nghề phổ biến
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {facets.industries.map((f) => (
-                    <button
-                      key={f.industry}
-                      onClick={() => updateParams({ industries: [f.industry] })}
-                      className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full border border-border-strong text-ink-muted hover:border-primary transition-colors"
-                    >
-                      {f.industry} ({f.count})
-                    </button>
-                  ))}
+                  {(showAllIndustries ? facets.industries : facets.industries.slice(0, INDUSTRIES_PREVIEW_COUNT)).map(
+                    (f) => (
+                      <button
+                        key={f.industry}
+                        onClick={() => updateParams({ industries: [f.industry] })}
+                        className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full border border-border-strong text-ink-muted hover:border-primary transition-colors"
+                      >
+                        {f.industry} ({f.count})
+                      </button>
+                    ),
+                  )}
                 </div>
+                {facets.industries.length > INDUSTRIES_PREVIEW_COUNT && (
+                  <button
+                    onClick={() => setShowAllIndustries((v) => !v)}
+                    className="text-[11.5px] font-bold text-primary mt-2.5 hover:underline"
+                  >
+                    {showAllIndustries
+                      ? 'Thu gọn'
+                      : `Xem thêm (${facets.industries.length - INDUSTRIES_PREVIEW_COUNT})`}
+                  </button>
+                )}
               </div>
             )}
           </div>

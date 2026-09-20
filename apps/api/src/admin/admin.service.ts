@@ -60,6 +60,15 @@ export class AdminService {
     });
   }
 
+  // Đợt 12i (21/09/2026) — cho Admin xem trước đúng nội dung tin (kể cả tin CHƯA duyệt) trước khi
+  // bấm Duyệt/Từ chối, thay vì chỉ đọc vài dòng rút gọn trong bảng. Route công khai GET /jobs/:id
+  // chỉ trả về tin đã duyệt (approvalStatus = APPROVED) nên không dùng lại được cho mục đích này.
+  async getJobForReview(id: string) {
+    const job = await this.jobRepo.findOne({ where: { id }, relations: { company: true } });
+    if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng');
+    return job;
+  }
+
   async setJobStatus(id: string, status: JobApprovalStatus.APPROVED | JobApprovalStatus.REJECTED) {
     const job = await this.jobRepo.findOne({ where: { id } });
     if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng');

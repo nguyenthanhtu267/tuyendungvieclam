@@ -29,16 +29,9 @@ export default function EmployerHeader() {
   return (
     <div className="flex items-center gap-5 px-4 sm:px-6 lg:px-10 h-14 bg-primary text-white sticky top-0 z-30">
       <Link href="/nha-tuyen-dung/dashboard" className="flex items-center gap-2 shrink-0">
+        {/* Đợt 12j (21/09/2026) — đổi biểu tượng logo từ icon dấu tích sang chữ "V" đơn giản. */}
         <span className="w-[26px] h-[26px] rounded-md bg-white flex items-center justify-center">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M4 14.5L10 8.5L14 12.5L20 6.5"
-              stroke="#163B7A"
-              strokeWidth="2.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <span className="text-primary font-extrabold text-sm leading-none select-none">V</span>
         </span>
         {/* Đợt 12c (21/09/2026) — cùng đổi chữ "ĐĂNG TUYỂN MIỄN PHÍ" như SiteHeader, vì đây chính
             là khu vực NTD (đối tượng lời kêu gọi này nhắm tới) sẽ thấy nhiều nhất. */}

@@ -121,22 +121,41 @@ export class JobsService {
       .orderBy('count', 'DESC')
       .getRawMany();
 
+    // Đợt 12i (21/09/2026) — sửa lỗi thống kê "Địa điểm phổ biến": trước đây GROUP BY thẳng cột
+    // `location` (chuỗi hiển thị, có thể là "Hà Nội | Hồ Chí Minh" khi 1 tin đăng ở nhiều tỉnh),
+    // khiến tổ hợp nhiều tỉnh bị đếm gộp thành 1 mục riêng thay vì cộng vào từng tỉnh. Nay lấy cột
+    // `provinces` (mỗi tin lưu danh sách tỉnh/thành riêng biệt) của các tin khớp bộ lọc, tách và
+    // đếm từng tỉnh trong Node — 1 tin đăng ở N tỉnh sẽ cộng +1 cho cả N tỉnh đó, không tạo mục tổ
+    // hợp. Tin cũ (đợt 7, chưa có `provinces`) vẫn dùng lại `location` để không mất số liệu.
     const locationQb = this.applyFilters(this.baseQuery(), { ...query, provinces: undefined, location: undefined });
-    const locations = await locationQb
+    const locationRows: Array<{ provinces: string | null; location: string | null }> = await locationQb
       .clone()
-      .select('job.location', 'location')
-      .addSelect('COUNT(*)', 'count')
-      .andWhere('job.location IS NOT NULL')
-      .groupBy('job.location')
-      .orderBy('count', 'DESC')
+      .select('job.provinces', 'provinces')
+      .addSelect('job.location', 'location')
       .getRawMany();
+
+    const locationCounts = new Map<string, number>();
+    for (const row of locationRows) {
+      const raw = row.provinces
+        ? row.provinces.split(',')
+        : row.location
+          ? row.location.split('|')
+          : [];
+      const provinces = Array.from(new Set(raw.map((p) => p.trim()).filter(Boolean)));
+      for (const p of provinces) {
+        locationCounts.set(p, (locationCounts.get(p) ?? 0) + 1);
+      }
+    }
+    const locations = Array.from(locationCounts.entries())
+      .map(([location, count]) => ({ location, count }))
+      .sort((a, b) => b.count - a.count);
 
     const total = await this.applyFilters(this.baseQuery(), query).getCount();
 
     return {
       total,
       industries: industries.map((r) => ({ industry: r.industry, count: Number(r.count) })),
-      locations: locations.map((r) => ({ location: r.location, count: Number(r.count) })),
+      locations,
     };
   }
 
