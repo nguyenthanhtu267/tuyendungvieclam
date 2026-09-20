@@ -10,6 +10,7 @@ import { User, UserRole } from '../database/entities/user.entity';
 import { ServicePackage } from '../database/entities/service-package.entity';
 import { Order, OrderStatus } from '../database/entities/order.entity';
 import { CreateJobDto } from './dto/create-job.dto';
+import { UpdateJobDto } from './dto/update-job.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CreateSubAccountDto } from './dto/create-sub-account.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -230,7 +231,9 @@ export class EmployerService {
 
   private async getOwnedJob(userId: string, jobId: string): Promise<JobPosting> {
     const companyId = await this.getCompanyIdForUser(userId);
-    const job = await this.jobRepo.findOne({ where: { id: jobId } });
+    // Đợt 12l (21/09/2026) — nạp thêm quan hệ company để trang Xem trước (NTD) có đủ thông tin
+    // công ty hiển thị giống hệt trang chi tiết tin công khai, không cần truy vấn thêm.
+    const job = await this.jobRepo.findOne({ where: { id: jobId }, relations: { company: true } });
     if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng');
     if (job.companyId !== companyId) {
       throw new ForbiddenException('Bạn không có quyền truy cập tin tuyển dụng này');
@@ -240,6 +243,44 @@ export class EmployerService {
 
   async getJob(userId: string, jobId: string) {
     return this.getOwnedJob(userId, jobId);
+  }
+
+  // Đợt 12l (21/09/2026) — sửa tin đã đăng: chỉ gán lại những trường THỰC SỰ có mặt trong dto (kể
+  // cả khi giá trị là null, để NTD có thể "xoá" một trường tuỳ chọn — VD bật lại "Thoả thuận" thì
+  // salaryMin/salaryMax gửi null để xoá số cũ). Sau khi lưu, tin luôn quay về PENDING chờ Admin
+  // duyệt lại — theo quyết định người dùng chốt đợt 12l (nhất quán với "Sao chép tin").
+  private static readonly EDITABLE_JOB_FIELDS = [
+    'title',
+    'industry',
+    'location',
+    'provinces',
+    'district',
+    'experienceLevel',
+    'isUrgent',
+    'salaryMin',
+    'salaryMax',
+    'employmentType',
+    'level',
+    'headcount',
+    'description',
+    'requirements',
+    'benefits',
+    'deadline',
+    'address',
+    'gender',
+    'ageRange',
+    'workSchedule',
+  ] as const;
+
+  async updateJob(userId: string, jobId: string, dto: UpdateJobDto) {
+    const job = await this.getOwnedJob(userId, jobId);
+    for (const key of EmployerService.EDITABLE_JOB_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(dto, key)) {
+        (job as unknown as Record<string, unknown>)[key] = dto[key];
+      }
+    }
+    job.approvalStatus = JobApprovalStatus.PENDING;
+    return this.jobRepo.save(job);
   }
 
   // Đợt 11b — Mục #4 ATS: bộ lọc nâng cao (trạng thái, thư mục, đánh giá tối thiểu, từ khoá, khoảng

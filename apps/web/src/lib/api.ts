@@ -126,6 +126,8 @@ export interface JobPosting {
   ageRange?: string;
   workSchedule?: string;
   approvalStatus?: JobApprovalStatus;
+  // Đợt 12l (21/09/2026) — dùng ở trang Xem trước NTD để hiện đúng trạng thái "Tạm ngưng".
+  isPaused?: boolean;
   createdAt: string;
   updatedAt?: string;
   company: Company;
@@ -564,8 +566,10 @@ export interface CreateJobPayload {
   district?: string;
   experienceLevel?: string;
   isUrgent?: boolean;
-  salaryMin?: number;
-  salaryMax?: number;
+  // Đợt 12l (21/09/2026) — `null` cho phép trang Sửa tin XOÁ mức lương cũ khi bật lại "Thoả thuận"
+  // (updateJob() ở backend chỉ ghi đè trường có mặt trong body — gửi null nghĩa là xoá).
+  salaryMin?: number | null;
+  salaryMax?: number | null;
   employmentType?: string;
   level?: string;
   headcount?: number;
@@ -685,6 +689,14 @@ export const employerApi = {
     }),
   getJob: (token: string, id: string) =>
     request<JobPosting>(`/employer/jobs/${id}`, { headers: authHeaders(token) }),
+  // Đợt 12l (21/09/2026) — sửa tin đã đăng. Chỉ gửi trường thay đổi; backend luôn đưa tin về PENDING
+  // chờ Admin duyệt lại sau khi lưu.
+  updateJob: (token: string, id: string, dto: Partial<CreateJobPayload>) =>
+    request<JobPosting>(`/employer/jobs/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(dto),
+    }),
   pauseJob: (token: string, id: string) =>
     request<EmployerJob>(`/employer/jobs/${id}/pause`, { method: 'PATCH', headers: authHeaders(token) }),
   resumeJob: (token: string, id: string) =>

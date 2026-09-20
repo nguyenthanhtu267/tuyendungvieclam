@@ -16,6 +16,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { EmployerService } from './employer.service';
 import { CreateJobDto } from './dto/create-job.dto';
+import { UpdateJobDto } from './dto/update-job.dto';
 import { UpdateApplicationStatusDto } from './dto/update-application-status.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CreateLegalDocLinkDto } from './dto/create-legal-doc-link.dto';
@@ -131,6 +132,16 @@ export class EmployerController {
   @Get('employer/jobs/:id')
   getJob(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
     return this.employerService.getJob(user.userId, id);
+  }
+
+  // Đợt 12l (21/09/2026) — NTD sửa tin đã đăng. Lưu xong luôn quay về PENDING chờ Admin duyệt lại.
+  @Patch('employer/jobs/:id')
+  updateJob(
+    @CurrentUser() user: { userId: string },
+    @Param('id') id: string,
+    @Body() dto: UpdateJobDto,
+  ) {
+    return this.employerService.updateJob(user.userId, id, dto);
   }
 
   @Patch('employer/jobs/:id/pause')

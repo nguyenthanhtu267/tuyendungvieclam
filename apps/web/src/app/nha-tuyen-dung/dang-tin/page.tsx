@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import EmployerHeader from '@/components/EmployerHeader';
 import { useAuth } from '@/lib/auth-context';
@@ -76,21 +76,69 @@ const INITIAL: FormState = {
   deadline: '',
 };
 
-export default function DangTinPage() {
+// Đợt 12l (21/09/2026) — dùng chung wizard này cho cả "Đăng tin mới" và "Sửa tin" (nút Sửa ở trang
+// Quản lý tin đăng dẫn tới đây kèm ?edit=<id>): khi có editId, nạp sẵn dữ liệu tin cũ vào form, đổi
+// nhãn nút/thông báo cho phù hợp, và gọi updateJob() thay vì createJob() khi gửi.
+function DangTinInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get('edit');
   const { me, token } = useAuth();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(INITIAL);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [loadingEdit, setLoadingEdit] = useState(!!editId);
 
   useEffect(() => {
     if (me === null) router.replace('/dang-nhap');
     else if (me && !me.role.startsWith('employer')) router.replace('/');
   }, [me, router]);
 
+  useEffect(() => {
+    if (!editId || !token) return;
+    setLoadingEdit(true);
+    employerApi
+      .getJob(token, editId)
+      .then((job) => {
+        setForm({
+          title: job.title ?? '',
+          headcount: String(job.headcount ?? 1),
+          industries: job.industry ? [job.industry] : [],
+          level: job.level ?? LEVELS[2],
+          employmentType: job.employmentType ?? EMPLOYMENT_TYPES[0],
+          experienceLevel: job.experienceLevel ?? EXPERIENCE_LEVELS[3],
+          provinces: job.provinces ?? [],
+          district: job.district ?? '',
+          address: job.address ?? '',
+          gender: job.gender ?? GENDER_OPTIONS[0],
+          ageRange: job.ageRange ?? '',
+          workSchedule: job.workSchedule ?? '',
+          isUrgent: job.isUrgent ?? false,
+          salaryMin: job.salaryMin != null ? String(job.salaryMin) : '',
+          salaryMax: job.salaryMax != null ? String(job.salaryMax) : '',
+          negotiable: job.salaryMin == null && job.salaryMax == null,
+          description: job.description ?? '',
+          requirements: job.requirements ?? '',
+          benefits: job.benefits ?? [],
+          deadline: job.deadline ?? '',
+        });
+      })
+      .catch((err) => setError(err instanceof ApiError ? err.message : 'Không thể tải tin để sửa'))
+      .finally(() => setLoadingEdit(false));
+  }, [editId, token]);
+
   if (!me || !me.role.startsWith('employer')) return null;
+
+  if (loadingEdit) {
+    return (
+      <main className="min-h-screen bg-bg">
+        <EmployerHeader />
+        <div className="max-w-2xl mx-auto px-4 py-24 text-center text-ink-faint text-sm">Đang tải tin để sửa...</div>
+      </main>
+    );
+  }
 
   function toggle(list: string[], value: string, max?: number): string[] {
     if (list.includes(value)) return list.filter((v) => v !== value);
@@ -107,32 +155,42 @@ export default function DangTinPage() {
     if (!token) return;
     setSubmitting(true);
     setError(null);
+    // Đợt 12l — khi sửa tin, salaryMin/salaryMax gửi `null` (thay vì bỏ qua) lúc bật "Thoả thuận",
+    // để backend biết cần XOÁ giá trị cũ chứ không phải giữ nguyên (xem updateJob() ở employer.service.ts).
+    const payload = {
+      title: form.title,
+      industry: form.industries[0],
+      location: form.provinces.length ? form.provinces.join(', ') : undefined,
+      provinces: form.provinces.length ? form.provinces : undefined,
+      district: form.district || undefined,
+      address: form.address.trim() || undefined,
+      gender: form.gender || undefined,
+      ageRange: form.ageRange.trim() || undefined,
+      workSchedule: form.workSchedule.trim() || undefined,
+      experienceLevel: form.experienceLevel || undefined,
+      isUrgent: form.isUrgent,
+      salaryMin: form.negotiable || !form.salaryMin ? (editId ? null : undefined) : Number(form.salaryMin),
+      salaryMax: form.negotiable || !form.salaryMax ? (editId ? null : undefined) : Number(form.salaryMax),
+      employmentType: form.employmentType,
+      level: form.level,
+      headcount: Number(form.headcount) || 1,
+      description: form.description || undefined,
+      requirements: form.requirements || undefined,
+      benefits: form.benefits.length ? form.benefits : undefined,
+      deadline: form.deadline || undefined,
+    };
     try {
-      await employerApi.createJob(token, {
-        title: form.title,
-        industry: form.industries[0],
-        location: form.provinces.length ? form.provinces.join(', ') : undefined,
-        provinces: form.provinces.length ? form.provinces : undefined,
-        district: form.district || undefined,
-        address: form.address.trim() || undefined,
-        gender: form.gender || undefined,
-        ageRange: form.ageRange.trim() || undefined,
-        workSchedule: form.workSchedule.trim() || undefined,
-        experienceLevel: form.experienceLevel || undefined,
-        isUrgent: form.isUrgent,
-        salaryMin: form.negotiable || !form.salaryMin ? undefined : Number(form.salaryMin),
-        salaryMax: form.negotiable || !form.salaryMax ? undefined : Number(form.salaryMax),
-        employmentType: form.employmentType,
-        level: form.level,
-        headcount: Number(form.headcount) || 1,
-        description: form.description || undefined,
-        requirements: form.requirements || undefined,
-        benefits: form.benefits.length ? form.benefits : undefined,
-        deadline: form.deadline || undefined,
-      });
+      if (editId) await employerApi.updateJob(token, editId, payload);
+      else await employerApi.createJob(token, payload);
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể đăng tin, vui lòng thử lại');
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : editId
+            ? 'Không thể lưu thay đổi, vui lòng thử lại'
+            : 'Không thể đăng tin, vui lòng thử lại',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -144,9 +202,11 @@ export default function DangTinPage() {
         <EmployerHeader />
         <div className="max-w-lg mx-auto px-4 py-24 text-center flex flex-col items-center gap-4">
           <div className="w-14 h-14 rounded-full bg-success-tint text-success flex items-center justify-center text-2xl">✓</div>
-          <h1 className="font-extrabold text-lg">Đã gửi tin để duyệt!</h1>
+          <h1 className="font-extrabold text-lg">{editId ? 'Đã lưu thay đổi!' : 'Đã gửi tin để duyệt!'}</h1>
           <p className="text-sm text-ink-faint">
-            Tin tuyển dụng &quot;{form.title}&quot; đã được gửi cho Admin xét duyệt. Tin sẽ hiển thị trong tìm kiếm việc làm ngay sau khi được duyệt (thường trong vòng 24 giờ).
+            {editId
+              ? `Thay đổi cho tin "${form.title}" đã được lưu và gửi lại cho Admin xét duyệt. Tin sẽ hiển thị lại trong tìm kiếm việc làm ngay sau khi được duyệt (thường trong vòng 24 giờ).`
+              : `Tin tuyển dụng "${form.title}" đã được gửi cho Admin xét duyệt. Tin sẽ hiển thị trong tìm kiếm việc làm ngay sau khi được duyệt (thường trong vòng 24 giờ).`}
           </p>
           {/* Đợt 12e (21/09/2026) — chia sẻ Facebook: link công khai chỉ xem được sau khi Admin
               duyệt, nên chưa mở popup chia sẻ ngay ở đây (link sẽ báo "không tìm thấy") — hướng
@@ -159,11 +219,16 @@ export default function DangTinPage() {
             để chia sẻ tin lên Facebook cá nhân — giúp tiếp cận thêm nhiều ứng viên.
           </p>
           <div className="flex gap-3 mt-2">
-            <button className="tvl-btn-ghost !w-auto px-5" onClick={() => { setForm(INITIAL); setStep(0); setSuccess(false); }}>
-              Đăng tin khác
-            </button>
-            <button className="tvl-btn-primary !w-auto px-5" onClick={() => router.push('/nha-tuyen-dung/dashboard')}>
-              Về Dashboard
+            {!editId && (
+              <button className="tvl-btn-ghost !w-auto px-5" onClick={() => { setForm(INITIAL); setStep(0); setSuccess(false); }}>
+                Đăng tin khác
+              </button>
+            )}
+            <button
+              className="tvl-btn-primary !w-auto px-5"
+              onClick={() => router.push(editId ? '/nha-tuyen-dung/tin-dang' : '/nha-tuyen-dung/dashboard')}
+            >
+              {editId ? 'Về Quản lý tin đăng' : 'Về Dashboard'}
             </button>
           </div>
         </div>
@@ -371,7 +436,9 @@ export default function DangTinPage() {
                 {form.deadline && <div className="text-[11px] text-ink-faint mt-2.5">Hạn nộp {form.deadline}</div>}
               </div>
               <div className="text-[11px] text-ink-faint">
-                Kiểm tra lại thông tin ở 3 bước trước — sau khi gửi, tin sẽ chờ Admin duyệt trước khi hiển thị trong tìm kiếm việc làm.
+                {editId
+                  ? 'Kiểm tra lại thông tin ở 3 bước trước — sau khi lưu, tin sẽ quay về trạng thái chờ Admin duyệt lại trước khi hiển thị trong tìm kiếm việc làm.'
+                  : 'Kiểm tra lại thông tin ở 3 bước trước — sau khi gửi, tin sẽ chờ Admin duyệt trước khi hiển thị trong tìm kiếm việc làm.'}
               </div>
             </>
           )}
@@ -386,13 +453,21 @@ export default function DangTinPage() {
               </button>
             ) : (
               <button type="button" disabled={submitting} onClick={handleSubmit} className="tvl-btn-accent !w-auto px-5">
-                {submitting ? 'Đang gửi…' : 'Gửi đăng tin →'}
+                {submitting ? 'Đang lưu…' : editId ? 'Cập nhật tin đăng →' : 'Gửi đăng tin →'}
               </button>
             )}
           </div>
         </div>
       </div>
     </main>
+  );
+}
+
+export default function DangTinPage() {
+  return (
+    <Suspense fallback={null}>
+      <DangTinInner />
+    </Suspense>
   );
 }
 

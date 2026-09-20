@@ -179,6 +179,24 @@ export default function TinDangPage() {
                             >
                               Xem ứng viên
                             </Link>
+                            {/* Đợt 12l (21/09/2026) — "Xem trước" mở tab mới, xem tin đúng như ứng
+                                viên sẽ thấy, hoạt động với MỌI trạng thái (kể cả chờ duyệt/tạm ngưng)
+                                vì dùng trang preview riêng của NTD (/nha-tuyen-dung/xem-tin/[id]),
+                                khác trang công khai /viec-lam/[id] chỉ xem được khi tin đang đăng. */}
+                            <Link
+                              href={`/nha-tuyen-dung/xem-tin/${job.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded-lg border border-border px-2.5 py-1.5 font-semibold text-ink-muted hover:bg-surface-alt whitespace-nowrap"
+                            >
+                              Xem trước
+                            </Link>
+                            <Link
+                              href={`/nha-tuyen-dung/dang-tin?edit=${job.id}`}
+                              className="rounded-lg border border-border px-2.5 py-1.5 font-semibold text-ink-muted hover:bg-surface-alt whitespace-nowrap"
+                            >
+                              Sửa
+                            </Link>
                             {/* Đợt 12e — chỉ hiện khi tin đang đăng công khai thật (link mới xem được,
                                 khớp với jobs.service.ts baseQuery: approvalStatus=APPROVED && !isPaused). */}
                             {status === 'dang_dang' && (
