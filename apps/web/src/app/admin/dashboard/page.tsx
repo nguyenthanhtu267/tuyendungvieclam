@@ -5,13 +5,20 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { adminApi, ApiError, type AdminDashboard, type JobPosting, type Company, type Order } from '@/lib/api';
 import { formatDate, formatSalary, formatCurrency, PAYMENT_METHOD_LABEL } from '@/lib/format';
+import ChangePasswordCard from '@/components/ChangePasswordCard';
 
+// Đợt 12f (21/09/2026) — bổ sung mục "Đổi mật khẩu" tự phục vụ cho Admin, còn thiếu sót ở Đợt
+// 12a (lúc đó chỉ làm cho Ứng viên và Nhà tuyển dụng). Trước khi có mục này, Admin chỉ có thể
+// dùng chức năng "Người dùng → Đặt lại mật khẩu (tạm)" để tự đặt lại cho chính mình (mật khẩu
+// ngẫu nhiên hệ thống sinh ra) — vẫn dùng được để khoá ngay mật khẩu mẫu, nhưng không tự chọn
+// được mật khẩu mong muốn như mục này.
 const NAV_ITEMS = [
   { id: 'overview', label: '📊 Tổng quan' },
   { id: 'jobs', label: '🗂 Duyệt tin' },
   { id: 'companies', label: '🏢 Duyệt công ty' },
   { id: 'orders', label: '💰 Đơn hàng' },
   { id: 'users', label: '👤 Người dùng' },
+  { id: 'settings', label: '🔒 Đổi mật khẩu' },
 ];
 
 export default function AdminDashboardPage() {
@@ -294,8 +301,15 @@ export default function AdminDashboardPage() {
               </div>
             )}
           </>
-        ) : (
+        ) : tab === 'users' ? (
           <UsersCard token={token} />
+        ) : (
+          <>
+            <h1 className="font-bold text-base mb-4">Đổi mật khẩu</h1>
+            <div className="max-w-md">
+              <ChangePasswordCard token={token} />
+            </div>
+          </>
         )}
       </div>
     </main>
