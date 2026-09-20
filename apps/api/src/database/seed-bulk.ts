@@ -40,14 +40,21 @@ import {
   SkillLevel,
 } from './entities/candidate-sections.entity';
 import * as entities from './entities';
+import { isProduction } from '../config/env-guard';
 
 const entityList = Object.values(entities).filter((e) => typeof e === 'function') as any[];
 
+// Đợt 12g (21/09/2026) — sửa lỗi "column ... does not exist" khi chạy seed:bulk trên CSDL thật:
+// script này tự mở 1 kết nối CSDL RIÊNG (không đi qua app.module.ts), nên trước đó luôn cố định
+// synchronize: false bất kể môi trường — khiến các cột được thêm ở đợt trước (ví dụ legal_doc_data,
+// đợt 7) nhưng chưa từng triển khai lên CSDL thật không được tự tạo ra trước khi insert dữ liệu ảo.
+// Nay đổi để khớp đúng quy tắc chung của app.module.ts (chỉ đồng bộ khi NODE_ENV khác 'production'),
+// giúp CSDL thật tự vá đủ cột thiếu trong lần chạy seed:bulk đầu tiên (khi NODE_ENV tạm chưa đặt).
 const dataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
   entities: entityList,
-  synchronize: false,
+  synchronize: !isProduction(),
 });
 
 // ---------------------------------------------------------------------------------------------
