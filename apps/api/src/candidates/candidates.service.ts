@@ -5,9 +5,11 @@ import { CandidateProfile } from '../database/entities/candidate-profile.entity'
 import { CV, CvType } from '../database/entities/cv.entity';
 import { SavedJob } from '../database/entities/saved-job.entity';
 import { BlockedCompany } from '../database/entities/blocked-company.entity';
-import { JobPosting } from '../database/entities/job-posting.entity';
+import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
+import { SearchHistory } from '../database/entities/search-history.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { BlockCompanyDto } from './dto/block-company.dto';
+import { SaveSearchDto } from './dto/save-search.dto';
 
 const CV_MAX_BYTES = 2 * 1024 * 1024; // 2MB — theo Mục 9 SRS
 
@@ -24,6 +26,8 @@ export class CandidatesService {
     private readonly blockedCompanyRepo: Repository<BlockedCompany>,
     @InjectRepository(JobPosting)
     private readonly jobRepo: Repository<JobPosting>,
+    @InjectRepository(SearchHistory)
+    private readonly searchHistoryRepo: Repository<SearchHistory>,
   ) {}
 
   async getOwnProfile(userId: string): Promise<CandidateProfile> {
@@ -183,5 +187,111 @@ export class CandidatesService {
     const row = await this.blockedCompanyRepo.findOne({ where: { id: blockId } });
     if (!row || row.candidateProfileId !== profile.id) throw new ForbiddenException();
     await this.blockedCompanyRepo.remove(row);
+  }
+
+  // Đợt 12m (21/09/2026) — "Tìm kiếm đã lưu" (Job alert): bảng search_histories vốn có sẵn nhưng
+  // trước đây không module nào đọc/ghi. owner_type cố định 'candidate_profile' để tách khỏi lượt
+  // dùng của NTD tìm hồ sơ (owner_type 'company', nếu sau này cần). Khi có tin mới được Admin duyệt
+  // khớp tiêu chí đã lưu, notifyJobAlertMatches() ở admin.service.ts sẽ báo qua chuông thông báo.
+  async listSavedSearches(userId: string) {
+    const profile = await this.getOwnProfile(userId);
+    return this.searchHistoryRepo.find({
+      where: { ownerType: 'candidate_profile', ownerId: profile.id },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async saveSearch(userId: string, dto: SaveSearchDto) {
+    const profile = await this.getOwnProfile(userId);
+    return this.searchHistoryRepo.save(
+      this.searchHistoryRepo.create({
+        ownerType: 'candidate_profile',
+        ownerId: profile.id,
+        criteria: dto.criteria,
+        resultCount: dto.resultCount ?? 0,
+      }),
+    );
+  }
+
+  async removeSavedSearch(userId: string, id: string) {
+    const profile = await this.getOwnProfile(userId);
+    const row = await this.searchHistoryRepo.findOne({ where: { id } });
+    if (!row || row.ownerType !== 'candidate_profile' || row.ownerId !== profile.id) {
+      throw new ForbiddenException();
+    }
+    await this.searchHistoryRepo.remove(row);
+  }
+
+  // Đợt 12p (21/09/2026) — Batch 4 mục #2 "Gợi ý việc làm thông minh hơn": thay vì chỉ tìm chuỗi
+  // theo "Vị trí mong muốn" (cách cũ, xem lịch sử ho-so/page.tsx trước đợt này), chấm điểm mỗi tin
+  // theo NHIỀU tiêu chí khớp với hồ sơ ứng viên — ngành nghề, địa điểm, hình thức làm việc, cấp bậc,
+  // kỹ năng/vị trí mong muốn (khớp tiêu đề tin) — cộng dồn điểm rồi sắp theo điểm cao nhất, mới nhất.
+  // Chỉ trả tin có điểm > 0 (khớp ít nhất 1 tiêu chí) để tránh gợi ý ngẫu nhiên không liên quan.
+  async getRecommendedJobs(userId: string, limit = 6) {
+    const profile = await this.profileRepo.findOne({ where: { userId }, relations: { skills: true } });
+    if (!profile) throw new NotFoundException('Không tìm thấy hồ sơ ứng viên');
+
+    const industries = (profile.desiredIndustries ?? []).filter(Boolean);
+    const locations = [...(profile.desiredLocations ?? []), profile.province].filter(Boolean) as string[];
+    const jobTypes = (profile.desiredJobTypes ?? []).filter(Boolean);
+    const skillNames = (profile.skills ?? []).map((s) => s.skillName).filter(Boolean);
+    const keywords = [profile.desiredPosition, ...skillNames].filter(Boolean) as string[];
+
+    // Hồ sơ chưa đủ thông tin để gợi ý có ý nghĩa — trả rỗng, FE hiện hướng dẫn điền hồ sơ.
+    if (!industries.length && !locations.length && !jobTypes.length && !keywords.length && !profile.desiredLevel) {
+      return [];
+    }
+
+    const blocked = await this.blockedCompanyRepo.find({ where: { candidateProfileId: profile.id } });
+    const blockedCompanyIds = blocked.map((b) => b.companyId);
+
+    const qb = this.jobRepo
+      .createQueryBuilder('job')
+      .leftJoinAndSelect('job.company', 'company')
+      .where('job.approvalStatus = :status', { status: JobApprovalStatus.APPROVED })
+      .andWhere('job.isPaused = false');
+
+    if (blockedCompanyIds.length) {
+      qb.andWhere('job.companyId NOT IN (:...blockedCompanyIds)', { blockedCompanyIds });
+    }
+
+    const scoreParts: string[] = [];
+    if (industries.length) {
+      qb.setParameter('industries', industries);
+      scoreParts.push('(CASE WHEN job.industry IN (:...industries) THEN 3 ELSE 0 END)');
+    }
+    if (locations.length) {
+      const locConds = locations.map((_, i) => `job.provinces ILIKE :loc${i}`);
+      locations.forEach((v, i) => qb.setParameter(`loc${i}`, `%${v}%`));
+      scoreParts.push(`(CASE WHEN (${locConds.join(' OR ')}) THEN 3 ELSE 0 END)`);
+    }
+    if (jobTypes.length) {
+      qb.setParameter('jobTypes', jobTypes);
+      scoreParts.push('(CASE WHEN job.employmentType IN (:...jobTypes) THEN 2 ELSE 0 END)');
+    }
+    if (profile.desiredLevel) {
+      qb.setParameter('level', profile.desiredLevel);
+      scoreParts.push('(CASE WHEN job.level = :level THEN 2 ELSE 0 END)');
+    }
+    if (keywords.length) {
+      const kwConds = keywords.map((_, i) => `job.title ILIKE :kw${i}`);
+      keywords.forEach((v, i) => qb.setParameter(`kw${i}`, `%${v}%`));
+      scoreParts.push(`(CASE WHEN (${kwConds.join(' OR ')}) THEN 2 ELSE 0 END)`);
+    }
+    if (profile.desiredSalaryMin) {
+      qb.setParameter('salaryMin', profile.desiredSalaryMin);
+      scoreParts.push('(CASE WHEN job.salaryMax IS NULL OR job.salaryMax >= :salaryMin THEN 1 ELSE 0 END)');
+    }
+
+    const scoreExpr = scoreParts.length ? scoreParts.join(' + ') : '0';
+
+    const jobs = await qb
+      .andWhere(`(${scoreExpr}) > 0`)
+      .orderBy(scoreExpr, 'DESC')
+      .addOrderBy('job.createdAt', 'DESC')
+      .take(limit)
+      .getMany();
+
+    return jobs;
   }
 }

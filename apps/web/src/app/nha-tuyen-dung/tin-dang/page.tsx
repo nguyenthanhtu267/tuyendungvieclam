@@ -141,7 +141,9 @@ export default function TinDangPage() {
                     <th className="py-2.5 px-3 font-semibold">Ngày đăng</th>
                     <th className="py-2.5 px-3 font-semibold">Hạn nộp</th>
                     <th className="py-2.5 px-3 font-semibold">Trạng thái</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">Lượt xem</th>
                     <th className="py-2.5 px-3 font-semibold text-right">Hồ sơ</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">Tỷ lệ chuyển đổi</th>
                     <th className="py-2.5 px-4 font-semibold text-right">Thao tác</th>
                   </tr>
                 </thead>
@@ -163,6 +165,7 @@ export default function TinDangPage() {
                             {EMPLOYER_JOB_STATUS_LABEL[status]}
                           </span>
                         </td>
+                        <td className="py-3 px-3 text-right tabular-nums text-ink-faint">{job.viewCount ?? 0}</td>
                         <td className="py-3 px-3 text-right tabular-nums">
                           <Link
                             href={`/nha-tuyen-dung/ung-vien?jobId=${job.id}`}
@@ -170,6 +173,11 @@ export default function TinDangPage() {
                           >
                             {job.applicationCount}
                           </Link>
+                        </td>
+                        {/* Đợt 12p (21/09/2026) — Batch 4 mục #1: hồ sơ nhận được / lượt xem, chỉ tính
+                            khi đã có ít nhất 1 lượt xem (tránh chia 0 hiện "0%" gây hiểu nhầm tin ế). */}
+                        <td className="py-3 px-3 text-right tabular-nums text-ink-faint">
+                          {job.viewCount ? `${Math.round((job.applicationCount / job.viewCount) * 100)}%` : '—'}
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex justify-end gap-2 flex-wrap">

@@ -1,7 +1,8 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Application } from '../database/entities/application.entity';
+import { ApplicationStatusHistory } from '../database/entities/application-status-history.entity';
 import { CandidateProfile } from '../database/entities/candidate-profile.entity';
 import { CV } from '../database/entities/cv.entity';
 import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
@@ -11,6 +12,8 @@ import { ApplyJobDto } from './dto/apply-job.dto';
 export class ApplicationsService {
   constructor(
     @InjectRepository(Application) private readonly applicationRepo: Repository<Application>,
+    @InjectRepository(ApplicationStatusHistory)
+    private readonly historyRepo: Repository<ApplicationStatusHistory>,
     @InjectRepository(CandidateProfile) private readonly profileRepo: Repository<CandidateProfile>,
     @InjectRepository(CV) private readonly cvRepo: Repository<CV>,
     @InjectRepository(JobPosting) private readonly jobRepo: Repository<JobPosting>,
@@ -43,7 +46,11 @@ export class ApplicationsService {
       cvId: cv.id,
       coverLetter: dto.coverLetter,
     });
-    return this.applicationRepo.save(application);
+    const saved = await this.applicationRepo.save(application);
+    // Đợt 12o (21/09/2026) — ghi dòng đầu tiên của "Nhật ký trạng thái ứng tuyển" ngay khi nộp hồ
+    // sơ (status mặc định 'new'), để ứng viên thấy đủ dòng thời gian ngay từ lúc ứng tuyển.
+    await this.historyRepo.save(this.historyRepo.create({ applicationId: saved.id, status: saved.status }));
+    return saved;
   }
 
   async listOwn(userId: string) {
@@ -61,5 +68,23 @@ export class ApplicationsService {
       .where('cv.candidateProfileId = :profileId', { profileId: profile.id })
       .orderBy('application.appliedAt', 'DESC')
       .getMany();
+  }
+
+  // Đợt 12o (21/09/2026) — "Nhật ký trạng thái ứng tuyển": ứng viên xem dòng thời gian xử lý đơn
+  // ứng tuyển của chính mình (mỗi lần NTD đổi trạng thái đều được ghi lại, xem
+  // EmployerService.updateApplicationStatus()).
+  async getHistory(userId: string, applicationId: string): Promise<ApplicationStatusHistory[]> {
+    const profile = await this.profileRepo.findOne({ where: { userId } });
+    if (!profile) throw new NotFoundException('Không tìm thấy hồ sơ ứng viên');
+    const application = await this.applicationRepo
+      .createQueryBuilder('application')
+      .withDeleted()
+      .leftJoinAndSelect('application.cv', 'cv')
+      .where('application.id = :applicationId', { applicationId })
+      .getOne();
+    if (!application || application.cv?.candidateProfileId !== profile.id) {
+      throw new ForbiddenException('Bạn không có quyền xem đơn ứng tuyển này');
+    }
+    return this.historyRepo.find({ where: { applicationId }, order: { createdAt: 'ASC' } });
   }
 }

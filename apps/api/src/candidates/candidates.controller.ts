@@ -19,6 +19,7 @@ import { CandidatesService } from './candidates.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { CreateCvLinkDto } from './dto/create-cv-link.dto';
 import { BlockCompanyDto } from './dto/block-company.dto';
+import { SaveSearchDto } from './dto/save-search.dto';
 
 const ALLOWED_CV_MIME = new Set([
   'application/pdf',
@@ -109,5 +110,27 @@ export class CandidatesController {
   @Delete('me/blocked-companies/:id')
   unblockCompany(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
     return this.candidatesService.unblockCompany(user.userId, id);
+  }
+
+  @Get('me/saved-searches')
+  listSavedSearches(@CurrentUser() user: { userId: string }) {
+    return this.candidatesService.listSavedSearches(user.userId);
+  }
+
+  @Post('me/saved-searches')
+  saveSearch(@CurrentUser() user: { userId: string }, @Body() dto: SaveSearchDto) {
+    return this.candidatesService.saveSearch(user.userId, dto);
+  }
+
+  @Delete('me/saved-searches/:id')
+  removeSavedSearch(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.candidatesService.removeSavedSearch(user.userId, id);
+  }
+
+  // Đợt 12p (21/09/2026) — Batch 4 mục #2: gợi ý việc làm chấm điểm đa tiêu chí, xem
+  // CandidatesService.getRecommendedJobs().
+  @Get('me/job-recommendations')
+  getRecommendedJobs(@CurrentUser() user: { userId: string }) {
+    return this.candidatesService.getRecommendedJobs(user.userId);
   }
 }

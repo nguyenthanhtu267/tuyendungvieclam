@@ -18,4 +18,9 @@ export class ApplicationsController {
   listOwn(@CurrentUser() user: { userId: string }) {
     return this.applicationsService.listOwn(user.userId);
   }
+
+  @Get('me/applications/:id/history')
+  getHistory(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.applicationsService.getHistory(user.userId, id);
+  }
 }

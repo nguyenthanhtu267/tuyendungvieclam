@@ -6,7 +6,8 @@ import SiteHeader from '@/components/SiteHeader';
 import { JobCard } from '@/components/JobCard';
 import { FilterBar } from '@/components/search/FilterBar';
 import { DistrictChips } from '@/components/search/DistrictChips';
-import { jobsApi, type JobFacets, type JobListParams, type JobListResponse, type DistrictFacet } from '@/lib/api';
+import { jobsApi, candidatesApi, type JobFacets, type JobListParams, type JobListResponse, type DistrictFacet } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 
 // Đợt 10 — trang tìm việc làm nâng cao đầy đủ (claude/06-spec-tim-kiem-nang-cao.md): thanh lọc
 // FilterBar (tỉnh/thành + ngành nghề multi-select, 5 dropdown đơn, khẩn cấp, doanh nghiệp yêu thích),
@@ -21,6 +22,8 @@ function arr(v: string | null): string[] | undefined {
 function JobSearchPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { me, token } = useAuth();
+  const [saveSearchState, setSaveSearchState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const filters: JobListParams = {
     q: searchParams.get('q') ?? undefined,
@@ -116,6 +119,25 @@ function JobSearchPage() {
     router.push(qInput ? `/viec-lam?q=${encodeURIComponent(qInput)}` : '/viec-lam');
   }
 
+  // Đợt 12m (21/09/2026) — "Lưu tìm kiếm này" (Job alert): lưu nguyên bộ lọc hiện tại làm tiêu chí,
+  // báo qua chuông thông báo khi có tin mới khớp (xem notifyJobAlertMatches() ở admin.service.ts —
+  // chỉ đọc q/industries/provinces trong criteria, các trường khác lưu kèm để hiển thị lại cho đúng).
+  async function handleSaveSearch() {
+    if (!token) return;
+    setSaveSearchState('saving');
+    try {
+      await candidatesApi.saveSearch(token, { criteria: filters as Record<string, unknown>, resultCount: result?.total });
+      setSaveSearchState('saved');
+    } catch {
+      setSaveSearchState('error');
+    }
+  }
+
+  useEffect(() => {
+    setSaveSearchState('idle');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   function goToPage(p: number) {
     const params = new URLSearchParams(searchParams.toString());
     params.set('page', String(p));
@@ -154,10 +176,28 @@ function JobSearchPage() {
 
         <div className="grid lg:grid-cols-[1fr_280px] gap-5 mt-2 items-start">
           <div>
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
               <h1 className="font-extrabold text-lg">
                 {loading ? 'Đang tìm...' : `${result?.total ?? 0} ${heading}`}
               </h1>
+              {/* Đợt 12m — chỉ hiện khi đã đăng nhập bằng tài khoản ứng viên và có ít nhất 1 tiêu chí
+                  lọc (q/ngành/tỉnh), tránh lưu "tìm kiếm rỗng" vô nghĩa. */}
+              {me?.role === 'candidate' && (filters.q || filters.industries?.length || filters.provinces?.length) ? (
+                <button
+                  type="button"
+                  onClick={handleSaveSearch}
+                  disabled={saveSearchState === 'saving' || saveSearchState === 'saved'}
+                  className="tvl-btn-ghost !w-auto px-3.5 py-1.5 text-xs disabled:opacity-70"
+                >
+                  {saveSearchState === 'saved'
+                    ? '✓ Đã lưu tìm kiếm'
+                    : saveSearchState === 'saving'
+                      ? 'Đang lưu...'
+                      : saveSearchState === 'error'
+                        ? 'Lỗi, thử lại'
+                        : '🔔 Lưu tìm kiếm này'}
+                </button>
+              ) : null}
             </div>
 
             {!loading && result?.items.length === 0 && (

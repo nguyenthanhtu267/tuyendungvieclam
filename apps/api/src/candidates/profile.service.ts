@@ -27,6 +27,11 @@ import {
   ActivityDto,
   ReferenceDto,
 } from './dto/profile-sections.dto';
+import { sanitizeRichText } from '../common/sanitize-html.util';
+
+// Đợt 12n (21/09/2026) — các mục "danh sách" có ô mô tả dài dùng RichTextEditor ở frontend
+// (Kinh nghiệm, Thành tích, Hoạt động) — khử độc HTML khi lưu, xem sanitize-html.util.ts.
+const SECTIONS_WITH_RICH_DESCRIPTION = new Set<SectionKey>(['experiences', 'achievements', 'activities']);
 
 export type SectionKey =
   | 'experiences'
@@ -200,7 +205,11 @@ export class ProfileService {
     if (min != null && max != null && min > max) {
       throw new BadRequestException('Mức lương "Từ" không được lớn hơn mức lương "Đến"');
     }
-    Object.assign(profile, dto);
+    // "Mục tiêu nghề nghiệp" dùng RichTextEditor ở frontend (/ho-so/truc-tuyen) — khử độc HTML khi lưu.
+    Object.assign(profile, dto, {
+      careerObjective:
+        dto.careerObjective !== undefined ? sanitizeRichText(dto.careerObjective) : profile.careerObjective,
+    });
     const saved = await this.profileRepo.save(profile);
     await this.refreshCompletion(profile.id);
     return saved;
@@ -261,11 +270,19 @@ export class ProfileService {
     return this.sectionRepos[section].find({ where: { candidateProfileId: profile.id } });
   }
 
+  private sanitizeSectionPayload(section: SectionKey, payload: any) {
+    if (SECTIONS_WITH_RICH_DESCRIPTION.has(section) && 'description' in payload) {
+      payload.description = sanitizeRichText(payload.description);
+    }
+    return payload;
+  }
+
   async addSectionItem(userId: string, section: string, body: unknown) {
     this.assertSection(section);
     const profile = await this.getOwnProfileEntity(userId);
     let payload = await this.validateSectionPayload(section, body);
     payload = this.normalizeDateRange(payload as any);
+    payload = this.sanitizeSectionPayload(section, payload);
     const repo = this.sectionRepos[section];
     const row = repo.create({ ...payload, candidateProfileId: profile.id });
     const saved = await repo.save(row);
@@ -283,6 +300,7 @@ export class ProfileService {
     }
     let payload = await this.validateSectionPayload(section, body);
     payload = this.normalizeDateRange(payload as any);
+    payload = this.sanitizeSectionPayload(section, payload);
     Object.assign(existing, payload);
     const saved = await repo.save(existing);
     await this.refreshCompletion(profile.id);

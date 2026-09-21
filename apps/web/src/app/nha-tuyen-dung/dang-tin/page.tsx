@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import EmployerHeader from '@/components/EmployerHeader';
+import { RichTextEditor } from '@/components/RichTextEditor';
 import { useAuth } from '@/lib/auth-context';
 import { employerApi, ApiError } from '@/lib/api';
 import { formatSalary } from '@/lib/format';
@@ -381,11 +382,24 @@ function DangTinInner() {
           {step === 1 && (
             <>
               <h2 className="font-bold text-sm">Mô tả & yêu cầu công việc</h2>
+              {/* Đợt 12n (21/09/2026) — đổi từ <textarea> sang RichTextEditor: khung nhập rộng hơn,
+                  kéo giãn chiều cao được, có Bold/Italic/Gạch chân/gạch đầu dòng/đánh số như Word —
+                  theo góp ý người dùng "chỗ điền JD phải rất rộng ... thuận tiện nhập liệu". */}
               <Field label="Mô tả công việc">
-                <textarea className="tvl-input min-h-[110px]" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Mô tả các đầu việc chính..." />
+                <RichTextEditor
+                  value={form.description}
+                  onChange={(html) => setForm({ ...form, description: html })}
+                  placeholder="Mô tả các đầu việc chính..."
+                  minHeight={220}
+                />
               </Field>
               <Field label="Yêu cầu ứng viên">
-                <textarea className="tvl-input min-h-[110px]" value={form.requirements} onChange={(e) => setForm({ ...form, requirements: e.target.value })} placeholder="Yêu cầu về kinh nghiệm, kỹ năng..." />
+                <RichTextEditor
+                  value={form.requirements}
+                  onChange={(html) => setForm({ ...form, requirements: html })}
+                  placeholder="Yêu cầu về kinh nghiệm, kỹ năng..."
+                  minHeight={220}
+                />
               </Field>
               <div className="text-[11px] text-ink-faint">
                 Ảnh/banner tin tuyển dụng: sẽ hỗ trợ ở bản cập nhật sau (khi kết nối lưu trữ tệp Cloudflare R2).

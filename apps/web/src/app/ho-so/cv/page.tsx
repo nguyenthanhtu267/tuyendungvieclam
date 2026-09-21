@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SiteHeader from '@/components/SiteHeader';
+import { RichTextView } from '@/components/RichTextView';
 import { useAuth } from '@/lib/auth-context';
 import {
   profileApi,
@@ -168,9 +169,7 @@ export default function CvBuilderPage() {
             <div className="flex flex-col gap-5 min-w-0">
               {profile.careerObjective && (
                 <CvSection title="Mục tiêu nghề nghiệp">
-                  <p className="text-[12.5px] text-ink-muted leading-relaxed whitespace-pre-line">
-                    {profile.careerObjective}
-                  </p>
+                  <RichTextView value={profile.careerObjective} className="text-[12.5px] text-ink-muted leading-relaxed" />
                 </CvSection>
               )}
 
@@ -187,9 +186,7 @@ export default function CvBuilderPage() {
                         </div>
                         {it.companyName && <div className="text-[12px] text-primary font-semibold">{it.companyName}</div>}
                         {it.description && (
-                          <p className="text-[12px] text-ink-muted mt-0.5 leading-relaxed whitespace-pre-line">
-                            {it.description}
-                          </p>
+                          <RichTextView value={it.description} className="text-[12px] text-ink-muted mt-0.5 leading-relaxed" />
                         )}
                       </div>
                     ))}
@@ -224,7 +221,7 @@ export default function CvBuilderPage() {
                           <span className="font-bold text-[12.5px] text-ink">{it.title}</span>
                           {it.date && <span className="text-[11px] text-ink-faint shrink-0">{fmtDate(it.date)}</span>}
                         </div>
-                        {it.description && <p className="text-[12px] text-ink-muted mt-0.5">{it.description}</p>}
+                        {it.description && <RichTextView value={it.description} className="text-[12px] text-ink-muted mt-0.5" />}
                       </div>
                     ))}
                   </div>
@@ -241,7 +238,7 @@ export default function CvBuilderPage() {
                           <span className="text-[11px] text-ink-faint shrink-0">{fmtRange(it.startDate, it.endDate)}</span>
                         </div>
                         {it.organizationName && <div className="text-[12px] text-primary font-semibold">{it.organizationName}</div>}
-                        {it.description && <p className="text-[12px] text-ink-muted mt-0.5">{it.description}</p>}
+                        {it.description && <RichTextView value={it.description} className="text-[12px] text-ink-muted mt-0.5" />}
                       </div>
                     ))}
                   </div>

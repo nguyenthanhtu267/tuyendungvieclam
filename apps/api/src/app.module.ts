@@ -17,6 +17,7 @@ import { FilesModule } from './files/files.module';
 import { CvSearchModule } from './cv-search/cv-search.module';
 import { HealthModule } from './health/health.module';
 import { PresenceModule } from './presence/presence.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { isProduction } from './config/env-guard';
 import {
   User,
@@ -26,6 +27,7 @@ import {
   CompanyUser,
   JobPosting,
   Application,
+  ApplicationStatusHistory,
   SavedJob,
   BlockedCompany,
   SearchHistory,
@@ -43,6 +45,7 @@ import {
   CandidateActivity,
   CandidateReference,
   UnlockedProfile,
+  AdminAuditLog,
 } from './database/entities';
 
 const entities = [
@@ -53,6 +56,7 @@ const entities = [
   CompanyUser,
   JobPosting,
   Application,
+  ApplicationStatusHistory,
   SavedJob,
   BlockedCompany,
   SearchHistory,
@@ -70,6 +74,7 @@ const entities = [
   CandidateActivity,
   CandidateReference,
   UnlockedProfile,
+  AdminAuditLog,
 ];
 
 @Module({
@@ -109,6 +114,7 @@ const entities = [
     CvSearchModule,
     HealthModule,
     PresenceModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

@@ -8,7 +8,6 @@ import { useAuth } from '@/lib/auth-context';
 import {
   candidatesApi,
   applicationsApi,
-  jobsApi,
   ApiError,
   type CandidateProfile,
   type CV,
@@ -16,15 +15,40 @@ import {
   type BlockedCompany,
   type Application,
   type JobPosting,
+  type SavedSearch,
+  type ApplicationStatusHistoryItem,
 } from '@/lib/api';
 import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatSalary } from '@/lib/format';
 import ChangePasswordCard from '@/components/ChangePasswordCard';
+
+// Đợt 12m (21/09/2026) — hiển thị lại tiêu chí "Tìm kiếm đã lưu" và dựng lại URL /viec-lam tương
+// ứng (đối xứng với cách viec-lam/page.tsx đọc query params thành filters).
+function describeSavedSearch(criteria: Record<string, unknown>): string {
+  const q = typeof criteria.q === 'string' ? criteria.q : '';
+  const industries = Array.isArray(criteria.industries) ? (criteria.industries as string[]) : [];
+  const provinces = Array.isArray(criteria.provinces) ? (criteria.provinces as string[]) : [];
+  const parts = [q, ...industries, ...provinces].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : 'Tất cả việc làm';
+}
+
+function savedSearchUrl(criteria: Record<string, unknown>): string {
+  const params = new URLSearchParams();
+  const q = typeof criteria.q === 'string' ? criteria.q : '';
+  const industries = Array.isArray(criteria.industries) ? (criteria.industries as string[]) : [];
+  const provinces = Array.isArray(criteria.provinces) ? (criteria.provinces as string[]) : [];
+  if (q) params.set('q', q);
+  if (industries.length) params.set('industries', industries.join(','));
+  if (provinces.length) params.set('provinces', provinces.join(','));
+  const qs = params.toString();
+  return qs ? `/viec-lam?${qs}` : '/viec-lam';
+}
 
 const NAV_ITEMS = [
   { id: 'overview', label: '👤 Quản lý hồ sơ' },
   { id: 'cvs', label: '📄 CV & tệp đính kèm' },
   { id: 'suggestions', label: '✨ Gợi ý việc làm' },
   { id: 'applications', label: '💼 Việc làm của tôi' },
+  { id: 'saved-searches', label: '🔔 Tìm kiếm đã lưu' },
   { id: 'settings', label: '⚙️ Cài đặt' },
 ];
 
@@ -36,6 +60,8 @@ export default function MyCenterPage() {
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [blocked, setBlocked] = useState<BlockedCompany[]>([]);
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+  const [historyApp, setHistoryApp] = useState<Application | null>(null);
   const [suggestions, setSuggestions] = useState<JobPosting[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
@@ -49,32 +75,53 @@ export default function MyCenterPage() {
     (async () => {
       setLoading(true);
       try {
-        const [p, sj, apps, bl] = await Promise.all([
+        const [p, sj, apps, bl, ss] = await Promise.all([
           candidatesApi.getProfile(token),
           candidatesApi.listSavedJobs(token),
           applicationsApi.listOwn(token),
           candidatesApi.listBlockedCompanies(token),
+          candidatesApi.listSavedSearches(token),
         ]);
         setProfile(p);
         setSavedJobs(sj);
         setApplications(apps);
         setBlocked(bl);
+        setSavedSearches(ss);
       } finally {
         setLoading(false);
       }
     })();
   }, [token]);
 
+  // Đợt 12p (21/09/2026) — Batch 4 mục #2: gợi ý theo nhiều tiêu chí hồ sơ (ngành, địa điểm, hình
+  // thức làm việc, cấp bậc, kỹ năng/vị trí mong muốn) thay vì chỉ tìm chuỗi theo "Vị trí mong muốn"
+  // như trước — xem CandidatesService.getRecommendedJobs(). Chạy lại khi các trường liên quan đổi.
+  const hasSuggestionInputs =
+    !!profile?.desiredPosition ||
+    !!profile?.desiredLevel ||
+    !!profile?.desiredIndustries?.length ||
+    !!profile?.desiredLocations?.length ||
+    !!profile?.desiredJobTypes?.length;
+
   useEffect(() => {
-    if (!profile?.desiredPosition) {
+    if (!token || !hasSuggestionInputs) {
       setSuggestions([]);
       return;
     }
-    jobsApi
-      .list({ q: profile.desiredPosition, pageSize: 3 })
-      .then((res) => setSuggestions(res.items))
+    candidatesApi
+      .getJobRecommendations(token)
+      .then((jobs) => setSuggestions(jobs))
       .catch(() => setSuggestions([]));
-  }, [profile?.desiredPosition]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    token,
+    hasSuggestionInputs,
+    profile?.desiredPosition,
+    profile?.desiredLevel,
+    profile?.desiredIndustries?.join(','),
+    profile?.desiredLocations?.join(','),
+    profile?.desiredJobTypes?.join(','),
+  ]);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -140,20 +187,19 @@ export default function MyCenterPage() {
             <div id="suggestions" className="rounded-xl border border-border bg-white p-[18px] scroll-mt-20">
               <div className="flex items-center justify-between mb-1">
                 <h2 className="font-extrabold text-[15px]">Việc làm gợi ý cho bạn</h2>
-                <span className="text-[11px] text-ink-faint">Theo vị trí mong muốn trong hồ sơ</span>
+                <span className="text-[11px] text-ink-faint">Theo ngành, địa điểm, cấp bậc... trong hồ sơ</span>
               </div>
-              {!profile.desiredPosition && (
+              {!hasSuggestionInputs && (
                 <div className="text-[12.5px] text-ink-muted py-3">
-                  Điền &ldquo;Vị trí mong muốn&rdquo; ở phần Quản lý hồ sơ để nhận gợi ý việc làm phù hợp.
+                  Điền &ldquo;Vị trí mong muốn&rdquo;, ngành nghề, địa điểm... ở phần Quản lý hồ sơ để nhận gợi ý
+                  việc làm phù hợp.
                 </div>
               )}
-              {profile.desiredPosition && suggestions === null && (
+              {hasSuggestionInputs && suggestions === null && (
                 <div className="text-[12.5px] text-ink-faint py-3">Đang tải gợi ý...</div>
               )}
-              {profile.desiredPosition && suggestions?.length === 0 && (
-                <div className="text-[12.5px] text-ink-faint py-3">
-                  Chưa có việc làm phù hợp với &ldquo;{profile.desiredPosition}&rdquo; lúc này.
-                </div>
+              {hasSuggestionInputs && suggestions?.length === 0 && (
+                <div className="text-[12.5px] text-ink-faint py-3">Chưa có việc làm phù hợp với hồ sơ của bạn lúc này.</div>
               )}
               <div className="flex flex-col">
                 {suggestions?.map((job) => (
@@ -192,6 +238,7 @@ export default function MyCenterPage() {
                           <th className="py-2 px-1 font-semibold">Công ty</th>
                           <th className="py-2 px-1 font-semibold">Ngày nộp</th>
                           <th className="py-2 px-1 font-semibold">Trạng thái</th>
+                          <th className="py-2 px-1 font-semibold"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -212,6 +259,14 @@ export default function MyCenterPage() {
                               >
                                 {APPLICATION_STATUS_LABEL[a.status]}
                               </span>
+                            </td>
+                            <td className="py-2 px-1 text-right">
+                              <button
+                                onClick={() => setHistoryApp(a)}
+                                className="text-primary text-[11px] font-semibold hover:underline whitespace-nowrap"
+                              >
+                                Lịch sử
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -257,6 +312,53 @@ export default function MyCenterPage() {
               </div>
             </div>
 
+            <div id="saved-searches" className="rounded-xl border border-border bg-white p-[18px] scroll-mt-20">
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="font-extrabold text-[15px]">Tìm kiếm đã lưu</h2>
+                <span className="text-[11px] text-ink-faint">{savedSearches.length} tìm kiếm</span>
+              </div>
+              <p className="text-[11.5px] text-ink-faint mb-2">
+                Khi có tin mới phù hợp với tiêu chí đã lưu, bạn sẽ nhận thông báo qua chuông 🔔 ở góc trên.
+              </p>
+              {savedSearches.length === 0 ? (
+                <div className="text-[12.5px] text-ink-muted py-3">
+                  Chưa có tìm kiếm nào được lưu.{' '}
+                  <Link href="/viec-lam" className="text-primary font-semibold hover:underline">
+                    Tìm việc làm
+                  </Link>{' '}
+                  rồi bấm &ldquo;🔔 Lưu tìm kiếm này&rdquo; để bắt đầu nhận thông báo.
+                </div>
+              ) : (
+                <div className="flex flex-col">
+                  {savedSearches.map((s) => (
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between gap-2 py-2.5 border-b border-border last:border-0"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-semibold text-[12.5px] truncate">{describeSavedSearch(s.criteria)}</div>
+                        <div className="text-ink-faint text-[11.3px]">Đã lưu {formatDate(s.createdAt)}</div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <Link href={savedSearchUrl(s.criteria)} className="text-primary text-xs font-semibold hover:underline">
+                          Xem tin
+                        </Link>
+                        <button
+                          onClick={async () => {
+                            await candidatesApi.removeSavedSearch(token, s.id);
+                            setSavedSearches((prev) => prev.filter((x) => x.id !== s.id));
+                          }}
+                          className="text-ink-faint hover:text-critical text-xs"
+                        >
+                          Xoá
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <SettingsSection
               profile={profile}
               token={token}
@@ -268,7 +370,89 @@ export default function MyCenterPage() {
           </div>
         </div>
       </div>
+
+      {historyApp && token && (
+        <ApplicationHistoryModal application={historyApp} token={token} onClose={() => setHistoryApp(null)} />
+      )}
     </main>
+  );
+}
+
+// Đợt 12o (21/09/2026) — "Lịch sử" trên mỗi dòng đơn ứng tuyển mở popup dòng thời gian, đọc từ
+// GET /me/applications/:id/history (ApplicationStatusHistory — ghi mỗi lần trạng thái đổi).
+function ApplicationHistoryModal({
+  application,
+  token,
+  onClose,
+}: {
+  application: Application;
+  token: string;
+  onClose: () => void;
+}) {
+  const [items, setItems] = useState<ApplicationStatusHistoryItem[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    applicationsApi
+      .getHistory(token, application.id)
+      .then((rows) => {
+        if (!cancelled) setItems(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setItems([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, application.id]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden flex flex-col max-h-[80vh]"
+      >
+        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+          <div className="min-w-0">
+            <h3 className="text-sm font-extrabold text-ink truncate">Lịch sử trạng thái ứng tuyển</h3>
+            <div className="text-[11.5px] text-ink-faint truncate">
+              {application.jobPosting.title} · {application.jobPosting.company.name}
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="text-lg text-ink-faint hover:text-ink shrink-0 ml-2">
+            ✕
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {items === null ? (
+            <div className="text-center text-ink-faint text-xs py-6">Đang tải...</div>
+          ) : items.length === 0 ? (
+            <div className="text-center text-ink-faint text-xs py-6">Chưa có lịch sử trạng thái.</div>
+          ) : (
+            <ol className="flex flex-col gap-4">
+              {items.map((h, i) => (
+                <li key={h.id} className="flex gap-3">
+                  <div className="flex flex-col items-center shrink-0">
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full ${i === items.length - 1 ? 'bg-primary' : 'bg-border-strong'}`}
+                    />
+                    {i < items.length - 1 && <span className="w-px flex-1 bg-border mt-1" />}
+                  </div>
+                  <div className="pb-1">
+                    <span
+                      className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full ${APPLICATION_STATUS_CLASS[h.status]}`}
+                    >
+                      {APPLICATION_STATUS_LABEL[h.status]}
+                    </span>
+                    <div className="text-[11px] text-ink-faint mt-1">{formatDate(h.createdAt)}</div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -141,6 +141,13 @@ export class JobPosting {
   @OneToMany(() => SavedJob, (savedJob) => savedJob.jobPosting)
   savedByCandidates?: SavedJob[];
 
+  // Đợt 12p (21/09/2026) — Batch 4 mục #1: đếm lượt xem trang chi tiết tin (chỉ tăng khi ứng viên
+  // xem qua trang công khai /viec-lam/[id] → jobs.service.ts findOne(), KHÔNG tăng khi NTD tự xem
+  // trước tin của mình ở /nha-tuyen-dung/xem-tin/[id] vì trang đó dùng employer.service.ts getJob()
+  // riêng). Dùng cho thống kê "Lượt xem" + "Tỷ lệ chuyển đổi" (hồ sơ/lượt xem) ở trang Tin đăng NTD.
+  @Column({ name: 'view_count', type: 'int', default: 0 })
+  viewCount: number;
+
   @Index()
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

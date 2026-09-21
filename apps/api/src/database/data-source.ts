@@ -8,6 +8,7 @@ import {
   CompanyUser,
   JobPosting,
   Application,
+  ApplicationStatusHistory,
   SavedJob,
   BlockedCompany,
   SearchHistory,
@@ -25,6 +26,7 @@ import {
   CandidateActivity,
   CandidateReference,
   UnlockedProfile,
+  AdminAuditLog,
 } from './entities';
 
 // Đợt 12a (20/09/2026) — DataSource riêng cho TypeORM CLI (migration:generate/run/revert), tách
@@ -41,6 +43,7 @@ export const AppDataSource = new DataSource({
     CompanyUser,
     JobPosting,
     Application,
+    ApplicationStatusHistory,
     SavedJob,
     BlockedCompany,
     SearchHistory,
@@ -58,6 +61,7 @@ export const AppDataSource = new DataSource({
     CandidateActivity,
     CandidateReference,
     UnlockedProfile,
+    AdminAuditLog,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,

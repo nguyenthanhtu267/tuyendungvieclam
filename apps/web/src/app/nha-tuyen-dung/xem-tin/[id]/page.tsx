@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import EmployerHeader from '@/components/EmployerHeader';
+import { RichTextView } from '@/components/RichTextView';
 import { useAuth } from '@/lib/auth-context';
 import { employerApi, ApiError, type JobPosting } from '@/lib/api';
 import {
@@ -139,6 +140,35 @@ export default function XemTinNtdPage() {
                 <Detail label="👥 Số lượng" value={String(job.headcount)} />
               </div>
 
+              {job.benefits && job.benefits.length > 0 && (
+                <div className="mt-5">
+                  <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Phúc lợi</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {job.benefits.map((b) => (
+                      <span key={b} className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full bg-surface-alt text-ink-muted">
+                        {b}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {job.description && (
+                <div className="mt-5">
+                  <h3 className="font-bold text-sm mb-2">Mô tả công việc</h3>
+                  <RichTextView value={job.description} className="text-[12.8px] text-ink-muted" />
+                </div>
+              )}
+
+              {job.requirements && (
+                <div className="mt-4">
+                  <h3 className="font-bold text-sm mb-2">Yêu cầu ứng viên</h3>
+                  <RichTextView value={job.requirements} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
+                </div>
+              )}
+
+              {/* Đợt 12n (21/09/2026) — chuyển xuống dưới "Yêu cầu ứng viên" theo mẫu, đồng bộ với
+                  trang chi tiết công khai /viec-lam/[id]. */}
               <div className="mt-5">
                 <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Địa điểm làm việc</div>
                 <div className="text-[12.8px] font-bold text-ink">{locationText ?? 'Đang cập nhật'}</div>
@@ -157,37 +187,6 @@ export default function XemTinNtdPage() {
                   <li>Lương: {formatSalaryTag(job.salaryMin, job.salaryMax)}</li>
                 </ul>
               </div>
-
-              {job.benefits && job.benefits.length > 0 && (
-                <div className="mt-5">
-                  <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Phúc lợi</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {job.benefits.map((b) => (
-                      <span key={b} className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full bg-surface-alt text-ink-muted">
-                        {b}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {job.description && (
-                <div className="mt-5">
-                  <h3 className="font-bold text-sm mb-2">Mô tả công việc</h3>
-                  <p className="text-[12.8px] text-ink-muted leading-relaxed whitespace-pre-line">{job.description}</p>
-                </div>
-              )}
-
-              {job.requirements && (
-                <div className="mt-4">
-                  <h3 className="font-bold text-sm mb-2">Yêu cầu ứng viên</h3>
-                  <ul className="text-[12.8px] text-ink-muted leading-loose list-disc pl-5">
-                    {job.requirements.split('\n').filter(Boolean).map((line) => (
-                      <li key={line}>{line}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </div>
           </div>
 

@@ -4,6 +4,8 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import SiteHeader from '@/components/SiteHeader';
+import { JobCard } from '@/components/JobCard';
+import { RichTextView } from '@/components/RichTextView';
 import { jobsApi, candidatesApi, applicationsApi, ApiError, type JobPosting, type CV } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -298,9 +300,37 @@ function JobDetailInner() {
                     <Detail label="👥 Số lượng" value={String(job.headcount)} />
                   </div>
 
+                  {job.benefits && job.benefits.length > 0 && (
+                    <div className="mt-5">
+                      <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Phúc lợi</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {job.benefits.map((b) => (
+                          <span key={b} className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full bg-surface-alt text-ink-muted">
+                            {b}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {job.description && (
+                    <div className="mt-5">
+                      <h3 className="font-bold text-sm mb-2">Mô tả công việc</h3>
+                      <RichTextView value={job.description} className="text-[12.8px] text-ink-muted" />
+                    </div>
+                  )}
+
+                  {job.requirements && (
+                    <div className="mt-4">
+                      <h3 className="font-bold text-sm mb-2">Yêu cầu ứng viên</h3>
+                      <RichTextView value={job.requirements} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
+                    </div>
+                  )}
+
                   {/* Đợt 12k (21/09/2026) — khối "Địa điểm làm việc" (địa chỉ chi tiết) + "Thông
                       tin khác" (Giới tính, Độ tuổi, Thời gian làm việc, Lương), theo mẫu
-                      careerviet.vn. Tin cũ chưa có dữ liệu vẫn hiện giá trị mặc định hợp lý. */}
+                      careerviet.vn. Tin cũ chưa có dữ liệu vẫn hiện giá trị mặc định hợp lý.
+                      Đợt 12n (21/09/2026) — chuyển xuống dưới "Yêu cầu ứng viên" theo mẫu. */}
                   <div className="mt-5">
                     <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">
                       Địa điểm làm việc
@@ -330,39 +360,6 @@ function JobDetailInner() {
                       <li>Lương: {formatSalaryTag(job.salaryMin, job.salaryMax)}</li>
                     </ul>
                   </div>
-
-                  {job.benefits && job.benefits.length > 0 && (
-                    <div className="mt-5">
-                      <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Phúc lợi</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {job.benefits.map((b) => (
-                          <span key={b} className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full bg-surface-alt text-ink-muted">
-                            {b}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {job.description && (
-                    <div className="mt-5">
-                      <h3 className="font-bold text-sm mb-2">Mô tả công việc</h3>
-                      <p className="text-[12.8px] text-ink-muted leading-relaxed whitespace-pre-line">
-                        {job.description}
-                      </p>
-                    </div>
-                  )}
-
-                  {job.requirements && (
-                    <div className="mt-4">
-                      <h3 className="font-bold text-sm mb-2">Yêu cầu ứng viên</h3>
-                      <ul className="text-[12.8px] text-ink-muted leading-loose list-disc pl-5">
-                        {job.requirements.split('\n').filter(Boolean).map((line) => (
-                          <li key={line}>{line}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
                 </>
               ) : (
                 <div className="flex flex-col gap-3 text-[12.8px] text-ink-muted">
@@ -405,26 +402,21 @@ function JobDetailInner() {
               </div>
               <button className="tvl-btn-ghost mt-3">+ Theo dõi</button>
             </div>
-
-            {related.length > 0 && (
-              <div className="rounded-xl border border-border bg-white p-4">
-                <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2.5">
-                  Việc làm tương tự
-                </div>
-                <div className="flex flex-col gap-3">
-                  {related.map((r) => (
-                    <Link key={r.id} href={`/viec-lam/${r.id}`} className="block hover:text-primary">
-                      <div className="font-bold text-[12.5px]">{r.title}</div>
-                      <div className="text-ink-faint text-[11.3px]">
-                        {r.company.name} · {formatSalary(r.salaryMin, r.salaryMax)}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
+
+        {/* Đợt 12n (21/09/2026) — "Các công việc tương tự" chuyển từ khối nhỏ trên sidebar xuống
+            cuối trang, dạng lưới đầy đủ như JobCard ở trang tìm việc, theo mẫu tham khảo. */}
+        {related.length > 0 && (
+          <div className="mt-8">
+            <h2 className="font-extrabold text-base uppercase tracking-wide mb-3">Các công việc tương tự</h2>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {related.map((r) => (
+                <JobCard key={r.id} job={r} />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

@@ -98,6 +98,8 @@ export interface Company {
   legalDocUrl?: string;
   legalDocOriginalFileName?: string;
   legalDocExternalLink?: string;
+  // Đợt 12q (21/09/2026) — Batch 5 mục #1: cờ "Doanh nghiệp yêu thích", bật/tắt qua Admin Console.
+  isFeaturedEmployer?: boolean;
 }
 
 export type JobApprovalStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'expired';
@@ -128,6 +130,9 @@ export interface JobPosting {
   approvalStatus?: JobApprovalStatus;
   // Đợt 12l (21/09/2026) — dùng ở trang Xem trước NTD để hiện đúng trạng thái "Tạm ngưng".
   isPaused?: boolean;
+  // Đợt 12p (21/09/2026) — lượt xem trang chi tiết công khai, dùng cho thống kê "Tỷ lệ chuyển đổi"
+  // (hồ sơ/lượt xem) ở trang Tin đăng NTD.
+  viewCount?: number;
   createdAt: string;
   updatedAt?: string;
   company: Company;
@@ -237,6 +242,13 @@ export interface CandidateProfile {
   completionPercent: number;
   allowJobNotifications: boolean;
   cvs?: CV[];
+  // Đợt 12p (21/09/2026) — GET /me/profile thật ra trả về toàn bộ CandidateProfile (entity backend
+  // có sẵn các trường này từ đợt 8), chỉ là type FE trước đây khai báo thiếu. Bổ sung để trang
+  // ho-so/page.tsx dùng được cho gợi ý việc làm đa tiêu chí (getRecommendedJobs).
+  province?: string;
+  desiredIndustries?: string[];
+  desiredLocations?: string[];
+  desiredJobTypes?: string[];
 }
 
 export interface CV {
@@ -262,6 +274,17 @@ export interface BlockedCompany {
   companyId?: string;
   companyNameText?: string;
   company?: Company;
+  createdAt: string;
+}
+
+// Đợt 12m (21/09/2026) — "Tìm kiếm đã lưu" (Job alert): lưu nguyên bộ lọc /viec-lam hiện tại, dùng
+// làm tiêu chí so khớp khi có tin mới được Admin duyệt (xem notifyJobAlertMatches() backend).
+export interface SavedSearch {
+  id: string;
+  ownerType: string;
+  ownerId: string;
+  criteria: Record<string, unknown>;
+  resultCount: number;
   createdAt: string;
 }
 
@@ -318,6 +341,22 @@ export const candidatesApi = {
     }),
   unblockCompany: (token: string, id: string) =>
     request<void>(`/me/blocked-companies/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
+
+  // Đợt 12m (21/09/2026) — "Tìm kiếm đã lưu" (Job alert).
+  listSavedSearches: (token: string) =>
+    request<SavedSearch[]>('/me/saved-searches', { headers: authHeaders(token) }),
+  saveSearch: (token: string, dto: { criteria: Record<string, unknown>; resultCount?: number }) =>
+    request<SavedSearch>('/me/saved-searches', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(dto),
+    }),
+  removeSavedSearch: (token: string, id: string) =>
+    request<void>(`/me/saved-searches/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
+
+  // Đợt 12p (21/09/2026) — gợi ý việc làm chấm điểm theo ngành/địa điểm/hình thức/cấp bậc/kỹ năng.
+  getJobRecommendations: (token: string) =>
+    request<JobPosting[]>('/me/job-recommendations', { headers: authHeaders(token) }),
 };
 
 // ===== Đợt 8 — Hồ sơ trực tuyến 13 mục =====
@@ -485,6 +524,14 @@ export const profileApi = {
   avatarUrl: (profileId: string) => `${API_URL}/files/avatar/${profileId}`,
 };
 
+// Đợt 12o (21/09/2026) — "Nhật ký trạng thái ứng tuyển": mỗi dòng ghi 1 lần trạng thái đơn thay đổi.
+export interface ApplicationStatusHistoryItem {
+  id: string;
+  applicationId: string;
+  status: ApplicationStatus;
+  createdAt: string;
+}
+
 export const applicationsApi = {
   apply: (token: string, jobId: string, dto: { cvId: string; coverLetter?: string }) =>
     request<Application>(`/jobs/${jobId}/apply`, {
@@ -493,6 +540,10 @@ export const applicationsApi = {
       body: JSON.stringify(dto),
     }),
   listOwn: (token: string) => request<Application[]>('/me/applications', { headers: authHeaders(token) }),
+  getHistory: (token: string, applicationId: string) =>
+    request<ApplicationStatusHistoryItem[]>(`/me/applications/${applicationId}/history`, {
+      headers: authHeaders(token),
+    }),
 };
 
 // ===== Nhà tuyển dụng (Employer) =====
@@ -763,6 +814,38 @@ export interface AdminDashboard {
   recentPendingJobs: JobPosting[];
 }
 
+// Đợt 12q (21/09/2026) — Batch 5.
+export interface AdminStatsPoint {
+  date: string;
+  jobsPosted: number;
+  companiesRegistered: number;
+  candidatesRegistered: number;
+  applications: number;
+}
+
+export interface AdminAuditLogEntry {
+  id: string;
+  adminEmail: string;
+  action: string;
+  targetType: string;
+  targetId?: string;
+  description?: string;
+  createdAt: string;
+}
+
+export interface AdminAuditLogResponse {
+  items: AdminAuditLogEntry[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface BulkActionResult {
+  succeeded: number;
+  failed: string[];
+}
+
 export const adminApi = {
   dashboard: (token: string) => request<AdminDashboard>('/admin/dashboard', { headers: authHeaders(token) }),
   listPendingJobs: (token: string) =>
@@ -796,6 +879,46 @@ export const adminApi = {
       method: 'PATCH',
       headers: authHeaders(token),
     }),
+
+  // Đợt 12q (21/09/2026) — Batch 5 mục #2: duyệt/từ chối hàng loạt.
+  bulkApproveJobs: (token: string, ids: string[]) =>
+    request<BulkActionResult>('/admin/jobs/bulk-approve', {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify({ ids }),
+    }),
+  bulkRejectJobs: (token: string, ids: string[]) =>
+    request<BulkActionResult>('/admin/jobs/bulk-reject', {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify({ ids }),
+    }),
+  bulkApproveCompanies: (token: string, ids: string[]) =>
+    request<BulkActionResult>('/admin/companies/bulk-approve', {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify({ ids }),
+    }),
+  bulkRejectCompanies: (token: string, ids: string[]) =>
+    request<BulkActionResult>('/admin/companies/bulk-reject', {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify({ ids }),
+    }),
+
+  // Đợt 12q (21/09/2026) — Batch 5 mục #1: tìm công ty + bật/tắt "Doanh nghiệp yêu thích".
+  searchCompanies: (token: string, q: string) =>
+    request<Company[]>(`/admin/companies?q=${encodeURIComponent(q)}`, { headers: authHeaders(token) }),
+  toggleFeaturedEmployer: (token: string, id: string) =>
+    request<Company>(`/admin/companies/${id}/toggle-featured`, { method: 'PATCH', headers: authHeaders(token) }),
+
+  // Đợt 12q (21/09/2026) — Batch 5 mục #3: chuỗi thời gian cho biểu đồ dashboard.
+  statsTimeSeries: (token: string, days = 14) =>
+    request<AdminStatsPoint[]>(`/admin/stats/timeseries?days=${days}`, { headers: authHeaders(token) }),
+
+  // Đợt 12q (21/09/2026) — Batch 5 mục #4: nhật ký thao tác admin.
+  auditLog: (token: string, page = 1) =>
+    request<AdminAuditLogResponse>(`/admin/audit-log?page=${page}`, { headers: authHeaders(token) }),
 };
 
 // ===== Đợt 9 — Tìm kiếm hồ sơ ứng viên cho nhà tuyển dụng =====
@@ -958,4 +1081,34 @@ export const presenceApi = {
   ping: (sessionId: string) =>
     request<{ success: boolean }>('/presence/ping', { method: 'POST', body: JSON.stringify({ sessionId }) }),
   getCount: () => request<{ displayed: number }>('/presence/count'),
+};
+
+// Đợt 12m (21/09/2026) — chuông thông báo hoạt động thật (dùng chung ứng viên/NTD/admin).
+export type NotificationType =
+  | 'profile_viewed'
+  | 'interview_invite'
+  | 'application_status'
+  | 'job_approved'
+  | 'job_rejected'
+  | 'company_approved'
+  | 'company_rejected'
+  | 'job_alert_match'
+  | string;
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  content: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export const notificationsApi = {
+  list: (token: string) => request<AppNotification[]>('/notifications', { headers: authHeaders(token) }),
+  unreadCount: (token: string) => request<number>('/notifications/unread-count', { headers: authHeaders(token) }),
+  markRead: (token: string, id: string) =>
+    request<AppNotification>(`/notifications/${id}/read`, { method: 'PATCH', headers: authHeaders(token) }),
+  markAllRead: (token: string) =>
+    request<{ success: true }>('/notifications/read-all', { method: 'PATCH', headers: authHeaders(token) }),
 };

@@ -58,6 +58,15 @@ export function formatDate(dateStr?: string): string {
   return d.toLocaleDateString('vi-VN');
 }
 
+// Đợt 12q (21/09/2026) — Batch 5 mục #4: hiện cả giờ:phút cho nhật ký thao tác admin (formatDate()
+// chỉ có ngày, không đủ phân biệt nhiều thao tác trong cùng 1 ngày).
+export function formatDateTime(dateStr?: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return `${d.toLocaleDateString('vi-VN')} ${d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
 export const APPLICATION_STATUS_LABEL: Record<string, string> = {
   new: 'Mới ứng tuyển',
   reviewing: 'Đang xem xét',

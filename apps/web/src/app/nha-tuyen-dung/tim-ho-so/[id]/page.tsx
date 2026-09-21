@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import EmployerHeader from '@/components/EmployerHeader';
+import { RichTextView } from '@/components/RichTextView';
 import { useAuth } from '@/lib/auth-context';
 import { cvSearchApi, ApiError, type CandidateDetail } from '@/lib/api';
 import { formatDate } from '@/lib/format';
@@ -196,7 +197,7 @@ export default function CandidateDetailPage() {
 
         {detail.careerObjective && (
           <Section title="Mục tiêu nghề nghiệp">
-            <p className="text-[12.5px] text-ink-muted leading-relaxed whitespace-pre-line">{detail.careerObjective}</p>
+            <RichTextView value={detail.careerObjective} className="text-[12.5px] text-ink-muted" />
           </Section>
         )}
 
@@ -224,7 +225,7 @@ export default function CandidateDetailPage() {
                     <span className="text-[11px] text-ink-faint shrink-0">{fmtRange(e.startDate, e.endDate, e.isCurrent)}</span>
                   </div>
                   {e.companyName && <div className="text-[12px] text-primary font-semibold">{e.companyName}</div>}
-                  {e.description && <p className="text-[12px] text-ink-muted mt-0.5 whitespace-pre-line">{e.description}</p>}
+                  {e.description && <RichTextView value={e.description} className="text-[12px] text-ink-muted mt-0.5" />}
                 </div>
               ))}
             </div>
@@ -295,7 +296,7 @@ export default function CandidateDetailPage() {
                     <span className="font-bold text-[12.5px] text-ink">{a.title}</span>
                     {a.date && <span className="text-[11px] text-ink-faint shrink-0">{fmtDate(a.date)}</span>}
                   </div>
-                  {a.description && <p className="text-[12px] text-ink-muted mt-0.5">{a.description}</p>}
+                  {a.description && <RichTextView value={a.description} className="text-[12px] text-ink-muted mt-0.5" />}
                 </div>
               ))}
             </div>
@@ -312,7 +313,7 @@ export default function CandidateDetailPage() {
                     <span className="text-[11px] text-ink-faint shrink-0">{fmtRange(a.startDate, a.endDate)}</span>
                   </div>
                   {a.organizationName && <div className="text-[12px] text-primary font-semibold">{a.organizationName}</div>}
-                  {a.description && <p className="text-[12px] text-ink-muted mt-0.5">{a.description}</p>}
+                  {a.description && <RichTextView value={a.description} className="text-[12px] text-ink-muted mt-0.5" />}
                 </div>
               ))}
             </div>

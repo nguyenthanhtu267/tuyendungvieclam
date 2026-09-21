@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { NavDropdown } from '@/components/nav/NavDropdown';
+import { NotificationBell } from '@/components/NotificationBell';
 import { CANDIDATE_ACCOUNT_MENU, EMPLOYER_CTA_MENU, JOBS_MEGA_MENU, UTILITY_TOOLS } from '@/lib/nav-menu';
 
 // Đợt 11 — mega-menu điều hướng nhiều cấp theo claude/06-spec-tim-kiem-nang-cao.md mục 5:
@@ -21,9 +22,8 @@ function initialsOf(email: string) {
 }
 
 export default function SiteHeader() {
-  const { me, logout } = useAuth();
+  const { me, token, logout } = useAuth();
   const pathname = usePathname();
-  const [notifOpen, setNotifOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const jobsActive = pathname?.startsWith('/viec-lam');
@@ -133,23 +133,7 @@ export default function SiteHeader() {
             🌐 VI
           </span>
 
-          {me && (
-            <div className="relative">
-              <button
-                onClick={() => setNotifOpen((v) => !v)}
-                className="w-9 h-9 rounded-full border border-border-strong flex items-center justify-center text-sm hover:bg-surface-alt transition-colors"
-                aria-label="Thông báo"
-              >
-                🔔
-              </button>
-              {notifOpen && (
-                <div className="absolute right-0 mt-2 w-72 rounded-xl border border-border bg-white shadow-lg overflow-hidden text-sm">
-                  <div className="px-4 py-3 font-bold border-b border-border">Thông báo</div>
-                  <div className="px-4 py-6 text-center text-ink-faint text-xs">Chưa có thông báo nào</div>
-                </div>
-              )}
-            </div>
-          )}
+          {me && token && <NotificationBell token={token} />}
 
           {me === undefined ? null : me ? (
             <NavDropdown

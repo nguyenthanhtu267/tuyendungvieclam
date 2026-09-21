@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { NavDropdown } from '@/components/nav/NavDropdown';
+import { NotificationBell } from '@/components/NotificationBell';
 
 const NAV_LINKS = [
   { href: '/nha-tuyen-dung/dashboard', label: 'Dashboard', enabled: true },
@@ -23,7 +24,7 @@ const ACCOUNT_MENU = [
 
 // Header riêng cho khu vực Nhà tuyển dụng — theo màn B1/B2/B3 mockup (topnav-ntd, nền primary).
 export default function EmployerHeader() {
-  const { me, logout } = useAuth();
+  const { me, token, logout } = useAuth();
   const pathname = usePathname();
 
   return (
@@ -68,6 +69,10 @@ export default function EmployerHeader() {
         >
           Dành cho Ứng Viên
         </Link>
+
+        {/* Đợt 12m (21/09/2026) — chuông thông báo hoạt động thật cho NTD (trước đây EmployerHeader
+            không có chuông); dùng chung component với SiteHeader, biến thể "dark" cho nền primary. */}
+        {me && token && <NotificationBell token={token} variant="dark" />}
 
         <NavDropdown
           trigger={

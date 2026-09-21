@@ -225,7 +225,7 @@ export function ListRow({
   onRemove,
 }: {
   title: string;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   meta?: string;
   onEdit: () => void;
   onRemove: () => void;

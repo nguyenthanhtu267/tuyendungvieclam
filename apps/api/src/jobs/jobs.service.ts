@@ -104,6 +104,12 @@ export class JobsService {
       .take(3)
       .getMany();
 
+    // Đợt 12p (21/09/2026) — mỗi lượt xem trang chi tiết công khai +1 view_count (dùng cho thống kê
+    // "Lượt xem"/"Tỷ lệ chuyển đổi" của NTD). Không await trước khi trả kết quả để không làm chậm
+    // phản hồi trang chi tiết — lỗi tăng đếm (nếu có) không nên chặn người dùng xem tin.
+    this.jobRepo.increment({ id }, 'viewCount', 1).catch(() => {});
+    job.viewCount = (job.viewCount ?? 0) + 1;
+
     return { job, related };
   }
 

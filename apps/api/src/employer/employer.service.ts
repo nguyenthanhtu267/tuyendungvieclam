@@ -6,16 +6,19 @@ import { Company } from '../database/entities/company.entity';
 import { CompanyUser, CompanyUserType } from '../database/entities/company-user.entity';
 import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
 import { Application, ApplicationStatus } from '../database/entities/application.entity';
+import { ApplicationStatusHistory } from '../database/entities/application-status-history.entity';
 import { User, UserRole } from '../database/entities/user.entity';
 import { ServicePackage } from '../database/entities/service-package.entity';
 import { Order, OrderStatus } from '../database/entities/order.entity';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CreateSubAccountDto } from './dto/create-sub-account.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { EmployerJobStatus } from './dto/list-jobs-query.dto';
 import { ListApplicantsQueryDto } from './dto/list-applicants-query.dto';
+import { sanitizeRichText } from '../common/sanitize-html.util';
 
 const LEGAL_DOC_MAX_BYTES = 3 * 1024 * 1024; // 3MB — theo Mục 9 SRS
 
@@ -26,9 +29,12 @@ export class EmployerService {
     @InjectRepository(CompanyUser) private readonly companyUserRepo: Repository<CompanyUser>,
     @InjectRepository(JobPosting) private readonly jobRepo: Repository<JobPosting>,
     @InjectRepository(Application) private readonly applicationRepo: Repository<Application>,
+    @InjectRepository(ApplicationStatusHistory)
+    private readonly applicationHistoryRepo: Repository<ApplicationStatusHistory>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(ServicePackage) private readonly packageRepo: Repository<ServicePackage>,
     @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   // Mọi endpoint của module này đều thao tác trên công ty gắn với tài khoản NTD đang đăng nhập —
@@ -216,8 +222,8 @@ export class EmployerService {
       employmentType: dto.employmentType,
       level: dto.level,
       headcount: dto.headcount ?? 1,
-      description: dto.description,
-      requirements: dto.requirements,
+      description: sanitizeRichText(dto.description),
+      requirements: sanitizeRichText(dto.requirements),
       benefits: dto.benefits,
       deadline: dto.deadline,
       address: dto.address,
@@ -276,7 +282,8 @@ export class EmployerService {
     const job = await this.getOwnedJob(userId, jobId);
     for (const key of EmployerService.EDITABLE_JOB_FIELDS) {
       if (Object.prototype.hasOwnProperty.call(dto, key)) {
-        (job as unknown as Record<string, unknown>)[key] = dto[key];
+        const value = key === 'description' || key === 'requirements' ? sanitizeRichText(dto[key]) : dto[key];
+        (job as unknown as Record<string, unknown>)[key] = value;
       }
     }
     job.approvalStatus = JobApprovalStatus.PENDING;
@@ -350,10 +357,35 @@ export class EmployerService {
     return application;
   }
 
+  // Đợt 12m (21/09/2026) — báo cho ứng viên khi NTD đổi trạng thái đơn ứng tuyển. `getOwnedApplication`
+  // đã nạp sẵn quan hệ jobPosting + cv.candidateProfile nên có đủ dữ liệu, không cần truy vấn thêm.
+  private static readonly APPLICATION_STATUS_NOTIFICATION: Partial<Record<ApplicationStatus, string>> = {
+    [ApplicationStatus.REVIEWING]: 'Nhà tuyển dụng đang xem xét hồ sơ ứng tuyển của bạn cho vị trí',
+    [ApplicationStatus.SUITABLE]: 'Hồ sơ ứng tuyển của bạn được đánh giá Phù hợp cho vị trí',
+    [ApplicationStatus.INTERVIEW]: 'Bạn được mời phỏng vấn cho vị trí',
+    [ApplicationStatus.REJECTED]: 'Rất tiếc, hồ sơ ứng tuyển của bạn không phù hợp với vị trí',
+  };
+
   async updateApplicationStatus(userId: string, applicationId: string, status: ApplicationStatus) {
     const application = await this.getOwnedApplication(userId, applicationId);
+    const statusChanged = application.status !== status;
     application.status = status;
-    return this.applicationRepo.save(application);
+    const saved = await this.applicationRepo.save(application);
+
+    if (statusChanged) {
+      // Đợt 12o (21/09/2026) — ghi "Nhật ký trạng thái ứng tuyển" mỗi lần NTD đổi trạng thái, để
+      // ứng viên xem lại được dòng thời gian xử lý hồ sơ của mình (GET /me/applications/:id/history).
+      await this.applicationHistoryRepo.save(
+        this.applicationHistoryRepo.create({ applicationId: application.id, status }),
+      );
+      const message = EmployerService.APPLICATION_STATUS_NOTIFICATION[status];
+      const candidateUserId = application.cv?.candidateProfile?.userId;
+      if (message && candidateUserId) {
+        const type = status === ApplicationStatus.INTERVIEW ? 'interview_invite' : 'application_status';
+        await this.notificationsService.create(candidateUserId, type, `${message} "${application.jobPosting.title}".`);
+      }
+    }
+    return saved;
   }
 
   async rateApplication(userId: string, applicationId: string, rating: number) {

@@ -7,6 +7,7 @@ import { CandidateProfile, ProfileVisibility } from '../database/entities/candid
 import { UnlockedProfile } from '../database/entities/unlocked-profile.entity';
 import { Order, OrderStatus } from '../database/entities/order.entity';
 import { SearchCandidatesDto } from './dto/search-candidates.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 // Các trường coi là "thông tin liên hệ" — bị ẩn ngay cả khi NTD đã trả điểm mở hồ sơ, nếu ứng viên
 // bật "Ẩn thông tin liên hệ" (đợt 8). Đây là lựa chọn riêng tư của ứng viên, không phải thứ mua được.
@@ -27,6 +28,7 @@ export class CvSearchService {
     @InjectRepository(UnlockedProfile) private readonly unlockedRepo: Repository<UnlockedProfile>,
     @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
     private readonly dataSource: DataSource,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   // Chỉ tài khoản NTD (employer_main/employer_sub) đã liên kết công ty mới dùng được module này —
@@ -371,6 +373,13 @@ export class CvSearchService {
       });
       await manager.save(unlockRow);
     });
+
+    // Đợt 12m (21/09/2026) — báo cho ứng viên khi hồ sơ được NTD xem lần đầu (chỉ báo 1 lần — xem
+    // lại sau đó miễn phí, không tính là "vừa xem" nữa, đã return sớm ở nhánh `already` phía trên).
+    const profile = await this.profileRepo.findOne({ where: { id: profileId } });
+    if (profile) {
+      await this.notificationsService.create(profile.userId, 'profile_viewed', `${company.name} vừa xem hồ sơ của bạn.`);
+    }
 
     return this.getDetail(userId, profileId);
   }

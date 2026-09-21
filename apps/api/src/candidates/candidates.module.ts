@@ -5,6 +5,7 @@ import { CV } from '../database/entities/cv.entity';
 import { SavedJob } from '../database/entities/saved-job.entity';
 import { BlockedCompany } from '../database/entities/blocked-company.entity';
 import { JobPosting } from '../database/entities/job-posting.entity';
+import { SearchHistory } from '../database/entities/search-history.entity';
 import {
   CandidateExperience,
   CandidateEducation,
@@ -28,6 +29,7 @@ import { ProfileService } from './profile.service';
       SavedJob,
       BlockedCompany,
       JobPosting,
+      SearchHistory,
       CandidateExperience,
       CandidateEducation,
       CandidateCertificate,

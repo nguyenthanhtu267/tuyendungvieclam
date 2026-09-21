@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
+import { RichTextView } from '@/components/RichTextView';
 import { adminApi, ApiError, type JobPosting } from '@/lib/api';
 import { formatDate, formatSalary } from '@/lib/format';
 import { scanJobContent } from '@/lib/content-moderation';
@@ -120,18 +121,14 @@ export default function AdminJobReviewPage() {
               {job.description && (
                 <div className="mb-4">
                   <h3 className="font-bold text-sm mb-2">Mô tả công việc</h3>
-                  <p className="text-[12.8px] text-ink-muted leading-relaxed whitespace-pre-line">{job.description}</p>
+                  <RichTextView value={job.description} className="text-[12.8px] text-ink-muted" />
                 </div>
               )}
 
               {job.requirements && (
                 <div>
                   <h3 className="font-bold text-sm mb-2">Yêu cầu ứng viên</h3>
-                  <ul className="text-[12.8px] text-ink-muted leading-loose list-disc pl-5">
-                    {job.requirements.split('\n').filter(Boolean).map((line) => (
-                      <li key={line}>{line}</li>
-                    ))}
-                  </ul>
+                  <RichTextView value={job.requirements} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
                 </div>
               )}
             </div>

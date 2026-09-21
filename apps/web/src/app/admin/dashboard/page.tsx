@@ -3,8 +3,17 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { adminApi, ApiError, type AdminDashboard, type JobPosting, type Company, type Order } from '@/lib/api';
-import { formatDate, formatSalary, formatCurrency, PAYMENT_METHOD_LABEL } from '@/lib/format';
+import {
+  adminApi,
+  ApiError,
+  type AdminDashboard,
+  type JobPosting,
+  type Company,
+  type Order,
+  type AdminStatsPoint,
+  type AdminAuditLogEntry,
+} from '@/lib/api';
+import { formatDate, formatDateTime, formatSalary, formatCurrency, PAYMENT_METHOD_LABEL } from '@/lib/format';
 import ChangePasswordCard from '@/components/ChangePasswordCard';
 import { scanJobContent } from '@/lib/content-moderation';
 
@@ -17,8 +26,12 @@ const NAV_ITEMS = [
   { id: 'overview', label: '📊 Tổng quan' },
   { id: 'jobs', label: '🗂 Duyệt tin' },
   { id: 'companies', label: '🏢 Duyệt công ty' },
+  // Đợt 12q (21/09/2026) — Batch 5: 4 mục Admin mới.
+  { id: 'featured', label: '🌟 DN yêu thích' },
+  { id: 'stats', label: '📈 Thống kê' },
   { id: 'orders', label: '💰 Đơn hàng' },
   { id: 'users', label: '👤 Người dùng' },
+  { id: 'audit-log', label: '📜 Nhật ký thao tác' },
   { id: 'settings', label: '🔒 Đổi mật khẩu' },
 ];
 
@@ -33,6 +46,11 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const hasLoadedRef = useRef(false);
+
+  // Đợt 12q (21/09/2026) — Batch 5 mục #2: chọn nhiều dòng để duyệt/từ chối hàng loạt.
+  const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   useEffect(() => {
     if (me === null) router.replace('/dang-nhap');
@@ -85,6 +103,59 @@ export default function AdminDashboardPage() {
       await loadAll();
     } finally {
       setBusyId(null);
+    }
+  }
+
+  // Đợt 12q (21/09/2026) — Batch 5 mục #2: duyệt/từ chối hàng loạt tin/công ty đang chờ.
+  function toggleJobSelected(id: string) {
+    setSelectedJobIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function toggleAllJobsSelected() {
+    setSelectedJobIds((prev) => (prev.size === pendingJobs.length ? new Set() : new Set(pendingJobs.map((j) => j.id))));
+  }
+  async function handleBulkJobDecision(decision: 'approve' | 'reject') {
+    if (!token || selectedJobIds.size === 0) return;
+    setBulkBusy(true);
+    try {
+      const ids = Array.from(selectedJobIds);
+      if (decision === 'approve') await adminApi.bulkApproveJobs(token, ids);
+      else await adminApi.bulkRejectJobs(token, ids);
+      setSelectedJobIds(new Set());
+      await loadAll();
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  function toggleCompanySelected(id: string) {
+    setSelectedCompanyIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function toggleAllCompaniesSelected() {
+    setSelectedCompanyIds((prev) =>
+      prev.size === pendingCompanies.length ? new Set() : new Set(pendingCompanies.map((c) => c.id)),
+    );
+  }
+  async function handleBulkCompanyDecision(decision: 'approve' | 'reject') {
+    if (!token || selectedCompanyIds.size === 0) return;
+    setBulkBusy(true);
+    try {
+      const ids = Array.from(selectedCompanyIds);
+      if (decision === 'approve') await adminApi.bulkApproveCompanies(token, ids);
+      else await adminApi.bulkRejectCompanies(token, ids);
+      setSelectedCompanyIds(new Set());
+      await loadAll();
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -157,7 +228,30 @@ export default function AdminDashboardPage() {
           </>
         ) : tab === 'jobs' ? (
           <>
-            <h1 className="font-bold text-base mb-4">Hàng chờ duyệt tin tuyển dụng</h1>
+            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+              <h1 className="font-bold text-base">Hàng chờ duyệt tin tuyển dụng</h1>
+              {/* Đợt 12q (21/09/2026) — Batch 5 mục #2: thanh thao tác hàng loạt, chỉ hiện khi đã chọn
+                  ít nhất 1 dòng. */}
+              {selectedJobIds.size > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-ink-faint font-semibold">Đã chọn {selectedJobIds.size}</span>
+                  <button
+                    disabled={bulkBusy}
+                    onClick={() => handleBulkJobDecision('approve')}
+                    className="font-bold rounded-md bg-success-tint text-success px-2.5 py-1.5 disabled:opacity-50"
+                  >
+                    Duyệt tất cả đã chọn
+                  </button>
+                  <button
+                    disabled={bulkBusy}
+                    onClick={() => handleBulkJobDecision('reject')}
+                    className="font-bold rounded-md bg-critical-tint text-critical px-2.5 py-1.5 disabled:opacity-50"
+                  >
+                    Từ chối tất cả đã chọn
+                  </button>
+                </div>
+              )}
+            </div>
             {pendingJobs.length === 0 ? (
               <div className="text-center text-ink-faint text-sm py-16">Không có tin nào đang chờ duyệt 🎉</div>
             ) : (
@@ -166,6 +260,13 @@ export default function AdminDashboardPage() {
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="text-left text-ink-faint bg-surface-alt">
+                        <th className="py-2.5 px-3 w-8">
+                          <input
+                            type="checkbox"
+                            checked={selectedJobIds.size > 0 && selectedJobIds.size === pendingJobs.length}
+                            onChange={toggleAllJobsSelected}
+                          />
+                        </th>
                         <th className="py-2.5 px-4 font-semibold">Tin đăng</th>
                         <th className="py-2.5 px-3 font-semibold">Công ty</th>
                         <th className="py-2.5 px-3 font-semibold">Mức lương</th>
@@ -178,6 +279,13 @@ export default function AdminDashboardPage() {
                         const scan = scanJobContent(job.title, job.description, job.requirements);
                         return (
                         <tr key={job.id} className="border-t border-border align-top">
+                          <td className="py-3 px-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedJobIds.has(job.id)}
+                              onChange={() => toggleJobSelected(job.id)}
+                            />
+                          </td>
                           <td className="py-3 px-4 font-bold">
                             {job.title}
                             {(scan.hasLink || scan.sensitiveHits.length > 0) && (
@@ -239,7 +347,28 @@ export default function AdminDashboardPage() {
           </>
         ) : tab === 'companies' ? (
           <>
-            <h1 className="font-bold text-base mb-4">Hàng chờ duyệt công ty</h1>
+            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+              <h1 className="font-bold text-base">Hàng chờ duyệt công ty</h1>
+              {selectedCompanyIds.size > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-ink-faint font-semibold">Đã chọn {selectedCompanyIds.size}</span>
+                  <button
+                    disabled={bulkBusy}
+                    onClick={() => handleBulkCompanyDecision('approve')}
+                    className="font-bold rounded-md bg-success-tint text-success px-2.5 py-1.5 disabled:opacity-50"
+                  >
+                    Duyệt tất cả đã chọn
+                  </button>
+                  <button
+                    disabled={bulkBusy}
+                    onClick={() => handleBulkCompanyDecision('reject')}
+                    className="font-bold rounded-md bg-critical-tint text-critical px-2.5 py-1.5 disabled:opacity-50"
+                  >
+                    Từ chối tất cả đã chọn
+                  </button>
+                </div>
+              )}
+            </div>
             {pendingCompanies.length === 0 ? (
               <div className="text-center text-ink-faint text-sm py-16">Không có công ty nào đang chờ duyệt 🎉</div>
             ) : (
@@ -248,6 +377,13 @@ export default function AdminDashboardPage() {
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="text-left text-ink-faint bg-surface-alt">
+                        <th className="py-2.5 px-3 w-8">
+                          <input
+                            type="checkbox"
+                            checked={selectedCompanyIds.size > 0 && selectedCompanyIds.size === pendingCompanies.length}
+                            onChange={toggleAllCompaniesSelected}
+                          />
+                        </th>
                         <th className="py-2.5 px-4 font-semibold">Tên công ty</th>
                         <th className="py-2.5 px-3 font-semibold">Mã số thuế</th>
                         <th className="py-2.5 px-3 font-semibold">Ngành nghề</th>
@@ -257,6 +393,13 @@ export default function AdminDashboardPage() {
                     <tbody>
                       {pendingCompanies.map((c) => (
                         <tr key={c.id} className="border-t border-border">
+                          <td className="py-3 px-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedCompanyIds.has(c.id)}
+                              onChange={() => toggleCompanySelected(c.id)}
+                            />
+                          </td>
                           <td className="py-3 px-4 font-bold">{c.name}</td>
                           <td className="py-3 px-3 tabular-nums">{c.taxCode}</td>
                           <td className="py-3 px-3 text-ink-faint">{c.industry ?? '—'}</td>
@@ -284,6 +427,10 @@ export default function AdminDashboardPage() {
               </div>
             )}
           </>
+        ) : tab === 'featured' ? (
+          <FeaturedEmployersCard token={token} />
+        ) : tab === 'stats' ? (
+          <StatsCard token={token} />
         ) : tab === 'orders' ? (
           <>
             <h1 className="font-bold text-base mb-4">Đơn hàng chờ xác nhận thanh toán</h1>
@@ -337,6 +484,8 @@ export default function AdminDashboardPage() {
           </>
         ) : tab === 'users' ? (
           <UsersCard token={token} />
+        ) : tab === 'audit-log' ? (
+          <AuditLogCard token={token} />
         ) : (
           <>
             <h1 className="font-bold text-base mb-4">Đổi mật khẩu</h1>
@@ -457,5 +606,303 @@ function StatTile({ value, label }: { value: number; label: string }) {
       <div className="text-2xl font-extrabold tabular-nums">{value}</div>
       <div className="text-xs text-ink-faint mt-1">{label}</div>
     </div>
+  );
+}
+
+// Đợt 12q (21/09/2026) — Batch 5 mục #1 "Bật/tắt Doanh nghiệp yêu thích qua Admin UI": trước đây cờ
+// isFeaturedEmployer chỉ sửa được thẳng trong CSDL. Tìm công ty theo tên (mọi trạng thái duyệt) rồi
+// bật/tắt — cờ này quyết định huy hiệu + bộ lọc "Nhà tuyển dụng nổi bật" ở trang tìm việc công khai.
+function FeaturedEmployersCard({ token }: { token: string }) {
+  const [q, setQ] = useState('');
+  const [companies, setCompanies] = useState<Company[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const search = useCallback(async () => {
+    setLoading(true);
+    try {
+      const rows = await adminApi.searchCompanies(token, q);
+      setCompanies(rows);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, q]);
+
+  useEffect(() => {
+    search();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleToggle(id: string) {
+    setBusyId(id);
+    try {
+      const updated = await adminApi.toggleFeaturedEmployer(token, id);
+      setCompanies((prev) => prev?.map((c) => (c.id === id ? updated : c)) ?? prev);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <>
+      <h1 className="font-bold text-base mb-1">Doanh nghiệp yêu thích</h1>
+      <div className="text-xs text-ink-faint mb-4 max-w-2xl">
+        Công ty được đánh dấu sẽ hiện huy hiệu &ldquo;Nhà tuyển dụng nổi bật&rdquo; và xuất hiện trong bộ lọc cùng tên
+        ở trang tìm việc công khai.
+      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          search();
+        }}
+        className="flex gap-2 mb-4 max-w-md"
+      >
+        <input
+          type="text"
+          placeholder="Tìm theo tên công ty…"
+          className="tvl-input text-sm"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <button type="submit" disabled={loading} className="tvl-btn-primary !w-auto px-4 whitespace-nowrap">
+          Tìm
+        </button>
+      </form>
+      {loading ? (
+        <div className="text-center text-ink-faint py-10 text-sm">Đang tải…</div>
+      ) : !companies || companies.length === 0 ? (
+        <div className="text-center text-ink-faint text-sm py-10">Không tìm thấy công ty nào.</div>
+      ) : (
+        <div className="rounded-xl bg-white border border-border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-ink-faint bg-surface-alt">
+                  <th className="py-2.5 px-4 font-semibold">Tên công ty</th>
+                  <th className="py-2.5 px-3 font-semibold">Ngành nghề</th>
+                  <th className="py-2.5 px-3 font-semibold">Trạng thái duyệt</th>
+                  <th className="py-2.5 px-4 font-semibold text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {companies.map((c) => (
+                  <tr key={c.id} className="border-t border-border">
+                    <td className="py-3 px-4 font-bold">
+                      {c.name}
+                      {c.isFeaturedEmployer && (
+                        <span className="ml-2 text-[10px] font-bold rounded-full bg-warning-tint text-warning px-2 py-0.5">
+                          🌟 Yêu thích
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 px-3 text-ink-faint">{c.industry ?? '—'}</td>
+                    <td className="py-3 px-3 text-ink-faint">{c.approvalStatus ?? '—'}</td>
+                    <td className="py-3 px-4 text-right whitespace-nowrap">
+                      <button
+                        disabled={busyId === c.id}
+                        onClick={() => handleToggle(c.id)}
+                        className={`text-[11px] font-bold rounded-md px-2.5 py-1.5 disabled:opacity-50 ${
+                          c.isFeaturedEmployer ? 'bg-critical-tint text-critical' : 'bg-success-tint text-success'
+                        }`}
+                      >
+                        {c.isFeaturedEmployer ? 'Bỏ đánh dấu' : 'Đánh dấu yêu thích'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// Đợt 12q (21/09/2026) — Batch 5 mục #3 "Biểu đồ dashboard theo thời gian": tự vẽ biểu đồ cột bằng
+// div/CSS (height %) thay vì thêm thư viện chart ngoài (recharts/chart.js...) — dự án chưa có thư viện
+// biểu đồ nào, thêm mới sẽ tăng bundle size chỉ cho 1 trang admin ít dùng. 4 chỉ số riêng biệt thay vì
+// gộp 1 biểu đồ nhiều màu — dễ đọc hơn khi thang giá trị giữa các chỉ số chênh lệch nhiều.
+const STATS_METRICS: { key: keyof AdminStatsPoint; label: string; barClass: string }[] = [
+  { key: 'jobsPosted', label: 'Tin đăng mới', barClass: 'bg-primary' },
+  { key: 'companiesRegistered', label: 'Công ty đăng ký mới', barClass: 'bg-info' },
+  { key: 'candidatesRegistered', label: 'Ứng viên đăng ký mới', barClass: 'bg-success' },
+  { key: 'applications', label: 'Đơn ứng tuyển mới', barClass: 'bg-warning' },
+];
+
+function StatsCard({ token }: { token: string }) {
+  const [days, setDays] = useState(14);
+  const [series, setSeries] = useState<AdminStatsPoint[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    adminApi
+      .statsTimeSeries(token, days)
+      .then(setSeries)
+      .finally(() => setLoading(false));
+  }, [token, days]);
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <h1 className="font-bold text-base">Thống kê theo thời gian</h1>
+        <div className="flex gap-1.5 text-xs">
+          {[7, 14, 30].map((d) => (
+            <button
+              key={d}
+              onClick={() => setDays(d)}
+              className={`px-3 py-1.5 rounded-lg font-bold ${
+                days === d ? 'bg-primary text-white' : 'bg-surface-alt text-ink-faint'
+              }`}
+            >
+              {d} ngày
+            </button>
+          ))}
+        </div>
+      </div>
+      {loading || !series ? (
+        <div className="text-center text-ink-faint py-10 text-sm">Đang tải…</div>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-4">
+          {STATS_METRICS.map((m) => (
+            <MetricChart key={m.key} series={series} metricKey={m.key} label={m.label} barClass={m.barClass} />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function MetricChart({
+  series,
+  metricKey,
+  label,
+  barClass,
+}: {
+  series: AdminStatsPoint[];
+  metricKey: keyof AdminStatsPoint;
+  label: string;
+  barClass: string;
+}) {
+  const values = series.map((p) => Number(p[metricKey]));
+  const max = Math.max(1, ...values);
+  const total = values.reduce((a, b) => a + b, 0);
+  return (
+    <div className="rounded-xl bg-white border border-border p-4">
+      <div className="flex items-baseline justify-between mb-3">
+        <div className="font-bold text-sm">{label}</div>
+        <div className="text-xs text-ink-faint">
+          Tổng: <span className="font-extrabold text-ink">{total}</span>
+        </div>
+      </div>
+      <div className="flex items-end gap-[3px] h-24">
+        {series.map((p) => {
+          const v = Number(p[metricKey]);
+          const heightPct = v > 0 ? Math.max(4, Math.round((v / max) * 100)) : 0;
+          return (
+            <div key={p.date} className="flex-1 h-full flex items-end" title={`${formatDate(p.date)}: ${v}`}>
+              <div className={`w-full rounded-t ${barClass}`} style={{ height: `${heightPct}%`, minHeight: v > 0 ? 2 : 0 }} />
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-between text-[10px] text-ink-faint mt-1.5">
+        <span>{formatDate(series[0]?.date)}</span>
+        <span>{formatDate(series[series.length - 1]?.date)}</span>
+      </div>
+    </div>
+  );
+}
+
+// Đợt 12q (21/09/2026) — Batch 5 mục #4 "Nhật ký thao tác admin".
+const AUDIT_ACTION_LABEL: Record<string, string> = {
+  'job.approve': 'Duyệt tin',
+  'job.reject': 'Từ chối tin',
+  'job.bulk_approve': 'Duyệt hàng loạt tin',
+  'job.bulk_reject': 'Từ chối hàng loạt tin',
+  'company.approve': 'Duyệt công ty',
+  'company.reject': 'Từ chối công ty',
+  'company.bulk_approve': 'Duyệt hàng loạt công ty',
+  'company.bulk_reject': 'Từ chối hàng loạt công ty',
+  'company.toggle_featured': 'Bật/tắt DN yêu thích',
+  'order.confirm_payment': 'Xác nhận thanh toán',
+  'user.reset_password': 'Đặt lại mật khẩu',
+};
+
+function AuditLogCard({ token }: { token: string }) {
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState<{ items: AdminAuditLogEntry[]; page: number; totalPages: number } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    adminApi
+      .auditLog(token, page)
+      .then(setData)
+      .finally(() => setLoading(false));
+  }, [token, page]);
+
+  return (
+    <>
+      <h1 className="font-bold text-base mb-1">Nhật ký thao tác admin</h1>
+      <div className="text-xs text-ink-faint mb-4 max-w-2xl">
+        Ghi lại hành động duyệt/từ chối tin &amp; công ty (kể cả hàng loạt), đặt lại mật khẩu, xác nhận thanh
+        toán, bật/tắt &ldquo;Doanh nghiệp yêu thích&rdquo; — tính từ đợt này trở đi.
+      </div>
+      {loading || !data ? (
+        <div className="text-center text-ink-faint py-10 text-sm">Đang tải…</div>
+      ) : data.items.length === 0 ? (
+        <div className="text-center text-ink-faint text-sm py-16">Chưa có nhật ký nào.</div>
+      ) : (
+        <>
+          <div className="rounded-xl bg-white border border-border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-ink-faint bg-surface-alt">
+                    <th className="py-2.5 px-4 font-semibold">Thời gian</th>
+                    <th className="py-2.5 px-3 font-semibold">Admin</th>
+                    <th className="py-2.5 px-3 font-semibold">Hành động</th>
+                    <th className="py-2.5 px-3 font-semibold">Chi tiết</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.items.map((row) => (
+                    <tr key={row.id} className="border-t border-border align-top">
+                      <td className="py-3 px-4 tabular-nums whitespace-nowrap">{formatDateTime(row.createdAt)}</td>
+                      <td className="py-3 px-3 text-ink-faint whitespace-nowrap">{row.adminEmail}</td>
+                      <td className="py-3 px-3 font-bold whitespace-nowrap">
+                        {AUDIT_ACTION_LABEL[row.action] ?? row.action}
+                      </td>
+                      <td className="py-3 px-3 text-ink-faint">{row.description ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="flex items-center justify-center gap-3 mt-4 text-xs">
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="px-3 py-1.5 rounded-lg font-bold bg-surface-alt text-ink-faint disabled:opacity-40"
+            >
+              ← Trước
+            </button>
+            <span className="text-ink-faint">
+              Trang {data.page}/{data.totalPages}
+            </span>
+            <button
+              disabled={page >= data.totalPages}
+              onClick={() => setPage((p) => p + 1)}
+              className="px-3 py-1.5 rounded-lg font-bold bg-surface-alt text-ink-faint disabled:opacity-40"
+            >
+              Sau →
+            </button>
+          </div>
+        </>
+      )}
+    </>
   );
 }

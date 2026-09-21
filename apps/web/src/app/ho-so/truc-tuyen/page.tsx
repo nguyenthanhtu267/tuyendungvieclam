@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import SiteHeader from '@/components/SiteHeader';
+import { RichTextEditor } from '@/components/RichTextEditor';
+import { RichTextView } from '@/components/RichTextView';
 import { useAuth } from '@/lib/auth-context';
 import {
   ApiError,
@@ -32,7 +34,6 @@ import {
   Select,
   StatusBadge,
   SectionCard,
-  TextArea,
   TextInput,
 } from '@/components/profile/ui';
 
@@ -241,7 +242,7 @@ export default function OnlineProfilePage() {
 
             <SectionCard id="muc-4" title="Mục tiêu nghề nghiệp" status={status.careerObjective} onEdit={() => setModal({ type: 'careerObjective' })}>
               {profile.careerObjective ? (
-                <p className="whitespace-pre-line text-sm text-ink-muted">{profile.careerObjective}</p>
+                <RichTextView value={profile.careerObjective} className="text-sm text-ink-muted" />
               ) : (
                 <EmptyBox text="Chưa có mục tiêu nghề nghiệp" />
               )}
@@ -403,7 +404,7 @@ export default function OnlineProfilePage() {
                 <ListRow
                   key={it.id}
                   title={it.title}
-                  subtitle={it.description}
+                  subtitle={it.description ? <RichTextView value={it.description} /> : undefined}
                   meta={fmtDate(it.date)}
                   onEdit={() => setModal({ type: 'achievements', mode: 'edit', item: it })}
                   onRemove={() => removeItem('achievements', it.id)}
@@ -722,7 +723,13 @@ function renderFields(modal: NonNullable<ModalState>, form: Record<string, any>,
     case 'careerObjective':
       return (
         <Field label="Mục tiêu nghề nghiệp" htmlFor="f-objective">
-          <TextArea id="f-objective" value={form.careerObjective} onChange={(e) => set('careerObjective', e.target.value)} />
+          <RichTextEditor
+            id="f-objective"
+            value={form.careerObjective}
+            onChange={(html) => set('careerObjective', html)}
+            placeholder="Định hướng nghề nghiệp, mục tiêu ngắn/dài hạn của bạn..."
+            minHeight={160}
+          />
         </Field>
       );
     case 'careerInfo':
@@ -791,7 +798,13 @@ function renderFields(modal: NonNullable<ModalState>, form: Record<string, any>,
           </div>
           <CheckboxRow label="Tôi đang làm việc ở đây" checked={!!form.isCurrent} onChange={(v) => set('isCurrent', v)} />
           <Field label="Mô tả công việc" htmlFor="f-desc">
-            <TextArea id="f-desc" value={form.description} onChange={(e) => set('description', e.target.value)} />
+            <RichTextEditor
+              id="f-desc"
+              value={form.description}
+              onChange={(html) => set('description', html)}
+              placeholder="Mô tả công việc, thành tích nổi bật trong vai trò này..."
+              minHeight={160}
+            />
           </Field>
         </div>
       );
@@ -874,7 +887,12 @@ function renderFields(modal: NonNullable<ModalState>, form: Record<string, any>,
             <TextInput id="f-atitle" value={form.title} onChange={(e) => set('title', e.target.value)} />
           </Field>
           <Field label="Mô tả" htmlFor="f-adesc">
-            <TextArea id="f-adesc" value={form.description} onChange={(e) => set('description', e.target.value)} />
+            <RichTextEditor
+              id="f-adesc"
+              value={form.description}
+              onChange={(html) => set('description', html)}
+              minHeight={140}
+            />
           </Field>
           <Field label="Ngày đạt được" htmlFor="f-adate">
             <TextInput id="f-adate" type="date" value={form.date} onChange={(e) => set('date', e.target.value)} />
@@ -899,7 +917,12 @@ function renderFields(modal: NonNullable<ModalState>, form: Record<string, any>,
             </Field>
           </div>
           <Field label="Mô tả" htmlFor="f-actdesc">
-            <TextArea id="f-actdesc" value={form.description} onChange={(e) => set('description', e.target.value)} />
+            <RichTextEditor
+              id="f-actdesc"
+              value={form.description}
+              onChange={(html) => set('description', html)}
+              minHeight={140}
+            />
           </Field>
         </div>
       );
