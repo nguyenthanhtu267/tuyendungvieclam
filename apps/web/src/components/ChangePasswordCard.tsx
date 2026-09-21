@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { authApi, ApiError } from '@/lib/api';
+import PasswordInput from '@/components/PasswordInput';
 
 // Đợt 12a (20/09/2026) — dùng chung cho trang Cài đặt của Ứng viên (/ho-so) và Nhà tuyển dụng
 // (/nha-tuyen-dung/tai-khoan). Đây là cách thực tế để đóng rủi ro "mật khẩu Admin mẫu lộ trong
@@ -45,24 +46,21 @@ export default function ChangePasswordCard({ token }: { token: string }) {
       <div className="font-bold text-[13px] mb-0.5">Đổi mật khẩu</div>
       <div className="text-ink-faint text-[11.3px] mb-3">Nên đổi ngay nếu bạn đang dùng mật khẩu được cấp tạm</div>
       <form onSubmit={handleSubmit} className="flex flex-col gap-2.5">
-        <input
-          type="password"
+        <PasswordInput
           required
           placeholder="Mật khẩu hiện tại"
           className="tvl-input text-[13px]"
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
         />
-        <input
-          type="password"
+        <PasswordInput
           required
           placeholder="Mật khẩu mới (tối thiểu 6 ký tự)"
           className="tvl-input text-[13px]"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
         />
-        <input
-          type="password"
+        <PasswordInput
           required
           placeholder="Nhập lại mật khẩu mới"
           className="tvl-input text-[13px]"

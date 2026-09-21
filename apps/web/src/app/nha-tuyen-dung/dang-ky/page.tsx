@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { authApi, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import PasswordInput from '@/components/PasswordInput';
 
 export default function DangKyNtdPage() {
   const router = useRouter();
@@ -131,7 +132,7 @@ export default function DangKyNtdPage() {
               </Field>
             </div>
             <Field label="Mật khẩu" hint="Tối thiểu 8 ký tự">
-              <input type="password" required minLength={8} className="tvl-input" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+              <PasswordInput required minLength={8} className="tvl-input" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
             </Field>
 
             <button type="submit" disabled={loading} className="tvl-btn-accent mt-2">

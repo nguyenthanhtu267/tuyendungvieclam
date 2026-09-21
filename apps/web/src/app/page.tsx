@@ -17,6 +17,13 @@ export default function Home() {
   const [jobs, setJobs] = useState<JobPosting[] | null>(null);
   const [facets, setFacets] = useState<JobFacets | null>(null);
   const [featured, setFeatured] = useState<FeaturedEmployer[] | null>(null);
+  // Đợt 12r (21/09/2026) — "Ngành nghề nổi bật" trước đây liệt kê HẾT mọi ngành (facets.industries
+  // không giới hạn số lượng ở backend), tạo danh sách rất dài trên trang chủ. Nay chỉ hiện 6 mục đầu
+  // (≈2 dòng ở màn hình rộng, khớp cách "Doanh nghiệp yêu thích" đang hiển thị) kèm nút "Xem tất cả"
+  // để mở rộng xem hết — không có trang riêng liệt kê toàn bộ ngành nên dùng toggle mở/thu gọn tại chỗ
+  // thay vì điều hướng sang trang khác.
+  const [showAllIndustries, setShowAllIndustries] = useState(false);
+  const HOME_SECTION_PREVIEW_COUNT = 6;
 
   useEffect(() => {
     jobsApi
@@ -156,18 +163,31 @@ export default function Home() {
 
         {facets && facets.industries.length > 0 && (
           <>
-            <h2 className="font-extrabold text-lg mt-9 mb-3">Ngành nghề nổi bật</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              {facets.industries.map((f) => (
-                <a
-                  key={f.industry}
-                  href={`/viec-lam?industries=${encodeURIComponent(f.industry)}`}
-                  className="flex items-center justify-between rounded-lg border border-border bg-white px-3.5 py-2.5 text-[12.5px] font-semibold hover:border-primary transition-colors"
+            <div className="flex items-center justify-between mt-9 mb-3">
+              <h2 className="font-extrabold text-lg">Ngành nghề nổi bật</h2>
+              {facets.industries.length > HOME_SECTION_PREVIEW_COUNT && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllIndustries((v) => !v)}
+                  className="text-primary text-xs font-bold"
                 >
-                  <span>{f.industry}</span>
-                  <b className="font-mono tabular-nums text-ink-faint">{f.count}</b>
-                </a>
-              ))}
+                  {showAllIndustries ? 'Thu gọn ↑' : 'Xem tất cả →'}
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {(showAllIndustries ? facets.industries : facets.industries.slice(0, HOME_SECTION_PREVIEW_COUNT)).map(
+                (f) => (
+                  <a
+                    key={f.industry}
+                    href={`/viec-lam?industries=${encodeURIComponent(f.industry)}`}
+                    className="flex items-center justify-between rounded-lg border border-border bg-white px-3.5 py-2.5 text-[12.5px] font-semibold hover:border-primary transition-colors"
+                  >
+                    <span>{f.industry}</span>
+                    <b className="font-mono tabular-nums text-ink-faint">{f.count}</b>
+                  </a>
+                ),
+              )}
             </div>
           </>
         )}
@@ -180,8 +200,11 @@ export default function Home() {
                 Xem tất cả →
               </a>
             </div>
+            {/* Đợt 12r — giới hạn 6 mục (≈2 dòng) trên trang chủ, đề phòng số Doanh nghiệp yêu thích
+                tăng lên sau này (đã có công cụ bật/tắt ở Admin Console từ Batch 5) khiến danh sách dài
+                ra. "Xem tất cả →" đã sẵn dẫn sang trang việc làm lọc theo NTD nổi bật — đủ để xem hết. */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {featured.map((c) => (
+              {featured.slice(0, HOME_SECTION_PREVIEW_COUNT).map((c) => (
                 <a
                   key={c.id}
                   href={`/viec-lam?q=${encodeURIComponent(c.name)}`}

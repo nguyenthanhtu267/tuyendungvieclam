@@ -8,6 +8,7 @@ import { employerApi, ApiError, type Company, type TeamMember } from '@/lib/api'
 import { formatDate } from '@/lib/format';
 import ChangePasswordCard from '@/components/ChangePasswordCard';
 import FacebookConnectCard from '@/components/FacebookConnectCard';
+import PasswordInput from '@/components/PasswordInput';
 
 const LEGAL_DOC_MAX_BYTES = 3 * 1024 * 1024;
 
@@ -387,9 +388,8 @@ function TeamCard({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
-            <input
+            <PasswordInput
               className="tvl-input"
-              type="password"
               placeholder="Mật khẩu (tối thiểu 8 ký tự)"
               required
               minLength={8}

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { authApi, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import PasswordInput from '@/components/PasswordInput';
 
 type Tab = 'login' | 'register';
 
@@ -143,8 +144,7 @@ export default function DangNhapPage() {
                 />
               </Field>
               <Field label="Mật khẩu">
-                <input
-                  type="password"
+                <PasswordInput
                   required
                   className="tvl-input"
                   value={loginPassword}
@@ -202,8 +202,7 @@ export default function DangNhapPage() {
                 />
               </Field>
               <Field label="Mật khẩu" hint="Tối thiểu 8 ký tự">
-                <input
-                  type="password"
+                <PasswordInput
                   required
                   minLength={8}
                   className="tvl-input"
