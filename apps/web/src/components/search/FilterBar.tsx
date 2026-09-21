@@ -26,10 +26,19 @@ export function FilterBar({
   value,
   onChange,
   onClear,
+  searchValue,
+  onSearchChange,
+  onSearchSubmit,
 }: {
   value: JobListParams;
   onChange: (patch: Partial<JobListParams>) => void;
   onClear: () => void;
+  // Đợt 12t (21/09/2026) — gộp ô tìm từ khóa + nút "Tìm" vào chung 1 dòng với 2 popover Tỉnh/Thành
+  // và Ngành nghề (trước đây tách thành 2 khối trắng xếp chồng, theo yêu cầu người dùng cần 1 dòng
+  // duy nhất giống ảnh mẫu). Các prop này optional để FilterBar vẫn dùng được không cần ô từ khóa.
+  searchValue?: string;
+  onSearchChange?: (v: string) => void;
+  onSearchSubmit?: (e: React.FormEvent) => void;
 }) {
   const hasAnyFilter =
     (value.provinces?.length ?? 0) > 0 ||
@@ -42,26 +51,48 @@ export function FilterBar({
     !!value.urgentOnly ||
     !!value.featuredEmployerOnly;
 
+  const showSearchField = onSearchChange !== undefined;
+
   return (
     <div className="rounded-xl border border-border bg-white p-3.5 flex flex-col gap-3">
-      <div className="grid sm:grid-cols-2 gap-2.5">
-        <MultiSelectPopover
-          label="Tỉnh, Thành Phố"
-          placeholder="Tỉnh, Thành Phố"
-          groups={PROVINCE_GROUPS}
-          selected={value.provinces ?? []}
-          onChange={(v) => onChange({ provinces: v })}
-          emptyText="Chọn địa điểm"
-        />
-        <MultiSelectPopover
-          label="Ngành nghề"
-          placeholder="Ngành nghề"
-          groups={INDUSTRY_GROUPS}
-          selected={value.industries ?? []}
-          onChange={(v) => onChange({ industries: v })}
-          emptyText="Vui lòng chọn ngành nghề"
-        />
-      </div>
+      <form
+        onSubmit={onSearchSubmit ?? ((e) => e.preventDefault())}
+        className="flex flex-col sm:flex-row gap-2.5"
+      >
+        {showSearchField && (
+          <input
+            className="tvl-input sm:flex-[1.4] min-w-0"
+            placeholder="Chức danh, kỹ năng, tên công ty"
+            value={searchValue}
+            onChange={(e) => onSearchChange?.(e.target.value)}
+          />
+        )}
+        <div className="sm:flex-1 min-w-0">
+          <MultiSelectPopover
+            label="Tỉnh, Thành Phố"
+            placeholder="Tỉnh, Thành Phố"
+            groups={PROVINCE_GROUPS}
+            selected={value.provinces ?? []}
+            onChange={(v) => onChange({ provinces: v })}
+            emptyText="Chọn địa điểm"
+          />
+        </div>
+        <div className="sm:flex-1 min-w-0">
+          <MultiSelectPopover
+            label="Ngành nghề"
+            placeholder="Ngành nghề"
+            groups={INDUSTRY_GROUPS}
+            selected={value.industries ?? []}
+            onChange={(v) => onChange({ industries: v })}
+            emptyText="Vui lòng chọn ngành nghề"
+          />
+        </div>
+        {showSearchField && (
+          <button type="submit" className="tvl-btn-primary !w-auto px-6 shrink-0">
+            🔎 Tìm
+          </button>
+        )}
+      </form>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         <select

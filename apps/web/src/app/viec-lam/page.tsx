@@ -152,19 +152,16 @@ function JobSearchPage() {
       <SiteHeader />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col gap-3">
-        <form onSubmit={handleSearchSubmit} className="rounded-xl border border-border bg-white p-3.5 flex gap-2.5 flex-wrap">
-          <input
-            className="tvl-input flex-[2] min-w-[200px]"
-            placeholder="Chức danh, kỹ năng, tên công ty"
-            value={qInput}
-            onChange={(e) => setQInput(e.target.value)}
-          />
-          <button type="submit" className="tvl-btn-primary !w-auto px-6">
-            🔎 Tìm
-          </button>
-        </form>
-
-        <FilterBar value={filters} onChange={updateParams} onClear={handleClearFilters} />
+        {/* Đợt 12t (21/09/2026) — gộp ô tìm từ khóa + nút "Tìm" vào chung 1 dòng với Tỉnh/Thành +
+            Ngành nghề trong FilterBar (trước đây là 2 khối trắng tách rời, theo yêu cầu người dùng). */}
+        <FilterBar
+          value={filters}
+          onChange={updateParams}
+          onClear={handleClearFilters}
+          searchValue={qInput}
+          onSearchChange={setQInput}
+          onSearchSubmit={handleSearchSubmit}
+        />
 
         {districts.length > 0 && (
           <DistrictChips
