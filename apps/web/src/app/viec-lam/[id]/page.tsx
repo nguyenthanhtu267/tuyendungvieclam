@@ -360,6 +360,23 @@ function JobDetailInner() {
                       <li>Lương: {formatSalaryTag(job.salaryMin, job.salaryMax)}</li>
                     </ul>
                   </div>
+
+                  {/* Đợt 12v (21/09/2026) — "JOB TAGS / SKILLS": thẻ từ khoá/kỹ năng NTD tự nhập khi
+                      đăng tin (theo ảnh mẫu người dùng gửi), chỉ hiện khi tin có ít nhất 1 tag. */}
+                  {job.tags && job.tags.length > 0 && (
+                    <div className="mt-5">
+                      <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">
+                        Job tags / Skills
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {job.tags.map((t) => (
+                          <span key={t} className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full bg-surface-alt text-ink-muted">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="flex flex-col gap-3 text-[12.8px] text-ink-muted">

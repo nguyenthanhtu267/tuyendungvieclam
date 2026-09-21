@@ -196,6 +196,7 @@ export class EmployerService {
       gender: job.gender,
       ageRange: job.ageRange,
       workSchedule: job.workSchedule,
+      tags: job.tags,
       approvalStatus: JobApprovalStatus.PENDING,
       isPaused: false,
     });
@@ -230,6 +231,7 @@ export class EmployerService {
       gender: dto.gender,
       ageRange: dto.ageRange,
       workSchedule: dto.workSchedule,
+      tags: dto.tags,
       approvalStatus: JobApprovalStatus.PENDING,
     });
     return this.jobRepo.save(job);
@@ -276,6 +278,7 @@ export class EmployerService {
     'gender',
     'ageRange',
     'workSchedule',
+    'tags',
   ] as const;
 
   async updateJob(userId: string, jobId: string, dto: UpdateJobDto) {

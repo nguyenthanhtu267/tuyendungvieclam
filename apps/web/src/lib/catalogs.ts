@@ -60,33 +60,52 @@ export const PROVINCES: string[] = [
   ...PROVINCE_REGIONS.flatMap((r) => r.provinces),
 ];
 
+// Đợt 12v (21/09/2026) — rà soát lại toàn bộ danh mục theo yêu cầu người dùng (sau khi phát hiện
+// thiếu "Nhân sự" ở đợt 12u): đối chiếu với danh mục ngành nghề phổ biến của các trang tuyển dụng lớn
+// tại VN (careerviet.vn, TopCV, VietnamWorks), bổ sung thêm 10 ngành còn thiếu — An ninh/Bảo vệ, Bảo
+// hiểm, Dệt may/Da giày, Điện/Điện tử/Điện lạnh, Lao động phổ thông, Luật/Pháp lý, Quảng cáo/Truyền
+// thông/Đối ngoại, Thiết kế/Mỹ thuật, Viễn thông, Xuất nhập khẩu — sắp theo thứ tự bảng chữ cái tiếng
+// Việt cho nhất quán (2 mục cuối "Ngành khác"/"Thương mại điện tử" giữ nguyên vị trí cũ, thêm sau).
 export const INDUSTRIES: string[] = [
+  'An ninh / Bảo vệ',
+  'Bảo hiểm',
   'Bảo trì / Sửa chữa',
   'Bán lẻ',
   'Biên phiên dịch',
   'Bất động sản',
   'CNTT / Phần mềm',
   'Công nghệ sinh học',
+  'Dệt may / Da giày',
   'Dịch vụ khách hàng',
   'Du lịch',
+  'Điện / Điện tử / Điện lạnh',
   'Giáo dục / Đào tạo',
   'Hàng hải',
   'Hành chính / Văn phòng',
   'Khoáng sản',
   'Kinh doanh / Bán hàng',
   'Kế toán / Kiểm toán',
+  'Lao động phổ thông',
   'Logistics',
+  'Luật / Pháp lý',
   'Marketing',
   'Mới tốt nghiệp / Thực tập',
   'Nhà hàng / Khách sạn',
+  // Đợt 12u (21/09/2026) — bổ sung "Nhân sự" (HR), bị thiếu trong danh mục ngành nghề dùng chung
+  // (FilterBar tìm việc, form đăng tin, mega menu) — người dùng phát hiện không tìm thấy khi lọc.
+  'Nhân sự',
   'Ngân hàng',
   'Nông nghiệp',
+  'Quảng cáo / Truyền thông / Đối ngoại',
   'Sản xuất / Cơ khí',
   'Tài chính / Đầu tư',
+  'Thiết kế / Mỹ thuật',
   'Thực phẩm & Đồ uống',
   'Tư vấn',
   'Vận tải',
+  'Viễn thông',
   'Xây dựng',
+  'Xuất nhập khẩu',
   'Y tế / Dược',
   'Ngành khác',
   'Thương mại điện tử',

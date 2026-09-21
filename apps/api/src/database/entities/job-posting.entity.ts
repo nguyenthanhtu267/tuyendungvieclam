@@ -127,6 +127,13 @@ export class JobPosting {
   @Column({ name: 'work_schedule', nullable: true })
   workSchedule?: string;
 
+  // Đợt 12v (21/09/2026) — "JOB TAGS / SKILLS": thẻ từ khoá/kỹ năng NTD tự nhập tự do khi đăng tin
+  // (VD "Tiktokshop Specialist", "Admin E-commerce"), hiển thị dạng chip dưới khối "Thông tin khác"
+  // ở trang chi tiết tin (theo ảnh mẫu người dùng gửi) — khác `industry` (1 ngành nghề chọn từ danh
+  // mục cố định) và `benefits` (phúc lợi chọn từ danh mục cố định).
+  @Column({ type: 'simple-array', nullable: true })
+  tags?: string[];
+
   @Column({
     type: 'enum',
     enum: JobApprovalStatus,

@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth-context';
 import { employerApi, ApiError } from '@/lib/api';
 import { formatSalary } from '@/lib/format';
 import { MultiSelectPopover } from '@/components/search/MultiSelectPopover';
+import { ChipsInput } from '@/components/profile/ui';
 import {
   EMPLOYMENT_TYPES,
   EXPERIENCE_LEVELS,
@@ -52,6 +53,9 @@ interface FormState {
   requirements: string;
   benefits: string[];
   deadline: string;
+  // Đợt 12v (21/09/2026) — "JOB TAGS / SKILLS": thẻ từ khoá/kỹ năng NTD tự nhập tự do (VD "Tiktokshop
+  // Specialist", "Admin E-commerce"), hiển thị dạng chip ở trang chi tiết tin.
+  tags: string[];
 }
 
 const INITIAL: FormState = {
@@ -75,6 +79,7 @@ const INITIAL: FormState = {
   requirements: '',
   benefits: [],
   deadline: '',
+  tags: [],
 };
 
 // Đợt 12l (21/09/2026) — dùng chung wizard này cho cả "Đăng tin mới" và "Sửa tin" (nút Sửa ở trang
@@ -124,6 +129,7 @@ function DangTinInner() {
           requirements: job.requirements ?? '',
           benefits: job.benefits ?? [],
           deadline: job.deadline ?? '',
+          tags: job.tags ?? [],
         });
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Không thể tải tin để sửa'))
@@ -179,6 +185,7 @@ function DangTinInner() {
       requirements: form.requirements || undefined,
       benefits: form.benefits.length ? form.benefits : undefined,
       deadline: form.deadline || undefined,
+      tags: form.tags.length ? form.tags : undefined,
     };
     try {
       if (editId) await employerApi.updateJob(token, editId, payload);
@@ -401,6 +408,11 @@ function DangTinInner() {
                   minHeight={220}
                 />
               </Field>
+              {/* Đợt 12v (21/09/2026) — "JOB TAGS / SKILLS": thẻ từ khoá/kỹ năng tự nhập tự do (không
+                  bắt buộc), hiển thị dạng chip ở trang chi tiết tin, dưới khối "Thông tin khác". */}
+              <Field label="Job tags / Kỹ năng (không bắt buộc)" hint="Nhập rồi Enter, VD: Tiktokshop Specialist">
+                <ChipsInput value={form.tags} onChange={(v) => setForm({ ...form, tags: v })} placeholder="Nhập rồi Enter" />
+              </Field>
               <div className="text-[11px] text-ink-faint">
                 Ảnh/banner tin tuyển dụng: sẽ hỗ trợ ở bản cập nhật sau (khi kết nối lưu trữ tệp Cloudflare R2).
               </div>
@@ -447,6 +459,16 @@ function DangTinInner() {
                     <span key={tag} className="text-[11px] font-semibold bg-primary-tint text-primary rounded-full px-2.5 py-1">{tag}</span>
                   ))}
                 </div>
+                {form.tags.length > 0 && (
+                  <div className="mt-2.5">
+                    <div className="text-[10.5px] font-bold text-ink-faint uppercase tracking-wide mb-1">Job tags / Skills</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {form.tags.map((tag) => (
+                        <span key={tag} className="text-[11px] font-semibold bg-surface-alt text-ink-muted rounded-full px-2.5 py-1">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {form.deadline && <div className="text-[11px] text-ink-faint mt-2.5">Hạn nộp {form.deadline}</div>}
               </div>
               <div className="text-[11px] text-ink-faint">

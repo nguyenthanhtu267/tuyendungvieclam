@@ -89,4 +89,9 @@ export class CreateJobDto {
   @IsOptional()
   @IsString()
   workSchedule?: string;
+
+  // Đợt 12v (21/09/2026) — "JOB TAGS / SKILLS", thẻ tự nhập tự do (không bắt buộc).
+  @IsOptional()
+  @IsArray()
+  tags?: string[];
 }

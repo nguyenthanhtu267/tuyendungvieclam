@@ -187,6 +187,22 @@ export default function XemTinNtdPage() {
                   <li>Lương: {formatSalaryTag(job.salaryMin, job.salaryMax)}</li>
                 </ul>
               </div>
+
+              {/* Đợt 12v (21/09/2026) — "JOB TAGS / SKILLS", đồng bộ với trang chi tiết công khai. */}
+              {job.tags && job.tags.length > 0 && (
+                <div className="mt-5">
+                  <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">
+                    Job tags / Skills
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {job.tags.map((t) => (
+                      <span key={t} className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full bg-surface-alt text-ink-muted">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

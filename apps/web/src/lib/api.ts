@@ -127,6 +127,9 @@ export interface JobPosting {
   gender?: string;
   ageRange?: string;
   workSchedule?: string;
+  // Đợt 12v (21/09/2026) — "JOB TAGS / SKILLS": thẻ từ khoá/kỹ năng NTD tự nhập, hiển thị dạng chip
+  // dưới khối "Thông tin khác" ở trang chi tiết tin (theo ảnh mẫu người dùng gửi).
+  tags?: string[];
   approvalStatus?: JobApprovalStatus;
   // Đợt 12l (21/09/2026) — dùng ở trang Xem trước NTD để hiện đúng trạng thái "Tạm ngưng".
   isPaused?: boolean;
@@ -633,6 +636,7 @@ export interface CreateJobPayload {
   gender?: string;
   ageRange?: string;
   workSchedule?: string;
+  tags?: string[];
 }
 
 // ===== B5 — Tài khoản & Hồ sơ công ty =====
