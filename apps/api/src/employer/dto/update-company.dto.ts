@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UpdateCompanyDto {
   @IsOptional()
@@ -17,4 +17,10 @@ export class UpdateCompanyDto {
   @IsOptional()
   @IsString()
   logoUrl?: string;
+
+  // Đợt 12ac (24/09/2026) — "Giới thiệu công ty" hiển thị ở tab Tổng quan công ty (trang chi tiết tin).
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  description?: string;
 }

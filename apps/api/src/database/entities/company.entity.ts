@@ -44,6 +44,11 @@ export class Company {
   @Column({ name: 'logo_url', nullable: true })
   logoUrl?: string;
 
+  // Đợt 12ac (24/09/2026) — "Giới thiệu công ty" cho tab Tổng quan công ty (trang chi tiết tin), có
+  // mở rộng/thu gọn ở FE khi dài — theo mẫu careerviet.vn.
+  @Column({ type: 'text', nullable: true })
+  description?: string;
+
   @Index()
   @Column({
     type: 'enum',

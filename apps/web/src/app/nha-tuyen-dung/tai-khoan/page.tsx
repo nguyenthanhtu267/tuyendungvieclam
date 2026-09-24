@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import EmployerHeader from '@/components/EmployerHeader';
 import { useAuth } from '@/lib/auth-context';
-import { employerApi, ApiError, type Company, type TeamMember } from '@/lib/api';
+import { employerApi, ApiError, type Company, type TeamMember, type WorkLocation } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import ChangePasswordCard from '@/components/ChangePasswordCard';
 import FacebookConnectCard from '@/components/FacebookConnectCard';
@@ -18,6 +18,7 @@ export default function TaiKhoanPage() {
   const { me, token } = useAuth();
   const [company, setCompany] = useState<Company | null>(null);
   const [team, setTeam] = useState<TeamMember[]>([]);
+  const [workLocations, setWorkLocations] = useState<WorkLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const hasLoadedRef = useRef(false);
@@ -34,9 +35,14 @@ export default function TaiKhoanPage() {
     if (!token) return;
     if (!hasLoadedRef.current) setLoading(true);
     try {
-      const [c, t] = await Promise.all([employerApi.getCompany(token), employerApi.listTeam(token)]);
+      const [c, t, wl] = await Promise.all([
+        employerApi.getCompany(token),
+        employerApi.listTeam(token),
+        employerApi.listWorkLocations(token),
+      ]);
       setCompany(c);
       setTeam(t);
+      setWorkLocations(wl);
       hasLoadedRef.current = true;
     } finally {
       setLoading(false);
@@ -71,6 +77,7 @@ export default function TaiKhoanPage() {
         ) : (
           <>
             <CompanyInfoCard token={token} company={company} onSaved={loadAll} onToast={notify} />
+            <WorkLocationsCard token={token} locations={workLocations} onSaved={loadAll} onToast={notify} />
             <LegalDocCard token={token} company={company} onSaved={loadAll} onToast={notify} />
             <TeamCard token={token} team={team} onSaved={loadAll} onToast={notify} />
             <ChangePasswordCard token={token} />
@@ -97,6 +104,7 @@ function CompanyInfoCard({
   const [industry, setIndustry] = useState(company.industry ?? '');
   const [website, setWebsite] = useState(company.website ?? '');
   const [logoUrl, setLogoUrl] = useState(company.logoUrl ?? '');
+  const [description, setDescription] = useState(company.description ?? '');
   const [saving, setSaving] = useState(false);
 
   async function handleSave(e: React.FormEvent) {
@@ -108,6 +116,7 @@ function CompanyInfoCard({
         industry: industry.trim() || undefined,
         website: website.trim() || undefined,
         logoUrl: logoUrl.trim() || undefined,
+        description: description.trim() || undefined,
       });
       onToast('Đã lưu thông tin công ty');
       await onSaved();
@@ -189,12 +198,164 @@ function CompanyInfoCard({
           Dán link ảnh logo công ty (PNG/JPG) đã đăng ở nơi khác — nếu link lỗi hoặc chưa có logo, hệ thống tự hiện chữ cái đầu tên công ty.
         </div>
       </div>
+      {/* Đợt 12ac (24/09/2026) — "Giới thiệu công ty", hiện ở tab Tổng quan công ty (trang chi tiết
+          tin), có mở rộng/thu gọn khi dài, theo mẫu careerviet.vn. */}
+      <div>
+        <label htmlFor="tk-description" className="text-xs font-semibold text-ink-faint mb-1 block">
+          Giới thiệu công ty (không bắt buộc)
+        </label>
+        <textarea
+          id="tk-description"
+          className="tvl-input !h-auto"
+          rows={5}
+          placeholder="Giới thiệu ngắn về công ty — lịch sử, lĩnh vực hoạt động, văn hoá làm việc…"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+        <div className="text-[10.5px] text-ink-faint mt-1.5">
+          Hiển thị ở tab &quot;Tổng quan công ty&quot; trên trang chi tiết tin tuyển dụng.
+        </div>
+      </div>
       <div className="flex justify-end pt-2 border-t border-border">
         <button type="submit" disabled={saving} className="tvl-btn-primary !w-auto px-6">
           {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
         </button>
       </div>
     </form>
+  );
+}
+
+// Đợt 12ac (24/09/2026) — "Quản lý địa điểm làm việc": lưu sẵn các địa điểm hay dùng để chọn nhanh
+// khi đăng tin (autofill tỉnh/thành, quận/huyện, địa chỉ), thay vì gõ lại mỗi lần. Text thuần, CHƯA
+// tích hợp bản đồ thật (Goong Maps là API trả phí — theo quyết định đã chốt).
+function WorkLocationsCard({
+  token,
+  locations,
+  onSaved,
+  onToast,
+}: {
+  token: string;
+  locations: WorkLocation[];
+  onSaved: () => Promise<void>;
+  onToast: (msg: string) => void;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [label, setLabel] = useState('');
+  const [province, setProvince] = useState('');
+  const [district, setDistrict] = useState('');
+  const [address, setAddress] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await employerApi.createWorkLocation(token, {
+        label: label.trim(),
+        province: province.trim(),
+        district: district.trim() || undefined,
+        address: address.trim() || undefined,
+      });
+      setLabel('');
+      setProvince('');
+      setDistrict('');
+      setAddress('');
+      setShowForm(false);
+      onToast('Đã thêm địa điểm làm việc');
+      await onSaved();
+    } catch (err) {
+      onToast(err instanceof ApiError ? err.message : 'Không thể thêm địa điểm');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleRemove(id: string) {
+    setRemovingId(id);
+    try {
+      await employerApi.deleteWorkLocation(token, id);
+      onToast('Đã xoá địa điểm làm việc');
+      await onSaved();
+    } catch (err) {
+      onToast(err instanceof ApiError ? err.message : 'Không thể xoá địa điểm này');
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-white p-[18px] flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-extrabold text-[15px]">Địa điểm làm việc</h2>
+        <button onClick={() => setShowForm((v) => !v)} className="text-xs font-bold text-primary">
+          {showForm ? 'Đóng' : '+ Thêm địa điểm'}
+        </button>
+      </div>
+      <div className="text-[11px] text-ink-faint -mt-1.5">
+        Lưu sẵn địa điểm hay dùng để chọn nhanh khi đăng tin tuyển dụng.
+      </div>
+
+      {showForm && (
+        <form onSubmit={handleAdd} className="rounded-lg border border-border-strong p-3.5 flex flex-col gap-2.5">
+          <input
+            className="tvl-input"
+            placeholder="Tên gợi nhớ (VD: Văn phòng Quận 1)"
+            required
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+          <div className="grid sm:grid-cols-2 gap-2.5">
+            <input
+              className="tvl-input"
+              placeholder="Tỉnh/Thành phố"
+              required
+              value={province}
+              onChange={(e) => setProvince(e.target.value)}
+            />
+            <input
+              className="tvl-input"
+              placeholder="Quận/Huyện (không bắt buộc)"
+              value={district}
+              onChange={(e) => setDistrict(e.target.value)}
+            />
+          </div>
+          <input
+            className="tvl-input"
+            placeholder="Địa chỉ chi tiết (không bắt buộc)"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+          />
+          <button type="submit" disabled={saving} className="tvl-btn-primary !w-auto px-5 self-end">
+            {saving ? 'Đang thêm…' : 'Thêm địa điểm'}
+          </button>
+        </form>
+      )}
+
+      {locations.length === 0 ? (
+        <div className="text-[12px] text-ink-faint text-center py-4">Bạn chưa lưu địa điểm làm việc nào.</div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {locations.map((loc) => (
+            <div key={loc.id} className="flex items-center justify-between gap-3 rounded-lg bg-surface-alt px-3 py-2.5">
+              <div className="min-w-0">
+                <div className="text-[12.5px] font-bold truncate">{loc.label}</div>
+                <div className="text-[11px] text-ink-faint truncate">
+                  {[loc.address, loc.district, loc.province].filter(Boolean).join(', ')}
+                </div>
+              </div>
+              <button
+                disabled={removingId === loc.id}
+                onClick={() => handleRemove(loc.id)}
+                className="shrink-0 text-[11px] font-bold rounded-md bg-critical-tint text-critical px-2.5 py-1.5 disabled:opacity-50"
+              >
+                Xoá
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

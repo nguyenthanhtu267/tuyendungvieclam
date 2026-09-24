@@ -7,11 +7,13 @@ import EmployerHeader from '@/components/EmployerHeader';
 import { useAuth } from '@/lib/auth-context';
 import {
   cvSearchApi,
+  employerApi,
   ApiError,
   type CandidateSearchParams,
   type CandidateSearchItem,
   type CandidateCredits,
   type UnlockedProfileRow,
+  type EmployerJob,
 } from '@/lib/api';
 import { formatSalary, formatDate } from '@/lib/format';
 import { ChipsInput, TextInput } from '@/components/profile/ui';
@@ -48,6 +50,7 @@ const EMPTY_FILTERS: CandidateSearchParams = {
   salaryMax: undefined,
   urgentOnly: false,
   unlockedOnly: false,
+  hiddenOnly: false,
 };
 
 export default function TimHoSoPage() {
@@ -64,6 +67,8 @@ export default function TimHoSoPage() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const loadedOnce = useRef(false);
+  // Đợt 12ac (24/09/2026) — icon hành động: ghi chú riêng, mời ứng tuyển, ẩn khỏi danh sách.
+  const [jobOptions, setJobOptions] = useState<EmployerJob[] | null>(null);
 
   useEffect(() => {
     if (me === null) router.replace('/dang-nhap');
@@ -130,6 +135,53 @@ export default function TimHoSoPage() {
       await Promise.all([runSearch(), loadCredits()]);
     } catch (err) {
       setToast(err instanceof ApiError ? err.message : 'Không thể mở hồ sơ, vui lòng thử lại');
+    }
+  }
+
+  async function ensureJobOptions() {
+    if (jobOptions != null || !token) return;
+    try {
+      const jobs = await employerApi.listJobs(token, 'dang_dang');
+      setJobOptions(jobs);
+    } catch {
+      setJobOptions([]);
+    }
+  }
+
+  async function refreshCurrentTab() {
+    if (tab === 'search') await runSearch();
+    else await loadUnlocked();
+  }
+
+  async function handleSaveNote(id: string, note: string) {
+    if (!token) return;
+    try {
+      await cvSearchApi.setNote(token, id, { note });
+      setToast('Đã lưu ghi chú.');
+      await refreshCurrentTab();
+    } catch (err) {
+      setToast(err instanceof ApiError ? err.message : 'Không thể lưu ghi chú, vui lòng thử lại');
+    }
+  }
+
+  async function handleToggleHidden(id: string, hidden: boolean) {
+    if (!token) return;
+    try {
+      await cvSearchApi.setNote(token, id, { hidden });
+      setToast(hidden ? 'Đã ẩn hồ sơ khỏi danh sách tìm kiếm.' : 'Đã bỏ ẩn hồ sơ.');
+      await refreshCurrentTab();
+    } catch (err) {
+      setToast(err instanceof ApiError ? err.message : 'Không thể cập nhật, vui lòng thử lại');
+    }
+  }
+
+  async function handleInvite(id: string, jobPostingId: string) {
+    if (!token) return;
+    try {
+      await cvSearchApi.invite(token, id, jobPostingId);
+      setToast('Đã gửi lời mời ứng tuyển.');
+    } catch (err) {
+      setToast(err instanceof ApiError ? err.message : 'Không thể gửi lời mời, vui lòng thử lại');
     }
   }
 
@@ -293,6 +345,15 @@ export default function TimHoSoPage() {
                 />
                 Chỉ hồ sơ đã mở
               </label>
+              <label className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 accent-primary"
+                  checked={filters.hiddenOnly ?? false}
+                  onChange={(e) => setFilters((f) => ({ ...f, hiddenOnly: e.target.checked }))}
+                />
+                Chỉ hồ sơ đã ẩn (để bỏ ẩn)
+              </label>
               <div className="flex gap-2 pt-1">
                 <button onClick={applyFilters} className="tvl-btn-primary !w-auto flex-1 text-xs">
                   Lọc
@@ -314,7 +375,16 @@ export default function TimHoSoPage() {
               )}
               <div className="flex flex-col gap-3">
                 {items.map((it) => (
-                  <CandidateCard key={it.id} item={it} onUnlock={() => handleUnlock(it.id)} />
+                  <CandidateCard
+                    key={it.id}
+                    item={it}
+                    onUnlock={() => handleUnlock(it.id)}
+                    jobOptions={jobOptions}
+                    onOpenInvite={ensureJobOptions}
+                    onSaveNote={(note) => handleSaveNote(it.id, note)}
+                    onToggleHidden={(hidden) => handleToggleHidden(it.id, hidden)}
+                    onInvite={(jobPostingId) => handleInvite(it.id, jobPostingId)}
+                  />
                 ))}
               </div>
               {totalPages > 1 && (
@@ -349,7 +419,15 @@ export default function TimHoSoPage() {
             ) : (
               unlockedRows.map((row) => (
                 <div key={row.profile.id} className="flex flex-col gap-1">
-                  <CandidateCard item={row.profile} onUnlock={() => handleUnlock(row.profile.id)} />
+                  <CandidateCard
+                    item={row.profile}
+                    onUnlock={() => handleUnlock(row.profile.id)}
+                    jobOptions={jobOptions}
+                    onOpenInvite={ensureJobOptions}
+                    onSaveNote={(note) => handleSaveNote(row.profile.id, note)}
+                    onToggleHidden={(hidden) => handleToggleHidden(row.profile.id, hidden)}
+                    onInvite={(jobPostingId) => handleInvite(row.profile.id, jobPostingId)}
+                  />
                   <div className="text-[10.5px] text-ink-faint pl-1">Đã mở lúc {formatDate(row.unlockedAt)}</div>
                 </div>
               ))
@@ -361,9 +439,30 @@ export default function TimHoSoPage() {
   );
 }
 
-function CandidateCard({ item, onUnlock }: { item: CandidateSearchItem; onUnlock: () => void }) {
+function CandidateCard({
+  item,
+  onUnlock,
+  jobOptions,
+  onOpenInvite,
+  onSaveNote,
+  onToggleHidden,
+  onInvite,
+}: {
+  item: CandidateSearchItem;
+  onUnlock: () => void;
+  jobOptions: EmployerJob[] | null;
+  onOpenInvite: () => void;
+  onSaveNote: (note: string) => void;
+  onToggleHidden: (hidden: boolean) => void;
+  onInvite: (jobPostingId: string) => void;
+}) {
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteDraft, setNoteDraft] = useState(item.note ?? '');
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteJobId, setInviteJobId] = useState('');
+
   return (
-    <div className="rounded-xl border border-border bg-white p-4 flex flex-col gap-2.5">
+    <div className={`rounded-xl border p-4 flex flex-col gap-2.5 ${item.hidden ? 'border-border bg-surface-alt/60' : 'border-border bg-white'}`}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -380,6 +479,11 @@ function CandidateCard({ item, onUnlock }: { item: CandidateSearchItem; onUnlock
                 Đã mở
               </span>
             )}
+            {item.hidden && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-alt text-ink-faint">
+                Đã ẩn
+              </span>
+            )}
           </div>
           <div className="text-primary font-semibold text-[13px] mt-0.5">{item.profileTitle}</div>
           <div className="text-ink-faint text-[11.5px] mt-1">
@@ -388,7 +492,34 @@ function CandidateCard({ item, onUnlock }: { item: CandidateSearchItem; onUnlock
               .join(' · ')}
           </div>
         </div>
-        <div className="shrink-0">
+        <div className="shrink-0 flex items-center gap-1.5">
+          {/* Đợt 12ac (24/09/2026) — icon hành động: ghi chú riêng, mời ứng tuyển, ẩn/bỏ ẩn. */}
+          <button
+            title="Ghi chú riêng"
+            onClick={() => setNoteOpen((v) => !v)}
+            className={`h-8 w-8 rounded-lg border text-sm flex items-center justify-center ${
+              item.note ? 'border-primary/40 bg-primary/5' : 'border-border bg-white'
+            } hover:bg-surface-alt`}
+          >
+            🏷️
+          </button>
+          <button
+            title="Mời ứng tuyển"
+            onClick={() => {
+              setInviteOpen((v) => !v);
+              onOpenInvite();
+            }}
+            className="h-8 w-8 rounded-lg border border-border bg-white text-sm flex items-center justify-center hover:bg-surface-alt"
+          >
+            ✉️
+          </button>
+          <button
+            title={item.hidden ? 'Bỏ ẩn' : 'Ẩn khỏi danh sách'}
+            onClick={() => onToggleHidden(!item.hidden)}
+            className="h-8 w-8 rounded-lg border border-border bg-white text-sm flex items-center justify-center hover:bg-surface-alt"
+          >
+            {item.hidden ? '👁️' : '🚫'}
+          </button>
           {item.unlocked ? (
             <Link href={`/nha-tuyen-dung/tim-ho-so/${item.id}`} className="tvl-btn-ghost !w-auto px-4 text-xs">
               Xem hồ sơ
@@ -400,6 +531,73 @@ function CandidateCard({ item, onUnlock }: { item: CandidateSearchItem; onUnlock
           )}
         </div>
       </div>
+
+      {noteOpen && (
+        <div className="rounded-lg bg-surface-alt p-2.5 flex flex-col gap-1.5">
+          <textarea
+            className="tvl-input !h-auto text-xs"
+            rows={2}
+            placeholder="Ghi chú riêng về ứng viên này (chỉ công ty bạn thấy)…"
+            value={noteDraft}
+            onChange={(e) => setNoteDraft(e.target.value)}
+          />
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setNoteOpen(false)} className="tvl-btn-ghost !w-auto px-3 py-1 text-[11px]">
+              Đóng
+            </button>
+            <button
+              onClick={() => {
+                onSaveNote(noteDraft);
+                setNoteOpen(false);
+              }}
+              className="tvl-btn-primary !w-auto px-3 py-1 text-[11px]"
+            >
+              Lưu ghi chú
+            </button>
+          </div>
+        </div>
+      )}
+
+      {inviteOpen && (
+        <div className="rounded-lg bg-surface-alt p-2.5 flex flex-col gap-1.5">
+          {jobOptions == null ? (
+            <div className="text-[11px] text-ink-faint">Đang tải danh sách tin đang tuyển…</div>
+          ) : jobOptions.length === 0 ? (
+            <div className="text-[11px] text-ink-faint">Bạn chưa có tin nào đang đăng để mời ứng viên.</div>
+          ) : (
+            <>
+              <select
+                className="tvl-input text-xs"
+                value={inviteJobId}
+                onChange={(e) => setInviteJobId(e.target.value)}
+              >
+                <option value="">— Chọn tin tuyển dụng —</option>
+                {jobOptions.map((j) => (
+                  <option key={j.id} value={j.id}>
+                    {j.title}
+                  </option>
+                ))}
+              </select>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setInviteOpen(false)} className="tvl-btn-ghost !w-auto px-3 py-1 text-[11px]">
+                  Đóng
+                </button>
+                <button
+                  disabled={!inviteJobId}
+                  onClick={() => {
+                    onInvite(inviteJobId);
+                    setInviteOpen(false);
+                    setInviteJobId('');
+                  }}
+                  className="tvl-btn-primary !w-auto px-3 py-1 text-[11px] disabled:opacity-40"
+                >
+                  Gửi lời mời
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {item.latestExperience && (
         <div className="text-[11.5px] text-ink-muted">

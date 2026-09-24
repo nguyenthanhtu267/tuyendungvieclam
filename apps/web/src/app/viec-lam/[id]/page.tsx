@@ -12,10 +12,12 @@ import {
   jobsApi,
   candidatesApi,
   applicationsApi,
+  companiesApi,
   ApiError,
   type JobPosting,
   type CV,
   type CompatibilityResult,
+  type CompanyProfileResponse,
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -52,6 +54,10 @@ function JobDetailInner() {
   const [following, setFollowing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
   const [compatibility, setCompatibility] = useState<CompatibilityResult | null | undefined>(undefined);
+  // Đợt 12ac (24/09/2026) — tab "Tổng quan công ty": giới thiệu công ty + số lượt theo dõi + danh
+  // sách tin đang tuyển khác ngay trong tab (trước đó chỉ có 1 link "Xem tất cả…"). Tải lười (chỉ khi
+  // mở tab) vì đa số người xem không bấm sang tab này.
+  const [companyOverview, setCompanyOverview] = useState<CompanyProfileResponse | null | undefined>(undefined);
 
   useEffect(() => {
     jobsApi
@@ -92,6 +98,14 @@ function JobDetailInner() {
       .then(setCompatibility)
       .catch(() => setCompatibility(null));
   }, [token, me, params.id]);
+
+  useEffect(() => {
+    if (tab !== 'company' || !job || companyOverview !== undefined) return;
+    companiesApi
+      .getProfile(job.company.id)
+      .then(setCompanyOverview)
+      .catch(() => setCompanyOverview(null));
+  }, [tab, job, companyOverview]);
 
   async function toggleSave() {
     if (!me || !token) return;
@@ -464,6 +478,17 @@ function JobDetailInner() {
                   {job.company.industry && <div>Lĩnh vực: {job.company.industry}</div>}
                   {job.company.size && <div>Quy mô: {job.company.size}</div>}
                   {job.company.website && <div>Website: {job.company.website}</div>}
+                  {/* Đợt 12ac (24/09/2026) — số lượt "Theo dõi công ty" (đồng bộ với nút "+ Theo dõi"
+                      ở khối bên phải), tải kèm mô tả + danh sách tin qua companiesApi.getProfile(). */}
+                  {companyOverview?.company.followersCount != null && (
+                    <div>{companyOverview.company.followersCount} lượt theo dõi</div>
+                  )}
+                  {companyOverview?.company.description && (
+                    <CompanyDescription text={companyOverview.company.description} />
+                  )}
+                  {companyOverview === undefined && (
+                    <div className="text-ink-faint text-xs">Đang tải thông tin công ty…</div>
+                  )}
                   {/* Đợt 12k (21/09/2026) — bấm tên công ty ở trên hoặc vào đây để xem tất cả tin
                       đang tuyển khác của công ty này (trang /cong-ty/[id]). */}
                   <Link
@@ -472,6 +497,29 @@ function JobDetailInner() {
                   >
                     Xem tất cả tin đang tuyển của công ty này →
                   </Link>
+
+                  {/* Đợt 12ac (24/09/2026) — danh sách tin đang tuyển khác NGAY trong tab (trước đó
+                      phải bấm sang trang /cong-ty/[id] mới xem được), giống mẫu careerviet.vn. */}
+                  {companyOverview && companyOverview.jobs.length > 1 && (
+                    <div className="flex flex-col gap-2 pt-2 border-t border-border">
+                      <div className="font-bold text-ink text-xs">Tin đang tuyển khác của công ty</div>
+                      {companyOverview.jobs
+                        .filter((j) => j.id !== job.id)
+                        .slice(0, 5)
+                        .map((j) => (
+                          <Link
+                            key={j.id}
+                            href={`/viec-lam/${j.id}`}
+                            className="rounded-lg border border-border px-3 py-2.5 hover:border-primary/40 hover:bg-surface-alt"
+                          >
+                            <div className="font-semibold text-ink text-[12.5px]">{j.title}</div>
+                            <div className="text-ink-faint text-[11px] mt-0.5">
+                              {[j.level, formatSalary(j.salaryMin, j.salaryMax)].filter(Boolean).join(' · ')}
+                            </div>
+                          </Link>
+                        ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -519,6 +567,26 @@ function JobDetailInner() {
         )}
       </div>
     </main>
+  );
+}
+
+// Đợt 12ac (24/09/2026) — "Giới thiệu công ty" mở rộng/thu gọn khi dài, theo mẫu careerviet.vn.
+const COMPANY_DESCRIPTION_COLLAPSED_LENGTH = 260;
+
+function CompanyDescription({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = text.length > COMPANY_DESCRIPTION_COLLAPSED_LENGTH;
+  const shown = expanded || !isLong ? text : `${text.slice(0, COMPANY_DESCRIPTION_COLLAPSED_LENGTH).trim()}…`;
+  return (
+    <div>
+      <div className="font-bold text-ink text-xs mb-1">Giới thiệu công ty</div>
+      <p className="whitespace-pre-line leading-relaxed">{shown}</p>
+      {isLong && (
+        <button onClick={() => setExpanded((v) => !v)} className="text-primary font-semibold text-xs mt-1 hover:underline">
+          {expanded ? 'Thu gọn' : 'Xem thêm'}
+        </button>
+      )}
+    </div>
   );
 }
 

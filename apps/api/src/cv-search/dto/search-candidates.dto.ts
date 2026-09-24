@@ -75,6 +75,14 @@ export class SearchCandidatesDto {
   @IsBoolean()
   unlockedOnly?: boolean;
 
+  // Đợt 12ac (24/09/2026) — "Ẩn khỏi danh sách": mặc định danh sách tìm kiếm LUÔN loại hồ sơ NTD đã
+  // tự ẩn (xem CvSearchService.baseSearchQuery); bật cờ này để xem LẠI đúng những hồ sơ đã ẩn, phòng
+  // khi NTD muốn bỏ ẩn.
+  @IsOptional()
+  @Transform(toBool)
+  @IsBoolean()
+  hiddenOnly?: boolean;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()

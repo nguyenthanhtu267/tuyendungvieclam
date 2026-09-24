@@ -148,9 +148,37 @@ export default function CongTyPage() {
                 {company.website && <div>Website: {company.website}</div>}
               </div>
             </div>
+            {/* Đợt 12ac (24/09/2026) — "Giới thiệu công ty", mở rộng/thu gọn khi dài. */}
+            {company.description && (
+              <div className="rounded-xl border border-border bg-white p-4">
+                <div className="text-[11px] font-bold text-primary uppercase tracking-wide mb-2.5">
+                  Giới thiệu công ty
+                </div>
+                <CompanyDescription text={company.description} />
+              </div>
+            )}
           </div>
         </div>
       </div>
     </main>
+  );
+}
+
+// Đợt 12ac (24/09/2026) — "Giới thiệu công ty" mở rộng/thu gọn khi dài, theo mẫu careerviet.vn.
+const COMPANY_DESCRIPTION_COLLAPSED_LENGTH = 260;
+
+function CompanyDescription({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = text.length > COMPANY_DESCRIPTION_COLLAPSED_LENGTH;
+  const shown = expanded || !isLong ? text : `${text.slice(0, COMPANY_DESCRIPTION_COLLAPSED_LENGTH).trim()}…`;
+  return (
+    <div className="text-[12.5px] text-ink-muted">
+      <p className="whitespace-pre-line leading-relaxed">{shown}</p>
+      {isLong && (
+        <button onClick={() => setExpanded((v) => !v)} className="text-primary font-semibold text-xs mt-1 hover:underline">
+          {expanded ? 'Thu gọn' : 'Xem thêm'}
+        </button>
+      )}
+    </div>
   );
 }

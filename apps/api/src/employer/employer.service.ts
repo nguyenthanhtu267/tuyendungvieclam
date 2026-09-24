@@ -10,7 +10,10 @@ import { ApplicationStatusHistory } from '../database/entities/application-statu
 import { User, UserRole } from '../database/entities/user.entity';
 import { ServicePackage } from '../database/entities/service-package.entity';
 import { Order, OrderStatus } from '../database/entities/order.entity';
+import { WorkLocation } from '../database/entities/work-location.entity';
 import { CreateJobDto } from './dto/create-job.dto';
+import { CreateWorkLocationDto } from './dto/create-work-location.dto';
+import { UpdateWorkLocationDto } from './dto/update-work-location.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UpdateCompanyDto } from './dto/update-company.dto';
@@ -35,6 +38,7 @@ export class EmployerService {
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(ServicePackage) private readonly packageRepo: Repository<ServicePackage>,
     @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
+    @InjectRepository(WorkLocation) private readonly workLocationRepo: Repository<WorkLocation>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -425,7 +429,49 @@ export class EmployerService {
     if (dto.industry !== undefined) company.industry = dto.industry;
     if (dto.website !== undefined) company.website = dto.website;
     if (dto.logoUrl !== undefined) company.logoUrl = dto.logoUrl.trim() || undefined;
+    // Đợt 12ac (24/09/2026) — "Giới thiệu công ty" cho tab Tổng quan công ty (trang chi tiết tin).
+    if (dto.description !== undefined) company.description = dto.description.trim() || undefined;
     return this.companyRepo.save(company);
+  }
+
+  // ===== Đợt 12ac (24/09/2026) — Quản lý địa điểm làm việc =====
+  // Lưu sẵn các địa điểm hay dùng để chọn nhanh khi đăng tin, thay vì gõ lại tỉnh/thành, quận/huyện,
+  // địa chỉ mỗi lần đăng tin mới.
+
+  async listWorkLocations(userId: string) {
+    const companyId = await this.getCompanyIdForUser(userId);
+    return this.workLocationRepo.find({ where: { companyId }, order: { createdAt: 'DESC' } });
+  }
+
+  async createWorkLocation(userId: string, dto: CreateWorkLocationDto) {
+    const companyId = await this.getCompanyIdForUser(userId);
+    const location = this.workLocationRepo.create({
+      companyId,
+      label: dto.label,
+      province: dto.province,
+      district: dto.district,
+      address: dto.address,
+    });
+    return this.workLocationRepo.save(location);
+  }
+
+  async updateWorkLocation(userId: string, id: string, dto: UpdateWorkLocationDto) {
+    const companyId = await this.getCompanyIdForUser(userId);
+    const location = await this.workLocationRepo.findOne({ where: { id, companyId } });
+    if (!location) throw new NotFoundException('Không tìm thấy địa điểm làm việc');
+    if (dto.label !== undefined) location.label = dto.label;
+    if (dto.province !== undefined) location.province = dto.province;
+    if (dto.district !== undefined) location.district = dto.district;
+    if (dto.address !== undefined) location.address = dto.address;
+    return this.workLocationRepo.save(location);
+  }
+
+  async deleteWorkLocation(userId: string, id: string) {
+    const companyId = await this.getCompanyIdForUser(userId);
+    const location = await this.workLocationRepo.findOne({ where: { id, companyId } });
+    if (!location) throw new NotFoundException('Không tìm thấy địa điểm làm việc');
+    await this.workLocationRepo.remove(location);
+    return { success: true };
   }
 
   async addLegalDocFromUpload(userId: string, file: Express.Multer.File) {

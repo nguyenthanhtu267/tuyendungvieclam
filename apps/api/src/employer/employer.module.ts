@@ -10,6 +10,7 @@ import { ApplicationStatusHistory } from '../database/entities/application-statu
 import { User } from '../database/entities/user.entity';
 import { ServicePackage } from '../database/entities/service-package.entity';
 import { Order } from '../database/entities/order.entity';
+import { WorkLocation } from '../database/entities/work-location.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
@@ -23,6 +24,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       User,
       ServicePackage,
       Order,
+      WorkLocation,
     ]),
     NotificationsModule,
   ],

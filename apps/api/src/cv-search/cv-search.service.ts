@@ -6,7 +6,10 @@ import { Company } from '../database/entities/company.entity';
 import { CandidateProfile, ProfileVisibility } from '../database/entities/candidate-profile.entity';
 import { UnlockedProfile } from '../database/entities/unlocked-profile.entity';
 import { Order, OrderStatus } from '../database/entities/order.entity';
+import { CandidateNote } from '../database/entities/candidate-note.entity';
+import { JobPosting } from '../database/entities/job-posting.entity';
 import { SearchCandidatesDto } from './dto/search-candidates.dto';
+import { SetCandidateNoteDto } from './dto/set-candidate-note.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 
 // Các trường coi là "thông tin liên hệ" — bị ẩn ngay cả khi NTD đã trả điểm mở hồ sơ, nếu ứng viên
@@ -27,6 +30,8 @@ export class CvSearchService {
     @InjectRepository(CandidateProfile) private readonly profileRepo: Repository<CandidateProfile>,
     @InjectRepository(UnlockedProfile) private readonly unlockedRepo: Repository<UnlockedProfile>,
     @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
+    @InjectRepository(CandidateNote) private readonly noteRepo: Repository<CandidateNote>,
+    @InjectRepository(JobPosting) private readonly jobRepo: Repository<JobPosting>,
     private readonly dataSource: DataSource,
     private readonly notificationsService: NotificationsService,
   ) {}
@@ -41,8 +46,11 @@ export class CvSearchService {
     return company;
   }
 
-  private baseSearchQuery(companyId: string, companyName: string) {
-    return this.profileRepo
+  // Đợt 12ac (24/09/2026) — `excludeHidden` mặc định true (danh sách tìm kiếm bình thường không hiện
+  // hồ sơ NTD đã tự ẩn qua CandidateNote.hidden); `search()` truyền false khi dto.hiddenOnly=true để
+  // NTD xem lại đúng những hồ sơ đã ẩn (và có thể bỏ ẩn).
+  private baseSearchQuery(companyId: string, companyName: string, excludeHidden = true) {
+    const qb = this.profileRepo
       .createQueryBuilder('profile')
       .where('profile.profile_title IS NOT NULL')
       .andWhere('profile.visibility != :locked', { locked: ProfileVisibility.LOCKED })
@@ -54,6 +62,22 @@ export class CvSearchService {
         )`,
         { companyId, companyName },
       );
+    if (excludeHidden) {
+      qb.andWhere(
+        `NOT EXISTS (
+          SELECT 1 FROM candidate_notes cn
+          WHERE cn.candidate_profile_id = profile.id AND cn.company_id = :companyId AND cn.hidden = true
+        )`,
+      );
+    } else {
+      qb.andWhere(
+        `EXISTS (
+          SELECT 1 FROM candidate_notes cn
+          WHERE cn.candidate_profile_id = profile.id AND cn.company_id = :companyId AND cn.hidden = true
+        )`,
+      );
+    }
+    return qb;
   }
 
   private applyFilters(qb: ReturnType<typeof this.baseSearchQuery>, dto: SearchCandidatesDto) {
@@ -130,7 +154,7 @@ export class CvSearchService {
     const page = dto.page ?? 1;
     const pageSize = dto.pageSize ?? 10;
 
-    let qb = this.baseSearchQuery(company.id, company.name);
+    let qb = this.baseSearchQuery(company.id, company.name, !dto.hiddenOnly);
     qb = this.applyFilters(qb, dto);
 
     if (dto.unlockedOnly) {
@@ -166,8 +190,9 @@ export class CvSearchService {
     const ordered = ids.map((id) => byId.get(id)).filter(Boolean) as CandidateProfile[];
 
     const unlockedSet = await this.getUnlockedIdSet(company.id, ids);
+    const notesMap = await this.getNotesMap(company.id, ids);
 
-    const items = ordered.map((p) => this.toSummary(p, unlockedSet.has(p.id)));
+    const items = ordered.map((p) => this.toSummary(p, unlockedSet.has(p.id), notesMap.get(p.id)));
     return { items, total, page, pageSize };
   }
 
@@ -182,7 +207,14 @@ export class CvSearchService {
     return new Set(rows.map((r) => r.candidateProfileId));
   }
 
-  private toSummary(profile: CandidateProfile, unlocked: boolean) {
+  // Đợt 12ac (24/09/2026) — ghi chú/trạng thái ẩn RIÊNG của công ty đang đăng nhập với từng hồ sơ.
+  private async getNotesMap(companyId: string, profileIds: string[]): Promise<Map<string, CandidateNote>> {
+    if (profileIds.length === 0) return new Map();
+    const rows = await this.noteRepo.find({ where: { companyId, candidateProfileId: In(profileIds) } });
+    return new Map(rows.map((r) => [r.candidateProfileId, r]));
+  }
+
+  private toSummary(profile: CandidateProfile, unlocked: boolean, note?: CandidateNote) {
     return {
       id: profile.id,
       fullName: unlocked ? profile.fullName : maskName(profile.fullName),
@@ -201,6 +233,9 @@ export class CvSearchService {
       languages: (profile.languages ?? []).map((l) => ({ language: l.language, level: l.level })),
       latestExperience: this.latestExperienceSummary(profile, unlocked),
       unlocked,
+      // Đợt 12ac (24/09/2026) — icon hành động: ghi chú riêng + đã ẩn (chỉ công ty đang xem thấy).
+      note: note?.note,
+      hidden: note?.hidden ?? false,
     };
   }
 
@@ -234,7 +269,8 @@ export class CvSearchService {
     if (!profile) throw new NotFoundException('Không tìm thấy hồ sơ');
 
     const unlocked = (await this.getUnlockedIdSet(company.id, [profileId])).has(profileId);
-    return this.toDetail(profile, unlocked);
+    const note = (await this.getNotesMap(company.id, [profileId])).get(profileId);
+    return this.toDetail(profile, unlocked, note);
   }
 
   private async assertVisibleToCompany(company: Company, profileId: string) {
@@ -251,7 +287,7 @@ export class CvSearchService {
     }
   }
 
-  private toDetail(profile: CandidateProfile, unlocked: boolean) {
+  private toDetail(profile: CandidateProfile, unlocked: boolean, note?: CandidateNote) {
     const showContact = unlocked && !profile.hideContactInfo;
     return {
       id: profile.id,
@@ -309,7 +345,45 @@ export class CvSearchService {
       })),
       unlocked,
       contactHiddenByCandidate: unlocked && profile.hideContactInfo,
+      // Đợt 12ac (24/09/2026) — ghi chú riêng + trạng thái ẩn (chỉ công ty đang xem thấy).
+      note: note?.note,
+      hidden: note?.hidden ?? false,
     };
+  }
+
+  // Đợt 12ac (24/09/2026) — "Ghi chú riêng" + "Ẩn khỏi danh sách": upsert theo (companyId, profileId).
+  async setNote(userId: string, profileId: string, dto: SetCandidateNoteDto) {
+    const company = await this.getCompany(userId);
+    await this.assertVisibleToCompany(company, profileId);
+
+    let row = await this.noteRepo.findOne({ where: { companyId: company.id, candidateProfileId: profileId } });
+    if (!row) {
+      row = this.noteRepo.create({ companyId: company.id, candidateProfileId: profileId });
+    }
+    if (dto.note !== undefined) row.note = dto.note;
+    if (dto.hidden !== undefined) row.hidden = dto.hidden;
+    await this.noteRepo.save(row);
+    return { note: row.note, hidden: row.hidden };
+  }
+
+  // Đợt 12ac (24/09/2026) — "Mời ứng tuyển": NTD gửi lời mời cho ứng viên vào 1 tin đang tuyển của
+  // ĐÚNG công ty đang thao tác (chặn mời hộ tin công ty khác), tái dùng NotificationsService.
+  async inviteToApply(userId: string, profileId: string, jobPostingId: string) {
+    const company = await this.getCompany(userId);
+    await this.assertVisibleToCompany(company, profileId);
+
+    const job = await this.jobRepo.findOne({ where: { id: jobPostingId, companyId: company.id } });
+    if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng của công ty bạn');
+
+    const profile = await this.profileRepo.findOne({ where: { id: profileId } });
+    if (!profile) throw new NotFoundException('Không tìm thấy hồ sơ');
+
+    await this.notificationsService.create(
+      profile.userId,
+      'job_invite',
+      `${company.name} mời bạn ứng tuyển vị trí "${job.title}".`,
+    );
+    return { success: true };
   }
 
   async listUnlocked(userId: string) {
@@ -319,11 +393,13 @@ export class CvSearchService {
       relations: { candidateProfile: true },
       order: { unlockedAt: 'DESC' },
     });
+    const profileIds = rows.filter((r) => r.candidateProfile).map((r) => r.candidateProfile.id);
+    const notesMap = await this.getNotesMap(company.id, profileIds);
     return rows
       .filter((r) => r.candidateProfile)
       .map((r) => ({
         unlockedAt: r.unlockedAt,
-        profile: this.toSummary(r.candidateProfile, true),
+        profile: this.toSummary(r.candidateProfile, true, notesMap.get(r.candidateProfile.id)),
       }));
   }
 

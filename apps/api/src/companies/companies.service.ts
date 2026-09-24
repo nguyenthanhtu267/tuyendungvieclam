@@ -51,6 +51,8 @@ export class CompaniesService {
         logoUrl: company.logoUrl,
         isFeaturedEmployer: company.isFeaturedEmployer,
         followersCount,
+        // Đợt 12ac (24/09/2026) — "Giới thiệu công ty" cho tab Tổng quan công ty.
+        description: company.description,
       },
       jobs,
       totalJobs: jobs.length,

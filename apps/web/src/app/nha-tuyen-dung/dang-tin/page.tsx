@@ -6,7 +6,7 @@ import Link from 'next/link';
 import EmployerHeader from '@/components/EmployerHeader';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { useAuth } from '@/lib/auth-context';
-import { employerApi, ApiError } from '@/lib/api';
+import { employerApi, ApiError, type WorkLocation } from '@/lib/api';
 import { formatSalary } from '@/lib/format';
 import { MultiSelectPopover } from '@/components/search/MultiSelectPopover';
 import { ChipsInput } from '@/components/profile/ui';
@@ -107,11 +107,18 @@ function DangTinInner() {
   // chính xác cần sửa gì trước khi gửi duyệt lại. Không phải 1 field của FormState vì không gửi lại
   // lên server khi submit — chỉ đọc để hiển thị.
   const [rejectionInfo, setRejectionInfo] = useState<{ reasons: string[]; note?: string } | null>(null);
+  // Đợt 12ac (24/09/2026) — "chọn từ địa điểm đã lưu" để autofill tỉnh/thành + quận/huyện + địa chỉ.
+  const [savedLocations, setSavedLocations] = useState<WorkLocation[]>([]);
 
   useEffect(() => {
     if (me === null) router.replace('/dang-nhap');
     else if (me && !me.role.startsWith('employer')) router.replace('/');
   }, [me, router]);
+
+  useEffect(() => {
+    if (!token) return;
+    employerApi.listWorkLocations(token).then(setSavedLocations).catch(() => setSavedLocations([]));
+  }, [token]);
 
   useEffect(() => {
     if (!editId || !token) return;
@@ -352,6 +359,26 @@ function DangTinInner() {
                   </div>
                 </Field>
               </div>
+              {savedLocations.length > 0 && (
+                <Field label="Chọn nhanh từ địa điểm đã lưu" hint="không bắt buộc">
+                  <select
+                    className="tvl-input"
+                    value=""
+                    onChange={(e) => {
+                      const loc = savedLocations.find((l) => l.id === e.target.value);
+                      if (!loc) return;
+                      setForm({ ...form, provinces: [loc.province], district: loc.district ?? '', address: loc.address ?? '' });
+                    }}
+                  >
+                    <option value="">— Chọn địa điểm đã lưu ở trang Tài khoản —</option>
+                    {savedLocations.map((loc) => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.label} ({loc.province})
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Tỉnh, Thành Phố" hint="có thể chọn nhiều">
                   <MultiSelectPopover

@@ -19,6 +19,8 @@ import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { UpdateApplicationStatusDto } from './dto/update-application-status.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
+import { CreateWorkLocationDto } from './dto/create-work-location.dto';
+import { UpdateWorkLocationDto } from './dto/update-work-location.dto';
 import { CreateLegalDocLinkDto } from './dto/create-legal-doc-link.dto';
 import { CreateSubAccountDto } from './dto/create-sub-account.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -218,5 +220,30 @@ export class EmployerController {
   @Delete('employer/applications/:id')
   permanentlyDeleteApplication(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
     return this.employerService.permanentlyDeleteApplication(user.userId, id);
+  }
+
+  // Đợt 12ac (24/09/2026) — Quản lý địa điểm làm việc.
+  @Get('employer/work-locations')
+  listWorkLocations(@CurrentUser() user: { userId: string }) {
+    return this.employerService.listWorkLocations(user.userId);
+  }
+
+  @Post('employer/work-locations')
+  createWorkLocation(@CurrentUser() user: { userId: string }, @Body() dto: CreateWorkLocationDto) {
+    return this.employerService.createWorkLocation(user.userId, dto);
+  }
+
+  @Patch('employer/work-locations/:id')
+  updateWorkLocation(
+    @CurrentUser() user: { userId: string },
+    @Param('id') id: string,
+    @Body() dto: UpdateWorkLocationDto,
+  ) {
+    return this.employerService.updateWorkLocation(user.userId, id, dto);
+  }
+
+  @Delete('employer/work-locations/:id')
+  deleteWorkLocation(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.employerService.deleteWorkLocation(user.userId, id);
   }
 }

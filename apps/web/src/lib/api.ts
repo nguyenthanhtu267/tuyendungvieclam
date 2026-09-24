@@ -103,6 +103,8 @@ export interface Company {
   // Đợt 12ab (24/09/2026) — logo qua link ảnh (URL) + số lượt "Theo dõi công ty".
   logoUrl?: string;
   followersCount?: number;
+  // Đợt 12ac (24/09/2026) — "Giới thiệu công ty" cho tab Tổng quan công ty (trang chi tiết tin).
+  description?: string;
 }
 
 export type JobApprovalStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'expired';
@@ -707,6 +709,26 @@ export interface UpdateCompanyPayload {
   website?: string;
   // Đợt 12ab (24/09/2026) — logo công ty qua link ảnh (URL).
   logoUrl?: string;
+  // Đợt 12ac (24/09/2026) — "Giới thiệu công ty" cho tab Tổng quan công ty.
+  description?: string;
+}
+
+// Đợt 12ac (24/09/2026) — "Quản lý địa điểm làm việc" (chọn nhanh khi đăng tin).
+export interface WorkLocation {
+  id: string;
+  companyId: string;
+  label: string;
+  province: string;
+  district?: string;
+  address?: string;
+  createdAt: string;
+}
+
+export interface CreateWorkLocationPayload {
+  label: string;
+  province: string;
+  district?: string;
+  address?: string;
 }
 
 export type CompanyUserType = 'main' | 'sub';
@@ -762,6 +784,26 @@ export const employerApi = {
       method: 'PATCH',
       headers: authHeaders(token),
       body: JSON.stringify(dto),
+    }),
+  // Đợt 12ac (24/09/2026) — Quản lý địa điểm làm việc.
+  listWorkLocations: (token: string) =>
+    request<WorkLocation[]>('/employer/work-locations', { headers: authHeaders(token) }),
+  createWorkLocation: (token: string, dto: CreateWorkLocationPayload) =>
+    request<WorkLocation>('/employer/work-locations', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(dto),
+    }),
+  updateWorkLocation: (token: string, id: string, dto: Partial<CreateWorkLocationPayload>) =>
+    request<WorkLocation>(`/employer/work-locations/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(dto),
+    }),
+  deleteWorkLocation: (token: string, id: string) =>
+    request<{ success: true }>(`/employer/work-locations/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
     }),
   uploadLegalDoc: (token: string, file: File) => {
     const form = new FormData();
@@ -1015,6 +1057,8 @@ export interface CandidateSearchParams {
   salaryMax?: number;
   urgentOnly?: boolean;
   unlockedOnly?: boolean;
+  // Đợt 12ac (24/09/2026) — xem lại đúng các hồ sơ NTD đã tự ẩn (để có thể bỏ ẩn).
+  hiddenOnly?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -1046,6 +1090,9 @@ export interface CandidateSearchItem {
   languages: CandidateLanguageSummary[];
   latestExperience: { position: string; companyName?: string; isCurrent: boolean } | null;
   unlocked: boolean;
+  // Đợt 12ac (24/09/2026) — icon hành động: ghi chú riêng + đã ẩn (chỉ công ty đang xem thấy).
+  note?: string;
+  hidden: boolean;
 }
 
 export interface CandidateSearchResult {
@@ -1117,6 +1164,9 @@ export interface CandidateDetail {
   activities: (ActivityItem & { organizationName?: string })[];
   unlocked: boolean;
   contactHiddenByCandidate: boolean;
+  // Đợt 12ac (24/09/2026) — ghi chú riêng + trạng thái ẩn (chỉ công ty đang xem thấy).
+  note?: string;
+  hidden: boolean;
 }
 
 export interface UnlockedProfileRow {
@@ -1138,6 +1188,7 @@ function buildSearchQuery(params: CandidateSearchParams): string {
   if (params.salaryMax != null) qs.set('salaryMax', String(params.salaryMax));
   if (params.urgentOnly) qs.set('urgentOnly', 'true');
   if (params.unlockedOnly) qs.set('unlockedOnly', 'true');
+  if (params.hiddenOnly) qs.set('hiddenOnly', 'true');
   qs.set('page', String(params.page ?? 1));
   qs.set('pageSize', String(params.pageSize ?? 10));
   return qs.toString();
@@ -1153,6 +1204,19 @@ export const cvSearchApi = {
     request<CandidateDetail>(`/employer/candidates/${id}`, { headers: authHeaders(token) }),
   unlock: (token: string, id: string) =>
     request<CandidateDetail>(`/employer/candidates/${id}/unlock`, { method: 'POST', headers: authHeaders(token) }),
+  // Đợt 12ac (24/09/2026) — icon hành động: ghi chú riêng, ẩn khỏi danh sách, mời ứng tuyển.
+  setNote: (token: string, id: string, dto: { note?: string; hidden?: boolean }) =>
+    request<{ note?: string; hidden: boolean }>(`/employer/candidates/${id}/note`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(dto),
+    }),
+  invite: (token: string, id: string, jobPostingId: string) =>
+    request<{ success: true }>(`/employer/candidates/${id}/invite`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ jobPostingId }),
+    }),
 };
 
 // Đợt 12d (21/09/2026) — banner "X người đang truy cập" ở trang chủ, gọi PresenceModule (đợt 12a).
