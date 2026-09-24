@@ -424,6 +424,7 @@ export class EmployerService {
     if (dto.size !== undefined) company.size = dto.size;
     if (dto.industry !== undefined) company.industry = dto.industry;
     if (dto.website !== undefined) company.website = dto.website;
+    if (dto.logoUrl !== undefined) company.logoUrl = dto.logoUrl.trim() || undefined;
     return this.companyRepo.save(company);
   }
 

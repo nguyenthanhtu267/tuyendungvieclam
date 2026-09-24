@@ -3,7 +3,41 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
 import { Company } from '../database/entities/company.entity';
+import { CandidateProfile } from '../database/entities/candidate-profile.entity';
+import { CandidateSkill } from '../database/entities/candidate-sections.entity';
 import { ListJobsDto, POSTED_WITHIN_DAYS } from './dto/list-jobs.dto';
+
+// Đợt 12ab (24/09/2026) — "Đánh giá mức độ tương thích" (radar chart, theo mẫu careerviet.vn): thứ
+// tự PHẢI khớp EXPERIENCE_LEVELS ở apps/web/src/lib/catalogs.ts (backend không import được catalogs
+// FE nên khai lại ở đây — nếu đổi 1 bên nhớ đổi bên kia).
+const EXPERIENCE_LEVEL_YEARS: { label: string; min: number; max: number }[] = [
+  { label: 'Không yêu cầu kinh nghiệm', min: 0, max: Infinity },
+  { label: 'Chưa có kinh nghiệm', min: 0, max: 0 },
+  { label: 'Đến dưới 1 năm', min: 0, max: 1 },
+  { label: 'Từ 1 đến 4 năm', min: 1, max: 4 },
+  { label: 'Từ 5 đến 7 năm', min: 5, max: 7 },
+  { label: 'Từ 7 đến 10 năm', min: 7, max: 10 },
+  { label: 'Từ 11 năm', min: 11, max: Infinity },
+];
+
+// Phải khớp LEVELS ở catalogs.ts — chỉ số càng gần nhau thì cấp bậc càng tương thích.
+const LEVEL_ORDER: string[] = [
+  'Sinh viên / Thực tập sinh',
+  'Mới tốt nghiệp',
+  'Nhân viên',
+  'Trưởng nhóm / Giám sát',
+  'Quản lý',
+  'Quản lý cấp cao',
+  'Điều hành cấp cao',
+];
+
+function stripHtml(html?: string): string {
+  return (html ?? '').replace(/<[^>]*>/g, ' ');
+}
+
+function clamp(n: number, min = 0, max = 100): number {
+  return Math.max(min, Math.min(max, n));
+}
 
 @Injectable()
 export class JobsService {
@@ -12,6 +46,10 @@ export class JobsService {
     private readonly jobRepo: Repository<JobPosting>,
     @InjectRepository(Company)
     private readonly companyRepo: Repository<Company>,
+    @InjectRepository(CandidateProfile)
+    private readonly candidateProfileRepo: Repository<CandidateProfile>,
+    @InjectRepository(CandidateSkill)
+    private readonly candidateSkillRepo: Repository<CandidateSkill>,
   ) {}
 
   // Dùng chung cho findAll() và facets() để 2 nơi luôn lọc giống hệt nhau (đợt 10, tránh lệch số
@@ -191,9 +229,99 @@ export class JobsService {
         name: c.name,
         industry: c.industry,
         size: c.size,
+        logoUrl: c.logoUrl,
         jobCount: await this.jobRepo.count({ where: { companyId: c.id, approvalStatus: JobApprovalStatus.APPROVED } }),
       })),
     );
     return withJobCount;
+  }
+
+  // ===== Đợt 12ab (24/09/2026) — "Đánh giá mức độ tương thích" (radar chart, theo mẫu careerviet.vn) =====
+  // Chấm điểm 6 tiêu chí (0-100 mỗi tiêu chí) rồi cộng có trọng số ra % tổng. Chỉ dùng dữ liệu hồ sơ
+  // ứng viên đã có sẵn (không cần thêm bảng/cột mới) — nếu thiếu dữ liệu ở tiêu chí nào thì chấm điểm
+  // trung tính (không cộng cũng không trừ mạnh) thay vì 0, tránh hồ sơ chưa điền đầy đủ bị đánh giá
+  // sai là "không phù hợp".
+  async getCompatibility(userId: string, jobId: string) {
+    const job = await this.jobRepo.findOne({ where: { id: jobId }, relations: { company: true } });
+    if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng');
+
+    const profile = await this.candidateProfileRepo.findOne({ where: { userId } });
+    if (!profile) throw new NotFoundException('Không tìm thấy hồ sơ ứng viên');
+
+    const skills = await this.candidateSkillRepo.find({ where: { candidateProfileId: profile.id } });
+    const skillNames = skills.map((s) => s.skillName.toLowerCase().trim()).filter(Boolean);
+
+    // 1) Kỹ năng — bao nhiêu % kỹ năng của ứng viên xuất hiện trong tags/tiêu đề/yêu cầu công việc.
+    const jobText = [
+      ...(job.tags ?? []),
+      job.title,
+      stripHtml(job.requirements),
+      stripHtml(job.description),
+    ]
+      .join(' ')
+      .toLowerCase();
+    const matchedSkills = skillNames.filter((s) => jobText.includes(s));
+    const skillScore = skillNames.length ? clamp(Math.round((matchedSkills.length / skillNames.length) * 100)) : 40;
+
+    // 2) Kinh nghiệm — số năm kinh nghiệm ứng viên so với khoảng yêu cầu của tin.
+    let experienceScore = 60;
+    const bucket = EXPERIENCE_LEVEL_YEARS.find((b) => b.label === job.experienceLevel);
+    if (bucket && profile.yearsOfExperience != null) {
+      const y = profile.yearsOfExperience;
+      if (y >= bucket.min && y <= bucket.max) experienceScore = 100;
+      else if (y < bucket.min) experienceScore = clamp(100 - (bucket.min - y) * 20);
+      else experienceScore = clamp(100 - (y - bucket.max) * 5, 40);
+    } else if (bucket && bucket.min === 0 && bucket.max === Infinity) {
+      experienceScore = 100; // "Không yêu cầu kinh nghiệm" — luôn phù hợp dù hồ sơ chưa điền số năm.
+    }
+
+    // 3) Cấp bậc — khoảng cách giữa cấp bậc mong muốn của ứng viên và cấp bậc tin tuyển dụng.
+    let levelScore = 50;
+    const candidateLevelIdx = LEVEL_ORDER.indexOf(profile.desiredLevel ?? profile.currentLevel ?? '');
+    const jobLevelIdx = LEVEL_ORDER.indexOf(job.level ?? '');
+    if (candidateLevelIdx >= 0 && jobLevelIdx >= 0) {
+      levelScore = clamp(100 - Math.abs(candidateLevelIdx - jobLevelIdx) * 25);
+    }
+
+    // 4) Mức lương — job trả thấp hơn mức mong muốn mới bị trừ điểm; trả bằng/cao hơn luôn tối đa.
+    let salaryScore = 60;
+    if (profile.desiredSalaryMin != null && job.salaryMax != null) {
+      salaryScore = job.salaryMax >= profile.desiredSalaryMin ? 100 : clamp(100 - (profile.desiredSalaryMin - job.salaryMax) * 5);
+    } else if (profile.desiredSalaryMin == null && job.salaryMax == null) {
+      salaryScore = 60;
+    } else {
+      salaryScore = 70;
+    }
+
+    // 5) Địa điểm — tỉnh/thành ứng viên mong muốn (hoặc nơi ở) có khớp nơi làm việc của tin không.
+    let locationScore = 60;
+    const candidateLocations = [profile.province, ...(profile.desiredLocations ?? [])]
+      .filter(Boolean)
+      .map((v) => (v as string).toLowerCase());
+    const jobLocations = [job.location, ...(job.provinces ?? [])].filter(Boolean).map((v) => (v as string).toLowerCase());
+    if (candidateLocations.length && jobLocations.length) {
+      const match = candidateLocations.some((cl) => jobLocations.some((jl) => jl.includes(cl) || cl.includes(jl)));
+      locationScore = match ? 100 : 25;
+    }
+
+    // 6) Ngành nghề — ngành ứng viên mong muốn có khớp ngành của tin không.
+    let industryScore = 60;
+    if (profile.desiredIndustries?.length && job.industry) {
+      const jobIndustry = job.industry.toLowerCase();
+      const match = profile.desiredIndustries.some((i) => i.toLowerCase() === jobIndustry);
+      industryScore = match ? 100 : 30;
+    }
+
+    const criteria = [
+      { key: 'skills', label: 'Kỹ năng', score: skillScore, weight: 30 },
+      { key: 'experience', label: 'Kinh nghiệm', score: experienceScore, weight: 20 },
+      { key: 'level', label: 'Cấp bậc', score: levelScore, weight: 15 },
+      { key: 'salary', label: 'Mức lương', score: salaryScore, weight: 15 },
+      { key: 'location', label: 'Địa điểm', score: locationScore, weight: 10 },
+      { key: 'industry', label: 'Ngành nghề', score: industryScore, weight: 10 },
+    ];
+    const overall = Math.round(criteria.reduce((sum, c) => sum + c.score * c.weight, 0) / 100);
+
+    return { overall, criteria };
   }
 }

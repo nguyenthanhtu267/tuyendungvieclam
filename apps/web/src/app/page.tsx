@@ -7,8 +7,8 @@ import OnlineBanner from '@/components/OnlineBanner';
 import { JobCard } from '@/components/JobCard';
 import { jobsApi, type JobFacets, type JobPosting, type FeaturedEmployer } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { companyInitials } from '@/lib/format';
 import { PINNED_PROVINCES } from '@/lib/catalogs';
+import { CompanyLogo } from '@/components/CompanyLogo';
 
 export default function Home() {
   const router = useRouter();
@@ -210,9 +210,7 @@ export default function Home() {
                   href={`/viec-lam?q=${encodeURIComponent(c.name)}`}
                   className="rounded-xl border border-border bg-white p-4 flex items-center gap-3 hover:border-primary hover:shadow-sm transition-all"
                 >
-                  <div className="w-10 h-10 shrink-0 rounded-lg bg-primary-tint text-primary flex items-center justify-center font-bold text-xs">
-                    {companyInitials(c.name)}
-                  </div>
+                  <CompanyLogo name={c.name} logoUrl={c.logoUrl} size={40} className="text-xs" />
                   <div className="min-w-0">
                     <div className="font-bold text-[12.5px] truncate">{c.name}</div>
                     <div className="text-ink-faint text-[11px]">{c.jobCount} việc làm đang tuyển</div>

@@ -46,6 +46,7 @@ import {
   CandidateReference,
   UnlockedProfile,
   AdminAuditLog,
+  CompanyFollow,
 } from './database/entities';
 
 const entities = [
@@ -75,6 +76,7 @@ const entities = [
   CandidateReference,
   UnlockedProfile,
   AdminAuditLog,
+  CompanyFollow,
 ];
 
 @Module({

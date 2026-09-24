@@ -6,6 +6,11 @@ import { SavedJob } from '../database/entities/saved-job.entity';
 import { BlockedCompany } from '../database/entities/blocked-company.entity';
 import { JobPosting } from '../database/entities/job-posting.entity';
 import { SearchHistory } from '../database/entities/search-history.entity';
+// Đợt 12ab (24/09/2026) — "Nhà tuyển dụng của tôi" (công ty đã xem hồ sơ qua UnlockedProfile, +
+// Theo dõi công ty qua CompanyFollow), "Đánh giá mức độ tương thích" (cần Company để tra ngành/tên).
+import { UnlockedProfile } from '../database/entities/unlocked-profile.entity';
+import { CompanyFollow } from '../database/entities/company-follow.entity';
+import { Company } from '../database/entities/company.entity';
 import {
   CandidateExperience,
   CandidateEducation,
@@ -38,6 +43,9 @@ import { ProfileService } from './profile.service';
       CandidateAchievement,
       CandidateActivity,
       CandidateReference,
+      UnlockedProfile,
+      CompanyFollow,
+      Company,
     ]),
   ],
   controllers: [CandidatesController, ProfileController],

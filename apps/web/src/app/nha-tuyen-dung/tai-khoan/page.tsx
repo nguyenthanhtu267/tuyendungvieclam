@@ -9,6 +9,7 @@ import { formatDate } from '@/lib/format';
 import ChangePasswordCard from '@/components/ChangePasswordCard';
 import FacebookConnectCard from '@/components/FacebookConnectCard';
 import PasswordInput from '@/components/PasswordInput';
+import { CompanyLogo } from '@/components/CompanyLogo';
 
 const LEGAL_DOC_MAX_BYTES = 3 * 1024 * 1024;
 
@@ -95,6 +96,7 @@ function CompanyInfoCard({
   const [size, setSize] = useState(company.size ?? '');
   const [industry, setIndustry] = useState(company.industry ?? '');
   const [website, setWebsite] = useState(company.website ?? '');
+  const [logoUrl, setLogoUrl] = useState(company.logoUrl ?? '');
   const [saving, setSaving] = useState(false);
 
   async function handleSave(e: React.FormEvent) {
@@ -105,6 +107,7 @@ function CompanyInfoCard({
         size: size.trim() || undefined,
         industry: industry.trim() || undefined,
         website: website.trim() || undefined,
+        logoUrl: logoUrl.trim() || undefined,
       });
       onToast('Đã lưu thông tin công ty');
       await onSaved();
@@ -165,6 +168,26 @@ function CompanyInfoCard({
           value={industry}
           onChange={(e) => setIndustry(e.target.value)}
         />
+      </div>
+      {/* Đợt 12ab (24/09/2026) — logo công ty qua link ảnh (URL, quyết định đã chốt), hiện trên thẻ
+          việc làm/trang chi tiết tin/trang công ty. Có xem trước ngay để NTD biết dán đúng link ảnh. */}
+      <div>
+        <label htmlFor="tk-logo" className="text-xs font-semibold text-ink-faint mb-1 block">
+          Logo công ty (link ảnh URL, không bắt buộc)
+        </label>
+        <div className="flex items-center gap-3">
+          <CompanyLogo name={company.name} logoUrl={logoUrl} size={44} className="text-xs" />
+          <input
+            id="tk-logo"
+            className="tvl-input flex-1"
+            placeholder="https://..."
+            value={logoUrl}
+            onChange={(e) => setLogoUrl(e.target.value)}
+          />
+        </div>
+        <div className="text-[10.5px] text-ink-faint mt-1.5">
+          Dán link ảnh logo công ty (PNG/JPG) đã đăng ở nơi khác — nếu link lỗi hoặc chưa có logo, hệ thống tự hiện chữ cái đầu tên công ty.
+        </div>
       </div>
       <div className="flex justify-end pt-2 border-t border-border">
         <button type="submit" disabled={saving} className="tvl-btn-primary !w-auto px-6">

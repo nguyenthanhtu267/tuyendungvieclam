@@ -133,4 +133,31 @@ export class CandidatesController {
   getRecommendedJobs(@CurrentUser() user: { userId: string }) {
     return this.candidatesService.getRecommendedJobs(user.userId);
   }
+
+  // Đợt 12ab (24/09/2026) — "Làm mới hồ sơ" (đẩy lên đầu danh sách tìm hồ sơ của NTD, giãn cách 24h).
+  @Post('me/profile/refresh')
+  refreshProfile(@CurrentUser() user: { userId: string }) {
+    return this.candidatesService.refreshProfile(user.userId);
+  }
+
+  // Đợt 12ab (24/09/2026) — "Nhà tuyển dụng của tôi": công ty đã xem hồ sơ tôi + công ty tôi theo dõi.
+  @Get('me/viewed-by-companies')
+  listViewedByCompanies(@CurrentUser() user: { userId: string }) {
+    return this.candidatesService.listViewedByCompanies(user.userId);
+  }
+
+  @Get('me/followed-companies')
+  listFollowedCompanies(@CurrentUser() user: { userId: string }) {
+    return this.candidatesService.listFollowedCompanies(user.userId);
+  }
+
+  @Post('me/followed-companies/:companyId')
+  followCompany(@CurrentUser() user: { userId: string }, @Param('companyId') companyId: string) {
+    return this.candidatesService.followCompany(user.userId, companyId);
+  }
+
+  @Delete('me/followed-companies/:companyId')
+  unfollowCompany(@CurrentUser() user: { userId: string }, @Param('companyId') companyId: string) {
+    return this.candidatesService.unfollowCompany(user.userId, companyId);
+  }
 }

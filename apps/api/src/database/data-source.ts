@@ -27,6 +27,7 @@ import {
   CandidateReference,
   UnlockedProfile,
   AdminAuditLog,
+  CompanyFollow,
 } from './entities';
 
 // Đợt 12a (20/09/2026) — DataSource riêng cho TypeORM CLI (migration:generate/run/revert), tách
@@ -62,6 +63,7 @@ export const AppDataSource = new DataSource({
     CandidateReference,
     UnlockedProfile,
     AdminAuditLog,
+    CompanyFollow,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,

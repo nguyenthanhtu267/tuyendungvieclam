@@ -6,10 +6,19 @@ import Link from 'next/link';
 import SiteHeader from '@/components/SiteHeader';
 import { JobCard } from '@/components/JobCard';
 import { RichTextView } from '@/components/RichTextView';
-import { jobsApi, candidatesApi, applicationsApi, ApiError, type JobPosting, type CV } from '@/lib/api';
+import { CompanyLogo } from '@/components/CompanyLogo';
+import { CompatibilityRadar } from '@/components/CompatibilityRadar';
+import {
+  jobsApi,
+  candidatesApi,
+  applicationsApi,
+  ApiError,
+  type JobPosting,
+  type CV,
+  type CompatibilityResult,
+} from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import {
-  companyInitials,
   formatDate,
   formatSalary,
   formatSalaryTag,
@@ -38,6 +47,12 @@ function JobDetailInner() {
   const [applyState, setApplyState] = useState<'idle' | 'submitting' | 'done'>('idle');
   const [applyError, setApplyError] = useState<string | null>(null);
 
+  // Đợt 12ab (24/09/2026) — "Theo dõi công ty" (nút trước đó chỉ là UI tĩnh) + "Đánh giá mức độ
+  // tương thích" (radar chart), chỉ ứng viên đã đăng nhập mới thấy/dùng được.
+  const [following, setFollowing] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [compatibility, setCompatibility] = useState<CompatibilityResult | null | undefined>(undefined);
+
   useEffect(() => {
     jobsApi
       .get(params.id)
@@ -59,6 +74,25 @@ function JobDetailInner() {
       .catch(() => {});
   }, [token, params.id]);
 
+  useEffect(() => {
+    if (!token || !job || me?.role !== 'candidate') return;
+    candidatesApi
+      .listFollowedCompanies(token)
+      .then((rows) => setFollowing(rows.some((r) => r.companyId === job.company.id)))
+      .catch(() => {});
+  }, [token, job, me]);
+
+  useEffect(() => {
+    if (!token || me?.role !== 'candidate') {
+      setCompatibility(null);
+      return;
+    }
+    jobsApi
+      .getCompatibility(token, params.id)
+      .then(setCompatibility)
+      .catch(() => setCompatibility(null));
+  }, [token, me, params.id]);
+
   async function toggleSave() {
     if (!me || !token) return;
     const next = !saved;
@@ -68,6 +102,21 @@ function JobDetailInner() {
       else await candidatesApi.unsaveJob(token, params.id);
     } catch {
       setSaved(!next);
+    }
+  }
+
+  async function toggleFollow() {
+    if (!token || !job) return;
+    setFollowBusy(true);
+    const next = !following;
+    setFollowing(next);
+    try {
+      if (next) await candidatesApi.followCompany(token, job.company.id);
+      else await candidatesApi.unfollowCompany(token, job.company.id);
+    } catch {
+      setFollowing(!next);
+    } finally {
+      setFollowBusy(false);
     }
   }
 
@@ -404,9 +453,7 @@ function JobDetailInner() {
               ) : (
                 <div className="flex flex-col gap-3 text-[12.8px] text-ink-muted">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-lg bg-primary-tint text-primary flex items-center justify-center font-bold text-sm shrink-0">
-                      {companyInitials(job.company.name)}
-                    </div>
+                    <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={48} className="text-sm" />
                     <div>
                       <Link href={`/cong-ty/${job.company.id}`} className="font-bold text-ink text-sm hover:text-primary hover:underline">
                         {job.company.name}
@@ -433,15 +480,28 @@ function JobDetailInner() {
           <div className="flex flex-col gap-3.5">
             <div className="rounded-xl border border-border bg-white p-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-lg bg-primary-tint text-primary flex items-center justify-center font-bold text-xs">
-                  {companyInitials(job.company.name)}
-                </div>
+                <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={40} className="text-xs" />
                 <Link href={`/cong-ty/${job.company.id}`} className="font-bold text-[13px] hover:text-primary hover:underline">
                   {job.company.name}
                 </Link>
               </div>
-              <button className="tvl-btn-ghost mt-3">+ Theo dõi</button>
+              {me?.role === 'candidate' && (
+                <button onClick={toggleFollow} disabled={followBusy} className="tvl-btn-ghost mt-3 disabled:opacity-60">
+                  {following ? '✓ Đang theo dõi' : '+ Theo dõi'}
+                </button>
+              )}
             </div>
+
+            {/* Đợt 12ab (24/09/2026) — "Đánh giá mức độ tương thích" (radar chart), theo mẫu
+                careerviet.vn — chỉ hiện cho ứng viên đã đăng nhập và đã có hồ sơ. */}
+            {me?.role === 'candidate' && compatibility && (
+              <div className="rounded-xl border border-border bg-white p-4">
+                <div className="text-[11px] font-bold text-primary uppercase tracking-wide mb-2 text-center">
+                  Đánh giá mức độ tương thích
+                </div>
+                <CompatibilityRadar criteria={compatibility.criteria} overall={compatibility.overall} />
+              </div>
+            )}
           </div>
         </div>
 

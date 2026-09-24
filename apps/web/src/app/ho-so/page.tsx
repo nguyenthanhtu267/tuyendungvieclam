@@ -17,7 +17,10 @@ import {
   type JobPosting,
   type SavedSearch,
   type ApplicationStatusHistoryItem,
+  type ViewedByCompanyRow,
+  type FollowedCompany,
 } from '@/lib/api';
+import { CompanyLogo } from '@/components/CompanyLogo';
 import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatSalary } from '@/lib/format';
 import ChangePasswordCard from '@/components/ChangePasswordCard';
 
@@ -48,6 +51,8 @@ const NAV_ITEMS = [
   { id: 'cvs', label: '📄 CV & tệp đính kèm' },
   { id: 'suggestions', label: '✨ Gợi ý việc làm' },
   { id: 'applications', label: '💼 Việc làm của tôi' },
+  // Đợt 12ab (24/09/2026) — "Nhà tuyển dụng của tôi": công ty đã xem hồ sơ + công ty đang theo dõi.
+  { id: 'employers', label: '🏢 Nhà tuyển dụng của tôi' },
   { id: 'saved-searches', label: '🔔 Tìm kiếm đã lưu' },
   { id: 'settings', label: '⚙️ Cài đặt' },
 ];
@@ -61,6 +66,8 @@ export default function MyCenterPage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [blocked, setBlocked] = useState<BlockedCompany[]>([]);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+  const [viewedByCompanies, setViewedByCompanies] = useState<ViewedByCompanyRow[]>([]);
+  const [followedCompanies, setFollowedCompanies] = useState<FollowedCompany[]>([]);
   const [historyApp, setHistoryApp] = useState<Application | null>(null);
   const [suggestions, setSuggestions] = useState<JobPosting[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,18 +82,22 @@ export default function MyCenterPage() {
     (async () => {
       setLoading(true);
       try {
-        const [p, sj, apps, bl, ss] = await Promise.all([
+        const [p, sj, apps, bl, ss, vb, fc] = await Promise.all([
           candidatesApi.getProfile(token),
           candidatesApi.listSavedJobs(token),
           applicationsApi.listOwn(token),
           candidatesApi.listBlockedCompanies(token),
           candidatesApi.listSavedSearches(token),
+          candidatesApi.listViewedByCompanies(token),
+          candidatesApi.listFollowedCompanies(token),
         ]);
         setProfile(p);
         setSavedJobs(sj);
         setApplications(apps);
         setBlocked(bl);
         setSavedSearches(ss);
+        setViewedByCompanies(vb);
+        setFollowedCompanies(fc);
       } finally {
         setLoading(false);
       }
@@ -175,6 +186,7 @@ export default function MyCenterPage() {
               savedCount={savedJobs.length}
               appliedCount={applications.length}
               interviewCount={applications.filter((a) => a.status === 'interview').length}
+              onToast={showToast}
             />
 
             <CvSection
@@ -304,6 +316,74 @@ export default function MyCenterPage() {
                           className="text-ink-faint hover:text-critical text-xs shrink-0"
                         >
                           Bỏ lưu
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Đợt 12ab (24/09/2026) — "Nhà tuyển dụng của tôi": công ty đã xem hồ sơ (qua
+                unlocked_profiles có sẵn từ Đợt 9) + công ty đang theo dõi (CompanyFollow mới). Cài đặt
+                "Chặn công ty xem hồ sơ" đã có sẵn ở mục Cài đặt bên dưới — không lặp lại ở đây, chỉ
+                dẫn link sang đó. */}
+            <div id="employers" className="grid lg:grid-cols-2 gap-4 scroll-mt-20">
+              <div className="rounded-xl border border-border bg-white p-[18px]">
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="font-extrabold text-[15px]">Nhà tuyển dụng đã xem hồ sơ</h2>
+                  <span className="text-[11px] text-ink-faint">{viewedByCompanies.length} công ty</span>
+                </div>
+                {viewedByCompanies.length === 0 ? (
+                  <div className="text-[12.5px] text-ink-muted py-4">
+                    Chưa có nhà tuyển dụng nào xem hồ sơ của bạn. Bật &ldquo;Cho phép tìm kiếm hồ sơ&rdquo;
+                    ở mục Cài đặt để NTD có thể tìm thấy bạn.
+                  </div>
+                ) : (
+                  <div className="flex flex-col">
+                    {viewedByCompanies.map((row) => (
+                      <div key={row.company.id} className="flex items-center gap-2.5 py-2.5 border-b border-border last:border-0">
+                        <CompanyLogo name={row.company.name} logoUrl={row.company.logoUrl} size={34} className="text-[10px]" />
+                        <div className="flex-1 min-w-0">
+                          <Link href={`/cong-ty/${row.company.id}`} className="font-bold text-[12.5px] hover:text-primary truncate block">
+                            {row.company.name}
+                          </Link>
+                          <div className="text-ink-faint text-[11px]">Đã xem lúc {formatDate(row.viewedAt)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-border bg-white p-[18px]">
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="font-extrabold text-[15px]">Công ty đang theo dõi</h2>
+                  <span className="text-[11px] text-ink-faint">{followedCompanies.length} công ty</span>
+                </div>
+                {followedCompanies.length === 0 ? (
+                  <div className="text-[12.5px] text-ink-muted py-4">
+                    Bạn chưa theo dõi công ty nào. Bấm &ldquo;+ Theo dõi&rdquo; ở trang chi tiết tin hoặc
+                    trang công ty để nhận thông tin từ nhà tuyển dụng bạn quan tâm.
+                  </div>
+                ) : (
+                  <div className="flex flex-col">
+                    {followedCompanies.map((row) => (
+                      <div key={row.id} className="flex items-center justify-between gap-2.5 py-2.5 border-b border-border last:border-0">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <CompanyLogo name={row.company.name} logoUrl={row.company.logoUrl} size={34} className="text-[10px]" />
+                          <Link href={`/cong-ty/${row.companyId}`} className="font-bold text-[12.5px] hover:text-primary truncate block">
+                            {row.company.name}
+                          </Link>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            await candidatesApi.unfollowCompany(token, row.companyId);
+                            setFollowedCompanies((prev) => prev.filter((x) => x.id !== row.id));
+                          }}
+                          className="text-ink-faint hover:text-critical text-xs shrink-0"
+                        >
+                          Bỏ theo dõi
                         </button>
                       </div>
                     ))}
@@ -463,6 +543,7 @@ function OverviewCard({
   savedCount,
   appliedCount,
   interviewCount,
+  onToast,
 }: {
   profile: CandidateProfile;
   token: string;
@@ -470,8 +551,25 @@ function OverviewCard({
   savedCount: number;
   appliedCount: number;
   interviewCount: number;
+  onToast: (msg: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Đợt 12ab (24/09/2026) — "Làm mới hồ sơ": đẩy hồ sơ lên đầu danh sách tìm hồ sơ của NTD (bumps
+  // updatedAt — xem CandidatesService.refreshProfile()), giãn cách 24h/lần.
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      const updated = await candidatesApi.refreshProfile(token);
+      onUpdated({ ...updated, cvs: profile.cvs });
+      onToast('Đã làm mới hồ sơ — hồ sơ của bạn sẽ hiện lên đầu danh sách tìm kiếm của NTD.');
+    } catch (err) {
+      onToast(err instanceof ApiError ? err.message : 'Không thể làm mới hồ sơ, vui lòng thử lại');
+    } finally {
+      setRefreshing(false);
+    }
+  }
   const [form, setForm] = useState({
     fullName: profile.fullName,
     desiredPosition: profile.desiredPosition ?? '',
@@ -573,6 +671,9 @@ function OverviewCard({
           <div className="flex flex-col gap-2 self-start shrink-0">
             <button onClick={() => setEditing(true)} className="tvl-btn-primary !w-auto px-5">
               Cập nhật hồ sơ
+            </button>
+            <button onClick={handleRefresh} disabled={refreshing} className="tvl-btn-ghost !w-auto px-5 text-center disabled:opacity-60">
+              {refreshing ? 'Đang làm mới…' : '🔄 Làm mới hồ sơ'}
             </button>
             <Link href="/ho-so/truc-tuyen" className="tvl-btn-ghost !w-auto px-5 text-center">
               📋 Hồ sơ trực tuyến
@@ -678,11 +779,16 @@ function CvSection({
   }
 
   const cvs = profile.cvs ?? [];
+  // Đợt 12ab (24/09/2026) — "tối đa 2 CV" theo yêu cầu (mẫu careerviet.vn); backend cũng chặn ở
+  // CandidatesService (CV_MAX_COUNT) — chặn cả 2 phía để không hiện form thêm CV vô ích khi đã đủ.
+  const atCvLimit = cvs.length >= 2;
 
   return (
     <div id="cvs" className="rounded-xl border border-border bg-white p-[18px] scroll-mt-20">
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <h2 className="font-extrabold text-[15px]">CV &amp; tệp đính kèm</h2>
+        <h2 className="font-extrabold text-[15px]">
+          CV &amp; tệp đính kèm <span className="text-ink-faint font-semibold text-[12px]">({cvs.length}/2)</span>
+        </h2>
         <div className="flex items-center gap-3">
           <span className="text-[11px] text-ink-faint">Tối đa 2MB (PDF/DOC) — hoặc dán link Google Drive</span>
           <Link href="/ho-so/cv" className="text-[11.5px] font-bold text-primary hover:underline shrink-0">
@@ -699,50 +805,56 @@ function CvSection({
         </div>
       )}
 
-      <div className="rounded-lg border border-border-strong p-3.5">
-        <div className="flex gap-1 mb-3">
-          <button
-            onClick={() => setMode('file')}
-            className={`text-xs font-bold px-3 py-1.5 rounded-md ${mode === 'file' ? 'bg-primary text-white' : 'bg-surface-alt text-ink-muted'}`}
-          >
-            Tải file CV lên
-          </button>
-          <button
-            onClick={() => setMode('link')}
-            className={`text-xs font-bold px-3 py-1.5 rounded-md ${mode === 'link' ? 'bg-primary text-white' : 'bg-surface-alt text-ink-muted'}`}
-          >
-            Dán link Google Drive
-          </button>
+      {atCvLimit ? (
+        <div className="rounded-lg bg-surface-alt text-ink-muted text-[12px] px-3.5 py-3 text-center">
+          Bạn đã đính kèm tối đa 2 CV — xoá bớt 1 CV nếu muốn thêm CV khác.
         </div>
-
-        {mode === 'file' ? (
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.doc,.docx"
-              onChange={handleFileChange}
-              disabled={uploading}
-              className="text-[12.5px]"
-            />
-            <div className="text-[11px] text-ink-faint mt-2">
-              Tối đa 2MB — định dạng PDF hoặc Word (.doc, .docx)
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={handleAddLink} className="flex gap-2 flex-wrap">
-            <input
-              className="tvl-input flex-1 min-w-[200px]"
-              placeholder="Dán link Google Drive đã bật chia sẻ xem…"
-              value={linkValue}
-              onChange={(e) => setLinkValue(e.target.value)}
-            />
-            <button type="submit" disabled={uploading} className="tvl-btn-primary !w-auto px-4">
-              Thêm
+      ) : (
+        <div className="rounded-lg border border-border-strong p-3.5">
+          <div className="flex gap-1 mb-3">
+            <button
+              onClick={() => setMode('file')}
+              className={`text-xs font-bold px-3 py-1.5 rounded-md ${mode === 'file' ? 'bg-primary text-white' : 'bg-surface-alt text-ink-muted'}`}
+            >
+              Tải file CV lên
             </button>
-          </form>
-        )}
-      </div>
+            <button
+              onClick={() => setMode('link')}
+              className={`text-xs font-bold px-3 py-1.5 rounded-md ${mode === 'link' ? 'bg-primary text-white' : 'bg-surface-alt text-ink-muted'}`}
+            >
+              Dán link Google Drive
+            </button>
+          </div>
+
+          {mode === 'file' ? (
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx"
+                onChange={handleFileChange}
+                disabled={uploading}
+                className="text-[12.5px]"
+              />
+              <div className="text-[11px] text-ink-faint mt-2">
+                Tối đa 2MB — định dạng PDF hoặc Word (.doc, .docx)
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleAddLink} className="flex gap-2 flex-wrap">
+              <input
+                className="tvl-input flex-1 min-w-[200px]"
+                placeholder="Dán link Google Drive đã bật chia sẻ xem…"
+                value={linkValue}
+                onChange={(e) => setLinkValue(e.target.value)}
+              />
+              <button type="submit" disabled={uploading} className="tvl-btn-primary !w-auto px-4">
+                Thêm
+              </button>
+            </form>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -797,8 +909,10 @@ function SettingsSection({
 }) {
   const [companyInput, setCompanyInput] = useState('');
 
-  async function toggleVisibility() {
-    const next = profile.visibility === 'locked' ? 'public' : 'locked';
+  // Đợt 12ab (24/09/2026) — nâng cấp từ toggle Khoá/Công khai lên đủ 3 trạng thái Khoá/Công khai/Khẩn
+  // cấp (ProfileVisibility đã có sẵn 'urgent' từ Đợt 8 nhưng trước đây FE chưa có nơi chọn) — theo
+  // mẫu careerviet.vn "hồ sơ nổi bật" giúp NTD ưu tiên xem trước ở cv-search.service.ts (urgent_rank).
+  async function setVisibility(next: CandidateProfile['visibility']) {
     const updated = await candidatesApi.updateProfile(token, { visibility: next });
     onChanged({ ...updated, cvs: profile.cvs });
   }
@@ -830,12 +944,33 @@ function SettingsSection({
   return (
     <div id="settings" className="grid md:grid-cols-2 gap-4 scroll-mt-20">
       <div className="flex flex-col gap-4">
-        <ToggleCard
-          title="Cho phép tìm kiếm hồ sơ"
-          desc="Nhà tuyển dụng có thể tìm thấy hồ sơ của bạn"
-          on={profile.visibility !== 'locked'}
-          onToggle={toggleVisibility}
-        />
+        <div className="rounded-xl border border-border bg-white p-4">
+          <div className="font-bold text-[13px] mb-0.5">Trạng thái hồ sơ</div>
+          <div className="text-ink-faint text-[11.3px] mb-3">Quyết định NTD có tìm thấy hồ sơ của bạn hay không</div>
+          <div className="flex gap-1.5 flex-wrap">
+            {(
+              [
+                ['locked', '🔒 Khoá', 'NTD không tìm thấy hồ sơ'],
+                ['public', '🌐 Công khai', 'NTD tìm thấy hồ sơ bình thường'],
+                ['urgent', '⚡ Khẩn cấp', 'Ưu tiên hiện trước trong kết quả tìm kiếm NTD'],
+              ] as [CandidateProfile['visibility'], string, string][]
+            ).map(([value, label, desc]) => (
+              <button
+                key={value}
+                type="button"
+                title={desc}
+                onClick={() => setVisibility(value)}
+                className={`text-xs font-bold px-3 py-2 rounded-lg border transition-colors ${
+                  profile.visibility === value
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-white text-ink-muted border-border-strong hover:border-primary'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         <ToggleCard
           title="Nhận thông báo việc làm"
           desc="Theo ngành nghề & vị trí đã lưu trong hồ sơ"

@@ -7,7 +7,8 @@ import type { JobPosting } from '@/lib/api';
 import { candidatesApi, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { benefitIcon } from '@/lib/benefit-icons';
-import { companyInitials, formatDate, formatSalaryTag, isNewJob } from '@/lib/format';
+import { formatDate, formatSalaryTag, isNewJob } from '@/lib/format';
+import { CompanyLogo } from '@/components/CompanyLogo';
 
 // Đợt 10 — thẻ việc làm theo mục 4 đặc tả: tiêu đề đậm + badge (MỚI) chữ đỏ trong ngoặc (không phải
 // pill), dòng lương đỏ, nhiều tỉnh ngăn bởi "|", hạn nộp/cập nhật, tag phúc lợi có icon, nút đỏ
@@ -81,9 +82,7 @@ export function JobCard({
         {isSaved ? '♥' : '♡'}
       </button>
 
-      <div className="w-11 h-11 shrink-0 rounded-lg bg-primary-tint text-primary flex items-center justify-center font-bold text-xs">
-        {companyInitials(job.company.name)}
-      </div>
+      <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={44} className="text-xs" />
       <div className="flex-1 min-w-0 pr-6">
         {job.isUrgent && (
           <div className="inline-flex items-center gap-1 mb-1 text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-critical text-white tracking-wide">

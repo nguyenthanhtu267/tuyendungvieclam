@@ -39,6 +39,11 @@ export class Company {
   @Column({ nullable: true })
   website?: string;
 
+  // Đợt 12ab (24/09/2026) — logo công ty hiện trên thẻ việc làm/trang công ty: theo quyết định đã
+  // chốt, NTD dán link ảnh (URL) thay vì tải tệp lên (chưa nối Cloudflare R2 cho ảnh loại này).
+  @Column({ name: 'logo_url', nullable: true })
+  logoUrl?: string;
+
   @Index()
   @Column({
     type: 'enum',

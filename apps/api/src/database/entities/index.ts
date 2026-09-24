@@ -17,3 +17,4 @@ export * from './notification.entity';
 export * from './candidate-sections.entity';
 export * from './unlocked-profile.entity';
 export * from './admin-audit-log.entity';
+export * from './company-follow.entity';

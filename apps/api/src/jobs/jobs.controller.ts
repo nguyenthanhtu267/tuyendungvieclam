@@ -1,6 +1,8 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { JobsService } from './jobs.service';
 import { ListJobsDto } from './dto/list-jobs.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @Controller('jobs')
 export class JobsController {
@@ -30,5 +32,13 @@ export class JobsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.jobsService.findOne(id);
+  }
+
+  // Đợt 12ab (24/09/2026) — "Đánh giá mức độ tương thích": chỉ ứng viên đã đăng nhập mới xem được
+  // (cần hồ sơ để so khớp), khác các route /jobs khác vốn công khai hoàn toàn.
+  @Get(':id/compatibility')
+  @UseGuards(JwtAuthGuard)
+  getCompatibility(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.jobsService.getCompatibility(user.userId, id);
   }
 }

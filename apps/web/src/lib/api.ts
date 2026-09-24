@@ -100,6 +100,9 @@ export interface Company {
   legalDocExternalLink?: string;
   // Đợt 12q (21/09/2026) — Batch 5 mục #1: cờ "Doanh nghiệp yêu thích", bật/tắt qua Admin Console.
   isFeaturedEmployer?: boolean;
+  // Đợt 12ab (24/09/2026) — logo qua link ảnh (URL) + số lượt "Theo dõi công ty".
+  logoUrl?: string;
+  followersCount?: number;
 }
 
 export type JobApprovalStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'expired';
@@ -173,6 +176,7 @@ export interface FeaturedEmployer {
   name: string;
   industry?: string;
   size?: string;
+  logoUrl?: string;
   jobCount: number;
 }
 
@@ -225,7 +229,22 @@ export const jobsApi = {
     return request<DistrictFacet[]>(`/jobs/district-facets?province=${encodeURIComponent(province)}${sep}${qs}`);
   },
   featuredEmployers: () => request<FeaturedEmployer[]>('/jobs/featured-employers'),
+  // Đợt 12ab (24/09/2026) — "Đánh giá mức độ tương thích" (radar chart), chỉ ứng viên đã đăng nhập.
+  getCompatibility: (token: string, id: string) =>
+    request<CompatibilityResult>(`/jobs/${id}/compatibility`, { headers: authHeaders(token) }),
 };
+
+export interface CompatibilityCriterion {
+  key: string;
+  label: string;
+  score: number;
+  weight: number;
+}
+
+export interface CompatibilityResult {
+  overall: number;
+  criteria: CompatibilityCriterion[];
+}
 
 // Đợt 12k (21/09/2026) — trang công ty công khai /cong-ty/[id]: thông tin công ty + toàn bộ tin
 // đang tuyển khác của công ty đó, bấm vào từ tên công ty trong trang chi tiết tin tuyển dụng.
@@ -260,6 +279,22 @@ export interface CandidateProfile {
   desiredIndustries?: string[];
   desiredLocations?: string[];
   desiredJobTypes?: string[];
+  // Đợt 12ab (24/09/2026) — "Làm mới hồ sơ" cần biết lần cập nhật gần nhất để tính giãn cách 24h.
+  updatedAt?: string;
+}
+
+// Đợt 12ab (24/09/2026) — "Nhà tuyển dụng của tôi": công ty đã xem hồ sơ (qua UnlockedProfile có
+// sẵn) + công ty đang theo dõi (CompanyFollow mới).
+export interface ViewedByCompanyRow {
+  viewedAt: string;
+  company: { id: string; name: string; industry?: string; size?: string; logoUrl?: string };
+}
+
+export interface FollowedCompany {
+  id: string;
+  companyId: string;
+  company: Company;
+  createdAt: string;
 }
 
 export interface CV {
@@ -368,6 +403,18 @@ export const candidatesApi = {
   // Đợt 12p (21/09/2026) — gợi ý việc làm chấm điểm theo ngành/địa điểm/hình thức/cấp bậc/kỹ năng.
   getJobRecommendations: (token: string) =>
     request<JobPosting[]>('/me/job-recommendations', { headers: authHeaders(token) }),
+
+  // Đợt 12ab (24/09/2026) — "Làm mới hồ sơ" + "Nhà tuyển dụng của tôi".
+  refreshProfile: (token: string) =>
+    request<CandidateProfile>('/me/profile/refresh', { method: 'POST', headers: authHeaders(token) }),
+  listViewedByCompanies: (token: string) =>
+    request<ViewedByCompanyRow[]>('/me/viewed-by-companies', { headers: authHeaders(token) }),
+  listFollowedCompanies: (token: string) =>
+    request<FollowedCompany[]>('/me/followed-companies', { headers: authHeaders(token) }),
+  followCompany: (token: string, companyId: string) =>
+    request<FollowedCompany>(`/me/followed-companies/${companyId}`, { method: 'POST', headers: authHeaders(token) }),
+  unfollowCompany: (token: string, companyId: string) =>
+    request<void>(`/me/followed-companies/${companyId}`, { method: 'DELETE', headers: authHeaders(token) }),
 };
 
 // ===== Đợt 8 — Hồ sơ trực tuyến 13 mục =====
@@ -658,6 +705,8 @@ export interface UpdateCompanyPayload {
   size?: string;
   industry?: string;
   website?: string;
+  // Đợt 12ab (24/09/2026) — logo công ty qua link ảnh (URL).
+  logoUrl?: string;
 }
 
 export type CompanyUserType = 'main' | 'sub';

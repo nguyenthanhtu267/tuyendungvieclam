@@ -7,11 +7,19 @@ import { SavedJob } from '../database/entities/saved-job.entity';
 import { BlockedCompany } from '../database/entities/blocked-company.entity';
 import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
 import { SearchHistory } from '../database/entities/search-history.entity';
+import { UnlockedProfile } from '../database/entities/unlocked-profile.entity';
+import { CompanyFollow } from '../database/entities/company-follow.entity';
+import { Company } from '../database/entities/company.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { BlockCompanyDto } from './dto/block-company.dto';
 import { SaveSearchDto } from './dto/save-search.dto';
 
 const CV_MAX_BYTES = 2 * 1024 * 1024; // 2MB — theo Mục 9 SRS
+// Đợt 12ab (24/09/2026) — "làm mới hồ sơ" tối đa 2 CV theo yêu cầu (mẫu careerviet.vn).
+const CV_MAX_COUNT = 2;
+// "Làm mới hồ sơ" — giãn cách tối thiểu giữa 2 lần làm mới, tránh ứng viên bấm liên tục để luôn đứng
+// đầu danh sách tìm kiếm (profile.updated_at DESC là tiêu chí sắp xếp phụ ở cv-search.service.ts).
+const REFRESH_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class CandidatesService {
@@ -28,6 +36,12 @@ export class CandidatesService {
     private readonly jobRepo: Repository<JobPosting>,
     @InjectRepository(SearchHistory)
     private readonly searchHistoryRepo: Repository<SearchHistory>,
+    @InjectRepository(UnlockedProfile)
+    private readonly unlockedRepo: Repository<UnlockedProfile>,
+    @InjectRepository(CompanyFollow)
+    private readonly followRepo: Repository<CompanyFollow>,
+    @InjectRepository(Company)
+    private readonly companyRepo: Repository<Company>,
   ) {}
 
   async getOwnProfile(userId: string): Promise<CandidateProfile> {
@@ -67,6 +81,9 @@ export class CandidatesService {
       throw new BadRequestException('Tệp CV vượt quá 2MB — vui lòng dán link Google Drive thay thế');
     }
     const profile = await this.getOwnProfile(userId);
+    if ((profile.cvs?.length ?? 0) >= CV_MAX_COUNT) {
+      throw new BadRequestException(`Bạn chỉ có thể đính kèm tối đa ${CV_MAX_COUNT} CV — vui lòng xoá bớt trước khi thêm CV mới`);
+    }
     const isFirst = (profile.cvs?.length ?? 0) === 0;
     const cv = this.cvRepo.create({
       candidateProfileId: profile.id,
@@ -86,6 +103,9 @@ export class CandidatesService {
 
   async addCvFromLink(userId: string, externalLinkUrl: string): Promise<CV> {
     const profile = await this.getOwnProfile(userId);
+    if ((profile.cvs?.length ?? 0) >= CV_MAX_COUNT) {
+      throw new BadRequestException(`Bạn chỉ có thể đính kèm tối đa ${CV_MAX_COUNT} CV — vui lòng xoá bớt trước khi thêm CV mới`);
+    }
     const isFirst = (profile.cvs?.length ?? 0) === 0;
     const cv = this.cvRepo.create({
       candidateProfileId: profile.id,
@@ -293,5 +313,72 @@ export class CandidatesService {
       .getMany();
 
     return jobs;
+  }
+
+  // ===== Đợt 12ab (24/09/2026) — "Làm mới hồ sơ" =====
+  // CareerViet: ứng viên bấm "Làm mới hồ sơ" để đẩy hồ sơ lên đầu danh sách tìm kiếm của NTD (dùng
+  // cùng `updatedAt` mà cv-search.service.ts đã lấy làm tiêu chí sắp xếp phụ — `ORDER BY ...
+  // profile.updated_at DESC`), có giãn cách 24h/lần để tránh lạm dụng.
+  async refreshProfile(userId: string): Promise<CandidateProfile> {
+    const profile = await this.getOwnProfile(userId);
+    const msSinceUpdate = Date.now() - new Date(profile.updatedAt).getTime();
+    if (msSinceUpdate < REFRESH_COOLDOWN_MS) {
+      const hoursLeft = Math.ceil((REFRESH_COOLDOWN_MS - msSinceUpdate) / (60 * 60 * 1000));
+      throw new BadRequestException(`Bạn vừa làm mới hồ sơ gần đây — vui lòng thử lại sau khoảng ${hoursLeft} giờ nữa`);
+    }
+    // .save() với entity đã tải sẵn sẽ tự cập nhật updated_at (UpdateDateColumn) dù không đổi field
+    // nào khác — không cần chạm dữ liệu thật, chỉ cần "chạm" bản ghi.
+    return this.profileRepo.save(profile);
+  }
+
+  // ===== Đợt 12ab (24/09/2026) — "Nhà tuyển dụng của tôi" =====
+  // Chiều ngược của CvSearchService.listUnlocked() (đó là "các hồ sơ NTD đã mở", đây là "các công ty
+  // đã xem hồ sơ CỦA TÔI") — cùng dựa trên bảng unlocked_profiles đã có sẵn từ Đợt 9, không cần bảng
+  // mới. Chỉ trả về công ty (không lộ thêm gì khác) + thời điểm xem gần nhất.
+  async listViewedByCompanies(userId: string) {
+    const profile = await this.getOwnProfile(userId);
+    const rows = await this.unlockedRepo.find({
+      where: { candidateProfileId: profile.id },
+      relations: { company: true },
+      order: { unlockedAt: 'DESC' },
+    });
+    return rows
+      .filter((r) => r.company)
+      .map((r) => ({
+        viewedAt: r.unlockedAt,
+        company: {
+          id: r.company.id,
+          name: r.company.name,
+          industry: r.company.industry,
+          size: r.company.size,
+          logoUrl: r.company.logoUrl,
+        },
+      }));
+  }
+
+  async listFollowedCompanies(userId: string) {
+    const profile = await this.getOwnProfile(userId);
+    const rows = await this.followRepo.find({
+      where: { candidateProfileId: profile.id },
+      relations: { company: true },
+      order: { createdAt: 'DESC' },
+    });
+    return rows.filter((r) => r.company);
+  }
+
+  async followCompany(userId: string, companyId: string) {
+    const profile = await this.getOwnProfile(userId);
+    const company = await this.companyRepo.findOne({ where: { id: companyId } });
+    if (!company) throw new NotFoundException('Không tìm thấy công ty');
+    const existing = await this.followRepo.findOne({
+      where: { candidateProfileId: profile.id, companyId },
+    });
+    if (existing) return existing;
+    return this.followRepo.save(this.followRepo.create({ candidateProfileId: profile.id, companyId }));
+  }
+
+  async unfollowCompany(userId: string, companyId: string) {
+    const profile = await this.getOwnProfile(userId);
+    await this.followRepo.delete({ candidateProfileId: profile.id, companyId });
   }
 }

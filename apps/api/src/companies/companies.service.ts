@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Company } from '../database/entities/company.entity';
 import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
+import { CompanyFollow } from '../database/entities/company-follow.entity';
 
 // Đợt 12k (21/09/2026) — trang công ty công khai /cong-ty/[id]: bấm tên công ty trong tin tuyển
 // dụng sẽ tới đây, xem thông tin công ty + toàn bộ tin đang tuyển khác của công ty đó (giống
@@ -15,6 +16,8 @@ export class CompaniesService {
     private readonly companyRepo: Repository<Company>,
     @InjectRepository(JobPosting)
     private readonly jobRepo: Repository<JobPosting>,
+    @InjectRepository(CompanyFollow)
+    private readonly followRepo: Repository<CompanyFollow>,
   ) {}
 
   async getProfile(id: string) {
@@ -33,6 +36,10 @@ export class CompaniesService {
       take: 100,
     });
 
+    // Đợt 12ab (24/09/2026) — "Theo dõi công ty": số lượt theo dõi hiện công khai trên trang công
+    // ty, đồng bộ với nút "+ Theo dõi" (viec-lam/[id]/page.tsx) và cong-ty/[id]/page.tsx.
+    const followersCount = await this.followRepo.count({ where: { companyId: id } });
+
     return {
       company: {
         id: company.id,
@@ -41,7 +48,9 @@ export class CompaniesService {
         size: company.size,
         industry: company.industry,
         website: company.website,
+        logoUrl: company.logoUrl,
         isFeaturedEmployer: company.isFeaturedEmployer,
+        followersCount,
       },
       jobs,
       totalJobs: jobs.length,
