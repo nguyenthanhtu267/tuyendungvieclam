@@ -134,6 +134,19 @@ export class JobPosting {
   @Column({ type: 'simple-array', nullable: true })
   tags?: string[];
 
+  // Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (theo mẫu careerviet.vn, mục người dùng yêu cầu bổ
+  // sung cùng "Quyền lợi được hưởng" — mục sau thực ra đã có sẵn từ trước dưới tên `benefits`/"Phúc
+  // lợi", chỉ có Thông tin liên hệ là thật sự thiếu). Cả 3 đều không bắt buộc — khi bỏ trống, trang
+  // chi tiết tin không hiện khối "Thông tin liên hệ" (không hiện giá trị mặc định gây hiểu nhầm).
+  @Column({ name: 'contact_name', nullable: true })
+  contactName?: string;
+
+  @Column({ name: 'contact_email', nullable: true })
+  contactEmail?: string;
+
+  @Column({ name: 'contact_phone', nullable: true })
+  contactPhone?: string;
+
   // Đợt 12x (21/09/2026) — "Sửa tin trước khi duyệt" + "Bắt buộc nhập lý do khi Từ chối" (theo yêu
   // cầu người dùng): khi Admin từ chối 1 tin, chọn ≥1 lý do từ danh mục cố định (JOB_REJECTION_REASONS
   // ở catalogs.ts) + ghi chú tự do (không bắt buộc) — NTD xem lại được lý do này ở trang Quản lý tin

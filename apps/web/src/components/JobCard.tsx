@@ -59,10 +59,17 @@ export function JobCard({
     router.push(`/viec-lam/${job.id}?apply=1`);
   }
 
+  // Đợt 12aa (24/09/2026) — badge "URGENT" (tin khẩn cấp) thiết kế lại theo mẫu careerviet.vn: thẻ
+  // nền hồng nhạt + viền hồng, badge có icon tia sét ⚡ và chữ tiếng Anh "URGENT" giống mẫu (thay
+  // cho pill "KHẨN CẤP" nhỏ trước đây), để nổi bật hơn giữa danh sách tin thường.
   return (
     <Link
       href={`/viec-lam/${job.id}`}
-      className="relative flex gap-3 rounded-xl border border-border bg-white p-4 hover:border-primary hover:shadow-sm transition-all"
+      className={`relative flex gap-3 rounded-xl border p-4 transition-all ${
+        job.isUrgent
+          ? 'border-critical/30 bg-critical-tint/50 hover:border-critical hover:shadow-sm'
+          : 'border-border bg-white hover:border-primary hover:shadow-sm'
+      }`}
     >
       <button
         type="button"
@@ -78,14 +85,14 @@ export function JobCard({
         {companyInitials(job.company.name)}
       </div>
       <div className="flex-1 min-w-0 pr-6">
+        {job.isUrgent && (
+          <div className="inline-flex items-center gap-1 mb-1 text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-critical text-white tracking-wide">
+            ⚡ URGENT
+          </div>
+        )}
         <div className="font-bold text-[13.5px] text-ink">
           {job.title}
           {isNewJob(job.createdAt) && <span className="text-critical font-extrabold ml-1.5">(MỚI)</span>}
-          {job.isUrgent && (
-            <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-critical-tint text-critical align-middle">
-              KHẨN CẤP
-            </span>
-          )}
         </div>
         <div className="text-xs text-ink-muted mt-0.5 truncate">{job.company.name}</div>
 

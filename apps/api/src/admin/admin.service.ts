@@ -138,11 +138,14 @@ export class AdminService {
     };
   }
 
+  // Đợt 12aa (24/09/2026) — đổi ASC → DESC theo yêu cầu người dùng: tin mới gửi nằm ở đầu danh
+  // sách để Admin dễ thấy tin mới nhất, thay vì phải cuộn xuống cuối (trước đó xếp kiểu FIFO, tin
+  // cũ nhất lên đầu — hợp lý cho hàng đợi nhưng không hợp lý cho việc "dễ thấy tin mới").
   listPendingJobs() {
     return this.jobRepo.find({
       where: { approvalStatus: JobApprovalStatus.PENDING },
       relations: { company: true },
-      order: { createdAt: 'ASC' },
+      order: { createdAt: 'DESC' },
     });
   }
 

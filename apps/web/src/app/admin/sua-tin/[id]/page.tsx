@@ -55,6 +55,10 @@ interface FormState {
   benefits: string[];
   deadline: string;
   tags: string[];
+  // Đợt 12aa (24/09/2026) — "Thông tin liên hệ", đồng bộ với wizard Đăng tin NTD.
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
 }
 
 export default function AdminSuaTinPage() {
@@ -98,6 +102,9 @@ export default function AdminSuaTinPage() {
           benefits: job.benefits ?? [],
           deadline: job.deadline ?? '',
           tags: job.tags ?? [],
+          contactName: job.contactName ?? '',
+          contactEmail: job.contactEmail ?? '',
+          contactPhone: job.contactPhone ?? '',
         });
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Không thể tải tin để sửa'))
@@ -136,6 +143,9 @@ export default function AdminSuaTinPage() {
       benefits: form.benefits.length ? form.benefits : undefined,
       deadline: form.deadline || undefined,
       tags: form.tags.length ? form.tags : undefined,
+      contactName: form.contactName.trim() || undefined,
+      contactEmail: form.contactEmail.trim() || undefined,
+      contactPhone: form.contactPhone.trim() || undefined,
     };
     try {
       await adminApi.updateJob(token, params.id, payload);
@@ -274,6 +284,24 @@ export default function AdminSuaTinPage() {
             <Field label="Job tags / Kỹ năng (không bắt buộc)" hint="Nhập rồi Enter">
               <ChipsInput value={form.tags} onChange={(v) => setForm({ ...form, tags: v })} placeholder="Nhập rồi Enter" />
             </Field>
+
+            {/* Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc), đồng bộ với wizard Đăng tin NTD. */}
+            <div className="border-t border-border pt-4 flex flex-col gap-3">
+              <h3 className="font-bold text-xs uppercase tracking-wide text-primary">
+                Thông tin liên hệ (không bắt buộc)
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Người liên hệ">
+                  <input className="tvl-input" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} placeholder="VD: Phòng Nhân sự" />
+                </Field>
+                <Field label="Số điện thoại liên hệ">
+                  <input className="tvl-input" value={form.contactPhone} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} placeholder="VD: 0901 234 567" />
+                </Field>
+              </div>
+              <Field label="Email liên hệ">
+                <input type="email" className="tvl-input" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} placeholder="VD: tuyendung@congty.vn" />
+              </Field>
+            </div>
 
             <h2 className="font-bold text-sm border-t border-border pt-5">Phúc lợi & hạn nộp</h2>
             <Field label="Phúc lợi">

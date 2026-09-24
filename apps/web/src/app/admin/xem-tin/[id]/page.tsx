@@ -172,7 +172,7 @@ export default function AdminJobReviewPage() {
               )}
 
               {job.tags && job.tags.length > 0 && (
-                <div>
+                <div className={(job.contactName || job.contactEmail || job.contactPhone) ? 'mb-4' : ''}>
                   <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Job tags / Skills</div>
                   <div className="flex flex-wrap gap-1.5">
                     {job.tags.map((t) => (
@@ -181,6 +181,19 @@ export default function AdminJobReviewPage() {
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Đợt 12aa (24/09/2026) — "Thông tin liên hệ": Admin nên thấy khi duyệt để đối chiếu
+                  chống lừa đảo (VD email/SĐT liên hệ khác hẳn công ty đăng ký). */}
+              {(job.contactName || job.contactEmail || job.contactPhone) && (
+                <div>
+                  <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Thông tin liên hệ</div>
+                  <ul className="text-[12.8px] text-ink-muted leading-loose list-disc pl-5">
+                    {job.contactName && <li>Người liên hệ: {job.contactName}</li>}
+                    {job.contactEmail && <li>Email: {job.contactEmail}</li>}
+                    {job.contactPhone && <li>Điện thoại: {job.contactPhone}</li>}
+                  </ul>
                 </div>
               )}
             </div>

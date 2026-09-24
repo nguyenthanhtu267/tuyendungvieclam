@@ -134,6 +134,10 @@ export interface JobPosting {
   // xem JOB_REJECTION_REASONS ở catalogs.ts) + ghi chú tự do, NTD xem lại được để biết cần sửa gì.
   rejectionReasons?: string[];
   rejectionNote?: string;
+  // Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc), theo mẫu careerviet.vn.
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
   approvalStatus?: JobApprovalStatus;
   // Đợt 12l (21/09/2026) — dùng ở trang Xem trước NTD để hiện đúng trạng thái "Tạm ngưng".
   isPaused?: boolean;
@@ -642,6 +646,10 @@ export interface CreateJobPayload {
   ageRange?: string;
   workSchedule?: string;
   tags?: string[];
+  // Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc), theo mẫu careerviet.vn.
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
 }
 
 // ===== B5 — Tài khoản & Hồ sơ công ty =====

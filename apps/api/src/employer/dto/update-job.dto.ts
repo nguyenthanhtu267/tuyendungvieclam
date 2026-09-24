@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsEmail, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // Đợt 12l (21/09/2026) — sửa tin đã đăng. Khác CreateJobDto ở chỗ MỌI trường đều optional (kể cả
@@ -96,4 +96,17 @@ export class UpdateJobDto {
   @IsOptional()
   @IsArray()
   tags?: string[];
+
+  // Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc), theo mẫu careerviet.vn.
+  @IsOptional()
+  @IsString()
+  contactName?: string;
+
+  @IsOptional()
+  @IsEmail({}, { message: 'Email liên hệ không hợp lệ' })
+  contactEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  contactPhone?: string;
 }

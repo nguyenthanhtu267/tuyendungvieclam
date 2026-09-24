@@ -202,6 +202,9 @@ export class EmployerService {
       ageRange: job.ageRange,
       workSchedule: job.workSchedule,
       tags: job.tags,
+      contactName: job.contactName,
+      contactEmail: job.contactEmail,
+      contactPhone: job.contactPhone,
       approvalStatus: JobApprovalStatus.PENDING,
       isPaused: false,
     });
@@ -237,6 +240,9 @@ export class EmployerService {
       ageRange: dto.ageRange,
       workSchedule: dto.workSchedule,
       tags: dto.tags,
+      contactName: dto.contactName,
+      contactEmail: dto.contactEmail,
+      contactPhone: dto.contactPhone,
       approvalStatus: JobApprovalStatus.PENDING,
     });
     return this.jobRepo.save(job);

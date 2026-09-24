@@ -24,4 +24,8 @@ export const JOB_EDITABLE_FIELDS = [
   'ageRange',
   'workSchedule',
   'tags',
+  // Đợt 12aa (24/09/2026) — "Thông tin liên hệ".
+  'contactName',
+  'contactEmail',
+  'contactPhone',
 ] as const;

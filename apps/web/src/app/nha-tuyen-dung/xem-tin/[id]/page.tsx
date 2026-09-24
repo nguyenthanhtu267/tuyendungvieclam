@@ -203,6 +203,20 @@ export default function XemTinNtdPage() {
                   </div>
                 </div>
               )}
+
+              {/* Đợt 12aa (24/09/2026) — "Thông tin liên hệ", đồng bộ với trang chi tiết công khai. */}
+              {(job.contactName || job.contactEmail || job.contactPhone) && (
+                <div className="mt-5">
+                  <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">
+                    Thông tin liên hệ
+                  </div>
+                  <ul className="text-[12.8px] text-ink-muted leading-loose list-disc pl-5">
+                    {job.contactName && <li>Người liên hệ: {job.contactName}</li>}
+                    {job.contactEmail && <li>Email: {job.contactEmail}</li>}
+                    {job.contactPhone && <li>Điện thoại: {job.contactPhone}</li>}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
 

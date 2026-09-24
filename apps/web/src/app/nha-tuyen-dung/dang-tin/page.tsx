@@ -56,6 +56,10 @@ interface FormState {
   // Đợt 12v (21/09/2026) — "JOB TAGS / SKILLS": thẻ từ khoá/kỹ năng NTD tự nhập tự do (VD "Tiktokshop
   // Specialist", "Admin E-commerce"), hiển thị dạng chip ở trang chi tiết tin.
   tags: string[];
+  // Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc), theo mẫu careerviet.vn.
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
 }
 
 const INITIAL: FormState = {
@@ -80,6 +84,9 @@ const INITIAL: FormState = {
   benefits: [],
   deadline: '',
   tags: [],
+  contactName: '',
+  contactEmail: '',
+  contactPhone: '',
 };
 
 // Đợt 12l (21/09/2026) — dùng chung wizard này cho cả "Đăng tin mới" và "Sửa tin" (nút Sửa ở trang
@@ -134,6 +141,9 @@ function DangTinInner() {
           benefits: job.benefits ?? [],
           deadline: job.deadline ?? '',
           tags: job.tags ?? [],
+          contactName: job.contactName ?? '',
+          contactEmail: job.contactEmail ?? '',
+          contactPhone: job.contactPhone ?? '',
         });
         if (job.rejectionReasons && job.rejectionReasons.length > 0) {
           setRejectionInfo({ reasons: job.rejectionReasons, note: job.rejectionNote });
@@ -193,6 +203,9 @@ function DangTinInner() {
       benefits: form.benefits.length ? form.benefits : undefined,
       deadline: form.deadline || undefined,
       tags: form.tags.length ? form.tags : undefined,
+      contactName: form.contactName.trim() || undefined,
+      contactEmail: form.contactEmail.trim() || undefined,
+      contactPhone: form.contactPhone.trim() || undefined,
     };
     try {
       if (editId) await employerApi.updateJob(token, editId, payload);
@@ -434,6 +447,44 @@ function DangTinInner() {
               <Field label="Job tags / Kỹ năng (không bắt buộc)" hint="Nhập rồi Enter, VD: Tiktokshop Specialist">
                 <ChipsInput value={form.tags} onChange={(v) => setForm({ ...form, tags: v })} placeholder="Nhập rồi Enter" />
               </Field>
+
+              {/* Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc), theo mẫu careerviet.vn:
+                  ứng viên xem tin thấy được người/kênh liên hệ trực tiếp thay vì chỉ liên hệ qua nút
+                  "Nộp đơn ứng tuyển". Bỏ trống hoàn toàn cũng được — trang chi tiết tin sẽ không hiện
+                  khối này nếu cả 3 trường đều trống. */}
+              <div className="border-t border-border pt-4 flex flex-col gap-3">
+                <h3 className="font-bold text-xs uppercase tracking-wide text-primary">
+                  Thông tin liên hệ (không bắt buộc)
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Người liên hệ">
+                    <input
+                      className="tvl-input"
+                      value={form.contactName}
+                      onChange={(e) => setForm({ ...form, contactName: e.target.value })}
+                      placeholder="VD: Phòng Nhân sự"
+                    />
+                  </Field>
+                  <Field label="Số điện thoại liên hệ">
+                    <input
+                      className="tvl-input"
+                      value={form.contactPhone}
+                      onChange={(e) => setForm({ ...form, contactPhone: e.target.value })}
+                      placeholder="VD: 0901 234 567"
+                    />
+                  </Field>
+                </div>
+                <Field label="Email liên hệ">
+                  <input
+                    type="email"
+                    className="tvl-input"
+                    value={form.contactEmail}
+                    onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
+                    placeholder="VD: tuyendung@congty.vn"
+                  />
+                </Field>
+              </div>
+
               <div className="text-[11px] text-ink-faint">
                 Ảnh/banner tin tuyển dụng: sẽ hỗ trợ ở bản cập nhật sau (khi kết nối lưu trữ tệp Cloudflare R2).
               </div>

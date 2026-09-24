@@ -377,6 +377,29 @@ function JobDetailInner() {
                       </div>
                     </div>
                   )}
+
+                  {/* Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc) NTD nhập khi đăng
+                      tin, chỉ hiện khi có ít nhất 1 trường, theo mẫu careerviet.vn. */}
+                  {(job.contactName || job.contactEmail || job.contactPhone) && (
+                    <div className="mt-5">
+                      <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">
+                        Thông tin liên hệ
+                      </div>
+                      <ul className="text-[12.8px] text-ink-muted leading-loose list-disc pl-5">
+                        {job.contactName && <li>Người liên hệ: {job.contactName}</li>}
+                        {job.contactEmail && (
+                          <li>
+                            Email: <a href={`mailto:${job.contactEmail}`} className="text-primary hover:underline">{job.contactEmail}</a>
+                          </li>
+                        )}
+                        {job.contactPhone && (
+                          <li>
+                            Điện thoại: <a href={`tel:${job.contactPhone}`} className="text-primary hover:underline">{job.contactPhone}</a>
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="flex flex-col gap-3 text-[12.8px] text-ink-muted">
