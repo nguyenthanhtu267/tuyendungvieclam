@@ -8,6 +8,8 @@ import { UserRole } from '../database/entities/user.entity';
 import { JobApprovalStatus } from '../database/entities/job-posting.entity';
 import { CompanyApprovalStatus } from '../database/entities/company.entity';
 import { BulkIdsDto } from './dto/bulk-ids.dto';
+import { RejectJobDto } from './dto/reject-job.dto';
+import { UpdateJobDto } from '../employer/dto/update-job.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -47,13 +49,20 @@ export class AdminController {
     return this.adminService.setJobStatus(admin, id, JobApprovalStatus.APPROVED);
   }
 
+  // Đợt 12x (21/09/2026) — "Bắt buộc nhập lý do khi Từ chối" (theo yêu cầu người dùng): route này
+  // giờ nhận body { reasons: string[]; note?: string } thay vì từ chối "trống không" như trước.
   @Patch('jobs/:id/reject')
-  rejectJob(@CurrentUser() admin: { userId: string; email: string }, @Param('id') id: string) {
-    return this.adminService.setJobStatus(admin, id, JobApprovalStatus.REJECTED);
+  rejectJob(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+    @Body() dto: RejectJobDto,
+  ) {
+    return this.adminService.rejectJobWithReason(admin, id, dto);
   }
 
-  // Đợt 12q (21/09/2026) — Batch 5 mục #2: duyệt/từ chối hàng loạt (đặt trước 'jobs/:id/...' về mặt
-  // route matching không xung đột vì tiền tố khác nhau: 'jobs/bulk-approve' không khớp 'jobs/:id/...').
+  // Đợt 12q (21/09/2026) — Batch 5 mục #2: duyệt/từ chối hàng loạt (đặt trước 'jobs/:id' về mặt
+  // route matching không xung đột: 'jobs/bulk-approve' 2 đoạn (đúng bằng số đoạn của 'jobs/:id') nên
+  // PHẢI khai báo trước 'jobs/:id' (đợt 12x, PATCH) — nếu không Nest sẽ hiểu "bulk-approve" là :id).
   @Patch('jobs/bulk-approve')
   bulkApproveJobs(@CurrentUser() admin: { userId: string; email: string }, @Body() dto: BulkIdsDto) {
     return this.adminService.bulkSetJobStatus(admin, dto.ids, JobApprovalStatus.APPROVED);
@@ -62,6 +71,17 @@ export class AdminController {
   @Patch('jobs/bulk-reject')
   bulkRejectJobs(@CurrentUser() admin: { userId: string; email: string }, @Body() dto: BulkIdsDto) {
     return this.adminService.bulkSetJobStatus(admin, dto.ids, JobApprovalStatus.REJECTED);
+  }
+
+  // Đợt 12x (21/09/2026) — "Sửa tin trước khi duyệt" (theo yêu cầu người dùng, chọn phương án "Sửa
+  // toàn bộ như form NTD"). Khai báo SAU 'jobs/bulk-approve'/'jobs/bulk-reject' (xem ghi chú ở trên).
+  @Patch('jobs/:id')
+  adminUpdateJob(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+    @Body() dto: UpdateJobDto,
+  ) {
+    return this.adminService.adminUpdateJob(admin, id, dto);
   }
 
   @Get('companies/pending')

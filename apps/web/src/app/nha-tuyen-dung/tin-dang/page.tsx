@@ -11,12 +11,15 @@ import { jobShareUrl, openFacebookShare } from '@/lib/social';
 
 // Đợt 11b — Mục #4 ATS: trang quản lý tin đăng của NTD, 4 tab trạng thái (đang đăng/chờ đăng/
 // tạm ngưng/hết hạn) + số lượng từng trạng thái, thao tác tạm ngưng/đăng lại/nhân bản tin.
+// Đợt 12x (21/09/2026) — thêm tab "Bị từ chối" (trước đây gộp lẫn vào không tab nào, NTD phải mò
+// tìm mới thấy) — đi kèm tính năng "Bắt buộc nhập lý do khi Từ chối".
 const TABS: { value: EmployerJobStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'Tất cả' },
   { value: 'dang_dang', label: 'Đang đăng' },
   { value: 'cho_dang', label: 'Chờ đăng' },
   { value: 'tam_ngung', label: 'Tạm ngưng' },
   { value: 'het_han', label: 'Hết hạn' },
+  { value: 'bi_tu_choi', label: 'Bị từ chối' },
 ];
 
 export default function TinDangPage() {
@@ -153,7 +156,17 @@ export default function TinDangPage() {
                     const canPauseResume = status === 'dang_dang' || status === 'tam_ngung';
                     return (
                       <tr key={job.id} className="border-t border-border align-top">
-                        <td className="py-3 px-4 font-bold max-w-xs">{job.title}</td>
+                        <td className="py-3 px-4 font-bold max-w-xs">
+                          {job.title}
+                          {/* Đợt 12x (21/09/2026) — hiện ngay lý do Admin từ chối dưới tên tin, để
+                              NTD biết cần sửa gì mà không phải mở "Xem trước" mới thấy. */}
+                          {status === 'bi_tu_choi' && job.rejectionReasons && job.rejectionReasons.length > 0 && (
+                            <div className="mt-1 text-[11px] font-normal text-critical leading-snug">
+                              Lý do: {job.rejectionReasons.join('; ')}
+                              {job.rejectionNote ? ` — ${job.rejectionNote}` : ''}
+                            </div>
+                          )}
+                        </td>
                         <td className="py-3 px-3 tabular-nums whitespace-nowrap">{formatDate(job.createdAt)}</td>
                         <td className="py-3 px-3 tabular-nums whitespace-nowrap">
                           {job.deadline ? formatDate(job.deadline) : '—'}

@@ -130,6 +130,10 @@ export interface JobPosting {
   // Đợt 12v (21/09/2026) — "JOB TAGS / SKILLS": thẻ từ khoá/kỹ năng NTD tự nhập, hiển thị dạng chip
   // dưới khối "Thông tin khác" ở trang chi tiết tin (theo ảnh mẫu người dùng gửi).
   tags?: string[];
+  // Đợt 12x (21/09/2026) — "Bắt buộc nhập lý do khi Từ chối": lý do Admin chọn (danh mục cố định,
+  // xem JOB_REJECTION_REASONS ở catalogs.ts) + ghi chú tự do, NTD xem lại được để biết cần sửa gì.
+  rejectionReasons?: string[];
+  rejectionNote?: string;
   approvalStatus?: JobApprovalStatus;
   // Đợt 12l (21/09/2026) — dùng ở trang Xem trước NTD để hiện đúng trạng thái "Tạm ngưng".
   isPaused?: boolean;
@@ -551,9 +555,9 @@ export const applicationsApi = {
 
 // ===== Nhà tuyển dụng (Employer) =====
 
-// Đợt 11b — Mục #4 ATS: 4 trạng thái tin tự quản lý (tính từ approvalStatus + isPaused + deadline
-// ở backend, xem computeEmployerStatus() trong employer.service.ts).
-export type EmployerJobStatus = 'dang_dang' | 'cho_dang' | 'tam_ngung' | 'het_han' | 'khac';
+// Đợt 11b — Mục #4 ATS: trạng thái tin tự quản lý (tính từ approvalStatus + isPaused + deadline ở
+// backend, xem computeEmployerStatus() trong employer.service.ts). Đợt 12x — tách 'bi_tu_choi'.
+export type EmployerJobStatus = 'dang_dang' | 'cho_dang' | 'tam_ngung' | 'het_han' | 'bi_tu_choi' | 'khac';
 
 export interface EmployerJob extends JobPosting {
   applicationCount: number;
@@ -565,6 +569,7 @@ export interface EmployerJobStatusCounts {
   cho_dang: number;
   tam_ngung: number;
   het_han: number;
+  bi_tu_choi: number;
   khac: number;
 }
 
@@ -859,8 +864,21 @@ export const adminApi = {
     request<JobPosting>(`/admin/jobs/${id}`, { headers: authHeaders(token) }),
   approveJob: (token: string, id: string) =>
     request<JobPosting>(`/admin/jobs/${id}/approve`, { method: 'PATCH', headers: authHeaders(token) }),
-  rejectJob: (token: string, id: string) =>
-    request<JobPosting>(`/admin/jobs/${id}/reject`, { method: 'PATCH', headers: authHeaders(token) }),
+  // Đợt 12x (21/09/2026) — "Bắt buộc nhập lý do khi Từ chối": nay cần body { reasons, note? }.
+  rejectJob: (token: string, id: string, dto: { reasons: string[]; note?: string }) =>
+    request<JobPosting>(`/admin/jobs/${id}/reject`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(dto),
+    }),
+  // Đợt 12x (21/09/2026) — "Sửa tin trước khi duyệt": Admin sửa toàn bộ trường như form NTD, không
+  // đổi approvalStatus (dùng chung kiểu payload với employerApi.updateJob).
+  updateJob: (token: string, id: string, dto: Partial<CreateJobPayload>) =>
+    request<JobPosting>(`/admin/jobs/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(dto),
+    }),
   listPendingCompanies: (token: string) =>
     request<Company[]>('/admin/companies/pending', { headers: authHeaders(token) }),
   approveCompany: (token: string, id: string) =>

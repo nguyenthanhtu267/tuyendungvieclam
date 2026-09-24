@@ -163,3 +163,19 @@ export const EXPERIENCE_LEVELS: string[] = [
 // Đợt 12k (21/09/2026) — cho ô "Giới tính" trong form Đăng tin (khối "Thông tin khác" ở trang chi
 // tiết tin, theo mẫu careerviet.vn).
 export const GENDER_OPTIONS: string[] = ['Không yêu cầu', 'Nam', 'Nữ'];
+
+// Đợt 12x (21/09/2026) — danh mục lý do từ chối tin cố định, theo yêu cầu người dùng "Bắt buộc nhập
+// lý do khi Từ chối" (chọn dạng checklist thay vì chỉ gõ tự do, để NTD biết chính xác cần sửa gì).
+// Dùng ở modal Từ chối (trang admin/xem-tin/[id]) và hiển thị lại cho NTD xem (trang quản lý tin
+// đăng + trang Sửa tin).
+export const JOB_REJECTION_REASONS: string[] = [
+  'Thiếu hoặc mô tả công việc quá sơ sài',
+  'Mức lương không hợp lý / không rõ ràng',
+  'Chọn sai ngành nghề',
+  'Tiêu đề không rõ ràng / gây hiểu nhầm',
+  'Thông tin công ty không khớp / nghi ngờ không xác thực',
+  'Nghi ngờ tin giả / lừa đảo / đa cấp',
+  'Trùng lặp với tin đã đăng trước đó',
+  'Vi phạm nội dung / từ ngữ không phù hợp',
+  'Khác (xem ghi chú)',
+];

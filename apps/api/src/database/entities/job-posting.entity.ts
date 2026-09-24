@@ -134,6 +134,17 @@ export class JobPosting {
   @Column({ type: 'simple-array', nullable: true })
   tags?: string[];
 
+  // Đợt 12x (21/09/2026) — "Sửa tin trước khi duyệt" + "Bắt buộc nhập lý do khi Từ chối" (theo yêu
+  // cầu người dùng): khi Admin từ chối 1 tin, chọn ≥1 lý do từ danh mục cố định (JOB_REJECTION_REASONS
+  // ở catalogs.ts) + ghi chú tự do (không bắt buộc) — NTD xem lại được lý do này ở trang Quản lý tin
+  // đăng / Sửa tin để biết chính xác cần sửa gì trước khi gửi duyệt lại. Bị xoá (đặt lại undefined)
+  // khi tin được duyệt lại lần sau (xem AdminService.setJobStatus()).
+  @Column({ type: 'simple-array', nullable: true })
+  rejectionReasons?: string[];
+
+  @Column({ name: 'rejection_note', type: 'text', nullable: true })
+  rejectionNote?: string;
+
   @Column({
     type: 'enum',
     enum: JobApprovalStatus,

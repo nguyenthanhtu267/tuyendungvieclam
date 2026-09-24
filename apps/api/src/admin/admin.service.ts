@@ -15,6 +15,10 @@ import { Invoice, InvoiceStatus } from '../database/entities/invoice.entity';
 import { SearchHistory } from '../database/entities/search-history.entity';
 import { AdminAuditLog } from '../database/entities/admin-audit-log.entity';
 import { NotificationsService } from '../notifications/notifications.service';
+import { UpdateJobDto } from '../employer/dto/update-job.dto';
+import { RejectJobDto } from './dto/reject-job.dto';
+import { JOB_EDITABLE_FIELDS } from '../common/job-editable-fields';
+import { sanitizeRichText } from '../common/sanitize-html.util';
 
 // Đợt 12q (21/09/2026) — thông tin admin đang đăng nhập, lấy từ CurrentUser() (payload JWT), dùng để
 // ghi nhật ký thao tác (mục #4 Batch 5). Chỉ cần userId + email, không cần load lại từ CSDL.
@@ -159,6 +163,14 @@ export class AdminService {
     const job = await this.jobRepo.findOne({ where: { id } });
     if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng');
     job.approvalStatus = status;
+    // Đợt 12x (21/09/2026) — tin được duyệt (kể cả sau khi từng bị từ chối rồi NTD sửa lại gửi lên)
+    // thì xoá lý do từ chối cũ, tránh còn sót lại gây hiểu nhầm khi xem lại tin đã duyệt.
+    if (status === JobApprovalStatus.APPROVED) {
+      // Dùng `null` (không phải `undefined`) để TypeORM thực sự XOÁ giá trị cũ trong CSDL — gán
+      // `undefined` sẽ bị TypeORM bỏ qua, coi như "không đổi trường này" (giữ nguyên lý do cũ).
+      job.rejectionReasons = null as unknown as string[];
+      job.rejectionNote = null as unknown as string;
+    }
     const saved = await this.jobRepo.save(job);
 
     if (status === JobApprovalStatus.APPROVED) {
@@ -182,6 +194,48 @@ export class AdminService {
       job.id,
       job.title,
     );
+    return saved;
+  }
+
+  // Đợt 12x (21/09/2026) — "Bắt buộc nhập lý do khi Từ chối" (theo yêu cầu người dùng, thay cho từ
+  // chối "trống không" như setJobStatus() ở trên) — dùng riêng cho route từ chối 1 tin (trang Xem
+  // tin). Từ chối hàng loạt (bulkSetJobStatus) vẫn dùng setJobStatus() không kèm lý do, vì đó là thao
+  // tác gạt bỏ nhanh nhiều tin cùng lúc, không phải luồng duyệt đọc kỹ từng tin.
+  async rejectJobWithReason(admin: AdminActor, id: string, dto: RejectJobDto) {
+    const job = await this.jobRepo.findOne({ where: { id } });
+    if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng');
+    job.approvalStatus = JobApprovalStatus.REJECTED;
+    job.rejectionReasons = dto.reasons;
+    job.rejectionNote = dto.note;
+    const saved = await this.jobRepo.save(job);
+
+    const reasonText = dto.reasons.join('; ');
+    await this.notifyCompanyUsers(
+      job.companyId,
+      'job_rejected',
+      `Tin "${job.title}" đã bị từ chối. Lý do: ${reasonText}.${dto.note ? ` Ghi chú thêm: ${dto.note}.` : ''} Vui lòng sửa lại nội dung rồi gửi duyệt lại.`,
+    );
+    await this.logAction(admin, 'job.reject', 'job', job.id, `${job.title} — Lý do: ${reasonText}`);
+    return saved;
+  }
+
+  // Đợt 12x (21/09/2026) — "Sửa tin trước khi duyệt" (theo yêu cầu người dùng: Admin duyệt thấy tin
+  // có sai sót thì sửa luôn rồi duyệt, thay vì phải từ chối rồi chờ NTD tự sửa gửi lại). Khác
+  // EmployerService.updateJob(): KHÔNG đổi approvalStatus (tin đang PENDING vẫn PENDING, Admin bấm
+  // "Duyệt tin này" ở bước riêng sau khi sửa xong — xem trang admin/sua-tin/[id]), và KHÔNG kiểm tra
+  // quyền sở hữu công ty (Admin sửa được tin của bất kỳ công ty nào). Dùng chung danh sách trường
+  // JOB_EDITABLE_FIELDS với EmployerService để không lệch nhau khi có trường mới.
+  async adminUpdateJob(admin: AdminActor, id: string, dto: UpdateJobDto) {
+    const job = await this.jobRepo.findOne({ where: { id } });
+    if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng');
+    for (const key of JOB_EDITABLE_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(dto, key)) {
+        const value = key === 'description' || key === 'requirements' ? sanitizeRichText(dto[key]) : dto[key];
+        (job as unknown as Record<string, unknown>)[key] = value;
+      }
+    }
+    const saved = await this.jobRepo.save(job);
+    await this.logAction(admin, 'job.admin_edit', 'job', job.id, job.title);
     return saved;
   }
 

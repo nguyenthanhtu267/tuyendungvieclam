@@ -109,14 +109,17 @@ export const PAYMENT_METHOD_LABEL: Record<string, string> = {
   contract_vat: 'Hợp đồng + hoá đơn VAT',
 };
 
-// Đợt 11b — Mục #4 ATS: 4 trạng thái tin NTD tự quản lý (tính từ approvalStatus + isPaused +
-// deadline, xem computeEmployerStatus() ở employer.service.ts). 'khac' gộp draft/rejected — hiếm
-// gặp trong luồng bình thường nhưng vẫn cần nhãn để không hiển thị rỗng.
+// Đợt 11b — Mục #4 ATS: trạng thái tin NTD tự quản lý (tính từ approvalStatus + isPaused +
+// deadline, xem computeEmployerStatus() ở employer.service.ts). 'khac' gộp draft — hiếm gặp trong
+// luồng bình thường nhưng vẫn cần nhãn để không hiển thị rỗng.
+// Đợt 12x (21/09/2026) — tách riêng 'bi_tu_choi' (trước đây gộp chung "khac" với draft, NTD không
+// biết tin bị từ chối) — đi kèm tính năng "Bắt buộc nhập lý do khi Từ chối".
 export const EMPLOYER_JOB_STATUS_LABEL: Record<string, string> = {
   dang_dang: 'Đang đăng',
   cho_dang: 'Chờ đăng',
   tam_ngung: 'Tạm ngưng',
   het_han: 'Hết hạn',
+  bi_tu_choi: 'Bị từ chối',
   khac: 'Khác',
 };
 
@@ -125,5 +128,6 @@ export const EMPLOYER_JOB_STATUS_CLASS: Record<string, string> = {
   cho_dang: 'bg-warning-tint text-warning',
   tam_ngung: 'bg-ink-faint/10 text-ink-faint',
   het_han: 'bg-critical-tint text-critical',
+  bi_tu_choi: 'bg-critical-tint text-critical',
   khac: 'bg-ink-faint/10 text-ink-faint',
 };

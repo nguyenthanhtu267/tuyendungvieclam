@@ -82,12 +82,15 @@ export default function AdminDashboardPage() {
     loadAll();
   }, [loadAll]);
 
-  async function handleJobDecision(id: string, decision: 'approve' | 'reject') {
+  // Đợt 12x (21/09/2026) — "Bắt buộc nhập lý do khi Từ chối": Từ chối không còn là 1 click ở đây
+  // nữa (adminApi.rejectJob giờ đòi hỏi reasons: string[] không rỗng) — nút "Từ chối" bên dưới đưa
+  // Admin sang trang /admin/xem-tin/[id] để chọn lý do trong modal. handleJobDecision chỉ còn xử lý
+  // Duyệt (vẫn 1 click như cũ, không cần lý do).
+  async function handleJobApprove(id: string) {
     if (!token) return;
     setBusyId(id);
     try {
-      if (decision === 'approve') await adminApi.approveJob(token, id);
-      else await adminApi.rejectJob(token, id);
+      await adminApi.approveJob(token, id);
       await loadAll();
     } finally {
       setBusyId(null);
@@ -323,18 +326,21 @@ export default function AdminDashboardPage() {
                             </a>
                             <button
                               disabled={busyId === job.id}
-                              onClick={() => handleJobDecision(job.id, 'approve')}
+                              onClick={() => handleJobApprove(job.id)}
                               className="text-[11px] font-bold rounded-md bg-success-tint text-success px-2.5 py-1.5 mr-1.5 disabled:opacity-50"
                             >
                               Duyệt
                             </button>
-                            <button
-                              disabled={busyId === job.id}
-                              onClick={() => handleJobDecision(job.id, 'reject')}
-                              className="text-[11px] font-bold rounded-md bg-critical-tint text-critical px-2.5 py-1.5 disabled:opacity-50"
+                            {/* Đợt 12x — Từ chối giờ bắt buộc chọn lý do, không còn là 1 click ở
+                                bảng này nữa: đưa sang trang Xem trước có modal chọn lý do. */}
+                            <a
+                              href={`/admin/xem-tin/${job.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-block text-[11px] font-bold rounded-md bg-critical-tint text-critical px-2.5 py-1.5"
                             >
                               Từ chối
-                            </button>
+                            </a>
                           </td>
                         </tr>
                         );

@@ -21,8 +21,14 @@ export class CompaniesService {
     const company = await this.companyRepo.findOne({ where: { id } });
     if (!company) throw new NotFoundException('Không tìm thấy công ty');
 
+    // Đợt 12y (24/09/2026) — FIX lỗi "Application error" khi bấm "Xem tất cả tin đang tuyển của
+    // công ty này": thiếu `relations: { company: true }` nên mỗi tin trong `jobs` không có field
+    // `company` lồng bên trong → JobCard.tsx (dùng chung với trang /viec-lam) gọi
+    // `companyInitials(job.company.name)` bị crash vì `job.company` là undefined. Lỗi có sẵn từ
+    // Đợt 12k (lúc tạo trang này), chưa từng được kiểm thử bấm thật tới bước cuối.
     const jobs = await this.jobRepo.find({
       where: { companyId: id, approvalStatus: JobApprovalStatus.APPROVED, isPaused: false },
+      relations: { company: true },
       order: { createdAt: 'DESC' },
       take: 100,
     });

@@ -19,6 +19,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { EmployerJobStatus } from './dto/list-jobs-query.dto';
 import { ListApplicantsQueryDto } from './dto/list-applicants-query.dto';
 import { sanitizeRichText } from '../common/sanitize-html.util';
+import { JOB_EDITABLE_FIELDS } from '../common/job-editable-fields';
 
 const LEGAL_DOC_MAX_BYTES = 3 * 1024 * 1024; // 3MB — theo Mục 9 SRS
 
@@ -101,9 +102,11 @@ export class EmployerService {
     };
   }
 
-  // Đợt 11b — Mục #4 ATS: 4 trạng thái tin do NTD tự quản lý, tính từ approvalStatus (Admin duyệt)
+  // Đợt 11b — Mục #4 ATS: trạng thái tin do NTD tự quản lý, tính từ approvalStatus (Admin duyệt)
   // + isPaused (NTD tự tạm ngưng) + deadline (tự hết hạn theo ngày) — không thêm enum trạng thái
-  // riêng để tránh 2 nguồn sự thật trùng nhau. "khac" gom draft/rejected (không thuộc 4 tab spec).
+  // riêng để tránh 2 nguồn sự thật trùng nhau. "khac" gom draft (hiếm gặp trong luồng bình thường).
+  // Đợt 12x (21/09/2026) — tách 'bi_tu_choi' ra khỏi 'khac': trước đây REJECTED bị gộp lẫn với draft
+  // khiến NTD không biết tin của mình đã bị từ chối — đi kèm "Bắt buộc nhập lý do khi Từ chối".
   private computeEmployerStatus(job: JobPosting): EmployerJobStatus {
     if (job.approvalStatus === JobApprovalStatus.PENDING) return 'cho_dang';
     if (job.approvalStatus === JobApprovalStatus.APPROVED) {
@@ -114,6 +117,7 @@ export class EmployerService {
       return 'dang_dang';
     }
     if (job.approvalStatus === JobApprovalStatus.EXPIRED) return 'het_han';
+    if (job.approvalStatus === JobApprovalStatus.REJECTED) return 'bi_tu_choi';
     return 'khac';
   }
 
@@ -140,6 +144,7 @@ export class EmployerService {
       cho_dang: 0,
       tam_ngung: 0,
       het_han: 0,
+      bi_tu_choi: 0,
       khac: 0,
     };
     jobs.forEach((job) => {
@@ -257,33 +262,12 @@ export class EmployerService {
   // cả khi giá trị là null, để NTD có thể "xoá" một trường tuỳ chọn — VD bật lại "Thoả thuận" thì
   // salaryMin/salaryMax gửi null để xoá số cũ). Sau khi lưu, tin luôn quay về PENDING chờ Admin
   // duyệt lại — theo quyết định người dùng chốt đợt 12l (nhất quán với "Sao chép tin").
-  private static readonly EDITABLE_JOB_FIELDS = [
-    'title',
-    'industry',
-    'location',
-    'provinces',
-    'district',
-    'experienceLevel',
-    'isUrgent',
-    'salaryMin',
-    'salaryMax',
-    'employmentType',
-    'level',
-    'headcount',
-    'description',
-    'requirements',
-    'benefits',
-    'deadline',
-    'address',
-    'gender',
-    'ageRange',
-    'workSchedule',
-    'tags',
-  ] as const;
-
+  // Đợt 12x (21/09/2026) — chuyển danh sách trường sang dùng chung `JOB_EDITABLE_FIELDS`
+  // (common/job-editable-fields.ts) để AdminService.adminUpdateJob() (Admin sửa tin trước khi
+  // duyệt) dùng lại đúng 1 danh sách, không lệch nhau khi có trường mới.
   async updateJob(userId: string, jobId: string, dto: UpdateJobDto) {
     const job = await this.getOwnedJob(userId, jobId);
-    for (const key of EmployerService.EDITABLE_JOB_FIELDS) {
+    for (const key of JOB_EDITABLE_FIELDS) {
       if (Object.prototype.hasOwnProperty.call(dto, key)) {
         const value = key === 'description' || key === 'requirements' ? sanitizeRichText(dto[key]) : dto[key];
         (job as unknown as Record<string, unknown>)[key] = value;

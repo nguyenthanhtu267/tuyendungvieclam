@@ -96,6 +96,10 @@ function DangTinInner() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(!!editId);
+  // Đợt 12x (21/09/2026) — hiện lại lý do Admin từ chối (nếu có) ngay trên form Sửa tin, để NTD biết
+  // chính xác cần sửa gì trước khi gửi duyệt lại. Không phải 1 field của FormState vì không gửi lại
+  // lên server khi submit — chỉ đọc để hiển thị.
+  const [rejectionInfo, setRejectionInfo] = useState<{ reasons: string[]; note?: string } | null>(null);
 
   useEffect(() => {
     if (me === null) router.replace('/dang-nhap');
@@ -131,6 +135,9 @@ function DangTinInner() {
           deadline: job.deadline ?? '',
           tags: job.tags ?? [],
         });
+        if (job.rejectionReasons && job.rejectionReasons.length > 0) {
+          setRejectionInfo({ reasons: job.rejectionReasons, note: job.rejectionNote });
+        }
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Không thể tải tin để sửa'))
       .finally(() => setLoadingEdit(false));
@@ -248,6 +255,20 @@ function DangTinInner() {
     <main className="min-h-screen bg-bg">
       <EmployerHeader />
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+        {/* Đợt 12x (21/09/2026) — "Bắt buộc nhập lý do khi Từ chối": hiện lại lý do Admin từ chối
+            ngay trên form sửa, NTD biết chính xác cần sửa gì trước khi gửi duyệt lại. */}
+        {rejectionInfo && (
+          <div className="rounded-xl border border-critical/30 bg-critical-tint p-4 mb-5 text-[12.5px]">
+            <div className="font-bold text-critical mb-1.5">Tin này đã bị từ chối — lý do:</div>
+            <ul className="list-disc pl-5 text-ink-muted leading-relaxed">
+              {rejectionInfo.reasons.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+            {rejectionInfo.note && <div className="mt-1.5 text-ink-muted">Ghi chú thêm: {rejectionInfo.note}</div>}
+          </div>
+        )}
+
         <div className="flex mb-6">
           {STEPS.map((label, i) => (
             <button
