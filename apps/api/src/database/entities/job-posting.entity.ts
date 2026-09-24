@@ -139,7 +139,7 @@ export class JobPosting {
   // ở catalogs.ts) + ghi chú tự do (không bắt buộc) — NTD xem lại được lý do này ở trang Quản lý tin
   // đăng / Sửa tin để biết chính xác cần sửa gì trước khi gửi duyệt lại. Bị xoá (đặt lại undefined)
   // khi tin được duyệt lại lần sau (xem AdminService.setJobStatus()).
-  @Column({ type: 'simple-array', nullable: true })
+  @Column({ name: 'rejection_reasons', type: 'simple-array', nullable: true })
   rejectionReasons?: string[];
 
   @Column({ name: 'rejection_note', type: 'text', nullable: true })
