@@ -7,7 +7,7 @@ import EmployerHeader from '@/components/EmployerHeader';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { useAuth } from '@/lib/auth-context';
 import { employerApi, ApiError, type WorkLocation } from '@/lib/api';
-import { formatSalary } from '@/lib/format';
+import { formatSalary, normalizeSalaryAmount } from '@/lib/format';
 import { isRichTextEmpty, richTextListItems } from '@/lib/richtext';
 import { MultiSelectPopover } from '@/components/search/MultiSelectPopover';
 import { ChipsInput } from '@/components/profile/ui';
@@ -214,8 +214,10 @@ function DangTinInner() {
       workSchedule: form.workSchedule.trim() || undefined,
       experienceLevel: form.experienceLevel || undefined,
       isUrgent: form.isUrgent,
-      salaryMin: form.negotiable || !form.salaryMin ? (editId ? null : undefined) : Number(form.salaryMin),
-      salaryMax: form.negotiable || !form.salaryMax ? (editId ? null : undefined) : Number(form.salaryMax),
+      // Đợt 17d — quy đổi lương ngay trước khi gửi (VD gõ nhầm 20000000 thay vì 20 → tự hiểu là 20
+      // triệu), không đổi ở ô nhập để không phá luồng gõ số của người dùng. Xem normalizeSalaryAmount().
+      salaryMin: form.negotiable || !form.salaryMin ? (editId ? null : undefined) : normalizeSalaryAmount(Number(form.salaryMin)),
+      salaryMax: form.negotiable || !form.salaryMax ? (editId ? null : undefined) : normalizeSalaryAmount(Number(form.salaryMax)),
       employmentType: form.employmentType,
       level: form.level,
       headcount: Number(form.headcount) || 1,

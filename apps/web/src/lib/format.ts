@@ -1,3 +1,15 @@
+// Đợt 17d (25/09/2026) — quy ước TOÀN HỆ THỐNG: `salaryMin`/`salaryMax` lưu theo ĐƠN VỊ TRIỆU ĐỒNG
+// (VD 15 nghĩa là 15.000.000đ — xem SALARY_TIERS ở catalogs.ts và formatSalary()/formatSalaryTag()
+// ngay dưới đây, cả 2 đều nối thẳng số vào chữ "triệu" không nhân/chia gì thêm). Nếu Admin/NTD gõ
+// nhầm số tiền đầy đủ (VD 20000000) thay vì số triệu (20), hàm này tự quy đổi xuống để không lưu nhầm
+// 1 số khổng lồ vào CSDL — áp dụng ở MỌI ô nhập lương trên web (theo yêu cầu người dùng, đã hỏi rõ qua
+// AskUserQuestion: ngưỡng 1.000.000, gõ dưới ngưỡng giữ nguyên vì đã đúng đơn vị triệu).
+export function normalizeSalaryAmount(raw: number | undefined | null): number | undefined {
+  if (raw === undefined || raw === null || Number.isNaN(raw) || raw <= 0) return undefined;
+  if (raw >= 1_000_000) return Math.round(raw / 1_000_000);
+  return Math.round(raw);
+}
+
 export function formatSalary(min?: number, max?: number): string {
   if (!min && !max) return 'Thoả thuận';
   if (min && max) return `${min}–${max} triệu`;

@@ -15,6 +15,8 @@ export interface ExtractedJobData {
   employmentType?: string;
   salaryMin?: number;
   salaryMax?: number;
+  // Đợt 17d (25/09/2026) — schema.org `validThrough` là field chuẩn cho hạn nộp, trước đó bỏ sót.
+  deadline?: string;
 }
 
 export interface ExtractJobUrlResult {
@@ -66,22 +68,99 @@ function escapeHtml(input: string): string {
   return input.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// Chuyển text/HTML thô từ JSON-LD thành rich text HTML gọn (mỗi dòng nguồn → 1 đoạn <p>), tương
-// thích trực tiếp với RichTextEditor ở FE và `sanitizeRichText()` khi lưu ở backend.
-function toRichTextHtml(raw?: unknown): string | undefined {
-  if (typeof raw !== 'string') return undefined;
+// Đợt 17d (25/09/2026) — tách phần "dọn text" dùng chung cho cả toRichTextHtml() (bọc <p>) VÀ
+// extractSalaryFromText() mới (dò số tiền trong đoạn văn xuôi) — trước đó logic này nằm gọn trong
+// toRichTextHtml(), giờ cần dùng lại dạng text thuần (không HTML) cho việc dò lương.
+function cleanTextLines(raw?: unknown): string[] {
+  if (typeof raw !== 'string') return [];
   let text = raw
     .replace(/<li[^>]*>/gi, '\n• ')
     .replace(/<\/(p|div|li|ul|ol|h[1-6]|tr)>/gi, '\n')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<[^>]*>/g, '');
   text = decodeHtmlEntities(text);
-  const lines = text
+  return text
     .split(/\r\n|\r|\n/)
     .map((l) => l.replace(/[ \t]+/g, ' ').trim())
     .filter((l) => l.length > 0);
+}
+
+// Chuyển text/HTML thô từ JSON-LD thành rich text HTML gọn (mỗi dòng nguồn → 1 đoạn <p>), tương
+// thích trực tiếp với RichTextEditor ở FE và `sanitizeRichText()` khi lưu ở backend.
+function toRichTextHtml(raw?: unknown): string | undefined {
+  const lines = cleanTextLines(raw);
   if (lines.length === 0) return undefined;
   return lines.map((l) => `<p>${escapeHtml(l)}</p>`).join('');
+}
+
+// Đợt 17d (25/09/2026) — quy ước TOÀN HỆ THỐNG: cột `salary_min`/`salary_max` lưu theo ĐƠN VỊ TRIỆU
+// ĐỒNG (VD 15 nghĩa là 15.000.000đ — xem SALARY_TIERS/formatSalary/formatSalaryTag ở frontend), KHÔNG
+// phải số tiền đầy đủ. Trước đợt này, `extractSalary()` lấy thẳng `minValue`/`maxValue` từ schema.org
+// baseSalary — mà giá trị đó ở hầu hết trang nguồn là SỐ TIỀN ĐẦY ĐỦ (VD 15000000), nên nếu lưu thẳng
+// sẽ ra "15000000 triệu" hiển thị vô lý. Hàm này quy đổi số ≥ 1.000.000 xuống đơn vị triệu; số đã nhỏ
+// (đã đúng đơn vị triệu, VD dò được "15" từ text "15 triệu") thì giữ nguyên. Áp dụng cho MỌI nơi số
+// lương/thu nhập được tạo ra (JSON-LD baseSalary lẫn dò trong văn bản) để không lưu nhầm số khổng lồ.
+function normalizeSalaryAmount(raw: number | undefined): number | undefined {
+  if (raw === undefined || !Number.isFinite(raw) || raw <= 0) return undefined;
+  if (raw >= 1_000_000) return Math.round(raw / 1_000_000);
+  return Math.round(raw);
+}
+
+// Đợt 17d (25/09/2026) — bổ sung theo yêu cầu người dùng (đã hỏi rõ qua AskUserQuestion, chọn "Có, tự
+// dò best-effort"): nhiều tin (đặc biệt do Admin tự dán/nhập tay từ Facebook) không có baseSalary
+// chuẩn hoá — số tiền nằm lẫn trong đoạn mô tả/phúc lợi dạng văn xuôi (VD "Thu nhập: 15 - 18 triệu
+// theo năng lực"). CHỈ dùng khi extractSalary() từ baseSalary không ra kết quả gì — Admin luôn xem lại
+// trước khi lưu vì đây chỉ là dò mẫu câu thường gặp, không phải đọc hiểu ngữ nghĩa.
+function extractSalaryFromText(lines: string[]): { min?: number; max?: number } {
+  const text = lines.join(' ');
+  // "15 - 18 triệu" / "15tr - 18tr" / "15 triệu đến 18 triệu"
+  const rangeMatch = text.match(
+    /(\d{1,3})\s*(?:triệu|tr)?\s*(?:-|–|~|đến)\s*(\d{1,3})\s*(?:triệu|tr\b)/i,
+  );
+  if (rangeMatch) {
+    const min = Number(rangeMatch[1]);
+    const max = Number(rangeMatch[2]);
+    if (min > 0 || max > 0) return { min: min || undefined, max: max || undefined };
+  }
+  // "lương 20 triệu" / "thu nhập 20tr/tháng" — chỉ 1 giá trị, dùng chung cho cả min/max.
+  const singleMatch = text.match(/(\d{1,3})\s*(?:triệu|tr\b)/i);
+  if (singleMatch) {
+    const v = Number(singleMatch[1]);
+    if (v > 0) return { min: v, max: v };
+  }
+  return {};
+}
+
+// Đợt 17d (25/09/2026) — schema.org employmentType trả về mã tiếng Anh chuẩn (FULL_TIME/PART_TIME/...)
+// nhưng hệ thống chỉ chấp nhận 4 giá trị tiếng Việt cố định (EMPLOYMENT_TYPES ở apps/web/src/lib/
+// catalogs.ts) — trước đây lưu thẳng mã tiếng Anh thô, không khớp lựa chọn nào nên hiển thị "—" ở trang
+// công khai. Map sang đúng nhãn tiếng Việt; mã lạ/không nhận diện được → để trống (không đoán bừa).
+const EMPLOYMENT_TYPE_MAP: Record<string, string> = {
+  FULL_TIME: 'Nhân viên chính thức',
+  PART_TIME: 'Thời vụ - Nghề tự do',
+  CONTRACTOR: 'Tạm thời/Dự án',
+  TEMPORARY: 'Tạm thời/Dự án',
+  INTERN: 'Thực tập',
+  INTERNSHIP: 'Thực tập',
+  VOLUNTEER: 'Thời vụ - Nghề tự do',
+  PER_DIEM: 'Tạm thời/Dự án',
+};
+
+function mapEmploymentType(raw?: string): string | undefined {
+  if (!raw) return undefined;
+  const first = raw.split(',')[0].replace(/[[\]"]/g, '').trim().toUpperCase();
+  return EMPLOYMENT_TYPE_MAP[first] ?? undefined;
+}
+
+// Đợt 17d (25/09/2026) — schema.org `validThrough` là field chuẩn cho hạn nộp hồ sơ, dạng ISO
+// ("2026-12-31" hoặc "2026-12-31T00:00:00+07:00") — trước đây bị bỏ sót hoàn toàn, chưa trích xuất.
+function extractDeadline(raw: unknown): string | undefined {
+  const value = asText(raw);
+  if (!value) return undefined;
+  const isoMatch = value.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoMatch) return isoMatch[1];
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString().slice(0, 10);
 }
 
 function asText(value: unknown): string | undefined {
@@ -112,8 +191,8 @@ function extractSalary(baseSalary: unknown): { min?: number; max?: number } {
   const min = toNum(v.minValue) ?? toNum(v.value);
   const max = toNum(v.maxValue) ?? toNum(v.value);
   return {
-    min: Number.isFinite(min) ? min : undefined,
-    max: Number.isFinite(max) ? max : undefined,
+    min: normalizeSalaryAmount(Number.isFinite(min) ? min : undefined),
+    max: normalizeSalaryAmount(Number.isFinite(max) ? max : undefined),
   };
 }
 
@@ -173,15 +252,22 @@ export async function extractJobFromUrl(url: string): Promise<ExtractJobUrlResul
     if (!node) continue;
 
     const org = node.hiringOrganization as Record<string, unknown> | undefined;
-    const salary = extractSalary(node.baseSalary);
+    let salary = extractSalary(node.baseSalary);
+    // Đợt 17d — không có baseSalary chuẩn hoá thì thử dò số tiền trong đoạn mô tả (best-effort, đã xác
+    // nhận với người dùng). Số dò được từ text (VD "15" từ "15 triệu") đã đúng đơn vị triệu sẵn, không
+    // cần normalizeSalaryAmount() thêm lần nữa (hàm này tự bỏ qua số đã nhỏ).
+    if (salary.min === undefined && salary.max === undefined) {
+      salary = extractSalaryFromText(cleanTextLines(node.description));
+    }
     const data: ExtractedJobData = {
       title: asText(node.title),
       companyName: asText(org?.name),
       description: toRichTextHtml(node.description),
       location: extractLocation(node.jobLocation),
-      employmentType: asText(node.employmentType),
+      employmentType: mapEmploymentType(asText(node.employmentType)),
       salaryMin: salary.min,
       salaryMax: salary.max,
+      deadline: extractDeadline(node.validThrough),
     };
     const hasAnyField = Object.values(data).some((v) => v !== undefined);
     if (hasAnyField) return { found: true, data };

@@ -1207,6 +1207,8 @@ export interface ExtractedJobData {
   employmentType?: string;
   salaryMin?: number;
   salaryMax?: number;
+  // Đợt 17d (25/09/2026) — schema.org `validThrough` (hạn nộp hồ sơ), trước đó bỏ sót.
+  deadline?: string;
 }
 
 export interface ExtractJobUrlResult {

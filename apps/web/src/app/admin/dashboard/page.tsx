@@ -18,7 +18,7 @@ import {
   type CompanyClaimRequestStatus,
   type CreateJobPayload,
 } from '@/lib/api';
-import { formatDate, formatDateTime, formatSalary, formatCurrency, formatNumber, PAYMENT_METHOD_LABEL } from '@/lib/format';
+import { formatDate, formatDateTime, formatSalary, formatCurrency, formatNumber, normalizeSalaryAmount, PAYMENT_METHOD_LABEL } from '@/lib/format';
 import ChangePasswordCard from '@/components/ChangePasswordCard';
 import { scanJobContent } from '@/lib/content-moderation';
 import { CompanyLogo } from '@/components/CompanyLogo';
@@ -1539,6 +1539,28 @@ function wrapParagraphs(lines: string[]): string {
   return cleaned.map((l) => `<p>${esc(l)}</p>`).join('');
 }
 
+// Đợt 17d (25/09/2026) — bổ sung theo yêu cầu người dùng (đã hỏi rõ qua AskUserQuestion, chọn "Có, tự
+// dò best-effort"): số tiền lương thường nằm lẫn trong đoạn Phúc lợi dạng văn xuôi khi copy từ Facebook
+// (VD "Thu nhập: 15 - 18 triệu theo năng lực") chứ không có ô riêng — tự dò theo mẫu câu tiếng Việt
+// thường gặp. Số dò được (VD "15") đã đúng đơn vị triệu sẵn — xem quy ước ở normalizeSalaryAmount()
+// (lib/format.ts) — không cần nhân/chia gì thêm. Giống hệt logic phía backend (job-url-extractor.util.ts
+// extractSalaryFromText()) — 2 nơi khác gói (apps/web/apps/api) nên không dùng chung được 1 file.
+function extractSalaryFromLines(lines: string[]): { min?: number; max?: number } {
+  const text = lines.join(' ');
+  const rangeMatch = text.match(/(\d{1,3})\s*(?:triệu|tr)?\s*(?:-|–|~|đến)\s*(\d{1,3})\s*(?:triệu|tr\b)/i);
+  if (rangeMatch) {
+    const min = Number(rangeMatch[1]);
+    const max = Number(rangeMatch[2]);
+    if (min > 0 || max > 0) return { min: min || undefined, max: max || undefined };
+  }
+  const singleMatch = text.match(/(\d{1,3})\s*(?:triệu|tr\b)/i);
+  if (singleMatch) {
+    const v = Number(singleMatch[1]);
+    if (v > 0) return { min: v, max: v };
+  }
+  return {};
+}
+
 function quickParseFacebookPost(raw: string): {
   title?: string;
   description?: string;
@@ -1546,6 +1568,8 @@ function quickParseFacebookPost(raw: string): {
   benefits?: string;
   address?: string;
   contactNote?: string;
+  salaryMin?: number;
+  salaryMax?: number;
 } {
   const lines = raw.split(/\r\n|\r|\n/);
   const buckets: Record<QuickPasteField, string[]> = {
@@ -1590,6 +1614,10 @@ function quickParseFacebookPost(raw: string): {
   const title = intro[0];
   if (intro.length > 1) buckets.description = [...intro.slice(1), ...buckets.description];
 
+  // Dò lương trên TOÀN BỘ nội dung dán vào (không chỉ riêng phần Quyền lợi) — số tiền có thể nằm ở
+  // Mô tả công việc hoặc dòng mở đầu tuỳ cách viết của từng bài đăng.
+  const salary = extractSalaryFromLines(lines.map((l) => l.trim()).filter((l) => l.length > 0));
+
   return {
     title,
     description: wrapParagraphs(buckets.description) || undefined,
@@ -1597,6 +1625,8 @@ function quickParseFacebookPost(raw: string): {
     benefits: wrapParagraphs(buckets.benefits) || undefined,
     address: buckets.address.join(', ') || undefined,
     contactNote: wrapParagraphs(buckets.contactNote) || undefined,
+    salaryMin: salary.min,
+    salaryMax: salary.max,
   };
 }
 
@@ -1634,6 +1664,9 @@ function AddJobForm({
       benefits: parsed.benefits || f.benefits,
       address: parsed.address || f.address,
       contactNote: parsed.contactNote || f.contactNote,
+      // Đợt 17d — số dò được từ text đã đúng đơn vị triệu, gán thẳng không cần quy đổi thêm.
+      salaryMin: parsed.salaryMin ?? f.salaryMin,
+      salaryMax: parsed.salaryMax ?? f.salaryMax,
     }));
     setQuickPasteDone(true);
   }
@@ -1653,6 +1686,8 @@ function AddJobForm({
           employmentType: res.data.employmentType || f.employmentType,
           salaryMin: res.data.salaryMin ?? f.salaryMin,
           salaryMax: res.data.salaryMax ?? f.salaryMax,
+          // Đợt 17d — thêm "Hạn nộp" (schema.org validThrough), trước đó bỏ sót dù trang nguồn có sẵn.
+          deadline: res.data.deadline || f.deadline,
           sourceUrl: url.trim(),
         }));
       } else {
@@ -1672,7 +1707,14 @@ function AddJobForm({
     setBusy(true);
     setError('');
     try {
-      await adminApi.createJobForCompany(token, companyId, form);
+      // Đợt 17d — quy đổi lương ngay trước khi gửi (VD gõ nhầm 20000000 thay vì 20 → tự hiểu là 20
+      // triệu). Số đã đúng đơn vị triệu (dò từ text/trích xuất) không bị đổi vì đã nhỏ hơn ngưỡng.
+      const payload: CreateJobPayload & { sourceUrl?: string } = {
+        ...form,
+        salaryMin: normalizeSalaryAmount(form.salaryMin ?? undefined) ?? undefined,
+        salaryMax: normalizeSalaryAmount(form.salaryMax ?? undefined) ?? undefined,
+      };
+      await adminApi.createJobForCompany(token, companyId, payload);
       onCreated();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Không thể lưu tin');
@@ -1818,6 +1860,23 @@ function AddJobForm({
           value={form.salaryMax ?? ''}
           onChange={(e) => setForm((f) => ({ ...f, salaryMax: e.target.value ? Number(e.target.value) : undefined }))}
         />
+        {/* Đợt 17d (25/09/2026) — nhắc đơn vị "triệu" (VD gõ 20 = 20 triệu); gõ nhầm số đầy đủ
+            (20000000) hệ thống vẫn tự hiểu đúng 20 triệu khi lưu — xem normalizeSalaryAmount(). */}
+        <div className="sm:col-span-2 text-[11px] text-ink-faint -mt-1">
+          Nhập theo đơn vị <strong>triệu đồng</strong> (VD gõ 20 = 20 triệu). Gõ nhầm số đầy đủ (VD
+          20000000) hệ thống vẫn tự hiểu là 20 triệu khi lưu.
+        </div>
+        {/* Đợt 17d (25/09/2026) — "Hạn nộp" trước đó chưa có ô nào trong form rút gọn này, dù backend/
+            schema.org đã hỗ trợ (validThrough) — nay trích xuất URL cũng điền được thẳng vào đây. */}
+        <div className="sm:col-span-2">
+          <label className="text-[11px] font-semibold text-ink-faint mb-1 block">Hạn nộp (không bắt buộc)</label>
+          <input
+            type="date"
+            className="tvl-input text-sm"
+            value={form.deadline ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, deadline: e.target.value || undefined }))}
+          />
+        </div>
         <div className="sm:col-span-2">
           <div className="text-[11px] font-semibold text-ink-faint mb-1">Mô tả công việc</div>
           <RichTextEditor

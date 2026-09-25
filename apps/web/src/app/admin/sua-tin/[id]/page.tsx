@@ -16,6 +16,7 @@ import { ChipsInput } from '@/components/profile/ui';
 import { MultiSelectPopover } from '@/components/search/MultiSelectPopover';
 import { adminApi, ApiError } from '@/lib/api';
 import { isRichTextEmpty } from '@/lib/richtext';
+import { normalizeSalaryAmount } from '@/lib/format';
 import {
   EMPLOYMENT_TYPES,
   EXPERIENCE_LEVELS,
@@ -143,8 +144,10 @@ export default function AdminSuaTinPage() {
       workSchedule: form.workSchedule.trim() || undefined,
       experienceLevel: form.experienceLevel || undefined,
       isUrgent: form.isUrgent,
-      salaryMin: form.negotiable || !form.salaryMin ? null : Number(form.salaryMin),
-      salaryMax: form.negotiable || !form.salaryMax ? null : Number(form.salaryMax),
+      // Đợt 17d — quy đổi lương ngay trước khi gửi (VD gõ nhầm 20000000 thay vì 20 → tự hiểu là 20
+      // triệu). Xem normalizeSalaryAmount() ở lib/format.ts.
+      salaryMin: form.negotiable || !form.salaryMin ? null : normalizeSalaryAmount(Number(form.salaryMin)),
+      salaryMax: form.negotiable || !form.salaryMax ? null : normalizeSalaryAmount(Number(form.salaryMax)),
       employmentType: form.employmentType,
       level: form.level,
       headcount: Number(form.headcount) || 1,
