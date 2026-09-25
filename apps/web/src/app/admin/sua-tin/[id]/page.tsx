@@ -2,84 +2,36 @@
 
 // Đợt 12x (21/09/2026) — "Sửa tin trước khi duyệt", theo yêu cầu người dùng: Admin xem tin (trang
 // admin/xem-tin/[id]) thấy sai sót thì sửa luôn ở đây rồi quay lại bấm Duyệt, thay vì phải Từ chối
-// và chờ NTD tự sửa gửi lại. Dùng lại đúng bộ trường của wizard "Đăng tin" NTD (lựa chọn "Sửa toàn
-// bộ như form NTD" người dùng chốt), nhưng trình bày thành 1 trang cuộn (không chia bước) — Admin
-// chỉ cần sửa đúng vài chỗ sai rồi lưu ngay, không cần đi qua từng bước như NTD nhập tin lần đầu.
-// Gọi PATCH /admin/jobs/:id (AdminService.adminUpdateJob) — khác EmployerService.updateJob() ở chỗ
-// KHÔNG đổi approvalStatus (tin đang chờ duyệt vẫn chờ duyệt, Admin tự bấm "Duyệt" ở bước sau).
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+// và chờ NTD tự sửa gửi lại. Dùng lại đúng bộ trường của wizard "Đăng tin" NTD.
+// Đợt 17h (25/09/2026) — theo yêu cầu người dùng ("3 giao diện phải giống hệt trang Đăng tin NTD"),
+// trang này đổi từ "1 trang cuộn không chia bước" (quyết định cũ ở Đợt 12x, ưu tiên sửa nhanh) sang
+// DÙNG CHUNG wizard 4 Bước y hệt `nha-tuyen-dung/dang-tin` (component `JobWizardSteps`). Đọc query
+// `?step=N` để mở đúng bước cần sửa khi bấm nút "✏️ Sửa" theo khối ở trang Xem tin (Đợt 17f — nay
+// đổi từ anchor-scroll sang chọn đúng bước, vì trang không còn cuộn liền 1 mạch nữa).
+// Vẫn gọi PATCH /admin/jobs/:id (AdminService.adminUpdateJob) — khác EmployerService.updateJob() ở
+// chỗ KHÔNG đổi approvalStatus (tin đang chờ duyệt vẫn chờ duyệt, Admin tự bấm "Duyệt" ở bước sau).
+import { Suspense, useEffect, useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { RichTextEditor } from '@/components/RichTextEditor';
-import { ChipsInput } from '@/components/profile/ui';
-import { MultiSelectPopover } from '@/components/search/MultiSelectPopover';
 import { adminApi, ApiError } from '@/lib/api';
 import { isRichTextEmpty } from '@/lib/richtext';
 import { normalizeSalaryAmount } from '@/lib/format';
-import {
-  EMPLOYMENT_TYPES,
-  EXPERIENCE_LEVELS,
-  GENDER_OPTIONS,
-  INDUSTRIES,
-  LEVELS,
-  PINNED_PROVINCES,
-  PROVINCE_REGIONS,
-} from '@/lib/catalogs';
+import { JobWizardSteps, type JobWizardFormState } from '@/components/JobWizardForm';
+import { EMPLOYMENT_TYPES, EXPERIENCE_LEVELS, GENDER_OPTIONS, LEVELS } from '@/lib/catalogs';
 
-const PROVINCE_GROUPS = [
-  { label: undefined, options: PINNED_PROVINCES },
-  ...PROVINCE_REGIONS.map((r) => ({ label: r.region, options: r.provinces })),
-];
-const INDUSTRY_GROUPS = [{ label: undefined, options: INDUSTRIES }];
-const DISTRICT_SUPPORTED_PROVINCES = ['Hồ Chí Minh', 'Hà Nội'];
-// Đợt 13 (24/09/2026) — đồng bộ với wizard Đăng tin NTD: "Quyền lợi được hưởng" đổi sang nhập tự
-// do (ChipsInput), không còn giới hạn 6 lựa chọn dựng sẵn — danh sách này chỉ còn dùng làm gợi ý
-// nhanh để bấm thêm cho tiện.
-// Đợt 14 (25/09/2026) — mục 15: đồng bộ tiếp với wizard Đăng tin NTD — đổi sang RichTextEditor.
-const BENEFIT_SUGGESTIONS = ['Bảo hiểm sức khỏe', 'Thưởng KPI', 'Laptop', 'Du lịch hằng năm', 'Tăng lương định kỳ', 'Đào tạo chuyên môn'];
-
-function appendRichTextSuggestion(current: string, suggestion: string): string {
-  const clean = isRichTextEmpty(current) ? '' : current;
-  return `${clean}<p>${suggestion}</p>`;
-}
-
-interface FormState {
-  title: string;
-  headcount: string;
-  industries: string[];
-  level: string;
-  employmentType: string;
-  experienceLevel: string;
-  provinces: string[];
-  district: string;
-  address: string;
-  gender: string;
-  ageRange: string;
-  workSchedule: string;
-  isUrgent: boolean;
-  salaryMin: string;
-  salaryMax: string;
-  negotiable: boolean;
-  description: string;
-  requirements: string;
-  // Đợt 14 (25/09/2026) — mục 15: rich text tự do (HTML), không còn mảng chip.
-  benefits: string;
-  deadline: string;
-  tags: string[];
-  // Đợt 12aa (24/09/2026) — "Thông tin liên hệ", đồng bộ với wizard Đăng tin NTD.
-  contactName: string;
-  contactEmail: string;
-  contactPhone: string;
-  // Đợt 14 (25/09/2026) — mục 15: ghi chú liên hệ tự do (rich text).
-  contactNote: string;
-}
-
-export default function AdminSuaTinPage() {
+// Đợt 17h — `useSearchParams()` (đọc `?step=`) bắt buộc phải nằm trong <Suspense> ở Next.js App
+// Router, giống hệt cách `nha-tuyen-dung/dang-tin/page.tsx` đã làm với `?edit=`.
+function AdminSuaTinInner() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { me, token } = useAuth();
-  const [form, setForm] = useState<FormState | null>(null);
+  const [step, setStep] = useState(() => {
+    const raw = Number(searchParams.get('step'));
+    return Number.isFinite(raw) && raw >= 0 && raw <= 3 ? raw : 0;
+  });
+  const [form, setForm] = useState<JobWizardFormState | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -197,210 +149,27 @@ export default function AdminSuaTinPage() {
             </Link>
           </div>
         ) : (
-          <div className="rounded-xl bg-white border border-border p-6 flex flex-col gap-5">
-            {error && <div className="rounded-lg bg-critical-tint text-critical text-sm px-3 py-2.5">{error}</div>}
-
-            {/* Đợt 17f — id neo (#f-co-ban) để trang Xem tin có thể nhảy thẳng vào đúng khối này khi
-                Admin bấm "✏️ Sửa" cạnh khối "Thông tin cơ bản" thay vì phải cuộn tìm. */}
-            <h2 id="f-co-ban" className="font-bold text-sm scroll-mt-20">Thông tin vị trí</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Chức danh">
-                <input className="tvl-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-              </Field>
-              <Field label="Số lượng tuyển">
-                <input type="number" min={1} className="tvl-input" value={form.headcount} onChange={(e) => setForm({ ...form, headcount: e.target.value })} />
-              </Field>
-            </div>
-            <Field label="Ngành nghề" hint="chọn tối đa 3">
-              <MultiSelectPopover
-                label="Ngành nghề"
-                placeholder="Chọn ngành nghề"
-                groups={INDUSTRY_GROUPS}
-                selected={form.industries}
-                onChange={(v) => setForm({ ...form, industries: v.slice(0, 3) })}
-                emptyText="Vui lòng chọn ngành nghề"
-              />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Cấp bậc">
-                <select className="tvl-input" value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })}>
-                  {LEVELS.map((o) => <option key={o}>{o}</option>)}
-                </select>
-              </Field>
-              <Field label="Hình thức làm việc">
-                <select className="tvl-input" value={form.employmentType} onChange={(e) => setForm({ ...form, employmentType: e.target.value })}>
-                  {EMPLOYMENT_TYPES.map((o) => <option key={o}>{o}</option>)}
-                </select>
-              </Field>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Kinh nghiệm làm việc">
-                <select className="tvl-input" value={form.experienceLevel} onChange={(e) => setForm({ ...form, experienceLevel: e.target.value })}>
-                  {EXPERIENCE_LEVELS.map((o) => <option key={o}>{o}</option>)}
-                </select>
-              </Field>
-              <Field label="Việc làm khẩn cấp">
-                <div className="flex items-center h-[42px]">
-                  <Chip active={form.isUrgent} onClick={() => setForm({ ...form, isUrgent: !form.isUrgent })}>
-                    {form.isUrgent ? '🔥 Khẩn cấp' : 'Đánh dấu khẩn cấp'}
-                  </Chip>
-                </div>
-              </Field>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Tỉnh, Thành Phố" hint="có thể chọn nhiều">
-                <MultiSelectPopover
-                  label="Tỉnh, Thành Phố"
-                  placeholder="Chọn tỉnh, thành phố"
-                  groups={PROVINCE_GROUPS}
-                  selected={form.provinces}
-                  onChange={(v) => setForm({ ...form, provinces: v, district: v.length === 1 ? form.district : '' })}
-                  emptyText="Chọn địa điểm làm việc"
-                />
-              </Field>
-              <Field label="Mức lương (triệu)">
-                <div className="flex gap-2 items-center">
-                  <input disabled={form.negotiable} className="tvl-input" placeholder="Từ" value={form.salaryMin} onChange={(e) => setForm({ ...form, salaryMin: e.target.value })} />
-                  <input disabled={form.negotiable} className="tvl-input" placeholder="Đến" value={form.salaryMax} onChange={(e) => setForm({ ...form, salaryMax: e.target.value })} />
-                  <Chip active={form.negotiable} onClick={() => setForm({ ...form, negotiable: !form.negotiable })}>
-                    Thoả thuận
-                  </Chip>
-                </div>
-              </Field>
-            </div>
-            {form.provinces.length === 1 && DISTRICT_SUPPORTED_PROVINCES.includes(form.provinces[0]) && (
-              <Field label="Quận / Huyện" hint="không bắt buộc">
-                <input className="tvl-input" value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} />
-              </Field>
-            )}
-            <Field label="Địa chỉ chi tiết" hint="không bắt buộc">
-              <input className="tvl-input" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Giới tính">
-                <select className="tvl-input" value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
-                  {GENDER_OPTIONS.map((o) => <option key={o}>{o}</option>)}
-                </select>
-              </Field>
-              <Field label="Độ tuổi" hint="không bắt buộc">
-                <input className="tvl-input" value={form.ageRange} onChange={(e) => setForm({ ...form, ageRange: e.target.value })} />
-              </Field>
-            </div>
-            <Field label="Thời gian làm việc" hint="không bắt buộc">
-              <input className="tvl-input" value={form.workSchedule} onChange={(e) => setForm({ ...form, workSchedule: e.target.value })} />
-            </Field>
-
-            <h2 className="font-bold text-sm border-t border-border pt-5">Mô tả & yêu cầu</h2>
-            <Field id="f-mo-ta" label="Mô tả công việc">
-              <RichTextEditor value={form.description} onChange={(html) => setForm({ ...form, description: html })} minHeight={200} />
-            </Field>
-            <Field id="f-yeu-cau" label="Yêu cầu ứng viên">
-              <RichTextEditor value={form.requirements} onChange={(html) => setForm({ ...form, requirements: html })} minHeight={200} />
-            </Field>
-
-            {/* Đợt 13 (24/09/2026) — "Quyền lợi được hưởng" chuyển lên ngay sau "Yêu cầu ứng viên",
-                đồng bộ với wizard Đăng tin NTD.
-                Đợt 14 (25/09/2026) — mục 15: đổi sang RichTextEditor, đồng bộ với wizard Đăng tin NTD. */}
-            {/* Đợt 17g — nhãn đổi từ "Quyền lợi được hưởng" sang "Phúc lợi" để khớp đúng tiêu đề hiển
-                thị ở trang Xem tin (không đổi tên field `benefits`). */}
-            <Field id="f-phuc-loi" label="Phúc lợi" hint="Gõ tự do, hoặc bấm gợi ý bên dưới để chèn thêm">
-              <RichTextEditor
-                value={form.benefits}
-                onChange={(html) => setForm({ ...form, benefits: html })}
-                placeholder="VD: Bảo hiểm sức khỏe, thưởng KPI, laptop..."
-                minHeight={140}
-              />
-              <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {BENEFIT_SUGGESTIONS.filter((opt) => !form.benefits.includes(opt)).map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => setForm({ ...form, benefits: appendRichTextSuggestion(form.benefits, opt) })}
-                    className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-surface-alt text-ink-muted hover:bg-primary-tint hover:text-primary"
-                  >
-                    + {opt}
-                  </button>
-                ))}
-              </div>
-            </Field>
-
-            {/* Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc), đồng bộ với wizard Đăng tin NTD.
-                Đợt 14 (25/09/2026) — mục 15: thêm "Thông tin khác" (rich text tự do) + chuyển khối này
-                lên TRƯỚC "Job tags / Kỹ năng", đồng bộ với wizard Đăng tin NTD.
-                Đợt 15 (25/09/2026) — theo yêu cầu người dùng, đổi thứ tự bên trong: "Thông tin khác"
-                lên TRƯỚC, "Thông tin liên hệ" (3 trường có cấu trúc) xuống SAU.
-                Đợt 16 (25/09/2026) — mục 20 danh sách lỗi: đồng bộ với wizard Đăng tin NTD, bỏ hint
-                "— ghi chú tự do" và đổi placeholder sang gợi ý nội dung thực tế. */}
-            <div id="f-lien-he" className="border-t border-border pt-4 flex flex-col gap-3 scroll-mt-20">
-              <Field label="Thông tin khác" hint="không bắt buộc">
-                <RichTextEditor
-                  value={form.contactNote}
-                  onChange={(html) => setForm({ ...form, contactNote: html })}
-                  placeholder="VD: Bằng cấp, độ tuổi, giới tính, chứng chỉ đặc thù, chế độ phúc lợi, mức lương…"
-                  minHeight={120}
-                />
-              </Field>
-              <h3 className="font-bold text-xs uppercase tracking-wide text-primary">
-                Thông tin liên hệ (không bắt buộc)
-              </h3>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Người liên hệ">
-                  <input className="tvl-input" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} placeholder="VD: Phòng Nhân sự" />
-                </Field>
-                <Field label="Số điện thoại liên hệ">
-                  <input className="tvl-input" value={form.contactPhone} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} placeholder="VD: 0901 234 567" />
-                </Field>
-              </div>
-              <Field label="Email liên hệ">
-                <input type="email" className="tvl-input" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} placeholder="VD: tuyendung@congty.vn" />
-              </Field>
-            </div>
-
-            <Field id="f-tags" label="Job tags / Kỹ năng (không bắt buộc)" hint="Nhập rồi Enter">
-              <ChipsInput value={form.tags} onChange={(v) => setForm({ ...form, tags: v })} placeholder="Nhập rồi Enter" />
-            </Field>
-
-            <h2 id="f-han-nop" className="font-bold text-sm border-t border-border pt-5 scroll-mt-20">Hạn nộp hồ sơ</h2>
-            <Field label="Hạn nộp hồ sơ">
-              <input type="date" className="tvl-input" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} />
-            </Field>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-border">
-              <Link href={`/admin/xem-tin/${params.id}`} className="tvl-btn-ghost !w-auto px-4">
-                Huỷ
-              </Link>
-              <button type="button" disabled={submitting} onClick={handleSubmit} className="tvl-btn-primary !w-auto px-5 disabled:opacity-50">
-                {submitting ? 'Đang lưu…' : 'Lưu thay đổi'}
-              </button>
-            </div>
-          </div>
+          <JobWizardSteps
+            form={form}
+            setForm={(u) => setForm((f) => (f ? (typeof u === 'function' ? u(f) : u) : f) as JobWizardFormState)}
+            step={step}
+            setStep={setStep}
+            error={error}
+            submitting={submitting}
+            onSubmit={handleSubmit}
+            submitLabel="Lưu thay đổi →"
+            previewNote='Kiểm tra lại thông tin ở 3 bước trước — Admin lưu KHÔNG làm đổi trạng thái duyệt của tin (tin đang chờ duyệt vẫn chờ duyệt, tin đã duyệt vẫn giữ đã duyệt). Bấm "← Quay lại Xem tin" để duyệt/từ chối sau khi sửa xong.'
+          />
         )}
       </div>
     </main>
   );
 }
 
-function Field({ id, label, hint, children }: { id?: string; label: string; hint?: string; children: React.ReactNode }) {
+export default function AdminSuaTinPage() {
   return (
-    <label id={id} className={id ? 'flex flex-col gap-1.5 scroll-mt-20' : 'flex flex-col gap-1.5'}>
-      <span className="text-xs font-bold text-ink">
-        {label} {hint && <span className="font-normal text-ink-faint">({hint})</span>}
-      </span>
-      {children}
-    </label>
-  );
-}
-
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`text-xs font-semibold rounded-full px-3 py-1.5 border transition-colors ${
-        active ? 'bg-primary text-white border-primary' : 'bg-white text-ink-muted border-border-strong hover:border-primary'
-      }`}
-    >
-      {children}
-    </button>
+    <Suspense fallback={null}>
+      <AdminSuaTinInner />
+    </Suspense>
   );
 }

@@ -22,30 +22,9 @@ import { formatDate, formatDateTime, formatSalary, formatCurrency, formatNumber,
 import ChangePasswordCard from '@/components/ChangePasswordCard';
 import { scanJobContent } from '@/lib/content-moderation';
 import { CompanyLogo } from '@/components/CompanyLogo';
-import { RichTextEditor } from '@/components/RichTextEditor';
-import {
-  INDUSTRIES,
-  LEVELS,
-  EMPLOYMENT_TYPES,
-  EXPERIENCE_LEVELS,
-  PINNED_PROVINCES,
-  PROVINCE_REGIONS,
-  GENDER_OPTIONS,
-} from '@/lib/catalogs';
-import { ChipsInput } from '@/components/profile/ui';
-import { MultiSelectPopover } from '@/components/search/MultiSelectPopover';
-
-// Đợt 17g (25/09/2026) — theo yêu cầu người dùng: form "Cách 3" (Nguồn ngoài) phải có ĐỦ trường và
-// cách chọn giống hệt wizard Đăng tin NTD / form Sửa tin Admin (trước đó chỉ chọn được 1 Ngành nghề /
-// 1 Tỉnh-Thành, thiếu Số lượng tuyển, Quận/Huyện, Giới tính, Độ tuổi, Thời gian làm việc, Khẩn cấp,
-// Job tags, và không tách riêng Người liên hệ/Email/SĐT). Dùng lại đúng các nhóm hằng số/constant đã
-// có sẵn ở admin/sua-tin/[id]/page.tsx thay vì viết lại.
-const AJF_PROVINCE_GROUPS = [
-  { label: undefined, options: PINNED_PROVINCES },
-  ...PROVINCE_REGIONS.map((r) => ({ label: r.region, options: r.provinces })),
-];
-const AJF_INDUSTRY_GROUPS = [{ label: undefined, options: INDUSTRIES }];
-const AJF_DISTRICT_SUPPORTED_PROVINCES = ['Hồ Chí Minh', 'Hà Nội'];
+import { isRichTextEmpty } from '@/lib/richtext';
+import { JobWizardSteps, JOB_WIZARD_INITIAL, type JobWizardFormState } from '@/components/JobWizardForm';
+import { INDUSTRIES, PROVINCES } from '@/lib/catalogs';
 
 // Đợt 12f (21/09/2026) — bổ sung mục "Đổi mật khẩu" tự phục vụ cho Admin, còn thiếu sót ở Đợt
 // 12a (lúc đó chỉ làm cho Ứng viên và Nhà tuyển dụng). Trước khi có mục này, Admin chỉ có thể
@@ -1673,6 +1652,39 @@ function quickParseFacebookPost(raw: string): {
 // (2) dán nhanh nội dung copy từ Facebook → tự tách mục (best-effort, xem hàm quickParseFacebookPost),
 // (3) nhập tay / kiểm tra lại rồi lưu.
 // Tin được lưu bằng adminApi.createJobForCompany() hiện CÔNG KHAI NGAY (không qua hàng đợi duyệt).
+// Đợt 17h (25/09/2026) — theo yêu cầu người dùng ("3 giao diện phải giống hệt trang Đăng tin NTD"),
+// "Cách 3" đổi từ form rút gọn tự viết (Đợt 17g) sang DÙNG CHUNG wizard 4 Bước `JobWizardSteps` y hệt
+// wizard Đăng tin NTD / form Sửa tin Admin. "Cách 1" (trích xuất URL) và "Cách 2" (dán nhanh Facebook)
+// giữ nguyên phía trên, chỉ đổi state đích từ `CreateJobPayload` (số) sang `JobWizardFormState` (chuỗi,
+// giống 2 form kia) — quy đổi kiểu dữ liệu ngay trong handleExtract/handleQuickPaste bên dưới.
+function guessProvincesFromText(text: string): { provinces: string[]; leftover?: string } {
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, ''); // bỏ dấu để so khớp (giống scanJobContent() ở lib/content-moderation.ts)
+  const normalizedText = normalize(text);
+  // Vài cách viết tắt thường gặp khi copy từ tin tuyển dụng/Facebook.
+  const aliasMap: Record<string, string> = {
+    'tphcm': 'Hồ Chí Minh',
+    'tp.hcm': 'Hồ Chí Minh',
+    'tp hcm': 'Hồ Chí Minh',
+    'hcm': 'Hồ Chí Minh',
+    'sai gon': 'Hồ Chí Minh',
+    'sg': 'Hồ Chí Minh',
+    'hn': 'Hà Nội',
+  };
+  const found = new Set<string>();
+  for (const p of PROVINCES) {
+    if (normalizedText.includes(normalize(p))) found.add(p);
+  }
+  for (const [alias, province] of Object.entries(aliasMap)) {
+    if (normalizedText.includes(alias)) found.add(province);
+  }
+  const provinces = Array.from(found);
+  return provinces.length ? { provinces } : { provinces: [], leftover: text.trim() || undefined };
+}
+
 function AddJobForm({
   token,
   companyId,
@@ -1687,14 +1699,11 @@ function AddJobForm({
   const [extractWarning, setExtractWarning] = useState('');
   const [quickPasteText, setQuickPasteText] = useState('');
   const [quickPasteDone, setQuickPasteDone] = useState(false);
-  const [form, setForm] = useState<CreateJobPayload & { sourceUrl?: string }>({ title: '', headcount: 1 });
+  const [sourceUrl, setSourceUrl] = useState<string | undefined>(undefined);
+  const [step, setStep] = useState(0);
+  const [form, setForm] = useState<JobWizardFormState>(JOB_WIZARD_INITIAL);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  // Đợt 17g — đồng bộ đầy đủ với wizard Đăng tin NTD / form Sửa tin Admin: "Ngành nghề" chọn được
-  // tối đa 3 (UI), nhưng CHỈ mục đầu tiên được lưu vào `form.industry` khi submit — giống hệt cách 2
-  // form kia hoạt động (không phải lỗi riêng của form này, xem `industries[0]` ở 2 nơi kia).
-  const [industries, setIndustries] = useState<string[]>([]);
-  const [negotiable, setNegotiable] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function handleQuickPaste() {
     if (!quickPasteText.trim()) return;
@@ -1708,8 +1717,8 @@ function AddJobForm({
       address: parsed.address || f.address,
       contactNote: parsed.contactNote || f.contactNote,
       // Đợt 17d — số dò được từ text đã đúng đơn vị triệu, gán thẳng không cần quy đổi thêm.
-      salaryMin: parsed.salaryMin ?? f.salaryMin,
-      salaryMax: parsed.salaryMax ?? f.salaryMax,
+      salaryMin: parsed.salaryMin != null ? String(parsed.salaryMin) : f.salaryMin,
+      salaryMax: parsed.salaryMax != null ? String(parsed.salaryMax) : f.salaryMax,
     }));
     setQuickPasteDone(true);
   }
@@ -1721,20 +1730,24 @@ function AddJobForm({
     try {
       const res = await adminApi.extractJobFromUrl(token, url.trim());
       if (res.found) {
+        // Đợt 17h — trang nguồn trả về "location" dạng text tự do (không có ô riêng), tự dò khớp với
+        // danh mục Tỉnh/Thành best-effort; không khớp được thì để vào "Địa chỉ cụ thể" cho Admin tự sửa.
+        const guess = res.data.location ? guessProvincesFromText(res.data.location) : null;
         setForm((f) => ({
           ...f,
           title: res.data.title || f.title,
           description: res.data.description || f.description,
-          location: res.data.location || f.location,
+          provinces: guess?.provinces.length ? guess.provinces : f.provinces,
+          address: guess?.leftover ? guess.leftover : f.address,
           employmentType: res.data.employmentType || f.employmentType,
-          salaryMin: res.data.salaryMin ?? f.salaryMin,
-          salaryMax: res.data.salaryMax ?? f.salaryMax,
+          salaryMin: res.data.salaryMin != null ? String(res.data.salaryMin) : f.salaryMin,
+          salaryMax: res.data.salaryMax != null ? String(res.data.salaryMax) : f.salaryMax,
           // Đợt 17d — thêm "Hạn nộp" (schema.org validThrough), trước đó bỏ sót dù trang nguồn có sẵn.
           deadline: res.data.deadline || f.deadline,
-          sourceUrl: url.trim(),
         }));
+        setSourceUrl(url.trim());
       } else {
-        setForm((f) => ({ ...f, sourceUrl: url.trim() }));
+        setSourceUrl(url.trim());
         setExtractWarning(res.warning ?? 'Không trích xuất được — vui lòng nhập tay bên dưới.');
       }
     } catch (err) {
@@ -1744,22 +1757,41 @@ function AddJobForm({
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit() {
     if (!form.title.trim()) return;
     setBusy(true);
-    setError('');
+    setError(null);
     try {
       // Đợt 17d — quy đổi lương ngay trước khi gửi (VD gõ nhầm 20000000 thay vì 20 → tự hiểu là 20
-      // triệu). Số đã đúng đơn vị triệu (dò từ text/trích xuất) không bị đổi vì đã nhỏ hơn ngưỡng.
-      // Đợt 17g — thêm "Thoả thuận" (bỏ qua lương khi bật) + gửi `industry`/`location` tổng hợp từ
-      // MultiSelectPopover, đúng cách 2 form kia (NTD đăng tin / Admin sửa tin) đang làm.
-      const payload: CreateJobPayload & { sourceUrl?: string } = {
-        ...form,
-        industry: industries[0],
-        location: form.provinces?.length ? form.provinces.join(', ') : form.location,
-        salaryMin: negotiable || !form.salaryMin ? undefined : normalizeSalaryAmount(form.salaryMin),
-        salaryMax: negotiable || !form.salaryMax ? undefined : normalizeSalaryAmount(form.salaryMax),
+      // triệu). Đợt 17h — payload dựng từ JobWizardFormState, giống hệt cách 2 form kia (NTD đăng tin /
+      // Admin sửa tin) đang làm — chỉ khác API gọi (createJobForCompany, hiện công khai ngay).
+      const payload: CreateJobPayload = {
+        title: form.title,
+        industry: form.industries[0],
+        location: form.provinces.length ? form.provinces.join(', ') : undefined,
+        provinces: form.provinces.length ? form.provinces : undefined,
+        district: form.district || undefined,
+        address: form.address.trim() || undefined,
+        gender: form.gender || undefined,
+        ageRange: form.ageRange.trim() || undefined,
+        workSchedule: form.workSchedule.trim() || undefined,
+        experienceLevel: form.experienceLevel || undefined,
+        isUrgent: form.isUrgent,
+        salaryMin: form.negotiable || !form.salaryMin ? undefined : normalizeSalaryAmount(Number(form.salaryMin)),
+        salaryMax: form.negotiable || !form.salaryMax ? undefined : normalizeSalaryAmount(Number(form.salaryMax)),
+        employmentType: form.employmentType,
+        level: form.level,
+        headcount: Number(form.headcount) || 1,
+        description: form.description || undefined,
+        requirements: form.requirements || undefined,
+        benefits: isRichTextEmpty(form.benefits) ? undefined : form.benefits,
+        deadline: form.deadline || undefined,
+        tags: form.tags.length ? form.tags : undefined,
+        contactName: form.contactName.trim() || undefined,
+        contactEmail: form.contactEmail.trim() || undefined,
+        contactPhone: form.contactPhone.trim() || undefined,
+        contactNote: isRichTextEmpty(form.contactNote) ? undefined : form.contactNote,
+        sourceUrl,
       };
       await adminApi.createJobForCompany(token, companyId, payload);
       onCreated();
@@ -1833,247 +1865,18 @@ function AddJobForm({
       <div className="text-[11px] font-bold text-ink-faint mt-3 mb-1.5">
         Cách 3 — Kiểm tra lại/nhập tay rồi lưu (luôn xem lại nội dung trước khi đăng)
       </div>
-      <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 gap-2.5 text-xs">
-        <input
-          required
-          placeholder="Chức danh *"
-          className="tvl-input text-sm sm:col-span-2"
-          value={form.title}
-          onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-        />
-        {/* Đợt 17g — "Số lượng tuyển" trước đó không có ô nào ở form này (luôn ngầm định 1). */}
-        <input
-          type="number"
-          min={1}
-          placeholder="Số lượng tuyển"
-          className="tvl-input text-sm"
-          value={form.headcount ?? 1}
-          onChange={(e) => setForm((f) => ({ ...f, headcount: Number(e.target.value) || 1 }))}
-        />
-        <div className="sm:col-span-2">
-          {/* Đợt 17g — đổi từ <select> chỉ chọn 1 sang MultiSelectPopover chọn tối đa 3, đúng cách
-              wizard Đăng tin NTD / form Sửa tin Admin đang làm (chỉ mục đầu tiên được lưu, xem
-              ghi chú ở khai báo state `industries` phía trên). */}
-          <MultiSelectPopover
-            label="Ngành nghề"
-            placeholder="Chọn ngành nghề (tối đa 3)"
-            groups={AJF_INDUSTRY_GROUPS}
-            selected={industries}
-            onChange={(v) => setIndustries(v.slice(0, 3))}
-            emptyText="Chọn ngành nghề"
-          />
-        </div>
-        <select
-          className="tvl-input text-sm"
-          value={form.employmentType ?? ''}
-          onChange={(e) => setForm((f) => ({ ...f, employmentType: e.target.value || undefined }))}
-        >
-          <option value="">Hình thức làm việc…</option>
-          {EMPLOYMENT_TYPES.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
-        <select
-          className="tvl-input text-sm"
-          value={form.level ?? ''}
-          onChange={(e) => setForm((f) => ({ ...f, level: e.target.value || undefined }))}
-        >
-          <option value="">Cấp bậc…</option>
-          {LEVELS.map((l) => (
-            <option key={l} value={l}>{l}</option>
-          ))}
-        </select>
-        <select
-          className="tvl-input text-sm"
-          value={form.experienceLevel ?? ''}
-          onChange={(e) => setForm((f) => ({ ...f, experienceLevel: e.target.value || undefined }))}
-        >
-          <option value="">Kinh nghiệm…</option>
-          {EXPERIENCE_LEVELS.map((l) => (
-            <option key={l} value={l}>{l}</option>
-          ))}
-        </select>
-        {/* Đợt 17g — "Việc làm khẩn cấp" trước đó không có ở form này. */}
-        <div className="flex items-center">
-          <Chip active={!!form.isUrgent} onClick={() => setForm((f) => ({ ...f, isUrgent: !f.isUrgent }))}>
-            {form.isUrgent ? '🔥 Khẩn cấp' : 'Đánh dấu khẩn cấp'}
-          </Chip>
-        </div>
-        <div className="sm:col-span-2">
-          {/* Đợt 17g — đổi từ <select> chỉ chọn 1 Tỉnh/Thành sang MultiSelectPopover chọn nhiều,
-              đúng cách 2 form kia đang làm. */}
-          <MultiSelectPopover
-            label="Tỉnh, Thành Phố"
-            placeholder="Chọn tỉnh, thành phố (có thể chọn nhiều)"
-            groups={AJF_PROVINCE_GROUPS}
-            selected={form.provinces ?? []}
-            onChange={(v) => setForm((f) => ({ ...f, provinces: v, district: v.length === 1 ? f.district : undefined }))}
-            emptyText="Chọn địa điểm làm việc"
-          />
-        </div>
-        {form.provinces?.length === 1 && AJF_DISTRICT_SUPPORTED_PROVINCES.includes(form.provinces[0]) && (
-          <input
-            placeholder="Quận / Huyện (không bắt buộc)"
-            className="tvl-input text-sm"
-            value={form.district ?? ''}
-            onChange={(e) => setForm((f) => ({ ...f, district: e.target.value || undefined }))}
-          />
-        )}
-        <div className="sm:col-span-2">
-          <select
-            className="tvl-input text-sm"
-            value={form.gender ?? ''}
-            onChange={(e) => setForm((f) => ({ ...f, gender: e.target.value || undefined }))}
-          >
-            <option value="">Giới tính…</option>
-            {GENDER_OPTIONS.map((g) => (
-              <option key={g} value={g}>{g}</option>
-            ))}
-          </select>
-        </div>
-        <input
-          placeholder="Độ tuổi (không bắt buộc)"
-          className="tvl-input text-sm"
-          value={form.ageRange ?? ''}
-          onChange={(e) => setForm((f) => ({ ...f, ageRange: e.target.value || undefined }))}
-        />
-        <input
-          placeholder="Thời gian làm việc (không bắt buộc)"
-          className="tvl-input text-sm"
-          value={form.workSchedule ?? ''}
-          onChange={(e) => setForm((f) => ({ ...f, workSchedule: e.target.value || undefined }))}
-        />
-        <input
-          type="number"
-          min={0}
-          disabled={negotiable}
-          placeholder="Lương từ"
-          className="tvl-input text-sm"
-          value={form.salaryMin ?? ''}
-          onChange={(e) => setForm((f) => ({ ...f, salaryMin: e.target.value ? Number(e.target.value) : undefined }))}
-        />
-        <div className="flex gap-2 items-center">
-          <input
-            type="number"
-            min={0}
-            disabled={negotiable}
-            placeholder="Lương đến"
-            className="tvl-input text-sm"
-            value={form.salaryMax ?? ''}
-            onChange={(e) => setForm((f) => ({ ...f, salaryMax: e.target.value ? Number(e.target.value) : undefined }))}
-          />
-          {/* Đợt 17g — nút "Thoả thuận" trước đó không có ở form này. */}
-          <Chip active={negotiable} onClick={() => setNegotiable((v) => !v)}>
-            Thoả thuận
-          </Chip>
-        </div>
-        {/* Đợt 17d (25/09/2026) — nhắc đơn vị "triệu" (VD gõ 20 = 20 triệu); gõ nhầm số đầy đủ
-            (20000000) hệ thống vẫn tự hiểu đúng 20 triệu khi lưu — xem normalizeSalaryAmount(). */}
-        <div className="sm:col-span-2 text-[11px] text-ink-faint -mt-1">
-          Nhập theo đơn vị <strong>triệu đồng</strong> (VD gõ 20 = 20 triệu). Gõ nhầm số đầy đủ (VD
-          20000000) hệ thống vẫn tự hiểu là 20 triệu khi lưu.
-        </div>
-        {/* Đợt 17d (25/09/2026) — "Hạn nộp" trước đó chưa có ô nào trong form rút gọn này, dù backend/
-            schema.org đã hỗ trợ (validThrough) — nay trích xuất URL cũng điền được thẳng vào đây. */}
-        <div className="sm:col-span-2">
-          <label className="text-[11px] font-semibold text-ink-faint mb-1 block">Hạn nộp (không bắt buộc)</label>
-          <input
-            type="date"
-            className="tvl-input text-sm"
-            value={form.deadline ?? ''}
-            onChange={(e) => setForm((f) => ({ ...f, deadline: e.target.value || undefined }))}
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <div className="text-[11px] font-semibold text-ink-faint mb-1">Mô tả công việc</div>
-          <RichTextEditor
-            value={form.description ?? ''}
-            onChange={(html) => setForm((f) => ({ ...f, description: html }))}
-            minHeight={120}
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <div className="text-[11px] font-semibold text-ink-faint mb-1">Yêu cầu ứng viên</div>
-          <RichTextEditor
-            value={form.requirements ?? ''}
-            onChange={(html) => setForm((f) => ({ ...f, requirements: html }))}
-            minHeight={100}
-          />
-        </div>
-        {/* Đợt 17c (25/09/2026) — thêm 3 field còn thiếu so với wizard đăng tin đầy đủ (nha-tuyen-dung/
-            dang-tin), để "Cách 2 — Dán nhanh" có chỗ điền vào: Quyền lợi, Địa chỉ cụ thể, Liên hệ. */}
-        {/* Đợt 17g — nhãn đổi từ "Quyền lợi được hưởng" sang "Phúc lợi" để khớp tiêu đề hiển thị. */}
-        <div className="sm:col-span-2">
-          <div className="text-[11px] font-semibold text-ink-faint mb-1">Phúc lợi</div>
-          <RichTextEditor
-            value={form.benefits ?? ''}
-            onChange={(html) => setForm((f) => ({ ...f, benefits: html }))}
-            minHeight={100}
-          />
-        </div>
-        <input
-          placeholder="Địa chỉ cụ thể (không bắt buộc)"
-          className="tvl-input text-sm sm:col-span-2"
-          value={form.address ?? ''}
-          onChange={(e) => setForm((f) => ({ ...f, address: e.target.value || undefined }))}
-        />
-        <div className="sm:col-span-2">
-          <div className="text-[11px] font-semibold text-ink-faint mb-1">Thông tin khác (không bắt buộc)</div>
-          <RichTextEditor
-            value={form.contactNote ?? ''}
-            onChange={(html) => setForm((f) => ({ ...f, contactNote: html }))}
-            minHeight={80}
-          />
-        </div>
-        {/* Đợt 17g — "Thông tin liên hệ" có cấu trúc (Người liên hệ/SĐT/Email) trước đó không có ở
-            form này — chỉ có mỗi ô "Thông tin khác" (contactNote) tự do, mất link mailto:/tel: tự
-            động ở trang chi tiết tin. Đồng bộ với 2 form kia. */}
-        <input
-          placeholder="Người liên hệ (không bắt buộc)"
-          className="tvl-input text-sm"
-          value={form.contactName ?? ''}
-          onChange={(e) => setForm((f) => ({ ...f, contactName: e.target.value || undefined }))}
-        />
-        <input
-          placeholder="Số điện thoại liên hệ (không bắt buộc)"
-          className="tvl-input text-sm"
-          value={form.contactPhone ?? ''}
-          onChange={(e) => setForm((f) => ({ ...f, contactPhone: e.target.value || undefined }))}
-        />
-        <input
-          type="email"
-          placeholder="Email liên hệ (không bắt buộc)"
-          className="tvl-input text-sm sm:col-span-2"
-          value={form.contactEmail ?? ''}
-          onChange={(e) => setForm((f) => ({ ...f, contactEmail: e.target.value || undefined }))}
-        />
-        {/* Đợt 17g — "Job tags / Kỹ năng" trước đó không có ở form này. */}
-        <div className="sm:col-span-2">
-          <div className="text-[11px] font-semibold text-ink-faint mb-1">Job tags / Kỹ năng (không bắt buộc)</div>
-          <ChipsInput value={form.tags ?? []} onChange={(v) => setForm((f) => ({ ...f, tags: v }))} placeholder="Nhập rồi Enter" />
-        </div>
-        {error && <div className="text-critical font-semibold sm:col-span-2">{error}</div>}
-        <button type="submit" disabled={busy} className="tvl-btn-primary !w-auto px-5 sm:col-span-2 self-start">
-          Đăng tin (hiển thị công khai ngay)
-        </button>
-      </form>
+      <JobWizardSteps
+        form={form}
+        setForm={setForm}
+        step={step}
+        setStep={setStep}
+        error={error}
+        submitting={busy}
+        onSubmit={handleSubmit}
+        submitLabel="Đăng tin (hiển thị công khai ngay) →"
+        previewNote='Kiểm tra lại thông tin ở 3 bước trước — tin này do Admin tạo hộ nên hiển thị CÔNG KHAI NGAY, không qua hàng đợi chờ duyệt như tin NTD tự đăng.'
+      />
     </div>
-  );
-}
-
-// Đợt 17g — dùng chung cho 2 nút bấm-bật/tắt trong AddJobForm ("Khẩn cấp", "Thoả thuận"), cùng kiểu
-// với component Chip đã có sẵn ở nha-tuyen-dung/dang-tin và admin/sua-tin/[id].
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`text-xs font-semibold rounded-full px-3 py-1.5 border transition-colors ${
-        active ? 'bg-primary text-white border-primary' : 'bg-white text-ink-muted border-border-strong hover:border-primary'
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 

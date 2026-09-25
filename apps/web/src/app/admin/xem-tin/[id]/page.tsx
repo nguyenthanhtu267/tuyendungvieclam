@@ -135,7 +135,7 @@ export default function AdminJobReviewPage() {
                     edit riêng để sửa bài đăng, chứ không riêng sửa tiêu đề"): mỗi khối nội dung ở
                     trang xem tin này giờ có nút "✏️ Sửa" RIÊNG, nhảy thẳng vào đúng khối đó ở trang
                     sửa tin (dùng anchor #id) thay vì chỉ có 1 nút "Sửa tin" chung ở thanh trên cùng. */}
-                {job && !done && <BlockEditLink jobId={params.id} anchor="f-co-ban" />}
+                {job && !done && <BlockEditLink jobId={params.id} step={0} />}
               </div>
               <div className="text-sm text-ink-muted font-semibold mb-4">{job.company?.name}</div>
 
@@ -147,7 +147,13 @@ export default function AdminJobReviewPage() {
                 <Detail label="💰 Lương" value={formatSalary(job.salaryMin, job.salaryMax)} />
                 <Detail label="🎖️ Cấp bậc" value={job.level ?? '—'} />
                 {job.experienceLevel && <Detail label="📊 Kinh nghiệm" value={job.experienceLevel} />}
-                <Detail label="⏳ Hạn nộp" value={job.deadline ? formatDate(job.deadline) : '—'} />
+                {/* Đợt 17h — "Hạn nộp" nằm ở Bước 2 riêng của wizard (khác các mục còn lại trong
+                    lưới này, đều ở Bước 0) nên có nút Sửa riêng, trỏ đúng step=2. */}
+                <Detail
+                  label="⏳ Hạn nộp"
+                  value={job.deadline ? formatDate(job.deadline) : '—'}
+                  edit={job && !done ? <BlockEditLink jobId={params.id} step={2} /> : undefined}
+                />
                 <Detail label="👥 Số lượng" value={String(job.headcount)} />
                 <Detail label="🕒 Gửi lúc" value={formatDate(job.createdAt)} />
               </div>
@@ -158,7 +164,7 @@ export default function AdminJobReviewPage() {
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-bold text-primary uppercase tracking-wide">Phúc lợi</div>
-                  <BlockEditLink jobId={params.id} anchor="f-phuc-loi" show={!!job && !done} />
+                  <BlockEditLink jobId={params.id} step={1} show={!!job && !done} />
                 </div>
                 {job.benefits ? (
                   <RichTextView value={benefitsRichTextValue(job.benefits)} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
@@ -170,7 +176,7 @@ export default function AdminJobReviewPage() {
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-bold text-sm">Mô tả công việc</h3>
-                  <BlockEditLink jobId={params.id} anchor="f-mo-ta" show={!!job && !done} />
+                  <BlockEditLink jobId={params.id} step={1} show={!!job && !done} />
                 </div>
                 {job.description ? (
                   <RichTextView value={job.description} className="text-[12.8px] text-ink-muted" />
@@ -182,7 +188,7 @@ export default function AdminJobReviewPage() {
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-bold text-sm">Yêu cầu ứng viên</h3>
-                  <BlockEditLink jobId={params.id} anchor="f-yeu-cau" show={!!job && !done} />
+                  <BlockEditLink jobId={params.id} step={1} show={!!job && !done} />
                 </div>
                 {job.requirements ? (
                   <RichTextView value={job.requirements} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
@@ -194,7 +200,7 @@ export default function AdminJobReviewPage() {
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-bold text-primary uppercase tracking-wide">Job tags / Skills</div>
-                  <BlockEditLink jobId={params.id} anchor="f-tags" show={!!job && !done} />
+                  <BlockEditLink jobId={params.id} step={1} show={!!job && !done} />
                 </div>
                 {job.tags && job.tags.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
@@ -216,7 +222,7 @@ export default function AdminJobReviewPage() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-bold text-primary uppercase tracking-wide">Thông tin liên hệ</div>
-                  <BlockEditLink jobId={params.id} anchor="f-lien-he" show={!!job && !done} />
+                  <BlockEditLink jobId={params.id} step={1} show={!!job && !done} />
                 </div>
                 {job.contactName || job.contactEmail || job.contactPhone || job.contactNote ? (
                   <>
@@ -350,23 +356,27 @@ export default function AdminJobReviewPage() {
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
+function Detail({ label, value, edit }: { label: string; value: string; edit?: React.ReactNode }) {
   return (
     <div>
-      <div className="text-ink-faint text-[11px] mb-0.5">{label}</div>
+      <div className="text-ink-faint text-[11px] mb-0.5 flex items-center gap-1.5">
+        {label}
+        {edit}
+      </div>
       <div className="font-semibold">{value}</div>
     </div>
   );
 }
 
 // Đợt 17f (25/09/2026) — nút "Sửa" riêng cho từng khối nội dung của tin, nhảy thẳng tới đúng khối
-// đó ở trang /admin/sua-tin/[id] bằng anchor (#f-co-ban, #f-phuc-loi, #f-mo-ta, #f-yeu-cau, #f-tags,
-// #f-lien-he — các id này được đặt sẵn trên trang sửa tin, kèm scroll-mt-20 để không bị thanh sticky
-// trên cùng che mất khi cuộn tới).
-function BlockEditLink({ jobId, anchor, show = true }: { jobId: string; anchor: string; show?: boolean }) {
+// đó ở trang /admin/sua-tin/[id].
+// Đợt 17h (25/09/2026) — trang Sửa tin đổi từ "1 trang cuộn" sang wizard 4 Bước (y hệt trang Đăng
+// tin NTD), nên "nhảy tới đúng khối" giờ là "mở đúng BƯỚC" (?step=N) thay vì cuộn tới anchor (#id).
+// Bước 0 = Thông tin vị trí, Bước 1 = Mô tả & yêu cầu, Bước 2 = Hạn nộp hồ sơ.
+function BlockEditLink({ jobId, step, show = true }: { jobId: string; step: 0 | 1 | 2; show?: boolean }) {
   if (!show) return null;
   return (
-    <a href={`/admin/sua-tin/${jobId}#${anchor}`} className="text-[11px] font-semibold text-primary hover:underline shrink-0">
+    <a href={`/admin/sua-tin/${jobId}?step=${step}`} className="text-[11px] font-semibold text-primary hover:underline shrink-0">
       ✏️ Sửa
     </a>
   );
