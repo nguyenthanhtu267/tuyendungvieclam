@@ -30,6 +30,8 @@ export const JOB_EDITABLE_FIELDS = [
   'contactPhone',
   // Đợt 14 (25/09/2026) — mục 15: khung mô tả thêm tự do cạnh 3 trường liên hệ ở trên.
   'contactNote',
+  // Đợt 17l (25/09/2026) — cho phép Admin sửa lại link nguồn ở màn "Cào lại" (xem update-job.dto.ts).
+  'sourceUrl',
 ] as const;
 
 // Đợt 14 (25/09/2026) — trường nào trong JOB_EDITABLE_FIELDS là rich text (HTML từ RichTextEditor),

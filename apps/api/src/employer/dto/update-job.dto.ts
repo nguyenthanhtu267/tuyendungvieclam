@@ -115,4 +115,13 @@ export class UpdateJobDto {
   @IsOptional()
   @IsString()
   contactNote?: string;
+
+  // Đợt 17l (25/09/2026) — theo phản hồi người dùng ở màn "Cào lại": cho phép Admin SỬA LẠI link
+  // nguồn (VD link cũ đã hỏng/đổi trang, hoặc muốn cào từ 1 link khác) trước khi trích xuất, thay vì
+  // chỉ cào lại đúng link cũ đã lưu — xem RescrapeJobModal ở admin/dashboard/page.tsx. Giống hệt
+  // CreateJobDto.sourceUrl: NTD tự sửa tin của mình không gửi trường này (form của NTD không có ô
+  // này) nên không ảnh hưởng luồng EmployerService.updateJob().
+  @IsOptional()
+  @IsString()
+  sourceUrl?: string;
 }

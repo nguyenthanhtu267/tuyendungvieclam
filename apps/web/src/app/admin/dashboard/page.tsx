@@ -1491,12 +1491,18 @@ function CompanyDetailPanel({
 }
 
 // Đợt 17k (25/09/2026) — "cào dữ liệu lại" cho 1 tin ĐÃ ĐĂNG (khác Cách 1 ở AddJobForm vốn chỉ cào
-// lúc TẠO MỚI): trích xuất lại từ đúng `sourceUrl` đã lưu, so sánh với dữ liệu hiện có của tin, Admin
-// tự chọn áp dụng từng trường (mặc định chọn sẵn các trường có thay đổi) rồi mới lưu — không ghi đè
-// âm thầm, vì Admin có thể đã tự sửa tay tin này sau khi tạo. Chỉ so khớp được các trường mà
-// job-url-extractor.util.ts đọc được (title/location/employmentType/salary/description/deadline) —
-// các trường khác (yêu cầu/phúc lợi/liên hệ/...) không có trong dữ liệu chuẩn hoá (JSON-LD) nên giữ
-// nguyên, đúng giới hạn Cách 1 đã có từ trước.
+// lúc TẠO MỚI): trích xuất lại, so sánh với dữ liệu hiện có của tin, Admin tự chọn áp dụng từng
+// trường (mặc định chọn sẵn các trường có thay đổi) rồi mới lưu — không ghi đè âm thầm, vì Admin có
+// thể đã tự sửa tay tin này sau khi tạo. Chỉ so khớp được các trường mà job-url-extractor.util.ts đọc
+// được (title/location/employmentType/salary/description/deadline) — các trường khác (yêu cầu/phúc
+// lợi/liên hệ/...) không có trong dữ liệu chuẩn hoá (JSON-LD) nên giữ nguyên, đúng giới hạn Cách 1.
+// Đợt 17l (25/09/2026) — theo phản hồi người dùng ("cào lại do thay đổi link... chứ không cào lại ở
+// link cũ"): ban đầu tự động cào NGAY khi mở modal, LUÔN dùng đúng `job.sourceUrl` đã lưu, không có
+// cách nào đổi sang link khác — sửa lại thành ô nhập link SỬA ĐƯỢC (điền sẵn link cũ), Admin tự bấm
+// "Cào lại" mới bắt đầu trích xuất — dùng để: (a) sửa link cũ nếu đã hỏng/đổi trang, hoặc (b) cào từ
+// 1 link hoàn toàn khác. Nếu link đã đổi, thêm 1 dòng "Link nguồn" vào danh sách so sánh (mặc định
+// chọn sẵn) để lưu lại link mới cho tin — cần thêm `sourceUrl` vào UpdateJobDto/JOB_EDITABLE_FIELDS ở
+// backend (trước đó chỉ ghi được lúc TẠO tin, không sửa được sau khi tin đã tồn tại).
 function RescrapeJobModal({
   token,
   job,
@@ -1508,24 +1514,30 @@ function RescrapeJobModal({
   onClose: () => void;
   onUpdated: () => void;
 }) {
-  const [loading, setLoading] = useState(true);
+  const [urlInput, setUrlInput] = useState(job.sourceUrl ?? '');
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ExtractJobUrlResult | null>(null);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  const attempted = result !== null || error !== null;
+  const urlChanged = urlInput.trim() !== (job.sourceUrl ?? '').trim();
+
+  function handleFetch() {
+    const trimmed = urlInput.trim();
+    if (!trimmed) return;
     setLoading(true);
     setError(null);
+    setResult(null);
     adminApi
-      .extractJobFromUrl(token, job.sourceUrl as string)
+      .extractJobFromUrl(token, trimmed)
       .then((res) => {
-        if (cancelled) return;
         setResult(res);
+        const init: Record<string, boolean> = {};
+        if (trimmed !== (job.sourceUrl ?? '').trim()) init.sourceUrl = true;
         if (res.found) {
           const guess = res.data.location ? guessProvincesFromText(res.data.location) : null;
-          const init: Record<string, boolean> = {};
           if (res.data.title && res.data.title !== job.title) init.title = true;
           if (guess?.provinces.length || guess?.leftover) init.location = true;
           if (res.data.employmentType && res.data.employmentType !== job.employmentType) init.employmentType = true;
@@ -1537,24 +1549,20 @@ function RescrapeJobModal({
           }
           if (res.data.description && res.data.description !== job.description) init.description = true;
           if (res.data.deadline && res.data.deadline !== job.deadline) init.deadline = true;
-          setSelected(init);
         }
+        setSelected(init);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : 'Không tải được trang này.');
+        setError(err instanceof ApiError ? err.message : 'Không tải được trang này.');
+        setSelected(trimmed !== (job.sourceUrl ?? '').trim() ? { sourceUrl: true } : {});
       })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [token, job]);
+      .finally(() => setLoading(false));
+  }
 
   const guess = result?.found && result.data.location ? guessProvincesFromText(result.data.location) : null;
 
   type Row = { key: string; label: string; oldValue: string; newValue: string };
-  const rows: Row[] = !result?.found
+  const dataRows: Row[] = !result?.found
     ? []
     : (
         [
@@ -1605,25 +1613,31 @@ function RescrapeJobModal({
         ] as (Row | null)[]
       ).filter((r): r is Row => r !== null);
 
+  // Đợt 17l — dòng riêng cho việc đổi link nguồn, hiện độc lập với kết quả trích xuất (kể cả khi
+  // trang mới không đọc được trường nào, hoặc lỗi tải trang — Admin vẫn có thể chỉ muốn sửa lại link).
+  const rows: Row[] = urlChanged && attempted
+    ? [{ key: 'sourceUrl', label: 'Link nguồn', oldValue: job.sourceUrl || '(chưa có)', newValue: urlInput.trim() }, ...dataRows]
+    : dataRows;
+
   async function handleApply() {
-    if (!result?.found) return;
     setSaving(true);
     setError(null);
     try {
       const dto: Partial<CreateJobPayload> = {};
-      if (selected.title) dto.title = result.data.title;
-      if (selected.location) {
+      if (selected.sourceUrl) dto.sourceUrl = urlInput.trim();
+      if (selected.title && result?.found) dto.title = result.data.title;
+      if (selected.location && result?.found) {
         dto.provinces = guess?.provinces.length ? guess.provinces : undefined;
         dto.location = guess?.provinces.length ? guess.provinces.join(', ') : undefined;
         if (guess?.leftover) dto.address = guess.leftover;
       }
-      if (selected.employmentType) dto.employmentType = result.data.employmentType;
-      if (selected.salary) {
+      if (selected.employmentType && result?.found) dto.employmentType = result.data.employmentType;
+      if (selected.salary && result?.found) {
         dto.salaryMin = result.data.salaryMin;
         dto.salaryMax = result.data.salaryMax;
       }
-      if (selected.description) dto.description = result.data.description;
-      if (selected.deadline) dto.deadline = result.data.deadline;
+      if (selected.description && result?.found) dto.description = result.data.description;
+      if (selected.deadline && result?.found) dto.deadline = result.data.deadline;
       await adminApi.updateJob(token, job.id, dto);
       onUpdated();
     } catch (err) {
@@ -1642,14 +1656,38 @@ function RescrapeJobModal({
           <div className="font-bold text-sm">🔄 Cào lại dữ liệu — {job.title}</div>
           <button onClick={onClose} className="text-ink-faint hover:text-ink text-lg leading-none">✕</button>
         </div>
-        <div className="text-[11px] text-ink-faint mb-3 break-all">Nguồn: {job.sourceUrl}</div>
 
-        {loading ? (
+        {/* Đợt 17l — ô nhập link SỬA ĐƯỢC (không còn tự cào ngay khi mở modal): điền sẵn link đã lưu,
+            Admin có thể giữ nguyên hoặc thay bằng link khác rồi mới bấm "Cào lại". */}
+        <div className="text-[11px] font-bold text-ink-faint mb-1">Link nguồn</div>
+        <div className="flex gap-2 mb-3">
+          <input
+            type="url"
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
+            placeholder="https://..."
+            className="flex-1 min-w-0 rounded-lg border border-border px-3 py-2 text-xs"
+          />
+          <button
+            type="button"
+            onClick={handleFetch}
+            disabled={loading || !urlInput.trim()}
+            className="tvl-btn-primary !w-auto px-4 text-xs disabled:opacity-50"
+          >
+            {loading ? 'Đang cào…' : 'Cào lại'}
+          </button>
+        </div>
+
+        {!attempted && !loading ? (
+          <div className="text-center text-ink-faint text-xs py-6 border border-dashed border-border rounded-lg">
+            Sửa link nếu cần rồi bấm &quot;Cào lại&quot; để trích xuất dữ liệu mới.
+          </div>
+        ) : loading ? (
           <div className="text-center text-ink-faint text-sm py-8">Đang cào lại từ trang nguồn…</div>
         ) : error ? (
-          <div className="rounded-lg bg-critical-tint text-critical text-xs px-3 py-2">{error}</div>
-        ) : !result?.found ? (
-          <div className="rounded-lg bg-warning-tint text-warning text-xs px-3 py-2">
+          <div className="rounded-lg bg-critical-tint text-critical text-xs px-3 py-2 mb-2">{error}</div>
+        ) : !result?.found && rows.length === 0 ? (
+          <div className="rounded-lg bg-warning-tint text-warning text-xs px-3 py-2 mb-2">
             {result?.warning ?? 'Không trích xuất được dữ liệu từ trang này.'}
           </div>
         ) : rows.length === 0 ? (
@@ -1658,8 +1696,13 @@ function RescrapeJobModal({
           </div>
         ) : (
           <>
+            {!result?.found && (
+              <div className="rounded-lg bg-warning-tint text-warning text-xs px-3 py-2 mb-2">
+                {result?.warning ?? 'Không trích xuất được dữ liệu từ trang này.'} Vẫn có thể lưu lại link mới bên dưới.
+              </div>
+            )}
             <div className="text-[11px] text-ink-faint mb-2">
-              Trang nguồn có {rows.length} trường khác với tin hiện tại — chọn trường muốn cập nhật (mặc định đã chọn sẵn):
+              {rows.length} thay đổi so với tin hiện tại — chọn mục muốn cập nhật (mặc định đã chọn sẵn):
             </div>
             <div className="flex flex-col gap-2 mb-3">
               {rows.map((r) => (
@@ -1685,14 +1728,14 @@ function RescrapeJobModal({
           <button type="button" onClick={onClose} className="tvl-btn-ghost !w-auto px-4 text-xs flex-1">
             Đóng
           </button>
-          {result?.found && rows.length > 0 && (
+          {rows.length > 0 && (
             <button
               type="button"
               onClick={handleApply}
               disabled={saving || !anySelected}
               className="tvl-btn-primary !w-auto px-4 text-xs flex-1 disabled:opacity-50"
             >
-              {saving ? 'Đang lưu…' : `Cập nhật ${Object.values(selected).filter(Boolean).length} trường`}
+              {saving ? 'Đang lưu…' : `Cập nhật ${Object.values(selected).filter(Boolean).length} mục`}
             </button>
           )}
         </div>
