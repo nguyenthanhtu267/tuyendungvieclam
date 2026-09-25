@@ -6,9 +6,7 @@ import Link from 'next/link';
 import type { JobPosting } from '@/lib/api';
 import { candidatesApi, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { benefitIcon } from '@/lib/benefit-icons';
 import { formatDate, formatSalaryTag, isNewJob } from '@/lib/format';
-import { richTextListItems } from '@/lib/richtext';
 import { CompanyLogo } from '@/components/CompanyLogo';
 
 // Đợt 10 — thẻ việc làm theo mục 4 đặc tả: tiêu đề đậm + badge (MỚI) chữ đỏ trong ngoặc (không phải
@@ -29,7 +27,6 @@ export function JobCard({
   const [busy, setBusy] = useState(false);
 
   const locationText = job.provinces?.length ? job.provinces.join(' | ') : job.location;
-  const benefitItems = richTextListItems(job.benefits, 3);
 
   async function handleToggleSave(e: React.MouseEvent) {
     e.preventDefault();
@@ -117,22 +114,10 @@ export function JobCard({
           <span>Cập nhật: {formatDate(job.updatedAt ?? job.createdAt)}</span>
         </div>
 
-        {/* Đợt 14 (25/09/2026) — mục 15: `benefits` nay là rich text tự do (HTML), không còn mảng
-            chip. richTextListItems() tách tối đa 3 "mục" ngắn (theo khối <li>/<p> nếu có, hoặc theo
-            dấu phẩy cho dữ liệu cũ) để vẫn hiện dạng chip có icon như trước — chỉ đổi CÁCH LẤY dữ
-            liệu, giao diện thẻ giữ nguyên. */}
-        {benefitItems.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-2">
-            {benefitItems.map((b, i) => (
-              <span
-                key={i}
-                className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-surface-alt text-ink-muted"
-              >
-                {benefitIcon(b)} {b}
-              </span>
-            ))}
-          </div>
-        )}
+        {/* Đợt 15 (25/09/2026) — mục 17 danh sách lỗi: bỏ hẳn khối chip "Phúc lợi" khỏi thẻ tin (theo
+            yêu cầu người dùng: "Phần phúc lợi không cần hiển thị ở đây để bảng thông tin của công ty
+            ít hơn") — thẻ tin gọn hơn. Phúc lợi đầy đủ vẫn xem được ở trang chi tiết tin
+            (/viec-lam/[id], mục "Phúc lợi"), không đụng gì tới trang đó hay dữ liệu backend. */}
       </div>
 
       <div className="w-full sm:w-auto shrink-0 pt-1 sm:pt-0">

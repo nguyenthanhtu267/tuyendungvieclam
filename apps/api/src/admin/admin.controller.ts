@@ -22,6 +22,21 @@ export class AdminController {
     return this.adminService.getDashboard();
   }
 
+  // Đợt 15 (25/09/2026) — công tắc chung "Tự động duyệt tin" (theo yêu cầu người dùng). Đặt trước
+  // 'jobs/:id' (không xung đột về số đoạn URL nhưng đặt gần các route cấu hình khác cho dễ đọc).
+  @Get('settings/auto-approve')
+  getAutoApproveSetting() {
+    return this.adminService.getAutoApproveSetting();
+  }
+
+  @Patch('settings/auto-approve')
+  setAutoApproveSetting(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Body('enabled') enabled: boolean,
+  ) {
+    return this.adminService.setAutoApproveSetting(admin, !!enabled);
+  }
+
   // Đợt 12q (21/09/2026) — Batch 5 mục #3: chuỗi thời gian cho biểu đồ dashboard, mặc định 14 ngày.
   @Get('stats/timeseries')
   getStatsTimeSeries(@Query('days') days?: string) {
@@ -47,6 +62,13 @@ export class AdminController {
   @Patch('jobs/:id/approve')
   approveJob(@CurrentUser() admin: { userId: string; email: string }, @Param('id') id: string) {
     return this.adminService.setJobStatus(admin, id, JobApprovalStatus.APPROVED);
+  }
+
+  // Đợt 15 (25/09/2026) — nút "Tin đã kiểm tra": chỉ dùng cho tin đã được TỰ ĐỘNG duyệt (còn hiện
+  // trong tab "Duyệt tin" chờ Admin xem lại lần 2) — bấm xong thì dòng tin biến mất khỏi danh sách.
+  @Patch('jobs/:id/mark-reviewed')
+  markJobReviewed(@CurrentUser() admin: { userId: string; email: string }, @Param('id') id: string) {
+    return this.adminService.markJobReviewed(admin, id);
   }
 
   // Đợt 12x (21/09/2026) — "Bắt buộc nhập lý do khi Từ chối" (theo yêu cầu người dùng): route này

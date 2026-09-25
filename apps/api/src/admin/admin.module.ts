@@ -13,6 +13,7 @@ import { Payment } from '../database/entities/payment.entity';
 import { Invoice } from '../database/entities/invoice.entity';
 import { SearchHistory } from '../database/entities/search-history.entity';
 import { AdminAuditLog } from '../database/entities/admin-audit-log.entity';
+import { AdminSetting } from '../database/entities/admin-setting.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
@@ -29,6 +30,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       Invoice,
       SearchHistory,
       AdminAuditLog,
+      AdminSetting,
     ]),
     NotificationsModule,
   ],

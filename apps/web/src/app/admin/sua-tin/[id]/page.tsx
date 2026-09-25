@@ -319,8 +319,18 @@ export default function AdminSuaTinPage() {
 
             {/* Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc), đồng bộ với wizard Đăng tin NTD.
                 Đợt 14 (25/09/2026) — mục 15: thêm "Thông tin khác" (rich text tự do) + chuyển khối này
-                lên TRƯỚC "Job tags / Kỹ năng", đồng bộ với wizard Đăng tin NTD. */}
+                lên TRƯỚC "Job tags / Kỹ năng", đồng bộ với wizard Đăng tin NTD.
+                Đợt 15 (25/09/2026) — theo yêu cầu người dùng, đổi thứ tự bên trong: "Thông tin khác"
+                lên TRƯỚC, "Thông tin liên hệ" (3 trường có cấu trúc) xuống SAU. */}
             <div className="border-t border-border pt-4 flex flex-col gap-3">
+              <Field label="Thông tin khác" hint="không bắt buộc — ghi chú tự do">
+                <RichTextEditor
+                  value={form.contactNote}
+                  onChange={(html) => setForm({ ...form, contactNote: html })}
+                  placeholder="VD: Vui lòng ghi rõ tiêu đề email là 'Ứng tuyển [vị trí] - [Họ tên]'..."
+                  minHeight={120}
+                />
+              </Field>
               <h3 className="font-bold text-xs uppercase tracking-wide text-primary">
                 Thông tin liên hệ (không bắt buộc)
               </h3>
@@ -334,14 +344,6 @@ export default function AdminSuaTinPage() {
               </div>
               <Field label="Email liên hệ">
                 <input type="email" className="tvl-input" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} placeholder="VD: tuyendung@congty.vn" />
-              </Field>
-              <Field label="Thông tin khác" hint="không bắt buộc — ghi chú tự do">
-                <RichTextEditor
-                  value={form.contactNote}
-                  onChange={(html) => setForm({ ...form, contactNote: html })}
-                  placeholder="VD: Vui lòng ghi rõ tiêu đề email là 'Ứng tuyển [vị trí] - [Họ tên]'..."
-                  minHeight={120}
-                />
               </Field>
             </div>
 

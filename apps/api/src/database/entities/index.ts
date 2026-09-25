@@ -20,3 +20,4 @@ export * from './admin-audit-log.entity';
 export * from './company-follow.entity';
 export * from './candidate-note.entity';
 export * from './work-location.entity';
+export * from './admin-setting.entity';

@@ -49,6 +49,7 @@ import {
   CompanyFollow,
   CandidateNote,
   WorkLocation,
+  AdminSetting,
 } from './database/entities';
 
 const entities = [
@@ -81,6 +82,7 @@ const entities = [
   CompanyFollow,
   CandidateNote,
   WorkLocation,
+  AdminSetting,
 ];
 
 @Module({

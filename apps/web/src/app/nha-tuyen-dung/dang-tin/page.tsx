@@ -516,9 +516,19 @@ function DangTinInner() {
                   "Nộp đơn ứng tuyển". Bỏ trống hoàn toàn cũng được — trang chi tiết tin sẽ không hiện
                   khối này nếu tất cả các trường đều trống.
                   Đợt 14 (25/09/2026) — mục 15: thêm ô "Thông tin khác" (rich text tự do) bên cạnh 3
-                  trường có cấu trúc, để NTD ghi chú thêm mà vẫn giữ link tự động mailto:/tel:. Đồng
-                  thời chuyển khối này lên TRƯỚC "Job tags / Kỹ năng" (theo yêu cầu người dùng). */}
+                  trường có cấu trúc, để NTD ghi chú thêm mà vẫn giữ link tự động mailto:/tel:.
+                  Đợt 15 (25/09/2026) — theo yêu cầu người dùng, đổi thứ tự: "Thông tin khác" (ô rich
+                  text) lên TRƯỚC, "Thông tin liên hệ" (3 trường có cấu trúc) xuống SAU — trước đó
+                  đang ngược lại (Thông tin liên hệ trước, Thông tin khác sau). */}
               <div className="border-t border-border pt-4 flex flex-col gap-3">
+                <Field label="Thông tin khác" hint="không bắt buộc — ghi chú tự do">
+                  <RichTextEditor
+                    value={form.contactNote}
+                    onChange={(html) => setForm({ ...form, contactNote: html })}
+                    placeholder="VD: Vui lòng ghi rõ tiêu đề email là 'Ứng tuyển [vị trí] - [Họ tên]'..."
+                    minHeight={120}
+                  />
+                </Field>
                 <h3 className="font-bold text-xs uppercase tracking-wide text-primary">
                   Thông tin liên hệ (không bắt buộc)
                 </h3>
@@ -547,14 +557,6 @@ function DangTinInner() {
                     value={form.contactEmail}
                     onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
                     placeholder="VD: tuyendung@congty.vn"
-                  />
-                </Field>
-                <Field label="Thông tin khác" hint="không bắt buộc — ghi chú tự do">
-                  <RichTextEditor
-                    value={form.contactNote}
-                    onChange={(html) => setForm({ ...form, contactNote: html })}
-                    placeholder="VD: Vui lòng ghi rõ tiêu đề email là 'Ứng tuyển [vị trí] - [Họ tên]'..."
-                    minHeight={120}
                   />
                 </Field>
               </div>

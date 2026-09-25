@@ -30,6 +30,7 @@ import {
   CompanyFollow,
   CandidateNote,
   WorkLocation,
+  AdminSetting,
 } from './entities';
 
 // Đợt 12a (20/09/2026) — DataSource riêng cho TypeORM CLI (migration:generate/run/revert), tách
@@ -68,6 +69,7 @@ export const AppDataSource = new DataSource({
     CompanyFollow,
     CandidateNote,
     WorkLocation,
+    AdminSetting,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,

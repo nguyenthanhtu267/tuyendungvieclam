@@ -148,6 +148,11 @@ export interface JobPosting {
   // Đợt 14 (25/09/2026) — mục 15: khung mô tả thêm tự do cạnh 3 trường liên hệ ở trên.
   contactNote?: string;
   approvalStatus?: JobApprovalStatus;
+  // Đợt 15 (25/09/2026) — "Tự động duyệt tin": true nếu tin này được hệ thống tự động duyệt (khác
+  // Admin duyệt tay) sau 15 phút chờ; adminReviewed = false nghĩa là Admin CHƯA bấm "Tin đã kiểm
+  // tra" nên tin vẫn còn hiện trong danh sách "Duyệt tin" (xem admin/dashboard/page.tsx).
+  autoApproved?: boolean;
+  adminReviewed?: boolean;
   // Đợt 12l (21/09/2026) — dùng ở trang Xem trước NTD để hiện đúng trạng thái "Tạm ngưng".
   isPaused?: boolean;
   // Đợt 12p (21/09/2026) — lượt xem trang chi tiết công khai, dùng cho thống kê "Tỷ lệ chuyển đổi"
@@ -992,6 +997,18 @@ export const adminApi = {
     request<JobPosting>(`/admin/jobs/${id}`, { headers: authHeaders(token) }),
   approveJob: (token: string, id: string) =>
     request<JobPosting>(`/admin/jobs/${id}/approve`, { method: 'PATCH', headers: authHeaders(token) }),
+  // Đợt 15 (25/09/2026) — "Tự động duyệt tin": công tắc chung + nút "Tin đã kiểm tra" cho tin đã
+  // được tự động duyệt (còn hiện trong danh sách /admin/jobs/pending chờ Admin kiểm tra lần 2).
+  getAutoApproveSetting: (token: string) =>
+    request<{ enabled: boolean }>('/admin/settings/auto-approve', { headers: authHeaders(token) }),
+  setAutoApproveSetting: (token: string, enabled: boolean) =>
+    request<{ enabled: boolean }>('/admin/settings/auto-approve', {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify({ enabled }),
+    }),
+  markJobReviewed: (token: string, id: string) =>
+    request<JobPosting>(`/admin/jobs/${id}/mark-reviewed`, { method: 'PATCH', headers: authHeaders(token) }),
   // Đợt 12x (21/09/2026) — "Bắt buộc nhập lý do khi Từ chối": nay cần body { reasons, note? }.
   rejectJob: (token: string, id: string, dto: { reasons: string[]; note?: string }) =>
     request<JobPosting>(`/admin/jobs/${id}/reject`, {

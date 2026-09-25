@@ -1,6 +1,6 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, LessThanOrEqual, Repository } from 'typeorm';
 import * as argon2 from 'argon2';
 import * as crypto from 'crypto';
 import { Company, CompanyApprovalStatus } from '../database/entities/company.entity';
@@ -14,6 +14,7 @@ import { Payment, PaymentStatus } from '../database/entities/payment.entity';
 import { Invoice, InvoiceStatus } from '../database/entities/invoice.entity';
 import { SearchHistory } from '../database/entities/search-history.entity';
 import { AdminAuditLog } from '../database/entities/admin-audit-log.entity';
+import { AdminSetting } from '../database/entities/admin-setting.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UpdateJobDto } from '../employer/dto/update-job.dto';
 import { RejectJobDto } from './dto/reject-job.dto';
@@ -24,8 +25,18 @@ import { sanitizeRichText } from '../common/sanitize-html.util';
 // ghi nhật ký thao tác (mục #4 Batch 5). Chỉ cần userId + email, không cần load lại từ CSDL.
 export type AdminActor = { userId: string; email: string };
 
+// Đợt 15 (25/09/2026) — "Tự động duyệt tin": kiểm tra mỗi phút xem có tin nào đủ 15 phút ở trạng
+// thái chờ duyệt chưa (đủ chính xác cho nhu cầu này — sai số tối đa gần 1 phút so với đúng 15:00 là
+// chấp nhận được, không cần thư viện cron riêng cho 1 tác vụ đơn giản).
+const AUTO_APPROVE_SWEEP_INTERVAL_MS = 60 * 1000;
+const AUTO_APPROVE_DELAY_MS = 15 * 60 * 1000;
+const AUTO_APPROVE_SETTING_ID = 'singleton';
+const AUTO_APPROVE_ACTOR: AdminActor = { userId: 'system', email: 'system-auto-approve' };
+
 @Injectable()
-export class AdminService {
+export class AdminService implements OnModuleInit, OnModuleDestroy {
+  private autoApproveTimer?: ReturnType<typeof setInterval>;
+
   constructor(
     @InjectRepository(Company) private readonly companyRepo: Repository<Company>,
     @InjectRepository(CompanyUser) private readonly companyUserRepo: Repository<CompanyUser>,
@@ -38,8 +49,26 @@ export class AdminService {
     @InjectRepository(Invoice) private readonly invoiceRepo: Repository<Invoice>,
     @InjectRepository(SearchHistory) private readonly searchHistoryRepo: Repository<SearchHistory>,
     @InjectRepository(AdminAuditLog) private readonly auditRepo: Repository<AdminAuditLog>,
+    @InjectRepository(AdminSetting) private readonly adminSettingRepo: Repository<AdminSetting>,
     private readonly notificationsService: NotificationsService,
   ) {}
+
+  // Đợt 15 (25/09/2026) — khởi động vòng lặp kiểm tra "Tự động duyệt tin" cùng lúc app khởi động,
+  // KHÔNG dùng thư viện @nestjs/schedule (tránh thêm dependency mới chỉ cho 1 tác vụ đơn giản) — dùng
+  // thẳng setInterval của Node, dọn dẹp ở onModuleDestroy() để không rò rỉ khi app tắt/restart (hot
+  // reload lúc dev). Lỗi trong 1 lần quét không được làm crash cả app — luôn try/catch.
+  onModuleInit() {
+    this.autoApproveTimer = setInterval(() => {
+      this.runAutoApproveSweep().catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[auto-approve] Lỗi khi quét tin tự động duyệt:', err);
+      });
+    }, AUTO_APPROVE_SWEEP_INTERVAL_MS);
+  }
+
+  onModuleDestroy() {
+    if (this.autoApproveTimer) clearInterval(this.autoApproveTimer);
+  }
 
   private async logAction(
     admin: AdminActor,
@@ -109,6 +138,19 @@ export class AdminService {
     );
   }
 
+  // Đợt 15 (25/09/2026) — "Tự động duyệt tin": tab "Duyệt tin" giờ hiện CẢ tin đang PENDING (chưa
+  // duyệt) LẪN tin đã được tự động duyệt nhưng Admin CHƯA bấm "Tin đã kiểm tra" (approvalStatus =
+  // APPROVED, autoApproved = true, adminReviewed = false) — dùng chung điều kiện này ở cả
+  // getDashboard() (đếm số + 5 tin gần nhất) và listPendingJobs() (toàn bộ danh sách tab "Duyệt tin")
+  // để không lệch số nhau. Tin do Admin tự tay duyệt (setJobStatus/bulkSetJobStatus) không set
+  // autoApproved nên KHÔNG rơi vào điều kiện thứ 2 — biến mất khỏi danh sách như hành vi cũ.
+  private pendingReviewWhere() {
+    return [
+      { approvalStatus: JobApprovalStatus.PENDING },
+      { approvalStatus: JobApprovalStatus.APPROVED, autoApproved: true, adminReviewed: false },
+    ];
+  }
+
   async getDashboard() {
     const [employerCount, candidateCount, companyCount, jobCount, pendingJobs, pendingCompanies] =
       await Promise.all([
@@ -116,13 +158,13 @@ export class AdminService {
         this.candidateProfileRepo.count(),
         this.companyRepo.count(),
         this.jobRepo.count(),
-        this.jobRepo.count({ where: { approvalStatus: JobApprovalStatus.PENDING } }),
+        this.jobRepo.count({ where: this.pendingReviewWhere() }),
         this.companyRepo.count({ where: { approvalStatus: CompanyApprovalStatus.PENDING } }),
       ]);
 
     // Đợt 13 (24/09/2026) — updatedAt thay vì createdAt, xem ghi chú ở listPendingJobs() bên dưới.
     const recentJobsPending = await this.jobRepo.find({
-      where: { approvalStatus: JobApprovalStatus.PENDING },
+      where: this.pendingReviewWhere(),
       relations: { company: true },
       order: { updatedAt: 'DESC' },
       take: 5,
@@ -146,12 +188,90 @@ export class AdminService {
   // (employer.service.ts chỉ đổi approvalStatus, KHÔNG đổi createdAt — cột @CreateDateColumn không
   // đổi được) trước đó vẫn kẹt ở vị trí cũ theo ngày tạo gốc thay vì nhảy lên đầu như tin gửi lần
   // đầu. updated_at tự động cập nhật mỗi lần save() kể cả khi resubmit nên phản ánh đúng "vừa gửi".
+  // Đợt 15 (25/09/2026) — xem ghi chú pendingReviewWhere() ở trên: giờ gồm cả tin tự động duyệt
+  // chưa được Admin kiểm tra lần 2.
   listPendingJobs() {
     return this.jobRepo.find({
-      where: { approvalStatus: JobApprovalStatus.PENDING },
+      where: this.pendingReviewWhere(),
       relations: { company: true },
       order: { updatedAt: 'DESC' },
     });
+  }
+
+  // Đợt 15 (25/09/2026) — công tắc chung "Tự động duyệt tin", lưu 1 dòng CSDL duy nhất (xem
+  // admin-setting.entity.ts). Tạo dòng mặc định (TẮT) nếu chưa từng có — lần đầu Admin mở trang.
+  async getAutoApproveSetting(): Promise<{ enabled: boolean }> {
+    let setting = await this.adminSettingRepo.findOne({ where: { id: AUTO_APPROVE_SETTING_ID } });
+    if (!setting) {
+      setting = await this.adminSettingRepo.save(
+        this.adminSettingRepo.create({ id: AUTO_APPROVE_SETTING_ID, autoApproveEnabled: false }),
+      );
+    }
+    return { enabled: setting.autoApproveEnabled };
+  }
+
+  async setAutoApproveSetting(admin: AdminActor, enabled: boolean): Promise<{ enabled: boolean }> {
+    let setting = await this.adminSettingRepo.findOne({ where: { id: AUTO_APPROVE_SETTING_ID } });
+    if (!setting) {
+      setting = this.adminSettingRepo.create({ id: AUTO_APPROVE_SETTING_ID });
+    }
+    setting.autoApproveEnabled = enabled;
+    await this.adminSettingRepo.save(setting);
+    await this.logAction(
+      admin,
+      enabled ? 'settings.auto_approve_on' : 'settings.auto_approve_off',
+      'admin_setting',
+      AUTO_APPROVE_SETTING_ID,
+      `Tự động duyệt tin: ${enabled ? 'BẬT' : 'TẮT'}`,
+    );
+    return { enabled };
+  }
+
+  // Đợt 15 (25/09/2026) — quét định kỳ (mỗi phút, xem onModuleInit() ở trên): nếu công tắc đang BẬT,
+  // tự động duyệt mọi tin PENDING đã đủ 15 phút kể từ lần gửi/gửi lại gần nhất (updatedAt — bao gồm
+  // CẢ tin từng bị từ chối rồi NTD sửa gửi lại, theo đúng lựa chọn của người dùng: "tính như nhau,
+  // không phân biệt tin mới hay tin gửi lại"). Khác setJobStatus() (duyệt tay): đặt thêm
+  // autoApproved = true, adminReviewed = false để tin còn hiện lại trong danh sách "Duyệt tin" (xem
+  // pendingReviewWhere()) cho Admin kiểm tra lần 2, không biến mất ngay như duyệt tay.
+  async runAutoApproveSweep(): Promise<number> {
+    const setting = await this.getAutoApproveSetting();
+    if (!setting.enabled) return 0;
+
+    const cutoff = new Date(Date.now() - AUTO_APPROVE_DELAY_MS);
+    const dueJobs = await this.jobRepo.find({
+      where: { approvalStatus: JobApprovalStatus.PENDING, updatedAt: LessThanOrEqual(cutoff) },
+    });
+    if (dueJobs.length === 0) return 0;
+
+    for (const job of dueJobs) {
+      job.approvalStatus = JobApprovalStatus.APPROVED;
+      job.autoApproved = true;
+      job.adminReviewed = false;
+      job.rejectionReasons = null as unknown as string[];
+      job.rejectionNote = null as unknown as string;
+      const saved = await this.jobRepo.save(job);
+      await this.notifyCompanyUsers(
+        job.companyId,
+        'job_approved',
+        `Tin "${job.title}" đã được TỰ ĐỘNG duyệt sau 15 phút và hiển thị công khai trong tìm kiếm việc làm.`,
+      );
+      await this.notifyJobAlertMatches(saved);
+      await this.logAction(AUTO_APPROVE_ACTOR, 'job.auto_approve', 'job', job.id, job.title);
+    }
+    return dueJobs.length;
+  }
+
+  // Đợt 15 (25/09/2026) — nút "Tin đã kiểm tra": Admin xem lại tin đã tự động duyệt (có thể đã sửa
+  // thông tin NTD nếu cần, qua "Sửa tin" sẵn có — không đổi gì ở đây), xác nhận xong thì bấm nút này
+  // để dòng tin biến mất khỏi danh sách "Duyệt tin" (không đổi approvalStatus — tin vẫn đang duyệt và
+  // hiển thị công khai bình thường, chỉ đánh dấu "đã được Admin xem qua lần 2").
+  async markJobReviewed(admin: AdminActor, id: string) {
+    const job = await this.jobRepo.findOne({ where: { id } });
+    if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng');
+    job.adminReviewed = true;
+    const saved = await this.jobRepo.save(job);
+    await this.logAction(admin, 'job.mark_reviewed', 'job', job.id, job.title);
+    return saved;
   }
 
   // Đợt 12i (21/09/2026) — cho Admin xem trước đúng nội dung tin (kể cả tin CHƯA duyệt) trước khi
@@ -179,6 +299,12 @@ export class AdminService {
       job.rejectionReasons = null as unknown as string[];
       job.rejectionNote = null as unknown as string;
     }
+    // Đợt 15 (25/09/2026) — Admin bấm "Duyệt tin này"/"Từ chối" thủ công CHÍNH LÀ hành động kiểm tra
+    // rồi, nên đánh dấu adminReviewed = true luôn — phòng trường hợp tin này đang ở dạng tự động
+    // duyệt chờ kiểm tra (autoApproved=true, adminReviewed=false) mà Admin lại bấm nút duyệt/từ chối
+    // thường thay vì "Tin đã kiểm tra": tin vẫn phải biến mất khỏi danh sách "Duyệt tin" như bình
+    // thường, không được kẹt lại do quên đánh dấu.
+    job.adminReviewed = true;
     const saved = await this.jobRepo.save(job);
 
     if (status === JobApprovalStatus.APPROVED) {
@@ -215,6 +341,8 @@ export class AdminService {
     job.approvalStatus = JobApprovalStatus.REJECTED;
     job.rejectionReasons = dto.reasons;
     job.rejectionNote = dto.note;
+    // Đợt 15 (25/09/2026) — xem ghi chú ở setJobStatus() về adminReviewed.
+    job.adminReviewed = true;
     const saved = await this.jobRepo.save(job);
 
     const reasonText = dto.reasons.join('; ');

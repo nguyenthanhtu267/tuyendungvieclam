@@ -179,6 +179,21 @@ export class JobPosting {
   })
   approvalStatus: JobApprovalStatus;
 
+  // Đợt 15 (25/09/2026) — "Tự động duyệt tin" (theo yêu cầu người dùng): khi công tắc chung
+  // (AdminSetting.autoApproveEnabled) đang BẬT, 1 tác vụ nền (AutoApproveService) tự chuyển tin từ
+  // PENDING sang APPROVED sau 15 phút kể từ lần gửi/gửi lại gần nhất (updatedAt) — KHÔNG cần Admin
+  // bấm "Duyệt tin này" thủ công, tin lên web ngay cho ứng viên nộp hồ sơ bình thường. Nhưng khác với
+  // duyệt tay: tin vẫn còn hiện trong danh sách "Duyệt tin" (xem AdminService.listPendingJobs()) để
+  // Admin kiểm tra lại lần 2 (có thể sửa thông tin NTD nếu cần) — chỉ biến mất khỏi danh sách khi
+  // Admin bấm nút "Tin đã kiểm tra" (đặt adminReviewed = true, xem AdminService.markJobReviewed()).
+  // Tin do Admin duyệt tay như trước giờ (setJobStatus/bulkSetJobStatus) KHÔNG bật autoApproved nên
+  // không bị giữ lại trong danh sách — hành vi cũ giữ nguyên 100% cho luồng duyệt tay.
+  @Column({ name: 'auto_approved', type: 'boolean', default: false })
+  autoApproved: boolean;
+
+  @Column({ name: 'admin_reviewed', type: 'boolean', default: false })
+  adminReviewed: boolean;
+
   @OneToMany(() => Application, (application) => application.jobPosting)
   applications?: Application[];
 

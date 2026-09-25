@@ -38,7 +38,9 @@ const NAV_ITEMS = [
 export default function AdminDashboardPage() {
   const router = useRouter();
   const { me, token, logout } = useAuth();
-  const [tab, setTab] = useState('overview');
+  // Đợt 15 (25/09/2026) — mặc định mở ở tab "Duyệt tin" (theo yêu cầu người dùng: "để tôi duyệt tin
+  // nhanh nhất") thay vì "Tổng quan" như trước — Admin vào Console là thấy ngay hàng chờ duyệt.
+  const [tab, setTab] = useState('jobs');
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [pendingJobs, setPendingJobs] = useState<JobPosting[]>([]);
   const [pendingCompanies, setPendingCompanies] = useState<Company[]>([]);
@@ -46,6 +48,10 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const hasLoadedRef = useRef(false);
+  // Đợt 15 (25/09/2026) — "Tự động duyệt tin": công tắc chung, mặc định TẮT cho tới khi tải được
+  // trạng thái thật từ server (null = chưa biết, tránh nháy UI sai trạng thái lúc đầu).
+  const [autoApproveEnabled, setAutoApproveEnabled] = useState<boolean | null>(null);
+  const [autoApproveBusy, setAutoApproveBusy] = useState(false);
 
   // Đợt 12q (21/09/2026) — Batch 5 mục #2: chọn nhiều dòng để duyệt/từ chối hàng loạt.
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
@@ -62,16 +68,18 @@ export default function AdminDashboardPage() {
     if (!token) return;
     if (!hasLoadedRef.current) setLoading(true);
     try {
-      const [d, jobs, companies, orders] = await Promise.all([
+      const [d, jobs, companies, orders, autoApprove] = await Promise.all([
         adminApi.dashboard(token),
         adminApi.listPendingJobs(token),
         adminApi.listPendingCompanies(token),
         adminApi.listPendingOrders(token),
+        adminApi.getAutoApproveSetting(token),
       ]);
       setDashboard(d);
       setPendingJobs(jobs);
       setPendingCompanies(companies);
       setPendingOrders(orders);
+      setAutoApproveEnabled(autoApprove.enabled);
       hasLoadedRef.current = true;
     } finally {
       setLoading(false);
@@ -91,6 +99,33 @@ export default function AdminDashboardPage() {
     setBusyId(id);
     try {
       await adminApi.approveJob(token, id);
+      await loadAll();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  // Đợt 15 (25/09/2026) — công tắc chung "Tự động duyệt tin": bật thì mọi tin đang chờ (kể cả tin
+  // gửi lại sau khi từng bị từ chối) sẽ tự động duyệt sau 15 phút — xem AdminService.runAutoApproveSweep().
+  async function handleToggleAutoApprove() {
+    if (!token || autoApproveEnabled === null) return;
+    setAutoApproveBusy(true);
+    try {
+      const result = await adminApi.setAutoApproveSetting(token, !autoApproveEnabled);
+      setAutoApproveEnabled(result.enabled);
+    } finally {
+      setAutoApproveBusy(false);
+    }
+  }
+
+  // Đợt 15 (25/09/2026) — nút "Tin đã kiểm tra": chỉ áp dụng cho tin đã được TỰ ĐỘNG duyệt (còn hiện
+  // trong danh sách chờ Admin xem lại lần 2) — bấm xong thì dòng tin biến mất khỏi danh sách này,
+  // KHÔNG đổi trạng thái duyệt (tin vẫn đang hiển thị công khai như trước khi bấm).
+  async function handleMarkReviewed(id: string) {
+    if (!token) return;
+    setBusyId(id);
+    try {
+      await adminApi.markJobReviewed(token, id);
       await loadAll();
     } finally {
       setBusyId(null);
@@ -231,8 +266,42 @@ export default function AdminDashboardPage() {
           </>
         ) : tab === 'jobs' ? (
           <>
-            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+            <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
               <h1 className="font-bold text-base">Hàng chờ duyệt tin tuyển dụng</h1>
+              {/* Đợt 15 (25/09/2026) — công tắc chung "Tự động duyệt tin" (theo yêu cầu người dùng):
+                  bật thì tin đang chờ (kể cả tin gửi lại) tự động duyệt sau 15 phút, không cần Admin
+                  bấm tay — nhưng vẫn còn hiện trong danh sách này (nhãn riêng bên dưới) chờ kiểm tra
+                  lần 2. Mặc định TẮT. */}
+              <button
+                type="button"
+                disabled={autoApproveEnabled === null || autoApproveBusy}
+                onClick={handleToggleAutoApprove}
+                className={`flex items-center gap-2 text-xs font-bold rounded-lg px-3 py-2 border disabled:opacity-50 ${
+                  autoApproveEnabled
+                    ? 'bg-success-tint text-success border-success/30'
+                    : 'bg-surface-alt text-ink-faint border-border'
+                }`}
+              >
+                <span
+                  className={`inline-block w-8 h-4 rounded-full relative transition-colors ${
+                    autoApproveEnabled ? 'bg-success' : 'bg-ink-faint/40'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
+                      autoApproveEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'
+                    }`}
+                  />
+                </span>
+                Tự động duyệt tin (sau 15 phút){autoApproveEnabled ? ': ĐANG BẬT' : ': đang tắt'}
+              </button>
+            </div>
+            <div className="text-[11px] text-ink-faint -mt-1.5 mb-4 max-w-2xl">
+              Khi bật, tin đang chờ duyệt (kể cả tin gửi lại sau khi từng bị từ chối) sẽ tự động lên web cho ứng
+              viên nộp hồ sơ sau 15 phút nếu Admin chưa duyệt tay. Tin vẫn còn hiện trong danh sách này (nhãn
+              &quot;Đã tự động duyệt&quot;) để kiểm tra lại lần 2 — bấm &quot;Tin đã kiểm tra&quot; khi xong.
+            </div>
+            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
               {/* Đợt 12q (21/09/2026) — Batch 5 mục #2: thanh thao tác hàng loạt, chỉ hiện khi đã chọn
                   ít nhất 1 dòng. */}
               {selectedJobIds.size > 0 && (
@@ -291,6 +360,16 @@ export default function AdminDashboardPage() {
                           </td>
                           <td className="py-3 px-4 font-bold">
                             {job.title}
+                            {/* Đợt 15 (25/09/2026) — nhãn phân biệt tin đã được TỰ ĐỘNG duyệt (còn
+                                chờ Admin kiểm tra lần 2) với tin CHƯA duyệt (đang chờ) — theo lựa
+                                chọn người dùng qua AskUserQuestion: "Có, nhãn riêng". */}
+                            {job.autoApproved && !job.adminReviewed && (
+                              <div className="mt-1.5">
+                                <span className="font-semibold text-[10px] rounded-full bg-success-tint text-success px-2 py-0.5">
+                                  ✓ Đã tự động duyệt — chờ kiểm tra
+                                </span>
+                              </div>
+                            )}
                             {(scan.hasLink || scan.sensitiveHits.length > 0) && (
                               <div className="flex flex-wrap gap-1 mt-1.5">
                                 {scan.hasLink && (
@@ -314,7 +393,7 @@ export default function AdminDashboardPage() {
                           </td>
                           <td className="py-3 px-3 text-ink-faint">{job.company?.name}</td>
                           <td className="py-3 px-3 tabular-nums">{formatSalary(job.salaryMin, job.salaryMax)}</td>
-                          <td className="py-3 px-3 tabular-nums whitespace-nowrap">{formatDate(job.createdAt)}</td>
+                          <td className="py-3 px-3 tabular-nums whitespace-nowrap">{formatDate(job.updatedAt ?? job.createdAt)}</td>
                           <td className="py-3 px-4 text-right whitespace-nowrap">
                             <a
                               href={`/admin/xem-tin/${job.id}`}
@@ -324,13 +403,26 @@ export default function AdminDashboardPage() {
                             >
                               Xem trước
                             </a>
-                            <button
-                              disabled={busyId === job.id}
-                              onClick={() => handleJobApprove(job.id)}
-                              className="text-[11px] font-bold rounded-md bg-success-tint text-success px-2.5 py-1.5 mr-1.5 disabled:opacity-50"
-                            >
-                              Duyệt
-                            </button>
+                            {job.autoApproved && !job.adminReviewed ? (
+                              // Đợt 15 — tin này ĐÃ được duyệt (tự động), không cần nút "Duyệt" nữa;
+                              // "Tin đã kiểm tra" chỉ ẩn dòng khỏi danh sách, không đổi trạng thái.
+                              // Vẫn giữ "Từ chối" phòng khi Admin kiểm tra lại thấy nội dung có vấn đề.
+                              <button
+                                disabled={busyId === job.id}
+                                onClick={() => handleMarkReviewed(job.id)}
+                                className="text-[11px] font-bold rounded-md bg-primary text-white px-2.5 py-1.5 mr-1.5 disabled:opacity-50"
+                              >
+                                Tin đã kiểm tra
+                              </button>
+                            ) : (
+                              <button
+                                disabled={busyId === job.id}
+                                onClick={() => handleJobApprove(job.id)}
+                                className="text-[11px] font-bold rounded-md bg-success-tint text-success px-2.5 py-1.5 mr-1.5 disabled:opacity-50"
+                              >
+                                Duyệt
+                              </button>
+                            )}
                             {/* Đợt 12x — Từ chối giờ bắt buộc chọn lý do, không còn là 1 click ở
                                 bảng này nữa: đưa sang trang Xem trước có modal chọn lý do. */}
                             <a
