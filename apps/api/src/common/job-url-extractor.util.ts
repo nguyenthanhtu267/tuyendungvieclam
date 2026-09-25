@@ -26,14 +26,66 @@ export interface ExtractJobUrlResult {
 const FETCH_TIMEOUT_MS = 12_000;
 const MAX_HTML_BYTES = 3 * 1024 * 1024; // 3MB đủ cho hầu hết trang tin tuyển dụng, tránh tải trang quá nặng
 
-function stripHtmlTags(input: unknown): string | undefined {
-  if (typeof input !== 'string') return undefined;
-  const text = input.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-  return text.length > 0 ? text : undefined;
+// Đợt 17b (25/09/2026) — FIX lỗi người dùng báo (ảnh chụp): mô tả trích xuất dính thành 1 khối chữ
+// (mất hết xuống dòng) + còn nguyên "&amp;" chưa giải mã. Nguyên nhân: trường `description` trong
+// JSON-LD của nhiều trang (VD careerviet.vn) là TEXT THUẦN (không phải thẻ HTML thật) nhưng đã được
+// mã hoá thực thể HTML (VD "M&amp;A") + dùng "\n" thật để xuống dòng — code cũ (a) không giải mã thực
+// thể, (b) dùng `.replace(/\s+/g, ' ')` gộp LUÔN cả ký tự xuống dòng thành 1 khoảng trắng, xoá sạch
+// cấu trúc dòng. Hàm mới xử lý ĐƯỢC CẢ 2 trường hợp (text thuần lẫn có thẻ HTML thật xen kẽ): chuyển
+// thẻ khối (<p>/<div>/<li>/<br>...) thành ký tự xuống dòng TRƯỚC khi xoá thẻ còn lại, giải mã thực
+// thể HTML, rồi giữ nguyên từng dòng khi bọc lại thành đoạn <p> — đúng yêu cầu "phải xuống dòng như
+// hiển thị của trang gốc".
+const NAMED_HTML_ENTITIES: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  nbsp: ' ',
+  mdash: '—',
+  ndash: '–',
+  hellip: '…',
+  rsquo: '’',
+  lsquo: '‘',
+  rdquo: '”',
+  ldquo: '“',
+  copy: '©',
+  reg: '®',
+  trade: '™',
+  bull: '•',
+};
+
+function decodeHtmlEntities(input: string): string {
+  return input
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/&([a-zA-Z]+);/g, (full: string, name: string) => NAMED_HTML_ENTITIES[name.toLowerCase()] ?? full);
+}
+
+function escapeHtml(input: string): string {
+  return input.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Chuyển text/HTML thô từ JSON-LD thành rich text HTML gọn (mỗi dòng nguồn → 1 đoạn <p>), tương
+// thích trực tiếp với RichTextEditor ở FE và `sanitizeRichText()` khi lưu ở backend.
+function toRichTextHtml(raw?: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  let text = raw
+    .replace(/<li[^>]*>/gi, '\n• ')
+    .replace(/<\/(p|div|li|ul|ol|h[1-6]|tr)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]*>/g, '');
+  text = decodeHtmlEntities(text);
+  const lines = text
+    .split(/\r\n|\r|\n/)
+    .map((l) => l.replace(/[ \t]+/g, ' ').trim())
+    .filter((l) => l.length > 0);
+  if (lines.length === 0) return undefined;
+  return lines.map((l) => `<p>${escapeHtml(l)}</p>`).join('');
 }
 
 function asText(value: unknown): string | undefined {
-  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (typeof value === 'string' && value.trim()) return decodeHtmlEntities(value.trim());
   if (Array.isArray(value) && value.length > 0) return asText(value[0]);
   return undefined;
 }
@@ -46,7 +98,9 @@ function extractLocation(jobLocation: unknown): string | undefined {
   const addr = (Array.isArray(address) ? address[0] : address) as Record<string, unknown> | undefined;
   if (!addr) return undefined;
   const parts = [addr.addressLocality, addr.addressRegion].filter((p) => typeof p === 'string' && p.trim());
-  return parts.length > 0 ? (parts as string[]).join(', ') : asText(addr.addressLocality ?? addr.addressRegion);
+  return parts.length > 0
+    ? decodeHtmlEntities((parts as string[]).join(', '))
+    : asText(addr.addressLocality ?? addr.addressRegion);
 }
 
 function extractSalary(baseSalary: unknown): { min?: number; max?: number } {
@@ -123,7 +177,7 @@ export async function extractJobFromUrl(url: string): Promise<ExtractJobUrlResul
     const data: ExtractedJobData = {
       title: asText(node.title),
       companyName: asText(org?.name),
-      description: stripHtmlTags(node.description),
+      description: toRichTextHtml(node.description),
       location: extractLocation(node.jobLocation),
       employmentType: asText(node.employmentType),
       salaryMin: salary.min,

@@ -1495,8 +1495,115 @@ function ClaimCompanyForm({
   );
 }
 
-// Form thêm tin cho công ty — 2 cách nhập nội dung (theo lựa chọn người dùng qua AskUserQuestion):
-// (1) dán URL trang gốc → trích xuất tự động (best-effort, luôn xem lại trước khi lưu), (2) nhập tay.
+// Đợt 17c (25/09/2026) — "Dán nhanh" nội dung copy từ nhóm Facebook. Facebook nhóm bắt buộc đăng
+// nhập + render bằng JavaScript + chặn truy cập tự động + không có dữ liệu chuẩn hoá (schema.org) như
+// các trang tuyển dụng khác — nên KHÔNG thể tự động trích xuất như "Cách 1" (đã trao đổi + xác nhận
+// với người dùng). Người dùng tự copy nguyên bài đăng Facebook, dán vào đây — hệ thống chỉ hỗ trợ
+// TÁCH NHANH theo từ khoá tiếng Việt thường gặp (Mô tả công việc/Yêu cầu/Quyền lợi/Địa điểm/Liên hệ),
+// không phải phân tích ngữ nghĩa — Admin luôn xem/sửa lại ở "Cách 3" bên dưới trước khi lưu. Theo
+// AskUserQuestion: ảnh Facebook KHÔNG xử lý ở đợt này (người dùng chọn "Bỏ qua ảnh, chỉ cần chữ").
+type QuickPasteField = 'description' | 'requirements' | 'benefits' | 'address' | 'contactNote';
+
+// Mỗi từ khoá 1 regex riêng (không gộp thành 1 alternation) để khi so khớp 1 dòng, có thể chọn đúng
+// từ khoá DÀI NHẤT khớp được (VD "Mô tả công việc:" phải nhận đúng cả cụm, không dừng ở "Mô tả:" rồi
+// để sót " công việc:" lẫn vào nội dung) — xem logic chọn `bestPrefixLen` trong quickParseFacebookPost().
+const QUICK_PASTE_KEYWORDS: { field: QuickPasteField; regex: RegExp }[] = [
+  { field: 'description', regex: /^[^A-Za-zÀ-ỹ]*mô tả công việc[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'description', regex: /^[^A-Za-zÀ-ỹ]*mô tả[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'description', regex: /^[^A-Za-zÀ-ỹ]*công việc chính[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'description', regex: /^[^A-Za-zÀ-ỹ]*nhiệm vụ[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'requirements', regex: /^[^A-Za-zÀ-ỹ]*yêu cầu ứng viên[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'requirements', regex: /^[^A-Za-zÀ-ỹ]*yêu cầu công việc[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'requirements', regex: /^[^A-Za-zÀ-ỹ]*yêu cầu[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'benefits', regex: /^[^A-Za-zÀ-ỹ]*quyền lợi[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'benefits', regex: /^[^A-Za-zÀ-ỹ]*phúc lợi[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'benefits', regex: /^[^A-Za-zÀ-ỹ]*chế độ đãi ngộ[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'benefits', regex: /^[^A-Za-zÀ-ỹ]*chế độ[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'address', regex: /^[^A-Za-zÀ-ỹ]*địa điểm làm việc[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'address', regex: /^[^A-Za-zÀ-ỹ]*địa điểm[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'address', regex: /^[^A-Za-zÀ-ỹ]*nơi làm việc[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'address', regex: /^[^A-Za-zÀ-ỹ]*địa chỉ làm việc[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'address', regex: /^[^A-Za-zÀ-ỹ]*địa chỉ[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'contactNote', regex: /^[^A-Za-zÀ-ỹ]*thông tin liên hệ[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'contactNote', regex: /^[^A-Za-zÀ-ỹ]*liên hệ[\s*_]*:?[ \t]*(.*)$/i },
+  { field: 'contactNote', regex: /^[^A-Za-zÀ-ỹ]*liên lạc[\s*_]*:?[ \t]*(.*)$/i },
+];
+
+// Giống toRichTextHtml() ở backend (job-url-extractor.util.ts) — mỗi dòng nguồn → 1 đoạn <p>, tương
+// thích thẳng với RichTextEditor. Không cần giải mã thực thể HTML ở đây vì nội dung dán vào là text
+// thuần từ clipboard (trình duyệt tự giải mã sẵn khi copy từ Facebook), khác trường hợp JSON-LD thô.
+function wrapParagraphs(lines: string[]): string {
+  const cleaned = lines.map((l) => l.trim()).filter((l) => l.length > 0);
+  if (cleaned.length === 0) return '';
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return cleaned.map((l) => `<p>${esc(l)}</p>`).join('');
+}
+
+function quickParseFacebookPost(raw: string): {
+  title?: string;
+  description?: string;
+  requirements?: string;
+  benefits?: string;
+  address?: string;
+  contactNote?: string;
+} {
+  const lines = raw.split(/\r\n|\r|\n/);
+  const buckets: Record<QuickPasteField, string[]> = {
+    description: [],
+    requirements: [],
+    benefits: [],
+    address: [],
+    contactNote: [],
+  };
+  const intro: string[] = [];
+  let current: QuickPasteField | null = null;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    let best: { field: QuickPasteField; content: string } | null = null;
+    let bestPrefixLen = -1;
+    for (const { field, regex } of QUICK_PASTE_KEYWORDS) {
+      const m = regex.exec(line);
+      if (!m) continue;
+      const content = (m[1] ?? '').trim();
+      const prefixLen = line.length - content.length;
+      if (prefixLen > bestPrefixLen) {
+        bestPrefixLen = prefixLen;
+        best = { field, content };
+      }
+    }
+
+    if (best) {
+      current = best.field;
+      if (best.content) buckets[current].push(best.content);
+      continue;
+    }
+
+    if (current) buckets[current].push(line);
+    else intro.push(line);
+  }
+
+  // Dòng đầu tiên trước mọi tiêu đề mục = chức danh; các dòng còn lại trước tiêu đề đầu tiên (nếu có)
+  // ghép vào đầu phần Mô tả công việc (đoạn giới thiệu mở đầu bài Facebook thường không có tiêu đề rõ).
+  const title = intro[0];
+  if (intro.length > 1) buckets.description = [...intro.slice(1), ...buckets.description];
+
+  return {
+    title,
+    description: wrapParagraphs(buckets.description) || undefined,
+    requirements: wrapParagraphs(buckets.requirements) || undefined,
+    benefits: wrapParagraphs(buckets.benefits) || undefined,
+    address: buckets.address.join(', ') || undefined,
+    contactNote: wrapParagraphs(buckets.contactNote) || undefined,
+  };
+}
+
+// Form thêm tin cho công ty — 3 cách nhập nội dung (theo lựa chọn người dùng qua AskUserQuestion):
+// (1) dán URL trang gốc → trích xuất tự động (best-effort, luôn xem lại trước khi lưu),
+// (2) dán nhanh nội dung copy từ Facebook → tự tách mục (best-effort, xem hàm quickParseFacebookPost),
+// (3) nhập tay / kiểm tra lại rồi lưu.
 // Tin được lưu bằng adminApi.createJobForCompany() hiện CÔNG KHAI NGAY (không qua hàng đợi duyệt).
 function AddJobForm({
   token,
@@ -1510,9 +1617,26 @@ function AddJobForm({
   const [url, setUrl] = useState('');
   const [extracting, setExtracting] = useState(false);
   const [extractWarning, setExtractWarning] = useState('');
+  const [quickPasteText, setQuickPasteText] = useState('');
+  const [quickPasteDone, setQuickPasteDone] = useState(false);
   const [form, setForm] = useState<CreateJobPayload & { sourceUrl?: string }>({ title: '', headcount: 1 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  function handleQuickPaste() {
+    if (!quickPasteText.trim()) return;
+    const parsed = quickParseFacebookPost(quickPasteText);
+    setForm((f) => ({
+      ...f,
+      title: parsed.title || f.title,
+      description: parsed.description || f.description,
+      requirements: parsed.requirements || f.requirements,
+      benefits: parsed.benefits || f.benefits,
+      address: parsed.address || f.address,
+      contactNote: parsed.contactNote || f.contactNote,
+    }));
+    setQuickPasteDone(true);
+  }
 
   async function handleExtract() {
     if (!url.trim()) return;
@@ -1579,8 +1703,46 @@ function AddJobForm({
       </div>
       {extractWarning && <div className="text-warning text-[11px] font-semibold mb-2">{extractWarning}</div>}
 
+      {/* Đợt 17c (25/09/2026) — "Cách 2": dành riêng cho nội dung copy từ nhóm Facebook (không cào
+          tự động được — xem ghi chú ở quickParseFacebookPost() phía trên). */}
       <div className="text-[11px] font-bold text-ink-faint mt-3 mb-1.5">
-        Cách 2 — Kiểm tra lại/nhập tay rồi lưu (luôn xem lại nội dung trước khi đăng)
+        Cách 2 — Dán nhanh nội dung copy từ Facebook (tự tách mục)
+      </div>
+      <div className="text-[11px] text-ink-faint mb-1.5">
+        Copy nguyên bài đăng Facebook rồi dán vào đây — hệ thống tự nhận diện các mục thường gặp (Mô tả
+        công việc / Yêu cầu / Quyền lợi / Địa điểm / Liên hệ) theo từ khoá và tự điền vào form &quot;Cách 3&quot;
+        bên dưới. Đây chỉ là gợi ý tách nhanh, không phải AI đọc hiểu — <strong>luôn kiểm tra lại kỹ</strong>{' '}
+        trước khi lưu. Ảnh trong bài đăng Facebook chưa hỗ trợ ở đây, xin tự upload logo/ảnh (nếu có) qua
+        các nơi dán URL ảnh có sẵn.
+      </div>
+      <textarea
+        placeholder={'Dán nguyên bài đăng Facebook vào đây...\n\nVD:\nTUYỂN NHÂN VIÊN KINH DOANH\nMô tả công việc:\n- Tìm kiếm khách hàng mới\nYêu cầu:\n- Tốt nghiệp Cao đẳng/Đại học\nQuyền lợi:\n- Lương thưởng hấp dẫn\nĐịa điểm: Quận 1, TP.HCM\nLiên hệ: 0909xxxxxx (Ms Hoa)'}
+        className="tvl-input text-sm w-full"
+        rows={6}
+        value={quickPasteText}
+        onChange={(e) => {
+          setQuickPasteText(e.target.value);
+          setQuickPasteDone(false);
+        }}
+      />
+      <div className="flex items-center gap-2 mt-1.5 mb-1">
+        <button
+          type="button"
+          disabled={!quickPasteText.trim()}
+          onClick={handleQuickPaste}
+          className="tvl-btn-primary !w-auto px-4 whitespace-nowrap disabled:opacity-50"
+        >
+          Tách nội dung ↓
+        </button>
+        {quickPasteDone && (
+          <span className="text-success text-[11px] font-semibold">
+            ✓ Đã điền vào form bên dưới — kiểm tra lại trước khi lưu.
+          </span>
+        )}
+      </div>
+
+      <div className="text-[11px] font-bold text-ink-faint mt-3 mb-1.5">
+        Cách 3 — Kiểm tra lại/nhập tay rồi lưu (luôn xem lại nội dung trước khi đăng)
       </div>
       <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 gap-2.5 text-xs">
         <input
@@ -1670,6 +1832,30 @@ function AddJobForm({
             value={form.requirements ?? ''}
             onChange={(html) => setForm((f) => ({ ...f, requirements: html }))}
             minHeight={100}
+          />
+        </div>
+        {/* Đợt 17c (25/09/2026) — thêm 3 field còn thiếu so với wizard đăng tin đầy đủ (nha-tuyen-dung/
+            dang-tin), để "Cách 2 — Dán nhanh" có chỗ điền vào: Quyền lợi, Địa chỉ cụ thể, Liên hệ. */}
+        <div className="sm:col-span-2">
+          <div className="text-[11px] font-semibold text-ink-faint mb-1">Quyền lợi được hưởng</div>
+          <RichTextEditor
+            value={form.benefits ?? ''}
+            onChange={(html) => setForm((f) => ({ ...f, benefits: html }))}
+            minHeight={100}
+          />
+        </div>
+        <input
+          placeholder="Địa chỉ cụ thể (không bắt buộc)"
+          className="tvl-input text-sm sm:col-span-2"
+          value={form.address ?? ''}
+          onChange={(e) => setForm((f) => ({ ...f, address: e.target.value || undefined }))}
+        />
+        <div className="sm:col-span-2">
+          <div className="text-[11px] font-semibold text-ink-faint mb-1">Thông tin liên hệ (không bắt buộc)</div>
+          <RichTextEditor
+            value={form.contactNote ?? ''}
+            onChange={(html) => setForm((f) => ({ ...f, contactNote: html }))}
+            minHeight={80}
           />
         </div>
         {error && <div className="text-critical font-semibold sm:col-span-2">{error}</div>}
