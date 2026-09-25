@@ -1134,10 +1134,12 @@ export const adminApi = {
     const suffix = qs.toString() ? `?${qs.toString()}` : '';
     return request<Company[]>(`/admin/companies/sourced${suffix}`, { headers: authHeaders(token) });
   },
+  // Đợt 17k (25/09/2026) — mỗi tin kèm `applicationCount` để FE cảnh báo trước khi xoá (xem deleteJob).
   getSourcedCompanyDetail: (token: string, id: string) =>
-    request<{ company: Company; jobs: JobPosting[] }>(`/admin/companies/${id}/sourced-detail`, {
-      headers: authHeaders(token),
-    }),
+    request<{ company: Company; jobs: (JobPosting & { applicationCount: number })[] }>(
+      `/admin/companies/${id}/sourced-detail`,
+      { headers: authHeaders(token) },
+    ),
   createJobForCompany: (token: string, companyId: string, dto: CreateJobPayload) =>
     request<JobPosting>(`/admin/companies/${companyId}/jobs`, {
       method: 'POST',
@@ -1156,6 +1158,9 @@ export const adminApi = {
       headers: authHeaders(token),
       body: JSON.stringify({ url }),
     }),
+  // Đợt 17k (25/09/2026) — "xoá tin đăng" (theo yêu cầu người dùng, màn "Quản lý" công ty nguồn ngoài).
+  deleteJob: (token: string, id: string) =>
+    request<{ success: true }>(`/admin/jobs/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
   listClaimRequests: (token: string, status?: CompanyClaimRequestStatus) =>
     request<CompanyClaimRequestRow[]>(`/admin/claim-requests${status ? `?status=${status}` : ''}`, {
       headers: authHeaders(token),

@@ -17,6 +17,7 @@ import {
   type CompanyClaimRequestRow,
   type CompanyClaimRequestStatus,
   type CreateJobPayload,
+  type ExtractJobUrlResult,
 } from '@/lib/api';
 import { formatDate, formatDateTime, formatSalary, formatCurrency, formatNumber, normalizeSalaryAmount, PAYMENT_METHOD_LABEL } from '@/lib/format';
 import ChangePasswordCard from '@/components/ChangePasswordCard';
@@ -1302,10 +1303,17 @@ function CompanyDetailPanel({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const [data, setData] = useState<{ company: Company; jobs: JobPosting[] } | null>(null);
+  const [data, setData] = useState<{
+    company: Company;
+    jobs: (JobPosting & { applicationCount: number })[];
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAddJob, setShowAddJob] = useState(false);
   const [showClaimForm, setShowClaimForm] = useState(false);
+  // Đợt 17k (25/09/2026) — theo yêu cầu người dùng ("cào dữ liệu lại hoặc xoá tin đăng"): tin đang
+  // được mở panel "Cào lại" (null = không mở); xoá thì xử lý thẳng qua confirm(), không cần state riêng.
+  const [rescrapeJob, setRescrapeJob] = useState<(JobPosting & { applicationCount: number }) | null>(null);
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1320,6 +1328,27 @@ function CompanyDetailPanel({
   useEffect(() => {
     load();
   }, [load]);
+
+  // Đợt 17k (25/09/2026) — "xoá tin đăng": xoá là hành động không thể hoàn tác (xoá CASCADE luôn hồ sơ
+  // ứng tuyển vào tin đó ở CSDL) nên bắt buộc xác nhận, và cảnh báo rõ số hồ sơ nếu có — theo yêu cầu
+  // người dùng "thiết kế sao cho có thể... xoá tin đăng", tránh bấm nhầm mất dữ liệu.
+  async function handleDeleteJob(job: JobPosting & { applicationCount: number }) {
+    const warning =
+      job.applicationCount > 0
+        ? `Tin "${job.title}" đã có ${job.applicationCount} hồ sơ ứng tuyển.\n\nXOÁ TIN SẼ XOÁ LUÔN CÁC HỒ SƠ NÀY — không thể khôi phục. Bạn có chắc chắn muốn xoá?`
+        : `Xoá tin "${job.title}"? Hành động này không thể hoàn tác.`;
+    if (!window.confirm(warning)) return;
+    setDeletingJobId(job.id);
+    try {
+      await adminApi.deleteJob(token, job.id);
+      await load();
+      onChanged();
+    } catch (err) {
+      window.alert(err instanceof ApiError ? err.message : 'Không thể xoá tin này');
+    } finally {
+      setDeletingJobId(null);
+    }
+  }
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-start justify-center overflow-y-auto py-8 px-4 z-50">
@@ -1413,6 +1442,27 @@ function CompanyDetailPanel({
                       >
                         👁️ Xem / Sửa
                       </a>
+                      {/* Đợt 17k (25/09/2026) — theo yêu cầu người dùng: "cào dữ liệu lại" (chỉ hiện khi
+                          tin có sourceUrl — tin Admin tự gõ tay/dán Facebook không có link nguồn để cào
+                          lại) và "xoá tin đăng", cả 2 ngay tại dòng tin trong màn "Quản lý" công ty. */}
+                      {j.sourceUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setRescrapeJob(j)}
+                          className="inline-block text-[11px] font-bold rounded-md bg-info-tint text-info px-2 py-1"
+                          title="Cào lại dữ liệu từ trang nguồn"
+                        >
+                          🔄 Cào lại
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteJob(j)}
+                        disabled={deletingJobId === j.id}
+                        className="inline-block text-[11px] font-bold rounded-md bg-critical-tint text-critical px-2 py-1 disabled:opacity-50"
+                      >
+                        {deletingJobId === j.id ? 'Đang xoá…' : '🗑️ Xoá'}
+                      </button>
                     </span>
                   </div>
                 ))}
@@ -1420,6 +1470,232 @@ function CompanyDetailPanel({
             )}
           </>
         )}
+      </div>
+
+      {/* Đợt 17k (25/09/2026) — panel "Cào lại" mở đè lên (z-index cao hơn overlay công ty), đóng lại
+          quay về đúng danh sách "Tin đăng" vừa xem. */}
+      {rescrapeJob && (
+        <RescrapeJobModal
+          token={token}
+          job={rescrapeJob}
+          onClose={() => setRescrapeJob(null)}
+          onUpdated={() => {
+            setRescrapeJob(null);
+            load();
+            onChanged();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Đợt 17k (25/09/2026) — "cào dữ liệu lại" cho 1 tin ĐÃ ĐĂNG (khác Cách 1 ở AddJobForm vốn chỉ cào
+// lúc TẠO MỚI): trích xuất lại từ đúng `sourceUrl` đã lưu, so sánh với dữ liệu hiện có của tin, Admin
+// tự chọn áp dụng từng trường (mặc định chọn sẵn các trường có thay đổi) rồi mới lưu — không ghi đè
+// âm thầm, vì Admin có thể đã tự sửa tay tin này sau khi tạo. Chỉ so khớp được các trường mà
+// job-url-extractor.util.ts đọc được (title/location/employmentType/salary/description/deadline) —
+// các trường khác (yêu cầu/phúc lợi/liên hệ/...) không có trong dữ liệu chuẩn hoá (JSON-LD) nên giữ
+// nguyên, đúng giới hạn Cách 1 đã có từ trước.
+function RescrapeJobModal({
+  token,
+  job,
+  onClose,
+  onUpdated,
+}: {
+  token: string;
+  job: JobPosting & { applicationCount: number };
+  onClose: () => void;
+  onUpdated: () => void;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<ExtractJobUrlResult | null>(null);
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    adminApi
+      .extractJobFromUrl(token, job.sourceUrl as string)
+      .then((res) => {
+        if (cancelled) return;
+        setResult(res);
+        if (res.found) {
+          const guess = res.data.location ? guessProvincesFromText(res.data.location) : null;
+          const init: Record<string, boolean> = {};
+          if (res.data.title && res.data.title !== job.title) init.title = true;
+          if (guess?.provinces.length || guess?.leftover) init.location = true;
+          if (res.data.employmentType && res.data.employmentType !== job.employmentType) init.employmentType = true;
+          if (
+            (res.data.salaryMin != null && res.data.salaryMin !== job.salaryMin) ||
+            (res.data.salaryMax != null && res.data.salaryMax !== job.salaryMax)
+          ) {
+            init.salary = true;
+          }
+          if (res.data.description && res.data.description !== job.description) init.description = true;
+          if (res.data.deadline && res.data.deadline !== job.deadline) init.deadline = true;
+          setSelected(init);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof ApiError ? err.message : 'Không tải được trang này.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, job]);
+
+  const guess = result?.found && result.data.location ? guessProvincesFromText(result.data.location) : null;
+
+  type Row = { key: string; label: string; oldValue: string; newValue: string };
+  const rows: Row[] = !result?.found
+    ? []
+    : (
+        [
+          result.data.title && result.data.title !== job.title
+            ? { key: 'title', label: 'Chức danh', oldValue: job.title, newValue: result.data.title }
+            : null,
+          guess?.provinces.length || guess?.leftover
+            ? {
+                key: 'location',
+                label: 'Địa điểm / Địa chỉ',
+                oldValue: [job.provinces?.join(', '), job.address].filter(Boolean).join(' — ') || '—',
+                newValue: [guess?.provinces.join(', '), guess?.leftover].filter(Boolean).join(' — ') || '—',
+              }
+            : null,
+          result.data.employmentType && result.data.employmentType !== job.employmentType
+            ? {
+                key: 'employmentType',
+                label: 'Hình thức làm việc',
+                oldValue: job.employmentType || '—',
+                newValue: result.data.employmentType,
+              }
+            : null,
+          (result.data.salaryMin != null && result.data.salaryMin !== job.salaryMin) ||
+          (result.data.salaryMax != null && result.data.salaryMax !== job.salaryMax)
+            ? {
+                key: 'salary',
+                label: 'Lương',
+                oldValue: formatSalary(job.salaryMin, job.salaryMax),
+                newValue: formatSalary(result.data.salaryMin, result.data.salaryMax),
+              }
+            : null,
+          result.data.description && result.data.description !== job.description
+            ? {
+                key: 'description',
+                label: 'Mô tả công việc',
+                oldValue: job.description ? 'Đã có nội dung' : '(trống)',
+                newValue: 'Có nội dung mới từ trang nguồn',
+              }
+            : null,
+          result.data.deadline && result.data.deadline !== job.deadline
+            ? {
+                key: 'deadline',
+                label: 'Hạn nộp',
+                oldValue: job.deadline ? formatDate(job.deadline) : '—',
+                newValue: formatDate(result.data.deadline),
+              }
+            : null,
+        ] as (Row | null)[]
+      ).filter((r): r is Row => r !== null);
+
+  async function handleApply() {
+    if (!result?.found) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const dto: Partial<CreateJobPayload> = {};
+      if (selected.title) dto.title = result.data.title;
+      if (selected.location) {
+        dto.provinces = guess?.provinces.length ? guess.provinces : undefined;
+        dto.location = guess?.provinces.length ? guess.provinces.join(', ') : undefined;
+        if (guess?.leftover) dto.address = guess.leftover;
+      }
+      if (selected.employmentType) dto.employmentType = result.data.employmentType;
+      if (selected.salary) {
+        dto.salaryMin = result.data.salaryMin;
+        dto.salaryMax = result.data.salaryMax;
+      }
+      if (selected.description) dto.description = result.data.description;
+      if (selected.deadline) dto.deadline = result.data.deadline;
+      await adminApi.updateJob(token, job.id, dto);
+      onUpdated();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Không thể cập nhật tin');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const anySelected = Object.values(selected).some(Boolean);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-start justify-center overflow-y-auto py-8 px-4 z-[60]">
+      <div className="bg-white rounded-2xl max-w-lg w-full p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="font-bold text-sm">🔄 Cào lại dữ liệu — {job.title}</div>
+          <button onClick={onClose} className="text-ink-faint hover:text-ink text-lg leading-none">✕</button>
+        </div>
+        <div className="text-[11px] text-ink-faint mb-3 break-all">Nguồn: {job.sourceUrl}</div>
+
+        {loading ? (
+          <div className="text-center text-ink-faint text-sm py-8">Đang cào lại từ trang nguồn…</div>
+        ) : error ? (
+          <div className="rounded-lg bg-critical-tint text-critical text-xs px-3 py-2">{error}</div>
+        ) : !result?.found ? (
+          <div className="rounded-lg bg-warning-tint text-warning text-xs px-3 py-2">
+            {result?.warning ?? 'Không trích xuất được dữ liệu từ trang này.'}
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="text-center text-ink-faint text-xs py-6 border border-dashed border-border rounded-lg">
+            Không có gì thay đổi so với dữ liệu hiện tại của tin.
+          </div>
+        ) : (
+          <>
+            <div className="text-[11px] text-ink-faint mb-2">
+              Trang nguồn có {rows.length} trường khác với tin hiện tại — chọn trường muốn cập nhật (mặc định đã chọn sẵn):
+            </div>
+            <div className="flex flex-col gap-2 mb-3">
+              {rows.map((r) => (
+                <label key={r.key} className="flex items-start gap-2 rounded-lg border border-border p-2.5 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!selected[r.key]}
+                    onChange={(e) => setSelected((s) => ({ ...s, [r.key]: e.target.checked }))}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-ink mb-0.5">{r.label}</div>
+                    <div className="text-ink-faint line-through truncate">{r.oldValue}</div>
+                    <div className="text-success font-semibold truncate">→ {r.newValue}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div className="flex gap-2 mt-2">
+          <button type="button" onClick={onClose} className="tvl-btn-ghost !w-auto px-4 text-xs flex-1">
+            Đóng
+          </button>
+          {result?.found && rows.length > 0 && (
+            <button
+              type="button"
+              onClick={handleApply}
+              disabled={saving || !anySelected}
+              className="tvl-btn-primary !w-auto px-4 text-xs flex-1 disabled:opacity-50"
+            >
+              {saving ? 'Đang lưu…' : `Cập nhật ${Object.values(selected).filter(Boolean).length} trường`}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

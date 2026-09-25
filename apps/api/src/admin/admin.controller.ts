@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -110,6 +120,13 @@ export class AdminController {
     @Body() dto: UpdateJobDto,
   ) {
     return this.adminService.adminUpdateJob(admin, id, dto);
+  }
+
+  // Đợt 17k (25/09/2026) — "xoá tin đăng" (theo yêu cầu người dùng). Khai báo sau PATCH 'jobs/:id'
+  // (method khác nên không xung đột route matching) cho gần các route sửa/xoá tin khác trong file này.
+  @Delete('jobs/:id')
+  deleteJob(@CurrentUser() admin: { userId: string; email: string }, @Param('id') id: string) {
+    return this.adminService.deleteJob(admin, id);
   }
 
   @Get('companies/pending')

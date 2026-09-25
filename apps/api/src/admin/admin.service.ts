@@ -766,11 +766,42 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
   // Chi tiết 1 công ty nguồn ngoài + toàn bộ tin (mọi trạng thái) — màn quản lý tin của Admin cho
   // công ty này (thêm tin mới, xem tin đã đăng).
+  // Đợt 17k (25/09/2026) — theo yêu cầu người dùng ("cào dữ liệu lại hoặc xoá tin đăng"): kèm thêm
+  // `applicationCount` từng tin để FE cảnh báo rõ trước khi Admin xoá (deleteJob() bên dưới xoá CASCADE
+  // luôn các hồ sơ đã ứng tuyển vào tin đó — xem application.entity.ts/saved-job.entity.ts).
   async getSourcedCompanyDetail(id: string) {
     const company = await this.companyRepo.findOne({ where: { id } });
     if (!company) throw new NotFoundException('Không tìm thấy công ty');
     const jobs = await this.jobRepo.find({ where: { companyId: id }, order: { createdAt: 'DESC' } });
-    return { company, jobs };
+    const applicationCounts = await Promise.all(
+      jobs.map((j) => this.applicationRepo.count({ where: { jobPostingId: j.id } })),
+    );
+    return {
+      company,
+      jobs: jobs.map((j, i) => ({
+        ...j,
+        applicationCount: applicationCounts[i],
+      })),
+    };
+  }
+
+  // Đợt 17k (25/09/2026) — "xoá tin đăng" (theo yêu cầu người dùng, màn "Quản lý" công ty nguồn ngoài).
+  // Xoá thẳng (JobPosting không có deletedAt/soft-delete) — applications/saved_jobs của tin này bị xoá
+  // CASCADE theo (onDelete: 'CASCADE' ở FK job_posting_id), nên ghi rõ số hồ sơ đã xoá kèm vào nhật ký
+  // thao tác để có dấu vết; FE đã cảnh báo Admin trước khi gọi (xem applicationCount ở trên).
+  async deleteJob(admin: AdminActor, id: string) {
+    const job = await this.jobRepo.findOne({ where: { id } });
+    if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng');
+    const applicationCount = await this.applicationRepo.count({ where: { jobPostingId: id } });
+    await this.jobRepo.remove(job);
+    await this.logAction(
+      admin,
+      'job.delete',
+      'job',
+      id,
+      `${job.title}${applicationCount > 0 ? ` (đã xoá kèm ${applicationCount} hồ sơ ứng tuyển)` : ''}`,
+    );
+    return { success: true as const };
   }
 
   // Admin đăng tin HỘ cho 1 công ty bất kỳ (khác EmployerService.createJob() vốn chỉ đăng được cho
