@@ -492,7 +492,11 @@ function DangTinInner() {
                   Đợt 14 (25/09/2026) — mục 15: đổi tiếp sang RichTextEditor (khung gõ tự do như Word,
                   giống ô "Yêu cầu ứng viên") thay vì ô chip — vẫn giữ gợi ý nhanh, bấm vào sẽ chèn
                   thêm 1 đoạn vào cuối nội dung đang nhập. */}
-              <Field label="Quyền lợi được hưởng" hint="Gõ tự do, hoặc bấm gợi ý bên dưới để chèn thêm">
+              {/* Đợt 17g (25/09/2026) — người dùng phát hiện nhãn ô nhập ("Quyền lợi được hưởng") và
+                  tiêu đề hiển thị ở trang xem tin ("Phúc lợi") không khớp nhau — nay thống nhất dùng
+                  chung "Phúc lợi" ở cả nơi nhập lẫn nơi hiển thị (không đổi tên field `benefits` ở
+                  backend/DB, chỉ đổi chữ hiển thị trên giao diện). */}
+              <Field label="Phúc lợi" hint="Gõ tự do, hoặc bấm gợi ý bên dưới để chèn thêm">
                 <RichTextEditor
                   value={form.benefits}
                   onChange={(html) => setForm({ ...form, benefits: html })}

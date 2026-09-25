@@ -301,7 +301,9 @@ export default function AdminSuaTinPage() {
             {/* Đợt 13 (24/09/2026) — "Quyền lợi được hưởng" chuyển lên ngay sau "Yêu cầu ứng viên",
                 đồng bộ với wizard Đăng tin NTD.
                 Đợt 14 (25/09/2026) — mục 15: đổi sang RichTextEditor, đồng bộ với wizard Đăng tin NTD. */}
-            <Field id="f-phuc-loi" label="Quyền lợi được hưởng" hint="Gõ tự do, hoặc bấm gợi ý bên dưới để chèn thêm">
+            {/* Đợt 17g — nhãn đổi từ "Quyền lợi được hưởng" sang "Phúc lợi" để khớp đúng tiêu đề hiển
+                thị ở trang Xem tin (không đổi tên field `benefits`). */}
+            <Field id="f-phuc-loi" label="Phúc lợi" hint="Gõ tự do, hoặc bấm gợi ý bên dưới để chèn thêm">
               <RichTextEditor
                 value={form.benefits}
                 onChange={(html) => setForm({ ...form, benefits: html })}
