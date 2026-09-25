@@ -8,6 +8,7 @@ import { FilterBar } from '@/components/search/FilterBar';
 import { DistrictChips } from '@/components/search/DistrictChips';
 import { jobsApi, candidatesApi, type JobFacets, type JobListParams, type JobListResponse, type DistrictFacet } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { formatNumber } from '@/lib/format';
 
 // Đợt 10 — trang tìm việc làm nâng cao đầy đủ (claude/06-spec-tim-kiem-nang-cao.md): thanh lọc
 // FilterBar (tỉnh/thành + ngành nghề multi-select, 5 dropdown đơn, khẩn cấp, doanh nghiệp yêu thích),
@@ -175,7 +176,9 @@ function JobSearchPage() {
           <div>
             <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
               <h1 className="font-extrabold text-lg">
-                {loading ? 'Đang tìm...' : `${result?.total ?? 0} ${heading}`}
+                {/* Đợt 13 (24/09/2026) — thiếu formatNumber() khiến số hàng nghìn hiện dính liền
+                    (VD "1106" thay vì "1.106") — xem Quy tắc chung mục A. */}
+                {loading ? 'Đang tìm...' : `${formatNumber(result?.total ?? 0)} ${heading}`}
               </h1>
               {/* Đợt 12m — chỉ hiện khi đã đăng nhập bằng tài khoản ứng viên và có ít nhất 1 tiêu chí
                   lọc (q/ngành/tỉnh), tránh lưu "tìm kiếm rỗng" vô nghĩa. */}
@@ -209,6 +212,15 @@ function JobSearchPage() {
 
             {result && result.totalPages > 1 && (
               <div className="flex items-center justify-center gap-2 mt-6">
+                {/* Đợt 13 (24/09/2026) — thêm nút "Đầu tiên"/"Cuối cùng" để nhảy nhanh 2 đầu danh
+                    sách phân trang, theo yêu cầu người dùng. */}
+                <button
+                  disabled={page <= 1}
+                  onClick={() => goToPage(1)}
+                  className="tvl-btn-ghost !w-auto px-4 py-1.5 text-xs disabled:opacity-40"
+                >
+                  Đầu tiên
+                </button>
                 <button
                   disabled={page <= 1}
                   onClick={() => goToPage(page - 1)}
@@ -225,6 +237,13 @@ function JobSearchPage() {
                   className="tvl-btn-ghost !w-auto px-4 py-1.5 text-xs disabled:opacity-40"
                 >
                   Sau →
+                </button>
+                <button
+                  disabled={page >= result.totalPages}
+                  onClick={() => goToPage(result.totalPages)}
+                  className="tvl-btn-ghost !w-auto px-4 py-1.5 text-xs disabled:opacity-40"
+                >
+                  Cuối cùng
                 </button>
               </div>
             )}

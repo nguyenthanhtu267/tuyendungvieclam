@@ -31,7 +31,10 @@ const PROVINCE_GROUPS = [
 ];
 const INDUSTRY_GROUPS = [{ label: undefined, options: INDUSTRIES }];
 const DISTRICT_SUPPORTED_PROVINCES = ['Hồ Chí Minh', 'Hà Nội'];
-const BENEFIT_OPTIONS = ['Bảo hiểm sức khỏe', 'Thưởng KPI', 'Laptop', 'Du lịch hằng năm', 'Tăng lương định kỳ', 'Đào tạo chuyên môn'];
+// Đợt 13 (24/09/2026) — đồng bộ với wizard Đăng tin NTD: "Quyền lợi được hưởng" đổi sang nhập tự
+// do (ChipsInput), không còn giới hạn 6 lựa chọn dựng sẵn — danh sách này chỉ còn dùng làm gợi ý
+// nhanh để bấm thêm cho tiện.
+const BENEFIT_SUGGESTIONS = ['Bảo hiểm sức khỏe', 'Thưởng KPI', 'Laptop', 'Du lịch hằng năm', 'Tăng lương định kỳ', 'Đào tạo chuyên môn'];
 
 interface FormState {
   title: string;
@@ -112,10 +115,6 @@ export default function AdminSuaTinPage() {
   }, [token, params.id]);
 
   if (!me || (me.role !== 'admin' && me.role !== 'moderator')) return null;
-
-  function toggle(list: string[], value: string): string[] {
-    return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
-  }
 
   async function handleSubmit() {
     if (!token || !form) return;
@@ -281,6 +280,25 @@ export default function AdminSuaTinPage() {
             <Field label="Yêu cầu ứng viên">
               <RichTextEditor value={form.requirements} onChange={(html) => setForm({ ...form, requirements: html })} minHeight={200} />
             </Field>
+
+            {/* Đợt 13 (24/09/2026) — "Quyền lợi được hưởng" chuyển lên ngay sau "Yêu cầu ứng viên",
+                đồng bộ với wizard Đăng tin NTD. */}
+            <Field label="Quyền lợi được hưởng" hint="Nhập rồi Enter, hoặc bấm gợi ý bên dưới">
+              <ChipsInput value={form.benefits} onChange={(v) => setForm({ ...form, benefits: v })} placeholder="VD: Bảo hiểm sức khỏe, thưởng KPI..." />
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {BENEFIT_SUGGESTIONS.filter((opt) => !form.benefits.includes(opt)).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setForm({ ...form, benefits: [...form.benefits, opt] })}
+                    className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-surface-alt text-ink-muted hover:bg-primary-tint hover:text-primary"
+                  >
+                    + {opt}
+                  </button>
+                ))}
+              </div>
+            </Field>
+
             <Field label="Job tags / Kỹ năng (không bắt buộc)" hint="Nhập rồi Enter">
               <ChipsInput value={form.tags} onChange={(v) => setForm({ ...form, tags: v })} placeholder="Nhập rồi Enter" />
             </Field>
@@ -303,16 +321,7 @@ export default function AdminSuaTinPage() {
               </Field>
             </div>
 
-            <h2 className="font-bold text-sm border-t border-border pt-5">Phúc lợi & hạn nộp</h2>
-            <Field label="Phúc lợi">
-              <div className="flex flex-wrap gap-2">
-                {BENEFIT_OPTIONS.map((opt) => (
-                  <Chip key={opt} active={form.benefits.includes(opt)} onClick={() => setForm({ ...form, benefits: toggle(form.benefits, opt) })}>
-                    {opt}
-                  </Chip>
-                ))}
-              </div>
-            </Field>
+            <h2 className="font-bold text-sm border-t border-border pt-5">Hạn nộp hồ sơ</h2>
             <Field label="Hạn nộp hồ sơ">
               <input type="date" className="tvl-input" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} />
             </Field>

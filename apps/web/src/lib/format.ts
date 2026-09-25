@@ -87,6 +87,15 @@ export function formatCurrency(amount: number | string): string {
   return `${Number(amount).toLocaleString('vi-VN')}đ`;
 }
 
+// Đợt 13 (24/09/2026) — Quy tắc chung: mọi số đếm/thống kê hiển thị ra giao diện phải có dấu chấm
+// phân cách hàng nghìn (định dạng Việt Nam). Trước đó mỗi nơi tự gọi `.toLocaleString('vi-VN')`
+// rời rạc (dễ quên, VD trang /viec-lam từng hiện "1106" thay vì "1.106") — nay dùng chung hàm này.
+// Áp dụng cho MỌI số đếm mới thêm sau này, không đợi báo lỗi nữa.
+export function formatNumber(n: number | undefined | null): string {
+  if (n === undefined || n === null || Number.isNaN(n)) return '—';
+  return n.toLocaleString('vi-VN');
+}
+
 export const ORDER_STATUS_LABEL: Record<string, string> = {
   pending: 'Chờ xác nhận thanh toán',
   active: 'Đã kích hoạt',

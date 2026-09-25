@@ -15,7 +15,7 @@ import {
   type UnlockedProfileRow,
   type EmployerJob,
 } from '@/lib/api';
-import { formatSalary, formatDate } from '@/lib/format';
+import { formatSalary, formatDate, formatNumber } from '@/lib/format';
 import { ChipsInput, TextInput } from '@/components/profile/ui';
 
 // Đợt 9 — Tìm kiếm hồ sơ ứng viên cho nhà tuyển dụng (/nha-tuyen-dung/tim-ho-so). Bộ lọc + danh
@@ -366,7 +366,7 @@ export default function TimHoSoPage() {
 
             <div className="flex flex-col gap-3">
               <div className="text-xs text-ink-faint">
-                {loading ? 'Đang tải…' : `Tìm thấy ${total} hồ sơ phù hợp`}
+                {loading ? 'Đang tải…' : `Tìm thấy ${formatNumber(total)} hồ sơ phù hợp`}
               </div>
               {!loading && items.length === 0 && (
                 <div className="rounded-xl border border-border bg-white text-center text-ink-faint text-sm py-16">
@@ -389,6 +389,15 @@ export default function TimHoSoPage() {
               </div>
               {totalPages > 1 && (
                 <div className="flex items-center justify-center gap-2 pt-2">
+                  {/* Đợt 13 (24/09/2026) — thêm nút "Đầu tiên"/"Cuối cùng", áp dụng nhất quán với
+                      phân trang ở trang /viec-lam. */}
+                  <button
+                    disabled={page <= 1}
+                    onClick={() => setPage(1)}
+                    className="tvl-btn-ghost !w-auto px-3 py-1.5 text-xs disabled:opacity-40"
+                  >
+                    Đầu tiên
+                  </button>
                   <button
                     disabled={page <= 1}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -405,6 +414,13 @@ export default function TimHoSoPage() {
                     className="tvl-btn-ghost !w-auto px-3 py-1.5 text-xs disabled:opacity-40"
                   >
                     Sau →
+                  </button>
+                  <button
+                    disabled={page >= totalPages}
+                    onClick={() => setPage(totalPages)}
+                    className="tvl-btn-ghost !w-auto px-3 py-1.5 text-xs disabled:opacity-40"
+                  >
+                    Cuối cùng
                   </button>
                 </div>
               )}

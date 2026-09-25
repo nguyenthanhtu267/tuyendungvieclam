@@ -12,7 +12,7 @@ import {
   type ApplicationStatus,
   type ApplicantFilters,
 } from '@/lib/api';
-import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate } from '@/lib/format';
+import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatNumber } from '@/lib/format';
 
 const STATUS_TABS: { value: ApplicationStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'Tất cả' },
@@ -303,7 +303,7 @@ function UngVienPageInner() {
                 <select className="tvl-input !w-auto text-sm" value={jobId} onChange={(e) => setJobId(e.target.value)}>
                   {jobs.map((j) => (
                     <option key={j.id} value={j.id}>
-                      {j.title} ({j.applicationCount} hồ sơ)
+                      {j.title} ({formatNumber(j.applicationCount)} hồ sơ)
                     </option>
                   ))}
                 </select>

@@ -234,7 +234,17 @@ export const jobsApi = {
   // Đợt 12ab (24/09/2026) — "Đánh giá mức độ tương thích" (radar chart), chỉ ứng viên đã đăng nhập.
   getCompatibility: (token: string, id: string) =>
     request<CompatibilityResult>(`/jobs/${id}/compatibility`, { headers: authHeaders(token) }),
+  // Đợt 13 (24/09/2026) — "Thống kê trang chủ" thật (thay 3/4 số ảo hard-code trước đó), công khai.
+  homepageStats: () => request<HomepageStats>('/jobs/stats/homepage'),
 };
+
+export interface HomepageStats {
+  memberCount: number;
+  companyCount: number;
+  openJobCount: number;
+  profilesUpdatedToday: number;
+  applicationsToday: number;
+}
 
 export interface CompatibilityCriterion {
   key: string;
@@ -243,9 +253,21 @@ export interface CompatibilityCriterion {
   weight: number;
 }
 
+// Đợt 13 (24/09/2026) — "TIÊU CHÍ ĐÁNH GIÁ" dạng checklist chia nhóm (theo mẫu careerviet.vn),
+// bổ sung cho biểu đồ radar hiện có (không thay thế — người dùng chọn giữ cả 2).
+export interface CompatibilityChecklistItem {
+  group: 'overview' | 'experience' | 'education' | 'skills';
+  key: string;
+  label: string;
+  detail: string;
+  matched: boolean;
+}
+
 export interface CompatibilityResult {
   overall: number;
   criteria: CompatibilityCriterion[];
+  checklist: CompatibilityChecklistItem[];
+  missingSkills: string[];
 }
 
 // Đợt 12k (21/09/2026) — trang công ty công khai /cong-ty/[id]: thông tin công ty + toàn bộ tin

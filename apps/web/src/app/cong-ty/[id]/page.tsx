@@ -8,6 +8,7 @@ import { JobCard } from '@/components/JobCard';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { companiesApi, candidatesApi, ApiError, type CompanyProfileResponse } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { formatNumber } from '@/lib/format';
 
 // Đợt 12k (21/09/2026) — trang công ty công khai: bấm tên công ty trong tin tuyển dụng sẽ tới đây,
 // xem thông tin công ty + toàn bộ tin đang tuyển khác của công ty đó (theo mẫu careerviet.vn).
@@ -98,9 +99,9 @@ export default function CongTyPage() {
             <div>
               <div className="text-white text-xl font-extrabold">{company.name}</div>
               <div className="text-white/75 text-[13px] mt-1">
-                {totalJobs} tin đang tuyển{company.industry ? ` · ${company.industry}` : ''}
+                {formatNumber(totalJobs)} tin đang tuyển{company.industry ? ` · ${company.industry}` : ''}
                 {' · '}
-                {company.followersCount ?? 0} người theo dõi
+                {formatNumber(company.followersCount ?? 0)} người theo dõi
               </div>
             </div>
           </div>
@@ -120,7 +121,7 @@ export default function CongTyPage() {
         <div className="grid lg:grid-cols-[1fr_280px] gap-5 mt-5 items-start">
           <div>
             <h2 className="font-extrabold text-lg mb-3">
-              {totalJobs > 0 ? `${totalJobs} việc làm đang tuyển tại ${company.name}` : 'Chưa có tin đang tuyển'}
+              {totalJobs > 0 ? `${formatNumber(totalJobs)} việc làm đang tuyển tại ${company.name}` : 'Chưa có tin đang tuyển'}
             </h2>
 
             {jobs.length === 0 && (

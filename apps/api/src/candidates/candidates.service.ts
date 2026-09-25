@@ -13,6 +13,7 @@ import { Company } from '../database/entities/company.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { BlockCompanyDto } from './dto/block-company.dto';
 import { SaveSearchDto } from './dto/save-search.dto';
+import { ProfileService } from './profile.service';
 
 const CV_MAX_BYTES = 2 * 1024 * 1024; // 2MB — theo Mục 9 SRS
 // Đợt 12ab (24/09/2026) — "làm mới hồ sơ" tối đa 2 CV theo yêu cầu (mẫu careerviet.vn).
@@ -42,6 +43,10 @@ export class CandidatesService {
     private readonly followRepo: Repository<CompanyFollow>,
     @InjectRepository(Company)
     private readonly companyRepo: Repository<Company>,
+    // Đợt 13 (24/09/2026) — dùng ProfileService.refreshCompletion() làm nguồn tính "mức độ hoàn
+    // thành" DUY NHẤT (xem ghi chú ở profile.service.ts), thay cho công thức 5 tiêu chí cũ riêng
+    // của service này đã bị xoá bên dưới.
+    private readonly profileService: ProfileService,
   ) {}
 
   async getOwnProfile(userId: string): Promise<CandidateProfile> {
@@ -50,24 +55,14 @@ export class CandidatesService {
     return profile;
   }
 
-  private computeCompletion(profile: CandidateProfile, hasCv: boolean): number {
-    const checks = [
-      !!profile.fullName,
-      !!profile.desiredPosition,
-      !!profile.desiredLevel,
-      !!(profile.desiredSalaryMin || profile.desiredSalaryMax),
-      hasCv,
-    ];
-    const done = checks.filter(Boolean).length;
-    return Math.round((done / checks.length) * 100);
-  }
-
   async updateOwnProfile(userId: string, dto: UpdateProfileDto): Promise<CandidateProfile> {
     const profile = await this.getOwnProfile(userId);
     Object.assign(profile, dto);
-    const hasCv = (profile.cvs?.length ?? 0) > 0;
-    profile.completionPercent = this.computeCompletion(profile, hasCv);
-    return this.profileRepo.save(profile);
+    const saved = await this.profileRepo.save(profile);
+    await this.profileService.refreshCompletion(profile.id);
+    // refreshCompletion() lưu completionPercent mới ở bản ghi riêng của nó — nạp lại để trả về đúng
+    // giá trị mới nhất cho FE thay vì bản `saved` đã cũ (chưa có % mới).
+    return (await this.profileRepo.findOne({ where: { id: profile.id }, relations: { cvs: true } })) ?? saved;
   }
 
   async listOwnCvs(userId: string): Promise<CV[]> {
@@ -97,7 +92,7 @@ export class CandidatesService {
     // fileUrl trỏ vào route phục vụ tệp từ CSDL (FilesController) — chỉ đặt được sau khi có id.
     saved.fileUrl = `/files/cv/${saved.id}`;
     await this.cvRepo.save(saved);
-    await this.refreshCompletion(profile.id);
+    await this.profileService.refreshCompletion(profile.id);
     return saved;
   }
 
@@ -114,15 +109,8 @@ export class CandidatesService {
       isPrimary: isFirst,
     });
     const saved = await this.cvRepo.save(cv);
-    await this.refreshCompletion(profile.id);
+    await this.profileService.refreshCompletion(profile.id);
     return saved;
-  }
-
-  private async refreshCompletion(profileId: string) {
-    const profile = await this.profileRepo.findOne({ where: { id: profileId }, relations: { cvs: true } });
-    if (!profile) return;
-    profile.completionPercent = this.computeCompletion(profile, (profile.cvs?.length ?? 0) > 0);
-    await this.profileRepo.save(profile);
   }
 
   async removeCv(userId: string, cvId: string): Promise<void> {
@@ -137,7 +125,7 @@ export class CandidatesService {
         await this.cvRepo.save(remaining[0]);
       }
     }
-    await this.refreshCompletion(profile.id);
+    await this.profileService.refreshCompletion(profile.id);
   }
 
   async setPrimaryCv(userId: string, cvId: string): Promise<CV> {

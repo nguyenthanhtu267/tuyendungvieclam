@@ -45,8 +45,11 @@ export type SectionKey =
 
 const AVATAR_MAX_BYTES = 1 * 1024 * 1024; // 1MB — theo quyết định 18/09/2026
 
-// Đợt 8 — 6 mục bắt buộc để tính "mức độ hoàn thành" (theo quyết định đã chốt với người dùng).
-const REQUIRED_SECTIONS = ['profileTitle', 'personalInfo', 'careerInfo', 'experiences', 'educations', 'skills'] as const;
+// Đợt 8 — 6 mục bắt buộc để tính "mức độ hoàn thành" (quyết định lúc đó).
+// Đợt 13 (24/09/2026) — người dùng chốt lại: CHỈ còn 3 mục bắt buộc để đạt 100% — Tiêu đề hồ sơ,
+// Thông tin cá nhân, Kinh nghiệm làm việc. Mục tiêu nghề nghiệp/Học vấn/Kỹ năng chuyên môn (và các
+// mục còn lại) chuyển sang không bắt buộc (xem computeSectionStatus() bên dưới).
+const REQUIRED_SECTIONS = ['profileTitle', 'personalInfo', 'experiences'] as const;
 
 // Thứ tự 13 mục hiển thị ở mục lục bên phải trang /ho-so/truc-tuyen.
 export const SECTION_ORDER = [
@@ -148,12 +151,15 @@ export class ProfileService {
     status.personalInfo =
       profile.lastName && profile.firstName && profile.phone && profile.dateOfBirth ? 'completed' : 'incomplete';
     status.careerObjective = profile.careerObjective ? 'completed' : 'optional';
-    status.careerInfo = profile.desiredPosition && profile.desiredLevel ? 'completed' : 'incomplete';
+    // Đợt 13 (24/09/2026) — careerInfo/educations/skills không còn nằm trong REQUIRED_SECTIONS, đổi
+    // trạng thái mặc định khi trống từ 'incomplete' sang 'optional' cho khớp (trước đó bị đánh dấu
+    // "còn thiếu" dù không còn tính vào % hoàn thành nữa).
+    status.careerInfo = profile.desiredPosition && profile.desiredLevel ? 'completed' : 'optional';
     status.experiences = sections.experiences.length > 0 ? 'completed' : 'incomplete';
-    status.educations = sections.educations.length > 0 ? 'completed' : 'incomplete';
+    status.educations = sections.educations.length > 0 ? 'completed' : 'optional';
     status.certificates = sections.certificates.length > 0 ? 'completed' : 'optional';
     status.languages = sections.languages.length > 0 ? 'completed' : 'optional';
-    status.skills = sections.skills.length > 0 ? 'completed' : 'incomplete';
+    status.skills = sections.skills.length > 0 ? 'completed' : 'optional';
     status.achievements = sections.achievements.length > 0 ? 'completed' : 'optional';
     status.activities = sections.activities.length > 0 ? 'completed' : 'optional';
     status.references = sections.references.length > 0 ? 'completed' : 'optional';
@@ -165,7 +171,13 @@ export class ProfileService {
     return Math.round((done / REQUIRED_SECTIONS.length) * 100);
   }
 
-  private async refreshCompletion(profileId: string) {
+  // Đợt 13 (24/09/2026) — bỏ `private`: đây phải là nguồn tính "mức độ hoàn thành" DUY NHẤT của
+  // toàn hệ thống. Trước đó candidates.service.ts có 1 công thức tính hoàn toàn khác (5 tiêu chí cũ:
+  // fullName/desiredPosition/desiredLevel/salary/hasCv) và tự ghi đè completionPercent mỗi khi NTD
+  // upload CV/đổi trạng thái hiển thị/sửa hồ sơ nhanh — khiến % hiển thị ở /ho-so/truc-tuyen có thể
+  // bị ghi đè sai ngay sau khi tính đúng theo REQUIRED_SECTIONS. Nay candidates.service.ts gọi thẳng
+  // hàm này thay vì tự tính lấy.
+  async refreshCompletion(profileId: string) {
     const profile = await this.profileRepo.findOne({ where: { id: profileId } });
     if (!profile) return;
     const [experiences, educations, skills] = await Promise.all([

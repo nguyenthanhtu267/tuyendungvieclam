@@ -6,7 +6,7 @@ import Link from 'next/link';
 import EmployerHeader from '@/components/EmployerHeader';
 import { useAuth } from '@/lib/auth-context';
 import { employerApi, type Company, type EmployerDashboard } from '@/lib/api';
-import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate } from '@/lib/format';
+import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatNumber } from '@/lib/format';
 
 const JOB_STATUS_LABEL: Record<string, string> = {
   draft: 'Nháp',
@@ -108,7 +108,7 @@ export default function EmployerDashboardPage() {
                                 {JOB_STATUS_LABEL[job.approvalStatus ?? 'approved']}
                               </span>
                             </td>
-                            <td className="py-2.5 text-right tabular-nums">{job.applicationCount}</td>
+                            <td className="py-2.5 text-right tabular-nums">{formatNumber(job.applicationCount)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -150,7 +150,7 @@ export default function EmployerDashboardPage() {
 function StatTile({ value, label }: { value: number; label: string }) {
   return (
     <div className="rounded-xl bg-white border border-border p-4">
-      <div className="text-2xl font-extrabold tabular-nums">{value}</div>
+      <div className="text-2xl font-extrabold tabular-nums">{formatNumber(value)}</div>
       <div className="text-xs text-ink-faint mt-1">{label}</div>
     </div>
   );

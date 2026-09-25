@@ -20,7 +20,7 @@ import {
   PROVINCE_REGIONS,
 } from '@/lib/catalogs';
 
-const STEPS = ['Thông tin vị trí', 'Mô tả & yêu cầu', 'Phúc lợi & hạn nộp', 'Xem trước & gửi'];
+const STEPS = ['Thông tin vị trí', 'Mô tả & yêu cầu', 'Hạn nộp hồ sơ', 'Xem trước & gửi'];
 // Đợt 10 — dùng chung danh mục ngành nghề/cấp bậc/hình thức việc làm/kinh nghiệm với thanh lọc tìm
 // việc (lib/catalogs.ts) để tin đăng khớp đúng giá trị mà FilterBar lọc theo (job.level = ... v.v).
 const PROVINCE_GROUPS = [
@@ -30,7 +30,12 @@ const PROVINCE_GROUPS = [
 const INDUSTRY_GROUPS = [{ label: undefined, options: INDUSTRIES }];
 // Quận/huyện hiện chỉ có dữ liệu mẫu cho Hồ Chí Minh — chỉ hiện ô nhập quận khi chọn tỉnh có hỗ trợ.
 const DISTRICT_SUPPORTED_PROVINCES = ['Hồ Chí Minh', 'Hà Nội'];
-const BENEFIT_OPTIONS = ['Bảo hiểm sức khỏe', 'Thưởng KPI', 'Laptop', 'Du lịch hằng năm', 'Tăng lương định kỳ', 'Đào tạo chuyên môn'];
+// Đợt 13 (24/09/2026) — "Quyền lợi được hưởng" trước đây chỉ chọn từ 6 lựa chọn dựng sẵn
+// (BENEFIT_OPTIONS), theo yêu cầu người dùng đổi thành nhập tự do không giới hạn (giống ô "Job
+// tags" đã có) để NTD ghi đúng quyền lợi thực tế của công ty mình, không bị bó buộc. Icon hiển thị
+// (benefit-icons.ts) vốn đã khớp theo từ khoá trong chuỗi bất kỳ nên không cần đổi gì thêm ở phần
+// hiển thị (JobCard/trang chi tiết tin/trang xem trước) — chỉ đổi cách NHẬP LIỆU ở đây.
+const BENEFIT_SUGGESTIONS = ['Bảo hiểm sức khỏe', 'Thưởng KPI', 'Laptop', 'Du lịch hằng năm', 'Tăng lương định kỳ', 'Đào tạo chuyên môn'];
 
 interface FormState {
   title: string;
@@ -169,12 +174,6 @@ function DangTinInner() {
         <div className="max-w-2xl mx-auto px-4 py-24 text-center text-ink-faint text-sm">Đang tải tin để sửa...</div>
       </main>
     );
-  }
-
-  function toggle(list: string[], value: string, max?: number): string[] {
-    if (list.includes(value)) return list.filter((v) => v !== value);
-    if (max && list.length >= max) return list;
-    return [...list, value];
   }
 
   function canProceed(): boolean {
@@ -469,6 +468,26 @@ function DangTinInner() {
                   minHeight={220}
                 />
               </Field>
+
+              {/* Đợt 13 (24/09/2026) — "Quyền lợi được hưởng" chuyển từ bước "Phúc lợi & hạn nộp"
+                  lên ngay sau "Yêu cầu ứng viên" (theo yêu cầu người dùng), đổi từ chọn 6 lựa chọn
+                  dựng sẵn sang nhập tự do không giới hạn — vẫn giữ gợi ý nhanh để bấm thêm cho tiện. */}
+              <Field label="Quyền lợi được hưởng" hint="Nhập rồi Enter, hoặc bấm gợi ý bên dưới">
+                <ChipsInput value={form.benefits} onChange={(v) => setForm({ ...form, benefits: v })} placeholder="VD: Bảo hiểm sức khỏe, thưởng KPI..." />
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {BENEFIT_SUGGESTIONS.filter((opt) => !form.benefits.includes(opt)).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setForm({ ...form, benefits: [...form.benefits, opt] })}
+                      className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-surface-alt text-ink-muted hover:bg-primary-tint hover:text-primary"
+                    >
+                      + {opt}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+
               {/* Đợt 12v (21/09/2026) — "JOB TAGS / SKILLS": thẻ từ khoá/kỹ năng tự nhập tự do (không
                   bắt buộc), hiển thị dạng chip ở trang chi tiết tin, dưới khối "Thông tin khác". */}
               <Field label="Job tags / Kỹ năng (không bắt buộc)" hint="Nhập rồi Enter, VD: Tiktokshop Specialist">
@@ -520,16 +539,7 @@ function DangTinInner() {
 
           {step === 2 && (
             <>
-              <h2 className="font-bold text-sm">Phúc lợi & hạn nộp hồ sơ</h2>
-              <Field label="Phúc lợi">
-                <div className="flex flex-wrap gap-2">
-                  {BENEFIT_OPTIONS.map((opt) => (
-                    <Chip key={opt} active={form.benefits.includes(opt)} onClick={() => setForm({ ...form, benefits: toggle(form.benefits, opt) })}>
-                      {opt}
-                    </Chip>
-                  ))}
-                </div>
-              </Field>
+              <h2 className="font-bold text-sm">Hạn nộp hồ sơ</h2>
               <Field label="Hạn nộp hồ sơ">
                 <input type="date" className="tvl-input" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} />
               </Field>

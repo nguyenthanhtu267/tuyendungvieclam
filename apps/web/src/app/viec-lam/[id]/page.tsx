@@ -8,6 +8,7 @@ import { JobCard } from '@/components/JobCard';
 import { RichTextView } from '@/components/RichTextView';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { CompatibilityRadar } from '@/components/CompatibilityRadar';
+import { CompatibilityChecklist } from '@/components/CompatibilityChecklist';
 import {
   jobsApi,
   candidatesApi,
@@ -22,6 +23,7 @@ import {
 import { useAuth } from '@/lib/auth-context';
 import {
   formatDate,
+  formatNumber,
   formatSalary,
   formatSalaryTag,
   jobAddressDisplay,
@@ -481,7 +483,7 @@ function JobDetailInner() {
                   {/* Đợt 12ac (24/09/2026) — số lượt "Theo dõi công ty" (đồng bộ với nút "+ Theo dõi"
                       ở khối bên phải), tải kèm mô tả + danh sách tin qua companiesApi.getProfile(). */}
                   {companyOverview?.company.followersCount != null && (
-                    <div>{companyOverview.company.followersCount} lượt theo dõi</div>
+                    <div>{formatNumber(companyOverview.company.followersCount)} lượt theo dõi</div>
                   )}
                   {companyOverview?.company.description && (
                     <CompanyDescription text={companyOverview.company.description} />
@@ -548,6 +550,18 @@ function JobDetailInner() {
                   Đánh giá mức độ tương thích
                 </div>
                 <CompatibilityRadar criteria={compatibility.criteria} overall={compatibility.overall} />
+              </div>
+            )}
+
+            {/* Đợt 13 (24/09/2026) — "TIÊU CHÍ ĐÁNH GIÁ" dạng checklist chia nhóm, đúng mẫu
+                careerviet.vn người dùng gửi ảnh. Hiện SONG SONG với radar ở trên (người dùng chọn
+                giữ cả 2 dạng), cùng điều kiện hiện (ứng viên đã đăng nhập + có hồ sơ). */}
+            {me?.role === 'candidate' && compatibility && (
+              <div className="rounded-xl border border-border bg-white p-4">
+                <div className="text-[11px] font-bold text-primary uppercase tracking-wide mb-2.5">
+                  Tiêu chí đánh giá
+                </div>
+                <CompatibilityChecklist checklist={compatibility.checklist} missingSkills={compatibility.missingSkills} />
               </div>
             )}
           </div>

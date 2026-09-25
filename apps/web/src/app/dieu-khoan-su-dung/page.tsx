@@ -20,7 +20,7 @@ export default function DieuKhoanSuDungPage() {
         </div>
 
         <Section title="1. Dịch vụ cung cấp">
-          Tuyển Dụng Việc Làm (tuyendungvieclam.vn) là cổng thông tin việc làm trực tuyến, kết nối
+          Tuyển Dụng Việc Làm (tuyendungvieclam) là cổng thông tin việc làm trực tuyến, kết nối
           ứng viên tìm việc với các doanh nghiệp có nhu cầu tuyển dụng. Dịch vụ hiện ở Giai đoạn 1:
           đăng ký tài khoản, tạo hồ sơ ứng viên, đăng tin tuyển dụng, nộp đơn ứng tuyển, tìm kiếm hồ
           sơ ứng viên (dành cho nhà tuyển dụng), và các gói dịch vụ trả phí cho nhà tuyển dụng.

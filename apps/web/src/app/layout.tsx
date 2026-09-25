@@ -8,6 +8,7 @@ import '@fontsource/ibm-plex-mono/500.css';
 import '@fontsource/ibm-plex-mono/600.css';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
+import { LanguageProvider } from '@/lib/i18n';
 import Footer from '@/components/Footer';
 
 // Font Inter (to, rõ, sắc nét — quyết định 18/09/2026) + IBM Plex Mono cho số liệu dạng bảng,
@@ -15,7 +16,7 @@ import Footer from '@/components/Footer';
 // mạng egress của môi trường build này.
 export const metadata: Metadata = {
   title: 'Tuyển Dụng Việc Làm',
-  description: 'Cổng việc làm đa công ty — tuyendungvieclam.vn',
+  description: 'Cổng việc làm đa công ty — tuyendungvieclam',
 };
 
 export default function RootLayout({
@@ -27,8 +28,10 @@ export default function RootLayout({
     <html lang="vi">
       <body className="font-sans antialiased bg-bg text-ink flex flex-col min-h-screen">
         <AuthProvider>
-          <div className="flex-1 flex flex-col">{children}</div>
-          <Footer />
+          <LanguageProvider>
+            <div className="flex-1 flex flex-col">{children}</div>
+            <Footer />
+          </LanguageProvider>
         </AuthProvider>
       </body>
     </html>

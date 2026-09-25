@@ -82,7 +82,10 @@ export function JobCard({
         {isSaved ? '♥' : '♡'}
       </button>
 
-      <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={44} className="text-xs" />
+      {/* Đợt 13 (24/09/2026) — mục 4 danh sách lỗi: logo công ty trên thẻ việc làm quá nhỏ so với
+          các trang khác (chi tiết tin, trang công ty đều dùng size lớn hơn). Tăng 44→60px + cỡ chữ
+          initials theo tỷ lệ để không bị vỡ layout khi công ty chưa có logoUrl. */}
+      <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={60} className="text-sm" />
       <div className="flex-1 min-w-0 pr-6">
         {job.isUrgent && (
           <div className="inline-flex items-center gap-1 mb-1 text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-critical text-white tracking-wide">

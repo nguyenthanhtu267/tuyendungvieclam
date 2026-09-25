@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { useLanguage } from '@/lib/i18n';
 import { NavDropdown } from '@/components/nav/NavDropdown';
 import { NotificationBell } from '@/components/NotificationBell';
 import { CANDIDATE_ACCOUNT_MENU, EMPLOYER_CTA_MENU, JOBS_MEGA_MENU, UTILITY_TOOLS } from '@/lib/nav-menu';
@@ -12,10 +13,9 @@ import { CANDIDATE_ACCOUNT_MENU, EMPLOYER_CTA_MENU, JOBS_MEGA_MENU, UTILITY_TOOL
 // "Tìm Việc Làm" (mega-menu 4 cột/5 nhóm), "Tiện Ích" (8 công cụ, placeholder), khối navy
 // "Dành cho Nhà Tuyển Dụng" (4 mục), menu tài khoản ứng viên (8 mục). "Mẫu CV"/"Cẩm Nang Nghề
 // Nghiệp" giữ nguyên placeholder "Sắp ra mắt" đã chốt trước đó.
-const SIMPLE_PLACEHOLDER_LINKS = [
-  { label: 'Mẫu CV' },
-  { label: 'Cẩm Nang Nghề Nghiệp' },
-];
+// Đợt 13 (24/09/2026) — nhãn của 2 mục placeholder này nay lấy qua i18n (t('nav.cvTemplate') /
+// t('nav.careerGuide')) thay vì hằng số cứng — xem SIMPLE_PLACEHOLDER_KEYS bên dưới.
+const SIMPLE_PLACEHOLDER_KEYS = ['nav.cvTemplate', 'nav.careerGuide'] as const;
 
 function initialsOf(email: string) {
   return email.slice(0, 2).toUpperCase();
@@ -23,6 +23,7 @@ function initialsOf(email: string) {
 
 export default function SiteHeader() {
   const { me, token, logout } = useAuth();
+  const { lang, toggleLang, t } = useLanguage();
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -48,7 +49,7 @@ export default function SiteHeader() {
 
         <nav className="hidden md:flex items-center gap-4 lg:gap-5 text-[13px] font-semibold text-ink-muted flex-1 min-w-0">
           <NavDropdown
-            trigger={<span className={jobsActive ? 'text-primary' : ''}>Tìm Việc Làm</span>}
+            trigger={<span className={jobsActive ? 'text-primary' : ''}>{t('nav.jobs')}</span>}
             panelClassName="w-[min(760px,90vw)] p-5"
           >
             <div className="grid grid-cols-4 gap-5">
@@ -84,14 +85,14 @@ export default function SiteHeader() {
             </div>
           </NavDropdown>
 
-          <NavDropdown trigger="Tiện Ích" panelClassName="w-64 p-2">
+          <NavDropdown trigger={t('nav.tools')} panelClassName="w-64 p-2">
             <div className="px-2.5 py-1.5 text-[10.5px] font-bold text-ink-faint uppercase tracking-wide">
-              Sắp ra mắt
+              {t('nav.comingSoon')}
             </div>
             {UTILITY_TOOLS.map((tool) => (
               <div
                 key={tool}
-                title="Sắp ra mắt"
+                title={t('nav.comingSoon')}
                 className="px-3 py-2 text-[12.3px] text-ink-faint cursor-default rounded-lg"
               >
                 {tool}
@@ -99,9 +100,9 @@ export default function SiteHeader() {
             ))}
           </NavDropdown>
 
-          {SIMPLE_PLACEHOLDER_LINKS.map((link) => (
-            <span key={link.label} className="text-ink-faint cursor-default whitespace-nowrap" title="Sắp ra mắt">
-              {link.label}
+          {SIMPLE_PLACEHOLDER_KEYS.map((key) => (
+            <span key={key} className="text-ink-faint cursor-default whitespace-nowrap" title={t('nav.comingSoon')}>
+              {t(key)}
             </span>
           ))}
         </nav>
@@ -109,7 +110,7 @@ export default function SiteHeader() {
 
         <div className="hidden md:flex items-center gap-3">
           <NavDropdown
-            trigger={<span className="text-white font-bold text-[12.5px]">Dành Cho Nhà Tuyển Dụng</span>}
+            trigger={<span className="text-white font-bold text-[12.5px]">{t('nav.forEmployer')}</span>}
             triggerClassName="!border-b-0 !text-white bg-primary-dark hover:bg-primary rounded-lg px-3.5 py-2"
             align="right"
             panelClassName="w-64 p-2"
@@ -126,12 +127,17 @@ export default function SiteHeader() {
             ))}
           </NavDropdown>
 
-          <span
-            className="text-[11px] font-bold text-ink-faint border border-border-strong rounded-md px-1.5 py-1 cursor-default"
-            title="Tiếng Anh sẽ hỗ trợ ở bản cập nhật sau"
+          {/* Đợt 13 (24/09/2026) — công tắc chuyển Tiếng Việt/Tiếng Anh (khung giao diện). Trước đó
+              chỉ là badge tĩnh "🌐 VI" với chú thích "sẽ hỗ trợ ở bản cập nhật sau" — nay đã hoạt
+              động thật, lưu lựa chọn ở localStorage, mặc định Tiếng Việt. */}
+          <button
+            type="button"
+            onClick={toggleLang}
+            className="text-[11px] font-bold text-ink-faint border border-border-strong rounded-md px-1.5 py-1 hover:border-primary hover:text-primary transition-colors"
+            title={lang === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
           >
-            🌐 VI
-          </span>
+            🌐 {lang === 'vi' ? 'VI' : 'EN'}
+          </button>
 
           {me && token && <NotificationBell token={token} />}
 
@@ -143,7 +149,7 @@ export default function SiteHeader() {
                     {initialsOf(me.email)}
                   </span>
                   <span className="max-w-[120px] truncate" title={me.email}>
-                    Chào {me.email.split('@')[0]}
+                    {t('nav.hello')} {me.email.split('@')[0]}
                   </span>
                 </span>
               }
@@ -165,12 +171,12 @@ export default function SiteHeader() {
                 onClick={logout}
                 className="w-full text-left px-3 py-2 text-[12.3px] font-semibold text-critical hover:bg-critical-tint rounded-lg"
               >
-                Đăng xuất
+                {t('nav.logout')}
               </button>
             </NavDropdown>
           ) : (
             <Link href="/dang-nhap" className="tvl-btn-primary !w-auto px-5 whitespace-nowrap">
-              Đăng nhập / Đăng ký
+              {t('nav.login')}
             </Link>
           )}
         </div>
@@ -178,7 +184,7 @@ export default function SiteHeader() {
         <button
           className="md:hidden ml-auto w-9 h-9 rounded-lg border border-border-strong flex items-center justify-center"
           onClick={() => setDrawerOpen(true)}
-          aria-label="Mở menu"
+          aria-label={t('nav.openMenu')}
         >
           ☰
         </button>
@@ -195,7 +201,7 @@ export default function SiteHeader() {
               <button
                 onClick={() => setDrawerOpen(false)}
                 className="w-8 h-8 flex items-center justify-center text-lg"
-                aria-label="Đóng menu"
+                aria-label={t('nav.closeMenu')}
               >
                 ✕
               </button>
@@ -203,7 +209,7 @@ export default function SiteHeader() {
             <div className="flex flex-col p-4 gap-1 text-sm font-semibold">
               <details className="group" open>
                 <summary className="px-3 py-2.5 rounded-lg hover:bg-surface-alt text-ink cursor-pointer list-none flex items-center justify-between">
-                  Tìm Việc Làm
+                  {t('nav.jobs')}
                   <span className="text-[10px] transition-transform group-open:rotate-180">▾</span>
                 </summary>
                 <div className="pl-3 flex flex-col gap-2.5 pb-2 pt-1">
@@ -232,34 +238,34 @@ export default function SiteHeader() {
                     onClick={() => setDrawerOpen(false)}
                     className="text-[12px] font-bold text-primary"
                   >
-                    Xem tất cả việc làm →
+                    {t('nav.viewAllJobs')}
                   </Link>
                 </div>
               </details>
 
               <details className="group">
                 <summary className="px-3 py-2.5 rounded-lg hover:bg-surface-alt text-ink cursor-pointer list-none flex items-center justify-between">
-                  Tiện Ích
+                  {t('nav.tools')}
                   <span className="text-[10px] transition-transform group-open:rotate-180">▾</span>
                 </summary>
                 <div className="pl-3 flex flex-col gap-0.5 pb-2 pt-1">
                   {UTILITY_TOOLS.map((tool) => (
                     <span key={tool} className="text-[12px] text-ink-faint py-0.5">
-                      {tool} <span className="text-[10px] font-normal">(Sắp ra mắt)</span>
+                      {tool} <span className="text-[10px] font-normal">({t('nav.comingSoon')})</span>
                     </span>
                   ))}
                 </div>
               </details>
 
-              {SIMPLE_PLACEHOLDER_LINKS.map((link) => (
-                <span key={link.label} className="px-3 py-2.5 rounded-lg text-ink-faint">
-                  {link.label} <span className="text-[10px] font-normal">(Sắp ra mắt)</span>
+              {SIMPLE_PLACEHOLDER_KEYS.map((key) => (
+                <span key={key} className="px-3 py-2.5 rounded-lg text-ink-faint">
+                  {t(key)} <span className="text-[10px] font-normal">({t('nav.comingSoon')})</span>
                 </span>
               ))}
 
               <details className="group">
                 <summary className="px-3 py-2.5 rounded-lg bg-primary-tint text-primary cursor-pointer list-none flex items-center justify-between mt-1">
-                  Dành Cho Nhà Tuyển Dụng
+                  {t('nav.forEmployer')}
                   <span className="text-[10px] transition-transform group-open:rotate-180">▾</span>
                 </summary>
                 <div className="pl-3 flex flex-col gap-0.5 pb-2 pt-1">
@@ -280,7 +286,7 @@ export default function SiteHeader() {
             <div className="mt-auto p-4 border-t border-border">
               {me === undefined ? null : me ? (
                 <div className="flex flex-col gap-2">
-                  <div className="text-xs text-ink-muted truncate">Đang đăng nhập: {me.email}</div>
+                  <div className="text-xs text-ink-muted truncate">{t('nav.loggedInAs')}: {me.email}</div>
                   {CANDIDATE_ACCOUNT_MENU.map((item) => (
                     <Link
                       key={item.label}
@@ -298,12 +304,12 @@ export default function SiteHeader() {
                     }}
                     className="tvl-btn-ghost mt-1"
                   >
-                    Đăng xuất
+                    {t('nav.logout')}
                   </button>
                 </div>
               ) : (
                 <Link href="/dang-nhap" onClick={() => setDrawerOpen(false)} className="tvl-btn-primary block text-center">
-                  Đăng nhập / Đăng ký
+                  {t('nav.login')}
                 </Link>
               )}
             </div>

@@ -13,7 +13,7 @@ import {
   type AdminStatsPoint,
   type AdminAuditLogEntry,
 } from '@/lib/api';
-import { formatDate, formatDateTime, formatSalary, formatCurrency, PAYMENT_METHOD_LABEL } from '@/lib/format';
+import { formatDate, formatDateTime, formatSalary, formatCurrency, formatNumber, PAYMENT_METHOD_LABEL } from '@/lib/format';
 import ChangePasswordCard from '@/components/ChangePasswordCard';
 import { scanJobContent } from '@/lib/content-moderation';
 
@@ -188,9 +188,9 @@ export default function AdminDashboardPage() {
             }`}
           >
             {item.label}
-            {item.id === 'jobs' && dashboard ? ` (${dashboard.pendingJobsCount})` : ''}
-            {item.id === 'companies' && dashboard ? ` (${dashboard.pendingCompaniesCount})` : ''}
-            {item.id === 'orders' ? ` (${pendingOrders.length})` : ''}
+            {item.id === 'jobs' && dashboard ? ` (${formatNumber(dashboard.pendingJobsCount)})` : ''}
+            {item.id === 'companies' && dashboard ? ` (${formatNumber(dashboard.pendingCompaniesCount)})` : ''}
+            {item.id === 'orders' ? ` (${formatNumber(pendingOrders.length)})` : ''}
           </button>
         ))}
         <button onClick={logout} className="mt-auto text-left px-2.5 py-2 rounded-lg text-xs font-bold text-white/70 hover:text-white">
@@ -609,7 +609,7 @@ function UsersCard({ token }: { token: string }) {
 function StatTile({ value, label }: { value: number; label: string }) {
   return (
     <div className="rounded-xl bg-white border border-border p-4">
-      <div className="text-2xl font-extrabold tabular-nums">{value}</div>
+      <div className="text-2xl font-extrabold tabular-nums">{formatNumber(value)}</div>
       <div className="text-xs text-ink-faint mt-1">{label}</div>
     </div>
   );
@@ -799,7 +799,7 @@ function MetricChart({
       <div className="flex items-baseline justify-between mb-3">
         <div className="font-bold text-sm">{label}</div>
         <div className="text-xs text-ink-faint">
-          Tổng: <span className="font-extrabold text-ink">{total}</span>
+          Tổng: <span className="font-extrabold text-ink">{formatNumber(total)}</span>
         </div>
       </div>
       <div className="flex items-end gap-[3px] h-24">
@@ -889,6 +889,15 @@ function AuditLogCard({ token }: { token: string }) {
             </div>
           </div>
           <div className="flex items-center justify-center gap-3 mt-4 text-xs">
+            {/* Đợt 13 (24/09/2026) — thêm nút "Đầu tiên"/"Cuối cùng", áp dụng nhất quán với phân
+                trang ở trang /viec-lam. */}
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage(1)}
+              className="px-3 py-1.5 rounded-lg font-bold bg-surface-alt text-ink-faint disabled:opacity-40"
+            >
+              Đầu tiên
+            </button>
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -905,6 +914,13 @@ function AuditLogCard({ token }: { token: string }) {
               className="px-3 py-1.5 rounded-lg font-bold bg-surface-alt text-ink-faint disabled:opacity-40"
             >
               Sau →
+            </button>
+            <button
+              disabled={page >= data.totalPages}
+              onClick={() => setPage(data.totalPages)}
+              className="px-3 py-1.5 rounded-lg font-bold bg-surface-alt text-ink-faint disabled:opacity-40"
+            >
+              Cuối cùng
             </button>
           </div>
         </>

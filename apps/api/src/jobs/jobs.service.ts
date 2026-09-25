@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { MoreThanOrEqual, Repository, SelectQueryBuilder } from 'typeorm';
 import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
-import { Company } from '../database/entities/company.entity';
+import { Company, CompanyApprovalStatus } from '../database/entities/company.entity';
 import { CandidateProfile } from '../database/entities/candidate-profile.entity';
 import { CandidateSkill } from '../database/entities/candidate-sections.entity';
+import { Application } from '../database/entities/application.entity';
 import { ListJobsDto, POSTED_WITHIN_DAYS } from './dto/list-jobs.dto';
 
 // Đợt 12ab (24/09/2026) — "Đánh giá mức độ tương thích" (radar chart, theo mẫu careerviet.vn): thứ
@@ -50,6 +51,9 @@ export class JobsService {
     private readonly candidateProfileRepo: Repository<CandidateProfile>,
     @InjectRepository(CandidateSkill)
     private readonly candidateSkillRepo: Repository<CandidateSkill>,
+    // Đợt 13 (24/09/2026) — "Thống kê trang chủ" (mục 7): cần đếm lượt ứng tuyển thật.
+    @InjectRepository(Application)
+    private readonly applicationRepo: Repository<Application>,
   ) {}
 
   // Dùng chung cho findAll() và facets() để 2 nơi luôn lọc giống hệt nhau (đợt 10, tránh lệch số
@@ -322,6 +326,124 @@ export class JobsService {
     ];
     const overall = Math.round(criteria.reduce((sum, c) => sum + c.score * c.weight, 0) / 100);
 
-    return { overall, criteria };
+    // Đợt 13 (24/09/2026) — "TIÊU CHÍ ĐÁNH GIÁ" dạng checklist chia nhóm (theo mẫu careerviet.vn,
+    // người dùng nhớ đã yêu cầu ở Đợt 12ab nhưng lúc đó chỉ ra được biểu đồ radar). Người dùng chọn
+    // GIỮ CẢ 2 dạng — `criteria` ở trên giữ NGUYÊN không đổi (radar vẫn dùng đúng mảng này), khối
+    // dưới đây là dữ liệu BỔ SUNG dành riêng cho checklist, không ảnh hưởng cách tính `overall`.
+    // Ngưỡng "khớp" (matched) dùng chung mốc score >= 70 cho các tiêu chí đã có sẵn score ở trên.
+    const MATCH_THRESHOLD = 70;
+
+    // "Chức danh" — so khớp chức danh tin với vị trí mong muốn/tiêu đề hồ sơ ứng viên (chưa có sẵn
+    // trong 6 tiêu chí ở trên, thêm mới theo ảnh mẫu). Chỉ mang tính tham khảo — KHÔNG cộng vào
+    // `overall` để không phá vỡ thang điểm đã có người dùng quen dùng.
+    const candidateTitleText = [profile.desiredPosition, profile.profileTitle]
+      .filter(Boolean)
+      .map((v) => (v as string).toLowerCase())
+      .join(' ');
+    const jobTitleLower = job.title.toLowerCase();
+    const titleMatched =
+      !!candidateTitleText &&
+      (jobTitleLower.includes(candidateTitleText) ||
+        candidateTitleText.split(/\s+/).some((w) => w.length > 2 && jobTitleLower.includes(w)));
+
+    // "Trình độ học vấn" — dữ liệu tin tuyển dụng hiện KHÔNG có trường yêu cầu bằng cấp riêng (chỉ
+    // hồ sơ ứng viên có `highestDegree`), nên chỉ hiện mang tính thông tin, không có gì để so khớp
+    // thật sự — theo đúng cách careerviet.vn cũng hiện mục này ở trạng thái "chưa xác nhận khớp"
+    // ngay cả khi ứng viên đã điền trình độ.
+    const hasDegree = !!profile.highestDegree;
+
+    // "Kỹ năng bạn còn thiếu" — job.tags (Đợt 12v, NTD tự nhập) là danh sách kỹ năng/từ khoá có cấu
+    // trúc DUY NHẤT hiện có ở phía tin tuyển dụng, dùng làm nguồn để tính phần bù còn thiếu.
+    const missingSkills = (job.tags ?? []).filter((t) => !skillNames.includes(t.toLowerCase().trim()));
+
+    const checklist = [
+      {
+        group: 'overview' as const,
+        key: 'location',
+        label: 'Địa điểm làm việc',
+        detail: jobLocations.length ? jobLocations.join(', ') : 'Chưa rõ địa điểm',
+        matched: locationScore >= MATCH_THRESHOLD,
+      },
+      {
+        group: 'overview' as const,
+        key: 'salary',
+        label: 'Mức lương',
+        detail: job.salaryMin || job.salaryMax ? `${job.salaryMin ?? '?'} – ${job.salaryMax ?? '?'} triệu` : 'Thoả thuận',
+        matched: salaryScore >= MATCH_THRESHOLD,
+      },
+      {
+        group: 'overview' as const,
+        key: 'industry',
+        label: 'Ngành nghề',
+        detail: job.industry ?? 'Chưa rõ',
+        matched: industryScore >= MATCH_THRESHOLD,
+      },
+      {
+        group: 'overview' as const,
+        key: 'level',
+        label: 'Cấp bậc',
+        detail: job.level ?? 'Chưa rõ',
+        matched: levelScore >= MATCH_THRESHOLD,
+      },
+      {
+        group: 'overview' as const,
+        key: 'jobTitle',
+        label: 'Chức danh',
+        detail: job.title,
+        matched: titleMatched,
+      },
+      {
+        group: 'experience' as const,
+        key: 'experienceYears',
+        label: 'Số năm kinh nghiệm',
+        detail: `${profile.yearsOfExperience ?? '—'} năm (yêu cầu: ${job.experienceLevel ?? 'Không yêu cầu'})`,
+        matched: experienceScore >= MATCH_THRESHOLD,
+      },
+      {
+        group: 'education' as const,
+        key: 'degree',
+        label: 'Trình độ học vấn',
+        detail: profile.highestDegree ?? 'Chưa cập nhật',
+        matched: hasDegree,
+      },
+      {
+        group: 'skills' as const,
+        key: 'skillsSummary',
+        label: 'Kỹ năng',
+        detail: skillNames.length ? `${matchedSkills.length}/${skillNames.length} kỹ năng khớp với tin` : 'Chưa cập nhật kỹ năng',
+        matched: skillScore >= MATCH_THRESHOLD,
+      },
+    ];
+
+    return { overall, criteria, checklist, missingSkills };
+  }
+
+  // Đợt 13 (24/09/2026) — "Thống kê trang chủ" (mục 7 danh sách lỗi): trước đó 3/4 số liệu ở khối 4
+  // thẻ trang chủ là số cứng (hard-code), không đổi theo dữ liệu thật. Endpoint công khai (không cần
+  // đăng nhập) này trả về số liệu thật để FE thay thế toàn bộ khối đó — theo lựa chọn của người dùng
+  // ("hiện đúng số thật"), không đặt ngưỡng/làm tròn giả.
+  async getHomepageStats() {
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [
+      memberCount,
+      companyCount,
+      openJobCount,
+      profilesUpdatedToday,
+      applicationsToday,
+    ] = await Promise.all([
+      this.candidateProfileRepo.count(),
+      this.companyRepo.count({ where: { approvalStatus: CompanyApprovalStatus.APPROVED } }),
+      this.jobRepo.count({ where: { approvalStatus: JobApprovalStatus.APPROVED, isPaused: false } }),
+      this.candidateProfileRepo.count({ where: { updatedAt: MoreThanOrEqual(since24h) } }),
+      this.applicationRepo.count({ where: { appliedAt: MoreThanOrEqual(since24h) } }),
+    ]);
+
+    return {
+      memberCount,
+      companyCount,
+      openJobCount,
+      profilesUpdatedToday,
+      applicationsToday,
+    };
   }
 }

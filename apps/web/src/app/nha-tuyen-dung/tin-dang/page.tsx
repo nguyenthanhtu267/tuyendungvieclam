@@ -6,7 +6,7 @@ import Link from 'next/link';
 import EmployerHeader from '@/components/EmployerHeader';
 import { useAuth } from '@/lib/auth-context';
 import { employerApi, type EmployerJob, type EmployerJobStatus, type EmployerJobStatusCounts } from '@/lib/api';
-import { EMPLOYER_JOB_STATUS_CLASS, EMPLOYER_JOB_STATUS_LABEL, formatDate } from '@/lib/format';
+import { EMPLOYER_JOB_STATUS_CLASS, EMPLOYER_JOB_STATUS_LABEL, formatDate, formatNumber } from '@/lib/format';
 import { jobShareUrl, openFacebookShare } from '@/lib/social';
 
 // Đợt 11b — Mục #4 ATS: trang quản lý tin đăng của NTD, 4 tab trạng thái (đang đăng/chờ đăng/
@@ -178,13 +178,13 @@ export default function TinDangPage() {
                             {EMPLOYER_JOB_STATUS_LABEL[status]}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-right tabular-nums text-ink-faint">{job.viewCount ?? 0}</td>
+                        <td className="py-3 px-3 text-right tabular-nums text-ink-faint">{formatNumber(job.viewCount ?? 0)}</td>
                         <td className="py-3 px-3 text-right tabular-nums">
                           <Link
                             href={`/nha-tuyen-dung/ung-vien?jobId=${job.id}`}
                             className="text-primary font-bold hover:underline"
                           >
-                            {job.applicationCount}
+                            {formatNumber(job.applicationCount)}
                           </Link>
                         </td>
                         {/* Đợt 12p (21/09/2026) — Batch 4 mục #1: hồ sơ nhận được / lượt xem, chỉ tính

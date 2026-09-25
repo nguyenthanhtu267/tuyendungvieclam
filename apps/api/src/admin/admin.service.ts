@@ -120,10 +120,11 @@ export class AdminService {
         this.companyRepo.count({ where: { approvalStatus: CompanyApprovalStatus.PENDING } }),
       ]);
 
+    // Đợt 13 (24/09/2026) — updatedAt thay vì createdAt, xem ghi chú ở listPendingJobs() bên dưới.
     const recentJobsPending = await this.jobRepo.find({
       where: { approvalStatus: JobApprovalStatus.PENDING },
       relations: { company: true },
-      order: { createdAt: 'DESC' },
+      order: { updatedAt: 'DESC' },
       take: 5,
     });
 
@@ -141,11 +142,15 @@ export class AdminService {
   // Đợt 12aa (24/09/2026) — đổi ASC → DESC theo yêu cầu người dùng: tin mới gửi nằm ở đầu danh
   // sách để Admin dễ thấy tin mới nhất, thay vì phải cuộn xuống cuối (trước đó xếp kiểu FIFO, tin
   // cũ nhất lên đầu — hợp lý cho hàng đợi nhưng không hợp lý cho việc "dễ thấy tin mới").
+  // Đợt 13 (24/09/2026) — đổi tiếp createdAt → updatedAt: tin bị Admin từ chối rồi NTD sửa gửi lại
+  // (employer.service.ts chỉ đổi approvalStatus, KHÔNG đổi createdAt — cột @CreateDateColumn không
+  // đổi được) trước đó vẫn kẹt ở vị trí cũ theo ngày tạo gốc thay vì nhảy lên đầu như tin gửi lần
+  // đầu. updated_at tự động cập nhật mỗi lần save() kể cả khi resubmit nên phản ánh đúng "vừa gửi".
   listPendingJobs() {
     return this.jobRepo.find({
       where: { approvalStatus: JobApprovalStatus.PENDING },
       relations: { company: true },
-      order: { createdAt: 'DESC' },
+      order: { updatedAt: 'DESC' },
     });
   }
 

@@ -29,6 +29,15 @@ export class JobsController {
     return this.jobsService.featuredEmployers();
   }
 
+  // Đợt 13 (24/09/2026) — "Thống kê trang chủ" (mục 7 danh sách lỗi), công khai không cần đăng
+  // nhập. Khai TRƯỚC @Get(':id') như các route tĩnh khác ở trên (facets, district-facets,
+  // featured-employers) để không bị ':id' (1 đoạn path) nuốt mất — dù 'stats/homepage' là 2 đoạn
+  // nên về lý thuyết không đụng ':id', khai trước vẫn là quy ước nhất quán của file này.
+  @Get('stats/homepage')
+  homepageStats() {
+    return this.jobsService.getHomepageStats();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.jobsService.findOne(id);

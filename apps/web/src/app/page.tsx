@@ -5,18 +5,24 @@ import { useRouter } from 'next/navigation';
 import SiteHeader from '@/components/SiteHeader';
 import OnlineBanner from '@/components/OnlineBanner';
 import { JobCard } from '@/components/JobCard';
-import { jobsApi, type JobFacets, type JobPosting, type FeaturedEmployer } from '@/lib/api';
+import { jobsApi, type JobFacets, type JobPosting, type FeaturedEmployer, type HomepageStats } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { PINNED_PROVINCES } from '@/lib/catalogs';
 import { CompanyLogo } from '@/components/CompanyLogo';
+import { formatNumber } from '@/lib/format';
+import { useLanguage } from '@/lib/i18n';
 
 export default function Home() {
   const router = useRouter();
   const { me } = useAuth();
+  const { t } = useLanguage();
   const [keyword, setKeyword] = useState('');
   const [jobs, setJobs] = useState<JobPosting[] | null>(null);
   const [facets, setFacets] = useState<JobFacets | null>(null);
   const [featured, setFeatured] = useState<FeaturedEmployer[] | null>(null);
+  // Đợt 13 (24/09/2026) — "Thống kê trang chủ" thật, thay 3/4 số ảo hard-code trước đó (mục 7 danh
+  // sách lỗi). Theo lựa chọn của người dùng: hiện đúng số thật, không đặt ngưỡng/làm tròn giả.
+  const [stats, setStats] = useState<HomepageStats | null>(null);
   // Đợt 12r (21/09/2026) — "Ngành nghề nổi bật" trước đây liệt kê HẾT mọi ngành (facets.industries
   // không giới hạn số lượng ở backend), tạo danh sách rất dài trên trang chủ. Nay chỉ hiện 6 mục đầu
   // (≈2 dòng ở màn hình rộng, khớp cách "Doanh nghiệp yêu thích" đang hiển thị) kèm nút "Xem tất cả"
@@ -38,6 +44,10 @@ export default function Home() {
       .featuredEmployers()
       .then(setFeatured)
       .catch(() => setFeatured([]));
+    jobsApi
+      .homepageStats()
+      .then(setStats)
+      .catch(() => setStats(null));
   }, []);
 
   function handleSearch(e: React.FormEvent) {
@@ -56,34 +66,34 @@ export default function Home() {
         <div className="grid md:grid-cols-2 gap-5 items-stretch">
           <div className="rounded-2xl border border-border bg-white p-7 flex flex-col gap-4 justify-center">
             <div className="text-xs font-bold text-primary uppercase tracking-wide">
-              {facets ? `${facets.total.toLocaleString('vi-VN')} việc làm đang tuyển hôm nay` : 'Đang tải...'}
+              {facets ? `${formatNumber(facets.total)} ${t('home.eyebrowJobsToday')}` : t('home.eyebrowLoading')}
             </div>
             <h1 className="text-2xl sm:text-[26px] font-extrabold leading-snug text-balance">
-              Tìm đúng việc,
+              {t('home.heading1')}
               <br />
-              ứng tuyển nhanh trong 3 bước
+              {t('home.heading2')}
             </h1>
             <form onSubmit={handleSearch} className="flex flex-col gap-3">
               <input
                 className="tvl-input"
-                placeholder="Chức danh, kỹ năng hoặc tên công ty..."
+                placeholder={t('home.searchPlaceholder')}
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
               />
               <div className="flex gap-3 flex-wrap">
                 <button type="submit" className="tvl-btn-accent !w-auto px-6">
-                  Tìm Việc Ngay
+                  {t('home.searchButton')}
                 </button>
                 <button
                   type="button"
                   onClick={() => router.push('/viec-lam')}
                   className="tvl-btn-ghost !w-auto px-5"
                 >
-                  Tìm kiếm nâng cao
+                  {t('home.advancedSearch')}
                 </button>
               </div>
               <div className="flex items-center gap-2 flex-wrap text-[11.5px]">
-                <span className="text-ink-faint">Nổi bật:</span>
+                <span className="text-ink-faint">{t('home.featured')}</span>
                 {PINNED_PROVINCES.map((p) => (
                   <button
                     key={p}
@@ -99,7 +109,7 @@ export default function Home() {
                   onClick={() => router.push('/viec-lam?urgentOnly=1')}
                   className="font-semibold px-2.5 py-1 rounded-full border border-critical/40 text-critical hover:border-critical transition-colors"
                 >
-                  Việc làm khẩn cấp
+                  {t('home.urgentJobs')}
                 </button>
               </div>
             </form>
@@ -107,13 +117,13 @@ export default function Home() {
               <div className="rounded-xl bg-primary-tint p-3.5 flex items-center gap-3">
                 <span className="text-lg">👋</span>
                 <div className="flex-1">
-                  <div className="text-xs font-bold text-primary">Chưa có tài khoản?</div>
+                  <div className="text-xs font-bold text-primary">{t('home.noAccount')}</div>
                   <div className="text-[11.5px] text-ink-muted">
-                    Đăng ký để lưu việc làm yêu thích và ứng tuyển nhanh hơn
+                    {t('home.noAccountDesc')}
                   </div>
                 </div>
                 <a href="/dang-nhap" className="tvl-btn-primary !w-auto px-4 py-2 text-xs">
-                  Đăng ký
+                  {t('home.register')}
                 </a>
               </div>
             )}
@@ -135,12 +145,17 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+        {/* Đợt 13 (24/09/2026) — 5 số liệu THẬT lấy từ jobsApi.homepageStats() (mục 7 danh sách
+            lỗi): trước đó 3/4 thẻ là số ảo hard-code ("2,4tr+", "9.600+", "18.200"), chỉ "Việc làm
+            đang tuyển" là thật. Thêm "Lượt ứng tuyển hôm nay" theo gợi ý — số liệu thật khác tính
+            được từ dữ liệu sẵn có (bảng applications). */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6">
           {[
-            ['2,4tr+', 'Thành viên'],
-            ['9.600+', 'Doanh nghiệp sử dụng'],
-            [facets ? facets.total.toLocaleString('vi-VN') : '—', 'Việc làm đang tuyển'],
-            ['18.200', 'Hồ sơ cập nhật / ngày'],
+            [stats ? formatNumber(stats.memberCount) : '—', 'Thành viên'],
+            [stats ? formatNumber(stats.companyCount) : '—', 'Doanh nghiệp sử dụng'],
+            [facets ? formatNumber(facets.total) : '—', 'Việc làm đang tuyển'],
+            [stats ? formatNumber(stats.profilesUpdatedToday) : '—', 'Hồ sơ cập nhật hôm nay'],
+            [stats ? formatNumber(stats.applicationsToday) : '—', 'Lượt ứng tuyển hôm nay'],
           ].map(([val, lbl]) => (
             <div key={lbl} className="rounded-xl border border-border bg-white p-4 text-center">
               <div className="font-mono font-extrabold text-lg tabular-nums">{val}</div>
@@ -150,28 +165,28 @@ export default function Home() {
         </div>
 
         <div className="flex items-center justify-between mt-9 mb-3">
-          <h2 className="font-extrabold text-lg">Việc làm mới nhất</h2>
+          <h2 className="font-extrabold text-lg">{t('home.latestJobs')}</h2>
           <a href="/viec-lam" className="text-primary text-xs font-bold">
-            Xem thêm →
+            {t('home.seeMore')}
           </a>
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
-          {jobs === null && <div className="text-ink-faint text-sm py-8">Đang tải việc làm...</div>}
-          {jobs?.length === 0 && <div className="text-ink-faint text-sm py-8">Chưa có tin tuyển dụng nào.</div>}
+          {jobs === null && <div className="text-ink-faint text-sm py-8">{t('home.loadingJobs')}</div>}
+          {jobs?.length === 0 && <div className="text-ink-faint text-sm py-8">{t('home.noJobs')}</div>}
           {jobs?.map((job) => <JobCard key={job.id} job={job} />)}
         </div>
 
         {facets && facets.industries.length > 0 && (
           <>
             <div className="flex items-center justify-between mt-9 mb-3">
-              <h2 className="font-extrabold text-lg">Ngành nghề nổi bật</h2>
+              <h2 className="font-extrabold text-lg">{t('home.topIndustries')}</h2>
               {facets.industries.length > HOME_SECTION_PREVIEW_COUNT && (
                 <button
                   type="button"
                   onClick={() => setShowAllIndustries((v) => !v)}
                   className="text-primary text-xs font-bold"
                 >
-                  {showAllIndustries ? 'Thu gọn ↑' : 'Xem tất cả →'}
+                  {showAllIndustries ? t('home.collapse') : t('home.showAll')}
                 </button>
               )}
             </div>
@@ -222,7 +237,7 @@ export default function Home() {
         )}
 
         <div className="mt-10 pt-4 border-t border-border text-[11.3px] text-ink-faint flex flex-wrap justify-between gap-2">
-          <span>© 2026 Tuyển Dụng Việc Làm · tuyendungvieclam.vn</span>
+          <span>© 2026 Tuyển Dụng Việc Làm · tuyendungvieclam</span>
           <span>Về chúng tôi · Điều khoản · Bảo mật · Liên hệ</span>
         </div>
       </div>

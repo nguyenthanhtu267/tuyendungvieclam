@@ -73,7 +73,10 @@ const TOC = [
   { id: 'muc-13', key: 'references', label: 'Người tham khảo' },
 ] as const;
 
-const REQUIRED_KEYS = ['profileTitle', 'personalInfo', 'careerInfo', 'experiences', 'educations', 'skills'];
+// Đợt 13 (24/09/2026) — chỉ còn 3 mục bắt buộc (đồng bộ với REQUIRED_SECTIONS ở
+// apps/api/src/candidates/profile.service.ts): Tiêu đề hồ sơ, Thông tin cá nhân, Kinh nghiệm làm
+// việc. Các mục còn lại không bắt buộc.
+const REQUIRED_KEYS = ['profileTitle', 'personalInfo', 'experiences'];
 
 function fmtDate(v?: string | null) {
   if (!v) return '';
