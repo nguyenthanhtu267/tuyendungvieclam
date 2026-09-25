@@ -1704,6 +1704,20 @@ function AddJobForm({
   const [form, setForm] = useState<JobWizardFormState>(JOB_WIZARD_INITIAL);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Đợt 17j (25/09/2026) — theo phản hồi người dùng: sau khi Trích xuất (Cách 1) hay Tách nội dung
+  // (Cách 2) điền xong, các mục "Mô tả công việc" (Bước 2) và "Hạn nộp" (Bước 3) nằm ở bước SAU bước
+  // đang đứng (Bước 1) nên KHÔNG hiện ngay — dễ khiến Admin tưởng "không cào được" dù đã điền đúng.
+  // `autoFillSummary` liệt kê rõ những mục vừa tự động điền được, hiển thị ngay phía trên "Cách 3".
+  const [autoFillSummary, setAutoFillSummary] = useState<string[] | null>(null);
+  const wizardRef = useRef<HTMLDivElement>(null);
+
+  // Nhảy thẳng tới Bước 4 "Xem trước & gửi" (đã có sẵn trong wizard, tổng hợp MỌI trường trong 1 màn
+  // hình) + cuộn tới đúng khung đó, để Admin thấy ngay kết quả cào/dán mà không phải tự bấm "Tiếp tục"
+  // qua từng bước. Cấu trúc/thứ tự 4 bước KHÔNG đổi — chỉ đổi bước wizard MỞ SẴN sau khi tự động điền.
+  function jumpToPreview() {
+    setStep(3);
+    requestAnimationFrame(() => wizardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
 
   function handleQuickPaste() {
     if (!quickPasteText.trim()) return;
@@ -1721,12 +1735,23 @@ function AddJobForm({
       salaryMax: parsed.salaryMax != null ? String(parsed.salaryMax) : f.salaryMax,
     }));
     setQuickPasteDone(true);
+    const filled: string[] = [];
+    if (parsed.title) filled.push('Chức danh');
+    if (parsed.description) filled.push('Mô tả công việc');
+    if (parsed.requirements) filled.push('Yêu cầu ứng viên');
+    if (parsed.benefits) filled.push('Quyền lợi được hưởng');
+    if (parsed.address) filled.push('Địa chỉ');
+    if (parsed.contactNote) filled.push('Thông tin khác');
+    if (parsed.salaryMin != null || parsed.salaryMax != null) filled.push('Lương');
+    setAutoFillSummary(filled.length ? filled : null);
+    if (filled.length) jumpToPreview();
   }
 
   async function handleExtract() {
     if (!url.trim()) return;
     setExtracting(true);
     setExtractWarning('');
+    setAutoFillSummary(null);
     try {
       const res = await adminApi.extractJobFromUrl(token, url.trim());
       if (res.found) {
@@ -1746,6 +1771,18 @@ function AddJobForm({
           deadline: res.data.deadline || f.deadline,
         }));
         setSourceUrl(url.trim());
+        const filled: string[] = [];
+        if (res.data.title) filled.push('Chức danh');
+        if (guess?.provinces.length || guess?.leftover) filled.push('Địa điểm / Địa chỉ');
+        if (res.data.employmentType) filled.push('Hình thức làm việc');
+        if (res.data.salaryMin != null || res.data.salaryMax != null) filled.push('Lương');
+        if (res.data.description) filled.push('Mô tả công việc');
+        if (res.data.deadline) filled.push('Hạn nộp');
+        setAutoFillSummary(filled.length ? filled : null);
+        if (filled.length) jumpToPreview();
+        if (!filled.length) {
+          setExtractWarning('Trang nguồn không có trường nào đọc được — vui lòng nhập tay bên dưới.');
+        }
       } else {
         setSourceUrl(url.trim());
         setExtractWarning(res.warning ?? 'Không trích xuất được — vui lòng nhập tay bên dưới.');
@@ -1865,17 +1902,33 @@ function AddJobForm({
       <div className="text-[11px] font-bold text-ink-faint mt-3 mb-1.5">
         Cách 3 — Kiểm tra lại/nhập tay rồi lưu (luôn xem lại nội dung trước khi đăng)
       </div>
-      <JobWizardSteps
-        form={form}
-        setForm={setForm}
-        step={step}
-        setStep={setStep}
-        error={error}
-        submitting={busy}
-        onSubmit={handleSubmit}
-        submitLabel="Đăng tin (hiển thị công khai ngay) →"
-        previewNote='Kiểm tra lại thông tin ở 3 bước trước — tin này do Admin tạo hộ nên hiển thị CÔNG KHAI NGAY, không qua hàng đợi chờ duyệt như tin NTD tự đăng.'
-      />
+      {/* Đợt 17j — tóm tắt các mục vừa tự động điền được từ Cách 1/Cách 2, kèm nhắc rõ wizard đã tự
+          nhảy tới Bước 4 "Xem trước & gửi" bên dưới (nơi duy nhất gộp đủ mọi trường trong 1 màn hình)
+          để Admin không phải tự bấm "Tiếp tục" qua từng bước mới thấy hết những gì vừa điền. */}
+      {autoFillSummary && (
+        <div className="rounded-lg bg-success-tint text-success text-[11.5px] font-semibold px-3 py-2 mb-2">
+          ✓ Đã tự động điền: {autoFillSummary.join(', ')} — đang mở sẵn ở bước &quot;Xem trước &amp; gửi&quot; bên
+          dưới để kiểm tra nhanh, bấm vào từng số bước phía trên nếu cần sửa lại chi tiết.
+        </div>
+      )}
+      <div ref={wizardRef}>
+        <JobWizardSteps
+          form={form}
+          setForm={setForm}
+          step={step}
+          setStep={(u) => {
+            setStep(u);
+            // Admin tự bấm điều hướng bước (thay vì đọc banner tóm tắt) — ẩn banner để đỡ rối, không
+            // ảnh hưởng gì tới dữ liệu form đã điền.
+            setAutoFillSummary(null);
+          }}
+          error={error}
+          submitting={busy}
+          onSubmit={handleSubmit}
+          submitLabel="Đăng tin (hiển thị công khai ngay) →"
+          previewNote='Kiểm tra lại thông tin ở 3 bước trước — tin này do Admin tạo hộ nên hiển thị CÔNG KHAI NGAY, không qua hàng đợi chờ duyệt như tin NTD tự đăng.'
+        />
+      </div>
     </div>
   );
 }
