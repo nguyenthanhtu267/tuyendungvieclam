@@ -200,7 +200,9 @@ export default function AdminSuaTinPage() {
           <div className="rounded-xl bg-white border border-border p-6 flex flex-col gap-5">
             {error && <div className="rounded-lg bg-critical-tint text-critical text-sm px-3 py-2.5">{error}</div>}
 
-            <h2 className="font-bold text-sm">Thông tin vị trí</h2>
+            {/* Đợt 17f — id neo (#f-co-ban) để trang Xem tin có thể nhảy thẳng vào đúng khối này khi
+                Admin bấm "✏️ Sửa" cạnh khối "Thông tin cơ bản" thay vì phải cuộn tìm. */}
+            <h2 id="f-co-ban" className="font-bold text-sm scroll-mt-20">Thông tin vị trí</h2>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Chức danh">
                 <input className="tvl-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
@@ -289,17 +291,17 @@ export default function AdminSuaTinPage() {
             </Field>
 
             <h2 className="font-bold text-sm border-t border-border pt-5">Mô tả & yêu cầu</h2>
-            <Field label="Mô tả công việc">
+            <Field id="f-mo-ta" label="Mô tả công việc">
               <RichTextEditor value={form.description} onChange={(html) => setForm({ ...form, description: html })} minHeight={200} />
             </Field>
-            <Field label="Yêu cầu ứng viên">
+            <Field id="f-yeu-cau" label="Yêu cầu ứng viên">
               <RichTextEditor value={form.requirements} onChange={(html) => setForm({ ...form, requirements: html })} minHeight={200} />
             </Field>
 
             {/* Đợt 13 (24/09/2026) — "Quyền lợi được hưởng" chuyển lên ngay sau "Yêu cầu ứng viên",
                 đồng bộ với wizard Đăng tin NTD.
                 Đợt 14 (25/09/2026) — mục 15: đổi sang RichTextEditor, đồng bộ với wizard Đăng tin NTD. */}
-            <Field label="Quyền lợi được hưởng" hint="Gõ tự do, hoặc bấm gợi ý bên dưới để chèn thêm">
+            <Field id="f-phuc-loi" label="Quyền lợi được hưởng" hint="Gõ tự do, hoặc bấm gợi ý bên dưới để chèn thêm">
               <RichTextEditor
                 value={form.benefits}
                 onChange={(html) => setForm({ ...form, benefits: html })}
@@ -327,7 +329,7 @@ export default function AdminSuaTinPage() {
                 lên TRƯỚC, "Thông tin liên hệ" (3 trường có cấu trúc) xuống SAU.
                 Đợt 16 (25/09/2026) — mục 20 danh sách lỗi: đồng bộ với wizard Đăng tin NTD, bỏ hint
                 "— ghi chú tự do" và đổi placeholder sang gợi ý nội dung thực tế. */}
-            <div className="border-t border-border pt-4 flex flex-col gap-3">
+            <div id="f-lien-he" className="border-t border-border pt-4 flex flex-col gap-3 scroll-mt-20">
               <Field label="Thông tin khác" hint="không bắt buộc">
                 <RichTextEditor
                   value={form.contactNote}
@@ -352,11 +354,11 @@ export default function AdminSuaTinPage() {
               </Field>
             </div>
 
-            <Field label="Job tags / Kỹ năng (không bắt buộc)" hint="Nhập rồi Enter">
+            <Field id="f-tags" label="Job tags / Kỹ năng (không bắt buộc)" hint="Nhập rồi Enter">
               <ChipsInput value={form.tags} onChange={(v) => setForm({ ...form, tags: v })} placeholder="Nhập rồi Enter" />
             </Field>
 
-            <h2 className="font-bold text-sm border-t border-border pt-5">Hạn nộp hồ sơ</h2>
+            <h2 id="f-han-nop" className="font-bold text-sm border-t border-border pt-5 scroll-mt-20">Hạn nộp hồ sơ</h2>
             <Field label="Hạn nộp hồ sơ">
               <input type="date" className="tvl-input" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} />
             </Field>
@@ -376,9 +378,9 @@ export default function AdminSuaTinPage() {
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({ id, label, hint, children }: { id?: string; label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <label className="flex flex-col gap-1.5">
+    <label id={id} className={id ? 'flex flex-col gap-1.5 scroll-mt-20' : 'flex flex-col gap-1.5'}>
       <span className="text-xs font-bold text-ink">
         {label} {hint && <span className="font-normal text-ink-faint">({hint})</span>}
       </span>

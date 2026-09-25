@@ -129,7 +129,14 @@ export default function AdminJobReviewPage() {
               <div className="text-[11px] font-bold text-ink-faint uppercase tracking-wide mb-1">
                 {job.approvalStatus === 'pending' ? 'Đang chờ duyệt' : job.approvalStatus}
               </div>
-              <h1 className="font-extrabold text-lg mb-1">{job.title}</h1>
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <h1 className="font-extrabold text-lg">{job.title}</h1>
+                {/* Đợt 17f (25/09/2026) — theo yêu cầu người dùng ("mỗi khối nội dung đều có phần
+                    edit riêng để sửa bài đăng, chứ không riêng sửa tiêu đề"): mỗi khối nội dung ở
+                    trang xem tin này giờ có nút "✏️ Sửa" RIÊNG, nhảy thẳng vào đúng khối đó ở trang
+                    sửa tin (dùng anchor #id) thay vì chỉ có 1 nút "Sửa tin" chung ở thanh trên cùng. */}
+                {job && !done && <BlockEditLink jobId={params.id} anchor="f-co-ban" />}
+              </div>
               <div className="text-sm text-ink-muted font-semibold mb-4">{job.company?.name}</div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-[12.5px] mb-4">
@@ -145,31 +152,51 @@ export default function AdminJobReviewPage() {
                 <Detail label="🕒 Gửi lúc" value={formatDate(job.createdAt)} />
               </div>
 
-              {/* Đợt 14 (25/09/2026) — mục 15: `benefits` nay là rich text tự do (HTML). */}
-              {job.benefits && (
-                <div className="mb-4">
-                  <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Phúc lợi</div>
+              {/* Đợt 14 (25/09/2026) — mục 15: `benefits` nay là rich text tự do (HTML).
+                  Đợt 17f — khối giờ LUÔN hiện (kể cả khi rỗng) kèm nút Sửa, để Admin còn cách bấm vào
+                  điền thêm khi tin bị thiếu mục này (thay vì cả khối biến mất không có lối vào). */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-bold text-primary uppercase tracking-wide">Phúc lợi</div>
+                  <BlockEditLink jobId={params.id} anchor="f-phuc-loi" show={!!job && !done} />
+                </div>
+                {job.benefits ? (
                   <RichTextView value={benefitsRichTextValue(job.benefits)} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
-                </div>
-              )}
+                ) : (
+                  <div className="text-[12.5px] text-ink-faint italic">— Chưa có, bấm "Sửa" để thêm</div>
+                )}
+              </div>
 
-              {job.description && (
-                <div className="mb-4">
-                  <h3 className="font-bold text-sm mb-2">Mô tả công việc</h3>
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-bold text-sm">Mô tả công việc</h3>
+                  <BlockEditLink jobId={params.id} anchor="f-mo-ta" show={!!job && !done} />
+                </div>
+                {job.description ? (
                   <RichTextView value={job.description} className="text-[12.8px] text-ink-muted" />
-                </div>
-              )}
+                ) : (
+                  <div className="text-[12.5px] text-ink-faint italic">— Chưa có, bấm "Sửa" để thêm</div>
+                )}
+              </div>
 
-              {job.requirements && (
-                <div className={job.tags && job.tags.length > 0 ? 'mb-4' : ''}>
-                  <h3 className="font-bold text-sm mb-2">Yêu cầu ứng viên</h3>
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-bold text-sm">Yêu cầu ứng viên</h3>
+                  <BlockEditLink jobId={params.id} anchor="f-yeu-cau" show={!!job && !done} />
+                </div>
+                {job.requirements ? (
                   <RichTextView value={job.requirements} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
-                </div>
-              )}
+                ) : (
+                  <div className="text-[12.5px] text-ink-faint italic">— Chưa có, bấm "Sửa" để thêm</div>
+                )}
+              </div>
 
-              {job.tags && job.tags.length > 0 && (
-                <div className={(job.contactName || job.contactEmail || job.contactPhone) ? 'mb-4' : ''}>
-                  <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Job tags / Skills</div>
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-bold text-primary uppercase tracking-wide">Job tags / Skills</div>
+                  <BlockEditLink jobId={params.id} anchor="f-tags" show={!!job && !done} />
+                </div>
+                {job.tags && job.tags.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
                     {job.tags.map((t) => (
                       <span key={t} className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full bg-surface-alt text-ink-muted">
@@ -177,32 +204,42 @@ export default function AdminJobReviewPage() {
                       </span>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="text-[12.5px] text-ink-faint italic">— Chưa có, bấm "Sửa" để thêm</div>
+                )}
+              </div>
 
               {/* Đợt 12aa (24/09/2026) — "Thông tin liên hệ": Admin nên thấy khi duyệt để đối chiếu
                   chống lừa đảo (VD email/SĐT liên hệ khác hẳn công ty đăng ký).
-                  Đợt 14 (25/09/2026) — mục 15: thêm `contactNote` (rich text tự do) song song. */}
-              {(job.contactName || job.contactEmail || job.contactPhone || job.contactNote) && (
-                <div>
-                  <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Thông tin liên hệ</div>
-                  {(job.contactName || job.contactEmail || job.contactPhone) && (
-                    <ul className="text-[12.8px] text-ink-muted leading-loose list-disc pl-5">
-                      {job.contactName && <li>Người liên hệ: {job.contactName}</li>}
-                      {job.contactEmail && <li>Email: {job.contactEmail}</li>}
-                      {job.contactPhone && <li>Điện thoại: {job.contactPhone}</li>}
-                    </ul>
-                  )}
-                  {job.contactNote && (
-                    <RichTextView
-                      value={job.contactNote}
-                      className={`text-[12.8px] text-ink-muted leading-loose${
-                        job.contactName || job.contactEmail || job.contactPhone ? ' mt-2' : ''
-                      }`}
-                    />
-                  )}
+                  Đợt 14 (25/09/2026) — mục 15: thêm `contactNote` (rich text tự do) song song.
+                  Đợt 17f — khối giờ LUÔN hiện kèm nút Sửa (xem lý do ở khối Phúc lợi phía trên). */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-bold text-primary uppercase tracking-wide">Thông tin liên hệ</div>
+                  <BlockEditLink jobId={params.id} anchor="f-lien-he" show={!!job && !done} />
                 </div>
-              )}
+                {job.contactName || job.contactEmail || job.contactPhone || job.contactNote ? (
+                  <>
+                    {(job.contactName || job.contactEmail || job.contactPhone) && (
+                      <ul className="text-[12.8px] text-ink-muted leading-loose list-disc pl-5">
+                        {job.contactName && <li>Người liên hệ: {job.contactName}</li>}
+                        {job.contactEmail && <li>Email: {job.contactEmail}</li>}
+                        {job.contactPhone && <li>Điện thoại: {job.contactPhone}</li>}
+                      </ul>
+                    )}
+                    {job.contactNote && (
+                      <RichTextView
+                        value={job.contactNote}
+                        className={`text-[12.8px] text-ink-muted leading-loose${
+                          job.contactName || job.contactEmail || job.contactPhone ? ' mt-2' : ''
+                        }`}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <div className="text-[12.5px] text-ink-faint italic">— Chưa có, bấm "Sửa" để thêm</div>
+                )}
+              </div>
             </div>
 
             {/* Đợt 12x (21/09/2026) — nếu tin này TỪNG bị Admin (có thể là lần trước) từ chối và NTD
@@ -319,5 +356,18 @@ function Detail({ label, value }: { label: string; value: string }) {
       <div className="text-ink-faint text-[11px] mb-0.5">{label}</div>
       <div className="font-semibold">{value}</div>
     </div>
+  );
+}
+
+// Đợt 17f (25/09/2026) — nút "Sửa" riêng cho từng khối nội dung của tin, nhảy thẳng tới đúng khối
+// đó ở trang /admin/sua-tin/[id] bằng anchor (#f-co-ban, #f-phuc-loi, #f-mo-ta, #f-yeu-cau, #f-tags,
+// #f-lien-he — các id này được đặt sẵn trên trang sửa tin, kèm scroll-mt-20 để không bị thanh sticky
+// trên cùng che mất khi cuộn tới).
+function BlockEditLink({ jobId, anchor, show = true }: { jobId: string; anchor: string; show?: boolean }) {
+  if (!show) return null;
+  return (
+    <a href={`/admin/sua-tin/${jobId}#${anchor}`} className="text-[11px] font-semibold text-primary hover:underline shrink-0">
+      ✏️ Sửa
+    </a>
   );
 }

@@ -1400,15 +1400,17 @@ function CompanyDetailPanel({
                       <span className="text-ink-faint">{formatSalary(j.salaryMin, j.salaryMax)}</span>
                       {/* Đợt 17e — trước đây dòng tin ở đây chỉ hiển thị, không có cách nào sửa các
                           trường (lương/địa điểm/hình thức/hạn nộp/...) của tin đã cào từ nguồn ngoài
-                          ngay trong màn "Quản lý" công ty. Nay thêm link sang trang sửa tin admin có
-                          sẵn (đã dùng ở hàng đợi Duyệt tin) để sửa được TẤT CẢ các mục. */}
+                          ngay trong màn "Quản lý" công ty.
+                          Đợt 17f — theo lựa chọn người dùng: bấm vào tin phải ra trang XEM đầy đủ,
+                          đúng bố cục thật, MỖI khối nội dung có nút Sửa riêng cạnh khối đó — không
+                          nhảy thẳng vào form sửa chung nữa (đổi từ /admin/sua-tin sang /admin/xem-tin). */}
                       <a
-                        href={`/admin/sua-tin/${j.id}`}
+                        href={`/admin/xem-tin/${j.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-block text-[11px] font-bold rounded-md bg-surface-alt text-ink px-2 py-1"
                       >
-                        ✏️ Sửa
+                        👁️ Xem / Sửa
                       </a>
                     </span>
                   </div>
