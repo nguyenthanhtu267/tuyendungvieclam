@@ -490,6 +490,27 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     return saved;
   }
 
+  // Đợt 16 (25/09/2026) — mục 22b danh sách lỗi: công cụ Admin tìm & gán logo công ty thủ công (theo
+  // yêu cầu người dùng: "tìm theo tên công ty giúp tôi nếu tìm ra được logo của công ty đó thì thêm
+  // vào luôn"). Dùng chung màn hình tìm công ty theo tên đã có sẵn (searchCompanies, Batch 5 mục #1)
+  // — Admin tự mở tìm ảnh (FE mở tab Google Images) rồi dán URL logo thật vào đây để lưu. Không giới
+  // hạn approvalStatus, không validate URL nghiêm ngặt (chấp nhận link ảnh từ bất kỳ nguồn công khai
+  // nào) — chỉ trim + cho phép xoá trắng (đặt lại rỗng để quay về favicon tự động/initials).
+  async updateCompanyLogo(admin: AdminActor, id: string, logoUrl: string) {
+    const company = await this.companyRepo.findOne({ where: { id } });
+    if (!company) throw new NotFoundException('Không tìm thấy công ty');
+    company.logoUrl = logoUrl.trim() || undefined;
+    const saved = await this.companyRepo.save(company);
+    await this.logAction(
+      admin,
+      'company.update_logo',
+      'company',
+      company.id,
+      `${company.name} → ${saved.logoUrl ? 'cập nhật logo' : 'xoá logo (quay về tự động/initials)'}`,
+    );
+    return saved;
+  }
+
   // ===== Đợt 12a (20/09/2026) — Admin hỗ trợ đặt lại mật khẩu =====
   // Giai đoạn 1 không có email/SMS (quyết định phạm vi ban đầu) nên không tự phục vụ "quên mật
   // khẩu" qua email được — thay vào đó Admin tra cứu tài khoản theo email rồi đặt lại mật khẩu

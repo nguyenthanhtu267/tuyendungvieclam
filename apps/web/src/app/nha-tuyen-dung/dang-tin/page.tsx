@@ -519,13 +519,17 @@ function DangTinInner() {
                   trường có cấu trúc, để NTD ghi chú thêm mà vẫn giữ link tự động mailto:/tel:.
                   Đợt 15 (25/09/2026) — theo yêu cầu người dùng, đổi thứ tự: "Thông tin khác" (ô rich
                   text) lên TRƯỚC, "Thông tin liên hệ" (3 trường có cấu trúc) xuống SAU — trước đó
-                  đang ngược lại (Thông tin liên hệ trước, Thông tin khác sau). */}
+                  đang ngược lại (Thông tin liên hệ trước, Thông tin khác sau).
+                  Đợt 16 (25/09/2026) — mục 20 danh sách lỗi: theo yêu cầu người dùng, bỏ phần hint
+                  "— ghi chú tự do" (chỉ còn "không bắt buộc") và đổi placeholder từ gợi ý tiêu đề
+                  email sang gợi ý nội dung thực tế nên ghi ("Bằng cấp, độ tuổi, giới tính, chứng chỉ
+                  đặc thù, chế độ phúc lợi, mức lương…"). */}
               <div className="border-t border-border pt-4 flex flex-col gap-3">
-                <Field label="Thông tin khác" hint="không bắt buộc — ghi chú tự do">
+                <Field label="Thông tin khác" hint="không bắt buộc">
                   <RichTextEditor
                     value={form.contactNote}
                     onChange={(html) => setForm({ ...form, contactNote: html })}
-                    placeholder="VD: Vui lòng ghi rõ tiêu đề email là 'Ứng tuyển [vị trí] - [Họ tên]'..."
+                    placeholder="VD: Bằng cấp, độ tuổi, giới tính, chứng chỉ đặc thù, chế độ phúc lợi, mức lương…"
                     minHeight={120}
                   />
                 </Field>

@@ -7,6 +7,7 @@ import { CandidateProfile } from '../database/entities/candidate-profile.entity'
 import { CandidateSkill } from '../database/entities/candidate-sections.entity';
 import { Application } from '../database/entities/application.entity';
 import { ListJobsDto, POSTED_WITHIN_DAYS } from './dto/list-jobs.dto';
+import { resolveCompanyLogoUrl } from '../common/company-logo.util';
 
 // Đợt 12ab (24/09/2026) — "Đánh giá mức độ tương thích" (radar chart, theo mẫu careerviet.vn): thứ
 // tự PHẢI khớp EXPERIENCE_LEVELS ở apps/web/src/lib/catalogs.ts (backend không import được catalogs
@@ -107,6 +108,17 @@ export class JobsService {
     return qb;
   }
 
+  // Đợt 16 (25/09/2026) — mục 22a danh sách lỗi: áp dụng favicon tự động (resolveCompanyLogoUrl) cho
+  // mọi tin trả về có kèm `company` — công ty nào đã dán logoUrl thủ công thì giữ nguyên, chỉ công
+  // ty CHƯA có logoUrl mới được gán favicon theo website làm ảnh tạm. Sửa thẳng trên entity đã fetch
+  // (an toàn vì không ghi lại vào CSDL, chỉ ảnh hưởng dữ liệu trả về cho client).
+  private applyLogoFallback(jobs: JobPosting[]) {
+    for (const job of jobs) {
+      if (job.company) job.company.logoUrl = resolveCompanyLogoUrl(job.company);
+    }
+    return jobs;
+  }
+
   async findAll(query: ListJobsDto) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 10;
@@ -119,6 +131,7 @@ export class JobsService {
       .take(pageSize);
 
     const [items, total] = await qb.getManyAndCount();
+    this.applyLogoFallback(items);
 
     return {
       items,
@@ -145,6 +158,7 @@ export class JobsService {
       .orderBy('job.createdAt', 'DESC')
       .take(3)
       .getMany();
+    this.applyLogoFallback([job, ...related]);
 
     // Đợt 12p (21/09/2026) — mỗi lượt xem trang chi tiết công khai +1 view_count (dùng cho thống kê
     // "Lượt xem"/"Tỷ lệ chuyển đổi" của NTD). Không await trước khi trả kết quả để không làm chậm
@@ -233,7 +247,7 @@ export class JobsService {
         name: c.name,
         industry: c.industry,
         size: c.size,
-        logoUrl: c.logoUrl,
+        logoUrl: resolveCompanyLogoUrl(c),
         jobCount: await this.jobRepo.count({ where: { companyId: c.id, approvalStatus: JobApprovalStatus.APPROVED } }),
       })),
     );

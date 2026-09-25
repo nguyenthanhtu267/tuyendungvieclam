@@ -123,6 +123,16 @@ export class AdminController {
     return this.adminService.toggleFeaturedEmployer(admin, id);
   }
 
+  // Đợt 16 (25/09/2026) — mục 22b: công cụ Admin tìm & gán logo công ty thủ công.
+  @Patch('companies/:id/logo')
+  updateCompanyLogo(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+    @Body('logoUrl') logoUrl: string,
+  ) {
+    return this.adminService.updateCompanyLogo(admin, id, logoUrl ?? '');
+  }
+
   @Patch('companies/:id/approve')
   approveCompany(@CurrentUser() admin: { userId: string; email: string }, @Param('id') id: string) {
     return this.adminService.setCompanyStatus(admin, id, CompanyApprovalStatus.APPROVED);

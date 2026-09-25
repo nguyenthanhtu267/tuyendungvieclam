@@ -16,6 +16,7 @@ import {
 import { formatDate, formatDateTime, formatSalary, formatCurrency, formatNumber, PAYMENT_METHOD_LABEL } from '@/lib/format';
 import ChangePasswordCard from '@/components/ChangePasswordCard';
 import { scanJobContent } from '@/lib/content-moderation';
+import { CompanyLogo } from '@/components/CompanyLogo';
 
 // Đợt 12f (21/09/2026) — bổ sung mục "Đổi mật khẩu" tự phục vụ cho Admin, còn thiếu sót ở Đợt
 // 12a (lúc đó chỉ làm cho Ứng viên và Nhà tuyển dụng). Trước khi có mục này, Admin chỉ có thể
@@ -741,12 +742,29 @@ function FeaturedEmployersCard({ token }: { token: string }) {
     }
   }
 
+  // Đợt 16 (25/09/2026) — mục 22b danh sách lỗi: dùng chung màn hình tìm công ty theo tên (đã có sẵn
+  // cho việc bật/tắt "Doanh nghiệp yêu thích") để thêm công cụ "tìm & gán logo" thủ công — theo yêu
+  // cầu người dùng ("tìm theo tên công ty giúp tôi nếu tìm ra được logo của công ty đó thì thêm vào
+  // luôn"). Công ty chưa dán logoUrl thủ công đang tự động hiện favicon theo website (mục 22a) —
+  // dùng ô này để thay bằng logo thật đẹp hơn khi cần.
+  async function handleSaveLogo(id: string, logoUrl: string) {
+    setBusyId(id);
+    try {
+      const updated = await adminApi.updateCompanyLogo(token, id, logoUrl);
+      setCompanies((prev) => prev?.map((c) => (c.id === id ? updated : c)) ?? prev);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <>
-      <h1 className="font-bold text-base mb-1">Doanh nghiệp yêu thích</h1>
+      <h1 className="font-bold text-base mb-1">Doanh nghiệp yêu thích &amp; Logo công ty</h1>
       <div className="text-xs text-ink-faint mb-4 max-w-2xl">
-        Công ty được đánh dấu sẽ hiện huy hiệu &ldquo;Nhà tuyển dụng nổi bật&rdquo; và xuất hiện trong bộ lọc cùng tên
-        ở trang tìm việc công khai.
+        Công ty được đánh dấu &ldquo;yêu thích&rdquo; sẽ hiện huy hiệu &ldquo;Nhà tuyển dụng nổi bật&rdquo; và xuất
+        hiện trong bộ lọc cùng tên ở trang tìm việc công khai. Công ty chưa có logo sẽ tự động hiện favicon theo
+        website đã lưu (nếu có) — dùng nút &ldquo;Tìm ảnh&rdquo; bên dưới để mở tìm logo thật trên Google Images
+        rồi dán URL vào ô, bấm Lưu để thay bằng logo đẹp hơn.
       </div>
       <form
         onSubmit={(e) => {
@@ -779,12 +797,13 @@ function FeaturedEmployersCard({ token }: { token: string }) {
                   <th className="py-2.5 px-4 font-semibold">Tên công ty</th>
                   <th className="py-2.5 px-3 font-semibold">Ngành nghề</th>
                   <th className="py-2.5 px-3 font-semibold">Trạng thái duyệt</th>
+                  <th className="py-2.5 px-3 font-semibold">Logo</th>
                   <th className="py-2.5 px-4 font-semibold text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 {companies.map((c) => (
-                  <tr key={c.id} className="border-t border-border">
+                  <tr key={c.id} className="border-t border-border align-top">
                     <td className="py-3 px-4 font-bold">
                       {c.name}
                       {c.isFeaturedEmployer && (
@@ -795,6 +814,13 @@ function FeaturedEmployersCard({ token }: { token: string }) {
                     </td>
                     <td className="py-3 px-3 text-ink-faint">{c.industry ?? '—'}</td>
                     <td className="py-3 px-3 text-ink-faint">{c.approvalStatus ?? '—'}</td>
+                    <td className="py-3 px-3">
+                      <CompanyLogoEditor
+                        company={c}
+                        busy={busyId === c.id}
+                        onSave={(url) => handleSaveLogo(c.id, url)}
+                      />
+                    </td>
                     <td className="py-3 px-4 text-right whitespace-nowrap">
                       <button
                         disabled={busyId === c.id}
@@ -814,6 +840,61 @@ function FeaturedEmployersCard({ token }: { token: string }) {
         </div>
       )}
     </>
+  );
+}
+
+// Đợt 16 (25/09/2026) — mục 22b: ô sửa logo riêng cho từng dòng công ty (state input tách biệt khỏi
+// danh sách chính để gõ URL không làm re-render/mất focus cả bảng). Nút "Tìm ảnh" mở tìm kiếm Google
+// Images theo ĐÚNG tên công ty ở tab mới — Admin tự xem & chọn ảnh phù hợp, copy URL ảnh rồi dán vào
+// ô bên dưới (không tự động tải/xác nhận thay Admin vì cần con người kiểm tra đúng logo thật).
+function CompanyLogoEditor({
+  company,
+  busy,
+  onSave,
+}: {
+  company: Company;
+  busy: boolean;
+  onSave: (logoUrl: string) => void;
+}) {
+  const [value, setValue] = useState(company.logoUrl ?? '');
+
+  useEffect(() => {
+    setValue(company.logoUrl ?? '');
+  }, [company.logoUrl]);
+
+  const searchUrl = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(`${company.name} logo`)}`;
+
+  return (
+    <div className="flex items-center gap-2 min-w-[220px]">
+      <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={28} className="text-[9px] shrink-0" />
+      <div className="flex flex-col gap-1 flex-1">
+        <input
+          type="text"
+          placeholder="Dán URL ảnh logo…"
+          className="tvl-input text-[11px] !py-1"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <div className="flex items-center gap-2">
+          <a
+            href={searchUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10.5px] font-semibold text-primary hover:underline"
+          >
+            🔍 Tìm ảnh
+          </a>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onSave(value)}
+            className="text-[10.5px] font-bold rounded-md px-2 py-1 bg-primary-tint text-primary disabled:opacity-50"
+          >
+            Lưu
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

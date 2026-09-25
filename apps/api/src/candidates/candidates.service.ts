@@ -13,6 +13,7 @@ import { Company } from '../database/entities/company.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { BlockCompanyDto } from './dto/block-company.dto';
 import { SaveSearchDto } from './dto/save-search.dto';
+import { resolveCompanyLogoUrl } from '../common/company-logo.util';
 import { ProfileService } from './profile.service';
 
 const CV_MAX_BYTES = 2 * 1024 * 1024; // 2MB — theo Mục 9 SRS
@@ -142,11 +143,16 @@ export class CandidatesService {
 
   async listSavedJobs(userId: string) {
     const profile = await this.getOwnProfile(userId);
-    return this.savedJobRepo.find({
+    const rows = await this.savedJobRepo.find({
       where: { candidateProfileId: profile.id },
       relations: { jobPosting: { company: true } },
       order: { createdAt: 'DESC' },
     });
+    // Đợt 16 (25/09/2026) — mục 22a danh sách lỗi: favicon tự động theo website khi chưa có logoUrl.
+    for (const r of rows) {
+      if (r.jobPosting?.company) r.jobPosting.company.logoUrl = resolveCompanyLogoUrl(r.jobPosting.company);
+    }
+    return rows;
   }
 
   async saveJob(userId: string, jobId: string) {
@@ -339,7 +345,7 @@ export class CandidatesService {
           name: r.company.name,
           industry: r.company.industry,
           size: r.company.size,
-          logoUrl: r.company.logoUrl,
+          logoUrl: resolveCompanyLogoUrl(r.company),
         },
       }));
   }
@@ -351,7 +357,12 @@ export class CandidatesService {
       relations: { company: true },
       order: { createdAt: 'DESC' },
     });
-    return rows.filter((r) => r.company);
+    const filtered = rows.filter((r) => r.company);
+    // Đợt 16 (25/09/2026) — mục 22a danh sách lỗi: favicon tự động theo website khi chưa có logoUrl.
+    for (const r of filtered) {
+      r.company.logoUrl = resolveCompanyLogoUrl(r.company);
+    }
+    return filtered;
   }
 
   async followCompany(userId: string, companyId: string) {

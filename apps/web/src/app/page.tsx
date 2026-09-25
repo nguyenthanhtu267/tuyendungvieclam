@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import SiteHeader from '@/components/SiteHeader';
 import OnlineBanner from '@/components/OnlineBanner';
@@ -9,7 +9,7 @@ import { jobsApi, type JobFacets, type JobPosting, type FeaturedEmployer, type H
 import { useAuth } from '@/lib/auth-context';
 import { PINNED_PROVINCES } from '@/lib/catalogs';
 import { CompanyLogo } from '@/components/CompanyLogo';
-import { formatNumber, formatRelativeTime } from '@/lib/format';
+import { formatNumber } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
 import { memberCountDisplay, profilesUpdatedTodayDisplay, applicationsTodayDisplay } from '@/lib/vanity-stats';
 
@@ -41,6 +41,18 @@ export default function Home() {
   const displayMemberCount = stats ? memberCountDisplay(stats.memberCount) : null;
   const displayProfilesUpdatedToday = stats ? profilesUpdatedTodayDisplay(stats.profilesUpdatedToday) : null;
   const displayApplicationsToday = stats ? applicationsTodayDisplay(stats.applicationsToday) : null;
+
+  // Đợt 16 (25/09/2026) — mục 21 danh sách lỗi: khối "Tin mới nhất" (trong "Hoạt động trực tuyến")
+  // trước đây hiện thời gian THẬT (formatRelativeTime) nên có thể ra "2 ngày trước" nếu lâu rồi
+  // không có tin mới hơn — theo yêu cầu người dùng, đổi sang số phút "hoa mỹ" ngẫu nhiên trong
+  // khoảng 1-15 phút trước (không phản ánh thời gian thật) để luôn tạo cảm giác web đang hoạt động
+  // liên tục. Người dùng chọn "cố định khi tải trang" (không tự làm mới liên tục) — tính 1 lần bằng
+  // useMemo, chỉ tính lại khi danh sách `jobs` thay đổi (tức là mỗi lần tải/làm mới trang), không
+  // đổi lại giữa các lần re-render khác của component.
+  const recentJobsMinutesAgo = useMemo(
+    () => (jobs ?? []).slice(0, 2).map(() => Math.floor(Math.random() * 15) + 1),
+    [jobs],
+  );
 
   useEffect(() => {
     jobsApi
@@ -203,11 +215,11 @@ export default function Home() {
                 )}
                 {jobs && jobs.length > 0 && (
                   <div className="flex flex-col gap-1.5">
-                    {jobs.slice(0, 2).map((j) => (
+                    {jobs.slice(0, 2).map((j, idx) => (
                       <div key={j.id} className="flex items-center justify-between gap-2 text-[11px]">
                         <span className="truncate font-semibold text-ink">{j.title}</span>
                         <span className="shrink-0 text-ink-faint">
-                          {formatRelativeTime(j.updatedAt ?? j.createdAt)}
+                          {recentJobsMinutesAgo[idx] ?? 1} phút trước
                         </span>
                       </div>
                     ))}

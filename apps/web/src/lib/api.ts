@@ -1078,6 +1078,13 @@ export const adminApi = {
     request<Company[]>(`/admin/companies?q=${encodeURIComponent(q)}`, { headers: authHeaders(token) }),
   toggleFeaturedEmployer: (token: string, id: string) =>
     request<Company>(`/admin/companies/${id}/toggle-featured`, { method: 'PATCH', headers: authHeaders(token) }),
+  // Đợt 16 (25/09/2026) — mục 22b: công cụ Admin tìm & gán logo công ty thủ công.
+  updateCompanyLogo: (token: string, id: string, logoUrl: string) =>
+    request<Company>(`/admin/companies/${id}/logo`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify({ logoUrl }),
+    }),
 
   // Đợt 12q (21/09/2026) — Batch 5 mục #3: chuỗi thời gian cho biểu đồ dashboard.
   statsTimeSeries: (token: string, days = 14) =>

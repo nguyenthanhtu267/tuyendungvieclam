@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Company } from '../database/entities/company.entity';
 import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
 import { CompanyFollow } from '../database/entities/company-follow.entity';
+import { resolveCompanyLogoUrl } from '../common/company-logo.util';
 
 // Đợt 12k (21/09/2026) — trang công ty công khai /cong-ty/[id]: bấm tên công ty trong tin tuyển
 // dụng sẽ tới đây, xem thông tin công ty + toàn bộ tin đang tuyển khác của công ty đó (giống
@@ -40,6 +41,13 @@ export class CompaniesService {
     // ty, đồng bộ với nút "+ Theo dõi" (viec-lam/[id]/page.tsx) và cong-ty/[id]/page.tsx.
     const followersCount = await this.followRepo.count({ where: { companyId: id } });
 
+    // Đợt 16 (25/09/2026) — mục 22a danh sách lỗi: favicon tự động theo website khi chưa có logoUrl
+    // thủ công — áp dụng cho cả logo công ty ở đầu trang lẫn từng tin trong `jobs` (mỗi tin có
+    // `company` lồng riêng, JobCard đọc trực tiếp `job.company.logoUrl`).
+    for (const job of jobs) {
+      if (job.company) job.company.logoUrl = resolveCompanyLogoUrl(job.company);
+    }
+
     return {
       company: {
         id: company.id,
@@ -48,7 +56,7 @@ export class CompaniesService {
         size: company.size,
         industry: company.industry,
         website: company.website,
-        logoUrl: company.logoUrl,
+        logoUrl: resolveCompanyLogoUrl(company),
         isFeaturedEmployer: company.isFeaturedEmployer,
         followersCount,
         // Đợt 12ac (24/09/2026) — "Giới thiệu công ty" cho tab Tổng quan công ty.

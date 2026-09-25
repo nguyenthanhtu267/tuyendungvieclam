@@ -321,13 +321,15 @@ export default function AdminSuaTinPage() {
                 Đợt 14 (25/09/2026) — mục 15: thêm "Thông tin khác" (rich text tự do) + chuyển khối này
                 lên TRƯỚC "Job tags / Kỹ năng", đồng bộ với wizard Đăng tin NTD.
                 Đợt 15 (25/09/2026) — theo yêu cầu người dùng, đổi thứ tự bên trong: "Thông tin khác"
-                lên TRƯỚC, "Thông tin liên hệ" (3 trường có cấu trúc) xuống SAU. */}
+                lên TRƯỚC, "Thông tin liên hệ" (3 trường có cấu trúc) xuống SAU.
+                Đợt 16 (25/09/2026) — mục 20 danh sách lỗi: đồng bộ với wizard Đăng tin NTD, bỏ hint
+                "— ghi chú tự do" và đổi placeholder sang gợi ý nội dung thực tế. */}
             <div className="border-t border-border pt-4 flex flex-col gap-3">
-              <Field label="Thông tin khác" hint="không bắt buộc — ghi chú tự do">
+              <Field label="Thông tin khác" hint="không bắt buộc">
                 <RichTextEditor
                   value={form.contactNote}
                   onChange={(html) => setForm({ ...form, contactNote: html })}
-                  placeholder="VD: Vui lòng ghi rõ tiêu đề email là 'Ứng tuyển [vị trí] - [Họ tên]'..."
+                  placeholder="VD: Bằng cấp, độ tuổi, giới tính, chứng chỉ đặc thù, chế độ phúc lợi, mức lương…"
                   minHeight={120}
                 />
               </Field>
