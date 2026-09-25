@@ -141,15 +141,6 @@ export default function XemTinNtdPage() {
                 <Detail label="👥 Số lượng" value={String(job.headcount)} />
               </div>
 
-              {/* Đợt 14 (25/09/2026) — mục 15: `benefits` nay là rich text tự do (HTML), không còn
-                  mảng chip — đồng bộ với trang chi tiết công khai /viec-lam/[id]. */}
-              {job.benefits && (
-                <div className="mt-5">
-                  <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Phúc lợi</div>
-                  <RichTextView value={benefitsRichTextValue(job.benefits)} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
-                </div>
-              )}
-
               {job.description && (
                 <div className="mt-5">
                   <h3 className="font-bold text-sm mb-2">Mô tả công việc</h3>
@@ -161,6 +152,17 @@ export default function XemTinNtdPage() {
                 <div className="mt-4">
                   <h3 className="font-bold text-sm mb-2">Yêu cầu ứng viên</h3>
                   <RichTextView value={job.requirements} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
+                </div>
+              )}
+
+              {/* Đợt 14 (25/09/2026) — mục 15: `benefits` nay là rich text tự do (HTML), không còn
+                  mảng chip — đồng bộ với trang chi tiết công khai /viec-lam/[id].
+                  Đợt 17i (25/09/2026) — theo yêu cầu người dùng: chuyển xuống SAU "Mô tả công việc"/
+                  "Yêu cầu ứng viên" để khớp đúng thứ tự nhập liệu ở wizard đăng tin. */}
+              {job.benefits && (
+                <div className="mt-4">
+                  <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Quyền lợi được hưởng</div>
+                  <RichTextView value={benefitsRichTextValue(job.benefits)} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
                 </div>
               )}
 

@@ -158,21 +158,6 @@ export default function AdminJobReviewPage() {
                 <Detail label="🕒 Gửi lúc" value={formatDate(job.createdAt)} />
               </div>
 
-              {/* Đợt 14 (25/09/2026) — mục 15: `benefits` nay là rich text tự do (HTML).
-                  Đợt 17f — khối giờ LUÔN hiện (kể cả khi rỗng) kèm nút Sửa, để Admin còn cách bấm vào
-                  điền thêm khi tin bị thiếu mục này (thay vì cả khối biến mất không có lối vào). */}
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs font-bold text-primary uppercase tracking-wide">Phúc lợi</div>
-                  <BlockEditLink jobId={params.id} step={1} show={!!job && !done} />
-                </div>
-                {job.benefits ? (
-                  <RichTextView value={benefitsRichTextValue(job.benefits)} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
-                ) : (
-                  <div className="text-[12.5px] text-ink-faint italic">— Chưa có, bấm "Sửa" để thêm</div>
-                )}
-              </div>
-
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-bold text-sm">Mô tả công việc</h3>
@@ -192,6 +177,23 @@ export default function AdminJobReviewPage() {
                 </div>
                 {job.requirements ? (
                   <RichTextView value={job.requirements} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
+                ) : (
+                  <div className="text-[12.5px] text-ink-faint italic">— Chưa có, bấm "Sửa" để thêm</div>
+                )}
+              </div>
+
+              {/* Đợt 14 (25/09/2026) — mục 15: `benefits` nay là rich text tự do (HTML).
+                  Đợt 17f — khối giờ LUÔN hiện (kể cả khi rỗng) kèm nút Sửa, để Admin còn cách bấm vào
+                  điền thêm khi tin bị thiếu mục này (thay vì cả khối biến mất không có lối vào).
+                  Đợt 17i (25/09/2026) — theo yêu cầu người dùng: chuyển xuống SAU "Mô tả công việc"/
+                  "Yêu cầu ứng viên" để khớp đúng thứ tự nhập liệu ở wizard đăng tin. */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-bold text-primary uppercase tracking-wide">Quyền lợi được hưởng</div>
+                  <BlockEditLink jobId={params.id} step={1} show={!!job && !done} />
+                </div>
+                {job.benefits ? (
+                  <RichTextView value={benefitsRichTextValue(job.benefits)} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
                 ) : (
                   <div className="text-[12.5px] text-ink-faint italic">— Chưa có, bấm "Sửa" để thêm</div>
                 )}

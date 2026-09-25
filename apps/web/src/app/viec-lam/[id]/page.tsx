@@ -370,17 +370,6 @@ function JobDetailInner() {
                     <Detail label="👥 Số lượng" value={String(job.headcount)} />
                   </div>
 
-                  {/* Đợt 14 (25/09/2026) — mục 15: "Quyền lợi được hưởng" nay là rich text tự do
-                      (HTML), hiển thị bằng RichTextView như Mô tả/Yêu cầu ứng viên thay vì mảng
-                      chip cố định. listFallback giữ đúng cách hiển thị cũ (tách dòng thành <li>)
-                      cho dữ liệu tin cũ trước Đợt 14 (dạng "A,B,C" từ cột simple-array). */}
-                  {job.benefits && (
-                    <div className="mt-5">
-                      <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Phúc lợi</div>
-                      <RichTextView value={benefitsRichTextValue(job.benefits)} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
-                    </div>
-                  )}
-
                   {job.description && (
                     <div className="mt-5">
                       <h3 className="font-bold text-sm mb-2">Mô tả công việc</h3>
@@ -392,6 +381,21 @@ function JobDetailInner() {
                     <div className="mt-4">
                       <h3 className="font-bold text-sm mb-2">Yêu cầu ứng viên</h3>
                       <RichTextView value={job.requirements} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
+                    </div>
+                  )}
+
+                  {/* Đợt 14 (25/09/2026) — mục 15: "Quyền lợi được hưởng" nay là rich text tự do
+                      (HTML), hiển thị bằng RichTextView như Mô tả/Yêu cầu ứng viên thay vì mảng
+                      chip cố định. listFallback giữ đúng cách hiển thị cũ (tách dòng thành <li>)
+                      cho dữ liệu tin cũ trước Đợt 14 (dạng "A,B,C" từ cột simple-array).
+                      Đợt 17i (25/09/2026) — theo yêu cầu người dùng: chuyển xuống SAU "Mô tả công
+                      việc"/"Yêu cầu ứng viên" để khớp đúng thứ tự nhập liệu ở wizard đăng tin (Mô tả
+                      công việc → Yêu cầu ứng viên → Quyền lợi được hưởng), trước đó hiện SAI thứ tự
+                      (Quyền lợi lại hiện lên đầu). */}
+                  {job.benefits && (
+                    <div className="mt-4">
+                      <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Quyền lợi được hưởng</div>
+                      <RichTextView value={benefitsRichTextValue(job.benefits)} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
                     </div>
                   )}
 

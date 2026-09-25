@@ -363,11 +363,14 @@ export function JobWizardSteps({
               />
             </Field>
 
-            <Field label="Phúc lợi" hint="Gõ tự do, hoặc bấm gợi ý bên dưới để chèn thêm">
+            {/* Đợt 17i (25/09/2026) — theo yêu cầu người dùng: đổi nhãn từ "Phúc lợi" (Đợt 17g) trở lại
+                "Quyền lợi được hưởng", áp dụng xuyên suốt từ ô nhập này tới mọi nơi hiển thị tin đăng
+                (xem 3 trang xem tin đã đổi theo — nha-tuyen-dung/xem-tin, admin/xem-tin, viec-lam/[id]). */}
+            <Field label="Quyền lợi được hưởng" hint="Gõ tự do, hoặc bấm gợi ý bên dưới để chèn thêm">
               <RichTextEditor
                 value={form.benefits}
                 onChange={(html) => setForm({ ...form, benefits: html })}
-                placeholder="VD: Bảo hiểm sức khỏe, thưởng KPI, laptop..."
+                placeholder="VD: Thu nhập, phúc lợi, môi trường làm việc, ..."
                 minHeight={140}
               />
               <div className="flex flex-wrap gap-1.5 mt-1.5">
