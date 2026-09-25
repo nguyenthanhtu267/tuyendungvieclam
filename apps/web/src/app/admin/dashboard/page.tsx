@@ -1395,8 +1395,22 @@ function CompanyDetailPanel({
               <div className="flex flex-col gap-1.5 mt-2">
                 {data.jobs.map((j) => (
                   <div key={j.id} className="flex items-center justify-between gap-2 text-xs border-t border-border pt-1.5">
-                    <span className="font-semibold">{j.title}</span>
-                    <span className="text-ink-faint">{formatSalary(j.salaryMin, j.salaryMax)}</span>
+                    <span className="font-semibold truncate">{j.title}</span>
+                    <span className="flex items-center gap-2 shrink-0">
+                      <span className="text-ink-faint">{formatSalary(j.salaryMin, j.salaryMax)}</span>
+                      {/* Đợt 17e — trước đây dòng tin ở đây chỉ hiển thị, không có cách nào sửa các
+                          trường (lương/địa điểm/hình thức/hạn nộp/...) của tin đã cào từ nguồn ngoài
+                          ngay trong màn "Quản lý" công ty. Nay thêm link sang trang sửa tin admin có
+                          sẵn (đã dùng ở hàng đợi Duyệt tin) để sửa được TẤT CẢ các mục. */}
+                      <a
+                        href={`/admin/sua-tin/${j.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block text-[11px] font-bold rounded-md bg-surface-alt text-ink px-2 py-1"
+                      >
+                        ✏️ Sửa
+                      </a>
+                    </span>
                   </div>
                 ))}
               </div>
