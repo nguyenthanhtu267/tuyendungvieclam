@@ -207,6 +207,14 @@ export class JobPosting {
   @Column({ name: 'view_count', type: 'int', default: 0 })
   viewCount: number;
 
+  // Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp": link gốc của tin (nếu Admin lấy từ trang
+  // tuyển dụng khác/paste URL trích xuất tự động — xem AdminService.extractJobFromUrl()). Không bắt
+  // buộc — tin Admin tự gõ tay (VD từ nhóm Facebook, người dùng copy nội dung ra rồi đọc cho Admin
+  // nhập) không có link nguồn. Không hiển thị công khai (tránh dẫn thẳng sang trang gốc mất traffic),
+  // chỉ Admin xem nội bộ để đối chiếu khi cần.
+  @Column({ name: 'source_url', nullable: true })
+  sourceUrl?: string;
+
   @Index()
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

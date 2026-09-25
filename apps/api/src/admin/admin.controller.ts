@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -7,9 +7,15 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { UserRole } from '../database/entities/user.entity';
 import { JobApprovalStatus } from '../database/entities/job-posting.entity';
 import { CompanyApprovalStatus } from '../database/entities/company.entity';
+import { CompanyClaimRequestStatus } from '../database/entities/company-claim-request.entity';
 import { BulkIdsDto } from './dto/bulk-ids.dto';
 import { RejectJobDto } from './dto/reject-job.dto';
 import { UpdateJobDto } from '../employer/dto/update-job.dto';
+import { CreateJobDto } from '../employer/dto/create-job.dto';
+import { CreateDraftCompanyDto } from './dto/create-draft-company.dto';
+import { ClaimCompanyDto } from './dto/claim-company.dto';
+import { ResolveClaimRequestDto } from './dto/resolve-claim-request.dto';
+import { ExtractJobUrlDto } from './dto/extract-job-url.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -109,6 +115,75 @@ export class AdminController {
   @Get('companies/pending')
   listPendingCompanies() {
     return this.adminService.listPendingCompanies();
+  }
+
+  // ===== Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp" =====
+  // Đặt các route literal ('companies/draft', 'companies/sourced') TRƯỚC 'companies/:id/...' — không
+  // thật sự xung đột về matching (khác số đoạn/khác method) nhưng đặt gần nhau cho dễ đọc, theo đúng
+  // quy ước ghi chú thứ tự route đã dùng xuyên suốt file này.
+  @Post('companies/draft')
+  createDraftCompany(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Body() dto: CreateDraftCompanyDto,
+  ) {
+    return this.adminService.createDraftCompany(admin, dto);
+  }
+
+  @Get('companies/sourced')
+  listSourcedCompanies(@Query('q') q?: string, @Query('claimed') claimed?: string) {
+    const claimedFilter = claimed === 'true' ? true : claimed === 'false' ? false : undefined;
+    return this.adminService.listSourcedCompanies(q, claimedFilter);
+  }
+
+  @Get('companies/:id/sourced-detail')
+  getSourcedCompanyDetail(@Param('id') id: string) {
+    return this.adminService.getSourcedCompanyDetail(id);
+  }
+
+  @Post('companies/:id/jobs')
+  createJobForCompany(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+    @Body() dto: CreateJobDto,
+  ) {
+    return this.adminService.createJobForCompany(admin, id, dto);
+  }
+
+  @Post('companies/:id/claim')
+  claimCompany(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+    @Body() dto: ClaimCompanyDto,
+  ) {
+    return this.adminService.claimCompany(admin, id, dto);
+  }
+
+  @Post('extract-job-url')
+  extractJobFromUrl(@Body() dto: ExtractJobUrlDto) {
+    return this.adminService.extractJobFromUrlTool(dto.url);
+  }
+
+  @Get('claim-requests')
+  listClaimRequests(@Query('status') status?: CompanyClaimRequestStatus) {
+    return this.adminService.listClaimRequests(status);
+  }
+
+  @Patch('claim-requests/:id/approve')
+  approveClaimRequest(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+    @Body() dto: ResolveClaimRequestDto,
+  ) {
+    return this.adminService.approveClaimRequest(admin, id, dto);
+  }
+
+  @Patch('claim-requests/:id/reject')
+  rejectClaimRequest(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+    @Body() dto: ResolveClaimRequestDto,
+  ) {
+    return this.adminService.rejectClaimRequest(admin, id, dto);
   }
 
   // Đợt 12q (21/09/2026) — Batch 5 mục #1: tìm công ty (mọi trạng thái) để bật/tắt "Doanh nghiệp yêu

@@ -105,6 +105,14 @@ export interface Company {
   followersCount?: number;
   // Đợt 12ac (24/09/2026) — "Giới thiệu công ty" cho tab Tổng quan công ty (trang chi tiết tin).
   description?: string;
+  // Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp": true nếu Admin tạo hộ từ nguồn ngoài;
+  // claimedAt có giá trị nghĩa là công ty thật đã "nhận lại" — FE hiện badge "Tin tổng hợp — chưa xác
+  // thực" khi isAdminSourced && !claimedAt (xem CompanyBadge trong components/CompanyLogo.tsx).
+  isAdminSourced?: boolean;
+  sourceLabel?: string;
+  claimedAt?: string;
+  // Đợt 17 — chỉ có ở AdminApi.listSourcedCompanies() (số tin của công ty này, mọi trạng thái).
+  jobCount?: number;
 }
 
 export type JobApprovalStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'expired';
@@ -158,6 +166,9 @@ export interface JobPosting {
   // Đợt 12p (21/09/2026) — lượt xem trang chi tiết công khai, dùng cho thống kê "Tỷ lệ chuyển đổi"
   // (hồ sơ/lượt xem) ở trang Tin đăng NTD.
   viewCount?: number;
+  // Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp": link gốc (chỉ Admin dùng nội bộ, không hiện
+  // công khai ở FE — xem ghi chú ở job-posting.entity.ts).
+  sourceUrl?: string;
   createdAt: string;
   updatedAt?: string;
   company: Company;
@@ -287,8 +298,21 @@ export interface CompanyProfileResponse {
   totalJobs: number;
 }
 
+// Đợt 17 (25/09/2026) — "Đây là công ty của bạn?", form công khai ở trang /cong-ty/[id].
+export interface ClaimRequestPayload {
+  requesterName: string;
+  requesterEmail: string;
+  requesterPhone?: string;
+  note?: string;
+}
+
 export const companiesApi = {
   getProfile: (id: string) => request<CompanyProfileResponse>(`/companies/${id}`),
+  submitClaimRequest: (id: string, dto: ClaimRequestPayload) =>
+    request<{ success: true; id: string }>(`/companies/${id}/claim-request`, {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    }),
 };
 
 export type ProfileVisibility = 'locked' | 'public' | 'urgent';
@@ -733,6 +757,8 @@ export interface CreateJobPayload {
   contactPhone?: string;
   // Đợt 14 (25/09/2026) — mục 15: khung mô tả thêm tự do cạnh 3 trường liên hệ ở trên.
   contactNote?: string;
+  // Đợt 17 (25/09/2026) — chỉ dùng khi Admin đăng tin hộ (adminApi.createJobForCompany).
+  sourceUrl?: string;
 }
 
 // ===== B5 — Tài khoản & Hồ sơ công ty =====
@@ -1093,7 +1119,117 @@ export const adminApi = {
   // Đợt 12q (21/09/2026) — Batch 5 mục #4: nhật ký thao tác admin.
   auditLog: (token: string, page = 1) =>
     request<AdminAuditLogResponse>(`/admin/audit-log?page=${page}`, { headers: authHeaders(token) }),
+
+  // ===== Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp" =====
+  createDraftCompany: (token: string, dto: CreateDraftCompanyPayload) =>
+    request<{ company: Company; draftAccount: DraftAccountInfo }>('/admin/companies/draft', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(dto),
+    }),
+  listSourcedCompanies: (token: string, q?: string, claimed?: boolean) => {
+    const qs = new URLSearchParams();
+    if (q) qs.set('q', q);
+    if (claimed !== undefined) qs.set('claimed', String(claimed));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return request<Company[]>(`/admin/companies/sourced${suffix}`, { headers: authHeaders(token) });
+  },
+  getSourcedCompanyDetail: (token: string, id: string) =>
+    request<{ company: Company; jobs: JobPosting[] }>(`/admin/companies/${id}/sourced-detail`, {
+      headers: authHeaders(token),
+    }),
+  createJobForCompany: (token: string, companyId: string, dto: CreateJobPayload) =>
+    request<JobPosting>(`/admin/companies/${companyId}/jobs`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(dto),
+    }),
+  claimCompany: (token: string, companyId: string, dto: ClaimCompanyPayload) =>
+    request<{ company: Company; account: DraftAccountInfo }>(`/admin/companies/${companyId}/claim`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(dto),
+    }),
+  extractJobFromUrl: (token: string, url: string) =>
+    request<ExtractJobUrlResult>('/admin/extract-job-url', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ url }),
+    }),
+  listClaimRequests: (token: string, status?: CompanyClaimRequestStatus) =>
+    request<CompanyClaimRequestRow[]>(`/admin/claim-requests${status ? `?status=${status}` : ''}`, {
+      headers: authHeaders(token),
+    }),
+  approveClaimRequest: (token: string, id: string, dto: { adminNote?: string; taxCode?: string } = {}) =>
+    request<{ request: CompanyClaimRequestRow; account: DraftAccountInfo }>(`/admin/claim-requests/${id}/approve`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(dto),
+    }),
+  rejectClaimRequest: (token: string, id: string, dto: { adminNote?: string } = {}) =>
+    request<CompanyClaimRequestRow>(`/admin/claim-requests/${id}/reject`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(dto),
+    }),
 };
+
+// Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp": type cho form tạo công ty nháp, tài khoản tạm
+// trả về sau khi tạo/claim, chuyển giao thủ công, trích xuất URL, và yêu cầu "nhận lại" công khai.
+export interface CreateDraftCompanyPayload {
+  name: string;
+  industry?: string;
+  size?: string;
+  website?: string;
+  logoUrl?: string;
+  description?: string;
+  sourceLabel?: string;
+}
+
+export interface DraftAccountInfo {
+  email: string;
+  tempPassword: string;
+  note?: string;
+}
+
+export interface ClaimCompanyPayload {
+  email: string;
+  fullName?: string;
+  phone?: string;
+  taxCode?: string;
+}
+
+export interface ExtractedJobData {
+  title?: string;
+  companyName?: string;
+  description?: string;
+  location?: string;
+  employmentType?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+}
+
+export interface ExtractJobUrlResult {
+  found: boolean;
+  data: ExtractedJobData;
+  warning?: string;
+}
+
+export type CompanyClaimRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface CompanyClaimRequestRow {
+  id: string;
+  companyId: string;
+  company?: Company;
+  requesterName: string;
+  requesterEmail: string;
+  requesterPhone?: string;
+  note?: string;
+  status: CompanyClaimRequestStatus;
+  adminNote?: string;
+  createdAt: string;
+  resolvedAt?: string;
+}
 
 // ===== Đợt 9 — Tìm kiếm hồ sơ ứng viên cho nhà tuyển dụng =====
 

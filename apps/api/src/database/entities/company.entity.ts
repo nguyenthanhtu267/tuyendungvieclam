@@ -80,6 +80,27 @@ export class Company {
   @Column({ name: 'is_featured_employer', default: false })
   isFeaturedEmployer: boolean;
 
+  // Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp" (mô hình "labeled aggregator" đã thống nhất
+  // với người dùng): Admin tự tạo hồ sơ công ty + đăng tin hộ từ các trang tuyển dụng khác
+  // (careerviet.vn, vietnamworks.com, glints.com, itviec.com, viecoi.vn, lamthem.com.vn, nhóm
+  // Facebook...) để tăng lượng tin ngay từ đầu, thay vì chờ từng công ty tự đăng ký. Khác với công ty
+  // tự đăng ký (registerEmployer): công ty này CHƯA xác thực — hiện badge "Tin tổng hợp — chưa xác
+  // thực" ở mọi nơi có tên/logo công ty (JobCard, trang chi tiết tin, trang công ty) cho tới khi
+  // "nhận lại" tài khoản (claimedAt được set — xem AdminService.approveClaimRequest()/claimCompany()).
+  // isAdminSourced giữ NGUYÊN true vĩnh viễn (ghi nhận lịch sử nguồn gốc), chỉ claimedAt quyết định có
+  // hiện badge hay không — badge ẩn khi `isAdminSourced && !claimedAt` sai (tức đã claimedAt).
+  @Index()
+  @Column({ name: 'is_admin_sourced', default: false })
+  isAdminSourced: boolean;
+
+  // Nhãn nguồn tự do Admin nhập khi tạo (VD "Tổng hợp từ careerviet.vn"), hiển thị cạnh badge ở FE.
+  @Column({ name: 'source_label', nullable: true })
+  sourceLabel?: string;
+
+  // Thời điểm công ty thật "nhận lại" tài khoản — null nghĩa là vẫn đang ở trạng thái "chưa xác thực".
+  @Column({ name: 'claimed_at', type: 'timestamp', nullable: true })
+  claimedAt?: Date;
+
   @OneToMany(() => CompanyUser, (companyUser) => companyUser.company)
   companyUsers?: CompanyUser[];
 

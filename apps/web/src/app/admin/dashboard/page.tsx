@@ -12,11 +12,18 @@ import {
   type Order,
   type AdminStatsPoint,
   type AdminAuditLogEntry,
+  type CreateDraftCompanyPayload,
+  type DraftAccountInfo,
+  type CompanyClaimRequestRow,
+  type CompanyClaimRequestStatus,
+  type CreateJobPayload,
 } from '@/lib/api';
 import { formatDate, formatDateTime, formatSalary, formatCurrency, formatNumber, PAYMENT_METHOD_LABEL } from '@/lib/format';
 import ChangePasswordCard from '@/components/ChangePasswordCard';
 import { scanJobContent } from '@/lib/content-moderation';
 import { CompanyLogo } from '@/components/CompanyLogo';
+import { RichTextEditor } from '@/components/RichTextEditor';
+import { PROVINCES, INDUSTRIES, LEVELS, EMPLOYMENT_TYPES, EXPERIENCE_LEVELS } from '@/lib/catalogs';
 
 // Đợt 12f (21/09/2026) — bổ sung mục "Đổi mật khẩu" tự phục vụ cho Admin, còn thiếu sót ở Đợt
 // 12a (lúc đó chỉ làm cho Ứng viên và Nhà tuyển dụng). Trước khi có mục này, Admin chỉ có thể
@@ -29,6 +36,8 @@ const NAV_ITEMS = [
   { id: 'companies', label: '🏢 Duyệt công ty' },
   // Đợt 12q (21/09/2026) — Batch 5: 4 mục Admin mới.
   { id: 'featured', label: '🌟 DN yêu thích' },
+  // Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp" (mô hình "labeled aggregator").
+  { id: 'sourced', label: '🏷️ Nguồn ngoài' },
   { id: 'stats', label: '📈 Thống kê' },
   { id: 'orders', label: '💰 Đơn hàng' },
   { id: 'users', label: '👤 Người dùng' },
@@ -528,6 +537,8 @@ export default function AdminDashboardPage() {
           </>
         ) : tab === 'featured' ? (
           <FeaturedEmployersCard token={token} />
+        ) : tab === 'sourced' ? (
+          <SourcedCompaniesCard token={token} />
         ) : tab === 'stats' ? (
           <StatsCard token={token} />
         ) : tab === 'orders' ? (
@@ -894,6 +905,778 @@ function CompanyLogoEditor({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ===== Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp" (mô hình "labeled aggregator") =====
+// Admin tự tạo hồ sơ công ty + tài khoản NTD nháp + đăng tin hộ từ các trang tuyển dụng khác
+// (careerviet.vn, vietnamworks.com, glints.com, itviec.com, viecoi.vn, lamthem.com.vn, nhóm Facebook…)
+// để tăng lượng tin ngay từ đầu — mọi công ty/tin loại này hiện công khai NGAY kèm badge "Tin tổng
+// hợp — chưa xác thực" cho tới khi công ty thật "nhận lại" (claim). 3 khối trong tab này: (1) tạo công
+// ty nguồn ngoài mới, (2) danh sách công ty nguồn ngoài (quản lý tin + chuyển giao thủ công), (3) hàng
+// chờ yêu cầu công khai "Đây là công ty của bạn?".
+function SourcedCompaniesCard({ token }: { token: string }) {
+  const [q, setQ] = useState('');
+  const [claimedFilter, setClaimedFilter] = useState<'unclaimed' | 'claimed' | 'all'>('unclaimed');
+  const [companies, setCompanies] = useState<Company[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [claimRequests, setClaimRequests] = useState<CompanyClaimRequestRow[] | null>(null);
+  const [claimRequestsLoading, setClaimRequestsLoading] = useState(false);
+
+  const search = useCallback(async () => {
+    setLoading(true);
+    try {
+      const claimed = claimedFilter === 'all' ? undefined : claimedFilter === 'claimed';
+      const rows = await adminApi.listSourcedCompanies(token, q, claimed);
+      setCompanies(rows);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, q, claimedFilter]);
+
+  const loadClaimRequests = useCallback(async () => {
+    setClaimRequestsLoading(true);
+    try {
+      const rows = await adminApi.listClaimRequests(token, 'pending');
+      setClaimRequests(rows);
+    } finally {
+      setClaimRequestsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    search();
+  }, [search]);
+
+  useEffect(() => {
+    loadClaimRequests();
+  }, [loadClaimRequests]);
+
+  return (
+    <>
+      <h1 className="font-bold text-base mb-1">Nguồn ngoài &amp; Tin tổng hợp</h1>
+      <div className="text-xs text-ink-faint mb-4 max-w-2xl">
+        Tạo hồ sơ công ty + đăng tin hộ từ các trang tuyển dụng khác để tăng lượng tin ngay từ đầu. Mọi công ty/tin
+        loại này hiện công khai NGAY kèm badge &ldquo;Tin tổng hợp — chưa xác thực&rdquo; cho tới khi công ty thật
+        &ldquo;nhận lại&rdquo; tài khoản (chuyển giao thủ công bên dưới, hoặc duyệt yêu cầu &ldquo;Đây là công ty của
+        bạn?&rdquo; công khai ở trang công ty).
+      </div>
+
+      <div className="rounded-xl bg-white border border-border p-4 mb-4">
+        <button
+          type="button"
+          onClick={() => setShowCreateForm((v) => !v)}
+          className="text-xs font-bold text-primary"
+        >
+          {showCreateForm ? '▾ Ẩn form tạo công ty mới' : '▸ + Tạo công ty nguồn ngoài mới'}
+        </button>
+        {showCreateForm && (
+          <CreateDraftCompanyForm
+            token={token}
+            onCreated={(company) => {
+              setShowCreateForm(false);
+              setSelectedId(company.id);
+              search();
+            }}
+          />
+        )}
+      </div>
+
+      {claimRequests && claimRequests.length > 0 && (
+        <ClaimRequestsQueue
+          token={token}
+          requests={claimRequests}
+          loading={claimRequestsLoading}
+          onResolved={() => {
+            loadClaimRequests();
+            search();
+          }}
+        />
+      )}
+
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            search();
+          }}
+          className="flex gap-2 max-w-md flex-1"
+        >
+          <input
+            type="text"
+            placeholder="Tìm theo tên công ty…"
+            className="tvl-input text-sm"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <button type="submit" disabled={loading} className="tvl-btn-primary !w-auto px-4 whitespace-nowrap">
+            Tìm
+          </button>
+        </form>
+        <div className="flex gap-1.5 text-xs">
+          {(
+            [
+              ['unclaimed', 'Chưa xác thực'],
+              ['claimed', 'Đã xác thực'],
+              ['all', 'Tất cả'],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setClaimedFilter(key)}
+              className={`px-3 py-1.5 rounded-lg font-bold ${
+                claimedFilter === key ? 'bg-primary text-white' : 'bg-surface-alt text-ink-faint'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="text-center text-ink-faint py-10 text-sm">Đang tải…</div>
+      ) : !companies || companies.length === 0 ? (
+        <div className="text-center text-ink-faint text-sm py-10">Chưa có công ty nguồn ngoài nào.</div>
+      ) : (
+        <div className="rounded-xl bg-white border border-border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-ink-faint bg-surface-alt">
+                  <th className="py-2.5 px-4 font-semibold">Tên công ty</th>
+                  <th className="py-2.5 px-3 font-semibold">Nguồn</th>
+                  <th className="py-2.5 px-3 font-semibold">Số tin</th>
+                  <th className="py-2.5 px-3 font-semibold">Trạng thái</th>
+                  <th className="py-2.5 px-4 font-semibold text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {companies.map((c) => (
+                  <tr key={c.id} className="border-t border-border align-top">
+                    <td className="py-3 px-4 font-bold">
+                      <div className="flex items-center gap-2">
+                        <CompanyLogo name={c.name} logoUrl={c.logoUrl} size={24} className="text-[9px] shrink-0" />
+                        {c.name}
+                      </div>
+                    </td>
+                    <td className="py-3 px-3 text-ink-faint">{c.sourceLabel ?? '—'}</td>
+                    <td className="py-3 px-3 tabular-nums">{c.jobCount ?? 0}</td>
+                    <td className="py-3 px-3">
+                      {c.claimedAt ? (
+                        <span className="font-semibold text-[10px] rounded-full bg-success-tint text-success px-2 py-0.5">
+                          ✓ Đã xác thực
+                        </span>
+                      ) : (
+                        <span className="font-semibold text-[10px] rounded-full bg-warning-tint text-warning px-2 py-0.5">
+                          ⚠ Chưa xác thực
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => setSelectedId(c.id)}
+                        className="text-[11px] font-bold rounded-md bg-primary-tint text-primary px-2.5 py-1.5"
+                      >
+                        Quản lý
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {selectedId && (
+        <CompanyDetailPanel
+          token={token}
+          companyId={selectedId}
+          onClose={() => setSelectedId(null)}
+          onChanged={search}
+        />
+      )}
+    </>
+  );
+}
+
+// Form tạo công ty "chưa xác thực" + tài khoản NTD nháp — tài khoản này CHƯA gửi cho ai, chỉ để Admin
+// tự đăng tin hộ (xem ghi chú AdminService.createDraftCompany() ở backend).
+function CreateDraftCompanyForm({ token, onCreated }: { token: string; onCreated: (company: Company) => void }) {
+  const [form, setForm] = useState<CreateDraftCompanyPayload>({ name: '' });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<{ company: Company; draftAccount: DraftAccountInfo } | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim()) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await adminApi.createDraftCompany(token, form);
+      setResult(res);
+      onCreated(res.company);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Không thể tạo công ty');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (result) {
+    return (
+      <div className="mt-3 rounded-lg bg-warning-tint text-warning text-xs font-semibold px-3.5 py-2.5">
+        Đã tạo công ty &ldquo;{result.company.name}&rdquo;. Tài khoản tạm: <span className="font-mono">{result.draftAccount.email}</span>{' '}
+        / mật khẩu: <span className="font-mono">{result.draftAccount.tempPassword}</span>
+        <br />
+        {result.draftAccount.note}
+        <br />
+        <button
+          type="button"
+          onClick={() => setResult(null)}
+          className="mt-2 text-[11px] font-bold underline"
+        >
+          Tạo công ty khác
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-3 grid sm:grid-cols-2 gap-2.5 text-xs">
+      <input
+        required
+        placeholder="Tên công ty *"
+        className="tvl-input text-sm sm:col-span-2"
+        value={form.name}
+        onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+      />
+      <input
+        placeholder="Nguồn (VD: Tổng hợp từ careerviet.vn)"
+        className="tvl-input text-sm sm:col-span-2"
+        value={form.sourceLabel ?? ''}
+        onChange={(e) => setForm((f) => ({ ...f, sourceLabel: e.target.value }))}
+      />
+      <select
+        className="tvl-input text-sm"
+        value={form.industry ?? ''}
+        onChange={(e) => setForm((f) => ({ ...f, industry: e.target.value || undefined }))}
+      >
+        <option value="">Ngành nghề…</option>
+        {INDUSTRIES.map((i) => (
+          <option key={i} value={i}>{i}</option>
+        ))}
+      </select>
+      <input
+        placeholder="Quy mô (VD: 100-499 nhân viên)"
+        className="tvl-input text-sm"
+        value={form.size ?? ''}
+        onChange={(e) => setForm((f) => ({ ...f, size: e.target.value }))}
+      />
+      <input
+        placeholder="Website"
+        className="tvl-input text-sm"
+        value={form.website ?? ''}
+        onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
+      />
+      <input
+        placeholder="URL logo (không bắt buộc)"
+        className="tvl-input text-sm"
+        value={form.logoUrl ?? ''}
+        onChange={(e) => setForm((f) => ({ ...f, logoUrl: e.target.value }))}
+      />
+      <textarea
+        placeholder="Giới thiệu công ty (không bắt buộc)"
+        className="tvl-input text-sm sm:col-span-2"
+        rows={2}
+        value={form.description ?? ''}
+        onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+      />
+      {error && <div className="text-critical font-semibold sm:col-span-2">{error}</div>}
+      <button type="submit" disabled={busy} className="tvl-btn-primary !w-auto px-5 sm:col-span-2 self-start">
+        Tạo công ty
+      </button>
+    </form>
+  );
+}
+
+// Hàng chờ yêu cầu công khai "Đây là công ty của bạn?" — Admin xác minh NGOÀI hệ thống (điện
+// thoại/Zalo/giấy tờ) rồi mới Duyệt (chuyển giao) hoặc Từ chối.
+function ClaimRequestsQueue({
+  token,
+  requests,
+  loading,
+  onResolved,
+}: {
+  token: string;
+  requests: CompanyClaimRequestRow[];
+  loading: boolean;
+  onResolved: () => void;
+}) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function handleApprove(id: string) {
+    setBusyId(id);
+    try {
+      await adminApi.approveClaimRequest(token, id);
+      onResolved();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : 'Không thể duyệt yêu cầu này');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleReject(id: string) {
+    const note = window.prompt('Lý do từ chối (không bắt buộc):') ?? undefined;
+    setBusyId(id);
+    try {
+      await adminApi.rejectClaimRequest(token, id, { adminNote: note });
+      onResolved();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="rounded-xl bg-white border border-border p-4 mb-4">
+      <div className="font-bold text-sm mb-1">
+        Yêu cầu &ldquo;Đây là công ty của bạn?&rdquo; đang chờ ({requests.length})
+      </div>
+      <div className="text-[11px] text-ink-faint mb-3">
+        Vui lòng xác minh thông tin người gửi ngoài hệ thống (gọi điện/email công ty thật) trước khi Duyệt.
+      </div>
+      {loading ? (
+        <div className="text-center text-ink-faint text-xs py-4">Đang tải…</div>
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {requests.map((r) => (
+            <div key={r.id} className="flex items-center justify-between gap-3 flex-wrap border-t border-border pt-2.5 text-xs">
+              <div>
+                <div className="font-bold">{r.company?.name ?? '—'}</div>
+                <div className="text-ink-faint">
+                  {r.requesterName} · {r.requesterEmail}
+                  {r.requesterPhone ? ` · ${r.requesterPhone}` : ''}
+                </div>
+                {r.note && <div className="text-ink-faint italic mt-0.5">&ldquo;{r.note}&rdquo;</div>}
+              </div>
+              <div className="flex gap-1.5 shrink-0">
+                <button
+                  disabled={busyId === r.id}
+                  onClick={() => handleApprove(r.id)}
+                  className="text-[11px] font-bold rounded-md bg-success-tint text-success px-2.5 py-1.5 disabled:opacity-50"
+                >
+                  Duyệt (chuyển giao)
+                </button>
+                <button
+                  disabled={busyId === r.id}
+                  onClick={() => handleReject(r.id)}
+                  className="text-[11px] font-bold rounded-md bg-critical-tint text-critical px-2.5 py-1.5 disabled:opacity-50"
+                >
+                  Từ chối
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Panel quản lý 1 công ty nguồn ngoài: thông tin + chuyển giao thủ công + danh sách tin + thêm tin.
+function CompanyDetailPanel({
+  token,
+  companyId,
+  onClose,
+  onChanged,
+}: {
+  token: string;
+  companyId: string;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [data, setData] = useState<{ company: Company; jobs: JobPosting[] } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showAddJob, setShowAddJob] = useState(false);
+  const [showClaimForm, setShowClaimForm] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await adminApi.getSourcedCompanyDetail(token, companyId);
+      setData(res);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, companyId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-start justify-center overflow-y-auto py-8 px-4 z-50">
+      <div className="bg-white rounded-2xl max-w-2xl w-full p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="font-bold text-sm">{data?.company.name ?? 'Đang tải…'}</div>
+          <button onClick={onClose} className="text-ink-faint hover:text-ink text-lg leading-none">✕</button>
+        </div>
+
+        {loading || !data ? (
+          <div className="text-center text-ink-faint text-sm py-10">Đang tải…</div>
+        ) : (
+          <>
+            <div className="text-xs text-ink-faint mb-3">
+              Nguồn: {data.company.sourceLabel ?? '—'} ·{' '}
+              {data.company.claimedAt ? (
+                <span className="text-success font-semibold">✓ Đã xác thực ({formatDate(data.company.claimedAt)})</span>
+              ) : (
+                <span className="text-warning font-semibold">⚠ Chưa xác thực</span>
+              )}
+            </div>
+
+            {!data.company.claimedAt && (
+              <div className="rounded-lg border border-border p-3 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setShowClaimForm((v) => !v)}
+                  className="text-xs font-bold text-primary"
+                >
+                  {showClaimForm ? '▾ Ẩn form chuyển giao' : '▸ Chuyển giao thủ công (đã xác minh ngoài hệ thống)'}
+                </button>
+                {showClaimForm && (
+                  <ClaimCompanyForm
+                    token={token}
+                    companyId={companyId}
+                    onClaimed={() => {
+                      setShowClaimForm(false);
+                      load();
+                      onChanged();
+                    }}
+                  />
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-bold text-xs">Tin đăng ({data.jobs.length})</div>
+              <button
+                type="button"
+                onClick={() => setShowAddJob((v) => !v)}
+                className="text-[11px] font-bold text-primary"
+              >
+                {showAddJob ? '▾ Ẩn form thêm tin' : '▸ + Thêm tin mới'}
+              </button>
+            </div>
+
+            {showAddJob && (
+              <AddJobForm
+                token={token}
+                companyId={companyId}
+                onCreated={() => {
+                  setShowAddJob(false);
+                  load();
+                  onChanged();
+                }}
+              />
+            )}
+
+            {data.jobs.length === 0 ? (
+              <div className="text-center text-ink-faint text-xs py-6 border border-dashed border-border rounded-lg">
+                Chưa có tin nào — dùng form phía trên để thêm.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5 mt-2">
+                {data.jobs.map((j) => (
+                  <div key={j.id} className="flex items-center justify-between gap-2 text-xs border-t border-border pt-1.5">
+                    <span className="font-semibold">{j.title}</span>
+                    <span className="text-ink-faint">{formatSalary(j.salaryMin, j.salaryMax)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// "Chuyển giao thủ công": Admin đã tự xác minh công ty thật ngoài hệ thống (điện thoại/Zalo), nhập
+// email thật để đổi email đăng nhập + đặt lại mật khẩu tạm — báo cho công ty qua kênh ngoài hệ thống.
+function ClaimCompanyForm({
+  token,
+  companyId,
+  onClaimed,
+}: {
+  token: string;
+  companyId: string;
+  onClaimed: () => void;
+}) {
+  const [email, setEmail] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [taxCode, setTaxCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<DraftAccountInfo | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await adminApi.claimCompany(token, companyId, {
+        email: email.trim(),
+        fullName: fullName.trim() || undefined,
+        phone: phone.trim() || undefined,
+        taxCode: taxCode.trim() || undefined,
+      });
+      setResult(res.account);
+      onClaimed();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Không thể chuyển giao');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (result) {
+    return (
+      <div className="mt-3 rounded-lg bg-warning-tint text-warning text-xs font-semibold px-3.5 py-2.5">
+        Đã chuyển giao. Tài khoản: <span className="font-mono">{result.email}</span> / mật khẩu tạm:{' '}
+        <span className="font-mono">{result.tempPassword}</span>
+        <br />
+        Chỉ hiển thị 1 lần — hãy báo ngay cho công ty qua kênh ngoài hệ thống.
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-3 grid sm:grid-cols-2 gap-2.5 text-xs">
+      <input
+        required
+        type="email"
+        placeholder="Email thật của công ty *"
+        className="tvl-input text-sm sm:col-span-2"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+      <input
+        placeholder="Họ tên người đại diện"
+        className="tvl-input text-sm"
+        value={fullName}
+        onChange={(e) => setFullName(e.target.value)}
+      />
+      <input
+        placeholder="Số điện thoại"
+        className="tvl-input text-sm"
+        value={phone}
+        onChange={(e) => setPhone(e.target.value)}
+      />
+      <input
+        placeholder="Mã số thuế thật (không bắt buộc ngay)"
+        className="tvl-input text-sm sm:col-span-2"
+        value={taxCode}
+        onChange={(e) => setTaxCode(e.target.value)}
+      />
+      {error && <div className="text-critical font-semibold sm:col-span-2">{error}</div>}
+      <button type="submit" disabled={busy} className="tvl-btn-primary !w-auto px-5 sm:col-span-2 self-start">
+        Chuyển giao ngay
+      </button>
+    </form>
+  );
+}
+
+// Form thêm tin cho công ty — 2 cách nhập nội dung (theo lựa chọn người dùng qua AskUserQuestion):
+// (1) dán URL trang gốc → trích xuất tự động (best-effort, luôn xem lại trước khi lưu), (2) nhập tay.
+// Tin được lưu bằng adminApi.createJobForCompany() hiện CÔNG KHAI NGAY (không qua hàng đợi duyệt).
+function AddJobForm({
+  token,
+  companyId,
+  onCreated,
+}: {
+  token: string;
+  companyId: string;
+  onCreated: () => void;
+}) {
+  const [url, setUrl] = useState('');
+  const [extracting, setExtracting] = useState(false);
+  const [extractWarning, setExtractWarning] = useState('');
+  const [form, setForm] = useState<CreateJobPayload & { sourceUrl?: string }>({ title: '', headcount: 1 });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleExtract() {
+    if (!url.trim()) return;
+    setExtracting(true);
+    setExtractWarning('');
+    try {
+      const res = await adminApi.extractJobFromUrl(token, url.trim());
+      if (res.found) {
+        setForm((f) => ({
+          ...f,
+          title: res.data.title || f.title,
+          description: res.data.description || f.description,
+          location: res.data.location || f.location,
+          employmentType: res.data.employmentType || f.employmentType,
+          salaryMin: res.data.salaryMin ?? f.salaryMin,
+          salaryMax: res.data.salaryMax ?? f.salaryMax,
+          sourceUrl: url.trim(),
+        }));
+      } else {
+        setForm((f) => ({ ...f, sourceUrl: url.trim() }));
+        setExtractWarning(res.warning ?? 'Không trích xuất được — vui lòng nhập tay bên dưới.');
+      }
+    } catch (err) {
+      setExtractWarning(err instanceof ApiError ? err.message : 'Không tải được trang này.');
+    } finally {
+      setExtracting(false);
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.title.trim()) return;
+    setBusy(true);
+    setError('');
+    try {
+      await adminApi.createJobForCompany(token, companyId, form);
+      onCreated();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Không thể lưu tin');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-border p-3 mb-4">
+      <div className="text-[11px] font-bold text-ink-faint mb-1.5">Cách 1 — Dán URL trang gốc để trích xuất tự động</div>
+      <div className="flex gap-2 mb-1.5">
+        <input
+          type="url"
+          placeholder="https://..."
+          className="tvl-input text-sm"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+        />
+        <button
+          type="button"
+          disabled={extracting || !url.trim()}
+          onClick={handleExtract}
+          className="tvl-btn-primary !w-auto px-4 whitespace-nowrap disabled:opacity-50"
+        >
+          {extracting ? 'Đang lấy…' : 'Trích xuất'}
+        </button>
+      </div>
+      {extractWarning && <div className="text-warning text-[11px] font-semibold mb-2">{extractWarning}</div>}
+
+      <div className="text-[11px] font-bold text-ink-faint mt-3 mb-1.5">
+        Cách 2 — Kiểm tra lại/nhập tay rồi lưu (luôn xem lại nội dung trước khi đăng)
+      </div>
+      <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 gap-2.5 text-xs">
+        <input
+          required
+          placeholder="Chức danh *"
+          className="tvl-input text-sm sm:col-span-2"
+          value={form.title}
+          onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+        />
+        <select
+          className="tvl-input text-sm"
+          value={form.industry ?? ''}
+          onChange={(e) => setForm((f) => ({ ...f, industry: e.target.value || undefined }))}
+        >
+          <option value="">Ngành nghề…</option>
+          {INDUSTRIES.map((i) => (
+            <option key={i} value={i}>{i}</option>
+          ))}
+        </select>
+        <select
+          className="tvl-input text-sm"
+          value={form.provinces?.[0] ?? ''}
+          onChange={(e) => setForm((f) => ({ ...f, provinces: e.target.value ? [e.target.value] : undefined }))}
+        >
+          <option value="">Tỉnh/Thành phố…</option>
+          {PROVINCES.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        <select
+          className="tvl-input text-sm"
+          value={form.employmentType ?? ''}
+          onChange={(e) => setForm((f) => ({ ...f, employmentType: e.target.value || undefined }))}
+        >
+          <option value="">Hình thức làm việc…</option>
+          {EMPLOYMENT_TYPES.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+        <select
+          className="tvl-input text-sm"
+          value={form.level ?? ''}
+          onChange={(e) => setForm((f) => ({ ...f, level: e.target.value || undefined }))}
+        >
+          <option value="">Cấp bậc…</option>
+          {LEVELS.map((l) => (
+            <option key={l} value={l}>{l}</option>
+          ))}
+        </select>
+        <select
+          className="tvl-input text-sm sm:col-span-2"
+          value={form.experienceLevel ?? ''}
+          onChange={(e) => setForm((f) => ({ ...f, experienceLevel: e.target.value || undefined }))}
+        >
+          <option value="">Kinh nghiệm…</option>
+          {EXPERIENCE_LEVELS.map((l) => (
+            <option key={l} value={l}>{l}</option>
+          ))}
+        </select>
+        <input
+          type="number"
+          min={0}
+          placeholder="Lương từ"
+          className="tvl-input text-sm"
+          value={form.salaryMin ?? ''}
+          onChange={(e) => setForm((f) => ({ ...f, salaryMin: e.target.value ? Number(e.target.value) : undefined }))}
+        />
+        <input
+          type="number"
+          min={0}
+          placeholder="Lương đến"
+          className="tvl-input text-sm"
+          value={form.salaryMax ?? ''}
+          onChange={(e) => setForm((f) => ({ ...f, salaryMax: e.target.value ? Number(e.target.value) : undefined }))}
+        />
+        <div className="sm:col-span-2">
+          <div className="text-[11px] font-semibold text-ink-faint mb-1">Mô tả công việc</div>
+          <RichTextEditor
+            value={form.description ?? ''}
+            onChange={(html) => setForm((f) => ({ ...f, description: html }))}
+            minHeight={120}
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <div className="text-[11px] font-semibold text-ink-faint mb-1">Yêu cầu ứng viên</div>
+          <RichTextEditor
+            value={form.requirements ?? ''}
+            onChange={(html) => setForm((f) => ({ ...f, requirements: html }))}
+            minHeight={100}
+          />
+        </div>
+        {error && <div className="text-critical font-semibold sm:col-span-2">{error}</div>}
+        <button type="submit" disabled={busy} className="tvl-btn-primary !w-auto px-5 sm:col-span-2 self-start">
+          Đăng tin (hiển thị công khai ngay)
+        </button>
+      </form>
     </div>
   );
 }

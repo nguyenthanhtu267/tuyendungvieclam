@@ -1,10 +1,10 @@
-import { ConflictException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, LessThanOrEqual, Repository } from 'typeorm';
 import * as argon2 from 'argon2';
 import * as crypto from 'crypto';
 import { Company, CompanyApprovalStatus } from '../database/entities/company.entity';
-import { CompanyUser } from '../database/entities/company-user.entity';
+import { CompanyUser, CompanyUserType } from '../database/entities/company-user.entity';
 import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
 import { Application } from '../database/entities/application.entity';
 import { User, UserRole } from '../database/entities/user.entity';
@@ -15,11 +15,17 @@ import { Invoice, InvoiceStatus } from '../database/entities/invoice.entity';
 import { SearchHistory } from '../database/entities/search-history.entity';
 import { AdminAuditLog } from '../database/entities/admin-audit-log.entity';
 import { AdminSetting } from '../database/entities/admin-setting.entity';
+import { CompanyClaimRequest, CompanyClaimRequestStatus } from '../database/entities/company-claim-request.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UpdateJobDto } from '../employer/dto/update-job.dto';
+import { CreateJobDto } from '../employer/dto/create-job.dto';
 import { RejectJobDto } from './dto/reject-job.dto';
+import { CreateDraftCompanyDto } from './dto/create-draft-company.dto';
+import { ClaimCompanyDto } from './dto/claim-company.dto';
+import { ResolveClaimRequestDto } from './dto/resolve-claim-request.dto';
 import { JOB_EDITABLE_FIELDS, JOB_RICH_TEXT_FIELDS } from '../common/job-editable-fields';
 import { sanitizeRichText } from '../common/sanitize-html.util';
+import { extractJobFromUrl, type ExtractJobUrlResult } from '../common/job-url-extractor.util';
 
 // Đợt 12q (21/09/2026) — thông tin admin đang đăng nhập, lấy từ CurrentUser() (payload JWT), dùng để
 // ghi nhật ký thao tác (mục #4 Batch 5). Chỉ cần userId + email, không cần load lại từ CSDL.
@@ -50,6 +56,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     @InjectRepository(SearchHistory) private readonly searchHistoryRepo: Repository<SearchHistory>,
     @InjectRepository(AdminAuditLog) private readonly auditRepo: Repository<AdminAuditLog>,
     @InjectRepository(AdminSetting) private readonly adminSettingRepo: Repository<AdminSetting>,
+    @InjectRepository(CompanyClaimRequest) private readonly claimRequestRepo: Repository<CompanyClaimRequest>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -662,5 +669,245 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       });
     }
     return series;
+  }
+
+  // ===== Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp" (mô hình "labeled aggregator") =====
+  // Admin tự tạo hồ sơ công ty + tài khoản NTD nháp + đăng tin hộ từ các trang tuyển dụng khác, để
+  // tăng lượng tin ngay từ đầu thay vì chờ công ty tự đăng ký — mọi công ty/tin loại này LUÔN hiện
+  // công khai NGAY (không phải chờ Admin duyệt thêm lần nữa, vì chính Admin là người tạo/đăng hộ) và
+  // LUÔN kèm badge "Tin tổng hợp — chưa xác thực" ở FE cho tới khi công ty thật "nhận lại" tài khoản
+  // (xem claimCompany() bên dưới) — thống nhất với người dùng qua trao đổi: "Đăng tin nguyên vẹn...
+  // Đề xuất mô hình an toàn: Bạn cứ đăng lên."
+
+  private async generateUniqueDraftTaxCode(): Promise<string> {
+    for (let i = 0; i < 20; i++) {
+      const code = `DRAFT-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+      const existing = await this.companyRepo.findOne({ where: { taxCode: code } });
+      if (!existing) return code;
+    }
+    throw new ConflictException('Không sinh được mã số thuế tạm — vui lòng thử lại');
+  }
+
+  private async generateUniquePlaceholderEmail(): Promise<string> {
+    for (let i = 0; i < 20; i++) {
+      const email = `nguon.${crypto.randomBytes(5).toString('hex')}@doi-tac.tuyendungvieclam.local`;
+      const existing = await this.userRepo.findOne({ where: { email } });
+      if (!existing) return email;
+    }
+    throw new ConflictException('Không sinh được email tạm — vui lòng thử lại');
+  }
+
+  // Tạo hồ sơ công ty "chưa xác thực" + tài khoản NTD nháp (employer_main, CHƯA từng đăng nhập — email
+  // + mật khẩu tạm chỉ để Admin tự thao tác đăng tin hộ, KHÔNG gửi cho ai cho tới khi claim thật).
+  async createDraftCompany(admin: AdminActor, dto: CreateDraftCompanyDto) {
+    const taxCode = await this.generateUniqueDraftTaxCode();
+    const placeholderEmail = await this.generateUniquePlaceholderEmail();
+    const tempPassword = crypto.randomBytes(6).toString('base64url');
+
+    const user = await this.userRepo.save(
+      this.userRepo.create({
+        email: placeholderEmail,
+        passwordHash: await argon2.hash(tempPassword),
+        fullName: dto.name,
+        role: UserRole.EMPLOYER_MAIN,
+      }),
+    );
+
+    const company = await this.companyRepo.save(
+      this.companyRepo.create({
+        name: dto.name,
+        taxCode,
+        industry: dto.industry,
+        size: dto.size,
+        website: dto.website,
+        logoUrl: dto.logoUrl?.trim() || undefined,
+        description: dto.description?.trim() || undefined,
+        // Admin đã tự tạo/tự chịu trách nhiệm nội dung nên duyệt hồ sơ luôn — khỏi lọt vào danh sách
+        // "Công ty chờ duyệt" (listPendingCompanies) gây nhầm lẫn cho chính Admin.
+        approvalStatus: CompanyApprovalStatus.APPROVED,
+        isAdminSourced: true,
+        sourceLabel: dto.sourceLabel?.trim() || undefined,
+      }),
+    );
+
+    await this.companyUserRepo.save(
+      this.companyUserRepo.create({ companyId: company.id, userId: user.id, type: CompanyUserType.MAIN }),
+    );
+
+    await this.logAction(admin, 'company.create_draft', 'company', company.id, `${company.name} (nguồn: ${dto.sourceLabel ?? 'không ghi rõ'})`);
+
+    return {
+      company,
+      draftAccount: {
+        email: placeholderEmail,
+        tempPassword,
+        note: 'Tài khoản tạm — dùng để bạn (Admin) tự đăng tin hộ. KHÔNG gửi cho ai cho tới khi công ty thật "nhận lại" (xem mục Chuyển giao).',
+      },
+    };
+  }
+
+  // Danh sách công ty nguồn ngoài (isAdminSourced=true), tìm theo tên — dùng cho tab "Nguồn ngoài".
+  // claimed=true lọc công ty đã được nhận lại; claimed=false lọc công ty còn "chưa xác thực"; bỏ trống
+  // lấy cả 2.
+  async listSourcedCompanies(q?: string, claimed?: boolean) {
+    const qb = this.companyRepo
+      .createQueryBuilder('company')
+      .where('company.isAdminSourced = true')
+      .orderBy('company.createdAt', 'DESC');
+    if (q?.trim()) qb.andWhere('company.name ILIKE :q', { q: `%${q.trim()}%` });
+    if (claimed === true) qb.andWhere('company.claimedAt IS NOT NULL');
+    if (claimed === false) qb.andWhere('company.claimedAt IS NULL');
+    const companies = await qb.take(100).getMany();
+    const jobCounts = await Promise.all(
+      companies.map((c) => this.jobRepo.count({ where: { companyId: c.id } })),
+    );
+    return companies.map((company, i) => ({ ...company, jobCount: jobCounts[i] }));
+  }
+
+  // Chi tiết 1 công ty nguồn ngoài + toàn bộ tin (mọi trạng thái) — màn quản lý tin của Admin cho
+  // công ty này (thêm tin mới, xem tin đã đăng).
+  async getSourcedCompanyDetail(id: string) {
+    const company = await this.companyRepo.findOne({ where: { id } });
+    if (!company) throw new NotFoundException('Không tìm thấy công ty');
+    const jobs = await this.jobRepo.find({ where: { companyId: id }, order: { createdAt: 'DESC' } });
+    return { company, jobs };
+  }
+
+  // Admin đăng tin HỘ cho 1 công ty bất kỳ (khác EmployerService.createJob() vốn chỉ đăng được cho
+  // công ty của chính tài khoản NTD đang đăng nhập). Đăng thẳng APPROVED (không qua hàng đợi "Duyệt
+  // tin") vì đây CHÍNH LÀ Admin tự biên soạn/kiểm tra nội dung rồi — tương tự adminUpdateJob() không
+  // cần vòng duyệt thêm lần 2 cho nội dung Admin tự tay xử lý.
+  async createJobForCompany(admin: AdminActor, companyId: string, dto: CreateJobDto) {
+    const company = await this.companyRepo.findOne({ where: { id: companyId } });
+    if (!company) throw new NotFoundException('Không tìm thấy công ty');
+    const job = this.jobRepo.create({
+      companyId,
+      title: dto.title,
+      industry: dto.industry,
+      location: dto.location,
+      provinces: dto.provinces,
+      district: dto.district,
+      experienceLevel: dto.experienceLevel,
+      isUrgent: dto.isUrgent ?? false,
+      salaryMin: dto.salaryMin,
+      salaryMax: dto.salaryMax,
+      employmentType: dto.employmentType,
+      level: dto.level,
+      headcount: dto.headcount ?? 1,
+      description: sanitizeRichText(dto.description),
+      requirements: sanitizeRichText(dto.requirements),
+      benefits: sanitizeRichText(dto.benefits),
+      deadline: dto.deadline,
+      address: dto.address,
+      gender: dto.gender,
+      ageRange: dto.ageRange,
+      workSchedule: dto.workSchedule,
+      tags: dto.tags,
+      contactName: dto.contactName,
+      contactEmail: dto.contactEmail,
+      contactPhone: dto.contactPhone,
+      contactNote: sanitizeRichText(dto.contactNote),
+      sourceUrl: dto.sourceUrl?.trim() || undefined,
+      approvalStatus: JobApprovalStatus.APPROVED,
+      adminReviewed: true,
+    });
+    const saved = await this.jobRepo.save(job);
+    await this.logAction(admin, 'job.create_for_company', 'job', saved.id, `${saved.title} (${company.name})`);
+    return saved;
+  }
+
+  // "Dán URL → trích xuất tự động" — best-effort, Admin luôn xem lại trước khi lưu (xem ghi chú ở
+  // job-url-extractor.util.ts). Không ghi audit log (chỉ là bước đọc dữ liệu tham khảo, chưa lưu gì).
+  async extractJobFromUrlTool(url: string): Promise<ExtractJobUrlResult> {
+    return extractJobFromUrl(url);
+  }
+
+  // Chuyển giao tài khoản nháp cho công ty thật ("nhận lại") — dùng chung cho cả 2 đường: Admin tự
+  // chủ động (đã xác minh qua điện thoại/Zalo ngoài hệ thống) VÀ duyệt yêu cầu công khai "Đây là công
+  // ty của bạn?" (approveClaimRequest() gọi lại hàm này). Đổi email đăng nhập + đặt lại mật khẩu tạm
+  // (Admin tự báo cho công ty qua kênh ngoài hệ thống, giống hệt resetUserPassword()) — KHÔNG tạo tài
+  // khoản mới để giữ nguyên toàn bộ tin/ứng viên đã có sẵn dưới công ty này.
+  async claimCompany(admin: AdminActor, companyId: string, dto: ClaimCompanyDto) {
+    const company = await this.companyRepo.findOne({ where: { id: companyId } });
+    if (!company) throw new NotFoundException('Không tìm thấy công ty');
+    if (!company.isAdminSourced) {
+      throw new BadRequestException('Công ty này không phải công ty nguồn ngoài — không áp dụng chuyển giao');
+    }
+
+    const mainLink = await this.companyUserRepo.findOne({ where: { companyId, type: CompanyUserType.MAIN } });
+    if (!mainLink) throw new NotFoundException('Không tìm thấy tài khoản chính của công ty này');
+    const user = await this.userRepo.findOne({ where: { id: mainLink.userId } });
+    if (!user) throw new NotFoundException('Không tìm thấy tài khoản chính của công ty này');
+
+    if (dto.email !== user.email) {
+      const existing = await this.userRepo.findOne({ where: { email: dto.email } });
+      if (existing) throw new ConflictException('Email này đã được đăng ký cho tài khoản khác');
+    }
+    if (dto.taxCode && dto.taxCode !== company.taxCode) {
+      const existingTax = await this.companyRepo.findOne({ where: { taxCode: dto.taxCode } });
+      if (existingTax) throw new ConflictException('Mã số thuế này đã được đăng ký cho công ty khác');
+      company.taxCode = dto.taxCode;
+    }
+
+    const tempPassword = crypto.randomBytes(6).toString('base64url');
+    user.email = dto.email;
+    if (dto.fullName) user.fullName = dto.fullName;
+    if (dto.phone) user.phone = dto.phone;
+    user.passwordHash = await argon2.hash(tempPassword);
+    await this.userRepo.save(user);
+
+    company.claimedAt = new Date();
+    await this.companyRepo.save(company);
+
+    await this.logAction(admin, 'company.claim', 'company', company.id, `${company.name} → ${dto.email}`);
+
+    return { company, account: { email: dto.email, tempPassword } };
+  }
+
+  // ===== Yêu cầu công khai "Đây là công ty của bạn?" =====
+
+  async listClaimRequests(status?: CompanyClaimRequestStatus) {
+    return this.claimRequestRepo.find({
+      where: status ? { status } : {},
+      relations: { company: true },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async approveClaimRequest(admin: AdminActor, id: string, dto: ResolveClaimRequestDto) {
+    const request = await this.claimRequestRepo.findOne({ where: { id } });
+    if (!request) throw new NotFoundException('Không tìm thấy yêu cầu');
+    if (request.status !== CompanyClaimRequestStatus.PENDING) {
+      throw new ConflictException('Yêu cầu này đã được xử lý trước đó');
+    }
+
+    const result = await this.claimCompany(admin, request.companyId, {
+      email: request.requesterEmail,
+      fullName: request.requesterName,
+      phone: request.requesterPhone,
+      taxCode: dto.taxCode,
+    });
+
+    request.status = CompanyClaimRequestStatus.APPROVED;
+    request.adminNote = dto.adminNote;
+    request.resolvedAt = new Date();
+    await this.claimRequestRepo.save(request);
+    await this.logAction(admin, 'claim_request.approve', 'company_claim_request', request.id, request.requesterEmail);
+
+    return { request, account: result.account };
+  }
+
+  async rejectClaimRequest(admin: AdminActor, id: string, dto: ResolveClaimRequestDto) {
+    const request = await this.claimRequestRepo.findOne({ where: { id } });
+    if (!request) throw new NotFoundException('Không tìm thấy yêu cầu');
+    if (request.status !== CompanyClaimRequestStatus.PENDING) {
+      throw new ConflictException('Yêu cầu này đã được xử lý trước đó');
+    }
+    request.status = CompanyClaimRequestStatus.REJECTED;
+    request.adminNote = dto.adminNote;
+    request.resolvedAt = new Date();
+    const saved = await this.claimRequestRepo.save(request);
+    await this.logAction(admin, 'claim_request.reject', 'company_claim_request', request.id, request.requesterEmail);
+    return saved;
   }
 }

@@ -50,6 +50,7 @@ import {
   CandidateNote,
   WorkLocation,
   AdminSetting,
+  CompanyClaimRequest,
 } from './database/entities';
 
 const entities = [
@@ -83,6 +84,7 @@ const entities = [
   CandidateNote,
   WorkLocation,
   AdminSetting,
+  CompanyClaimRequest,
 ];
 
 @Module({

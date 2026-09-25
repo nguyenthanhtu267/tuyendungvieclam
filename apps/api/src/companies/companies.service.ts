@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Company } from '../database/entities/company.entity';
 import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
 import { CompanyFollow } from '../database/entities/company-follow.entity';
+import { CompanyClaimRequest, CompanyClaimRequestStatus } from '../database/entities/company-claim-request.entity';
 import { resolveCompanyLogoUrl } from '../common/company-logo.util';
+import { CreateClaimRequestDto } from './dto/create-claim-request.dto';
 
 // Đợt 12k (21/09/2026) — trang công ty công khai /cong-ty/[id]: bấm tên công ty trong tin tuyển
 // dụng sẽ tới đây, xem thông tin công ty + toàn bộ tin đang tuyển khác của công ty đó (giống
@@ -19,6 +21,8 @@ export class CompaniesService {
     private readonly jobRepo: Repository<JobPosting>,
     @InjectRepository(CompanyFollow)
     private readonly followRepo: Repository<CompanyFollow>,
+    @InjectRepository(CompanyClaimRequest)
+    private readonly claimRequestRepo: Repository<CompanyClaimRequest>,
   ) {}
 
   async getProfile(id: string) {
@@ -61,9 +65,38 @@ export class CompaniesService {
         followersCount,
         // Đợt 12ac (24/09/2026) — "Giới thiệu công ty" cho tab Tổng quan công ty.
         description: company.description,
+        // Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp": FE dùng 2 trường này để quyết định có
+        // hiện badge "Tin tổng hợp — chưa xác thực" + nút "Đây là công ty của bạn?" hay không (điều
+        // kiện: isAdminSourced && !claimedAt — xem ghi chú ở company.entity.ts).
+        isAdminSourced: company.isAdminSourced,
+        sourceLabel: company.sourceLabel,
+        claimedAt: company.claimedAt,
       },
       jobs,
       totalJobs: jobs.length,
     };
+  }
+
+  // Đợt 17 (25/09/2026) — "Đây là công ty của bạn?": ai cũng gửi được (không cần đăng nhập, xem ghi
+  // chú ở company-claim-request.entity.ts), nhưng chỉ áp dụng cho công ty đang ở trạng thái "chưa xác
+  // thực" (isAdminSourced && !claimedAt) — công ty đã claimed hoặc tự đăng ký từ đầu không cần "nhận
+  // lại" gì cả, chặn sớm ở đây để tránh spam yêu cầu vô nghĩa.
+  async submitClaimRequest(companyId: string, dto: CreateClaimRequestDto) {
+    const company = await this.companyRepo.findOne({ where: { id: companyId } });
+    if (!company) throw new NotFoundException('Không tìm thấy công ty');
+    if (!company.isAdminSourced || company.claimedAt) {
+      throw new BadRequestException('Công ty này không ở trạng thái "chưa xác thực" — không cần gửi yêu cầu nhận lại');
+    }
+    const saved = await this.claimRequestRepo.save(
+      this.claimRequestRepo.create({
+        companyId,
+        requesterName: dto.requesterName,
+        requesterEmail: dto.requesterEmail,
+        requesterPhone: dto.requesterPhone,
+        note: dto.note,
+        status: CompanyClaimRequestStatus.PENDING,
+      }),
+    );
+    return { success: true, id: saved.id };
   }
 }

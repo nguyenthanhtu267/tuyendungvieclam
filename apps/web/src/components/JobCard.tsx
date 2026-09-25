@@ -8,6 +8,7 @@ import { candidatesApi, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { formatDate, formatSalaryTag, isNewJob } from '@/lib/format';
 import { CompanyLogo } from '@/components/CompanyLogo';
+import { SourcedBadge, isCompanyUnverified } from '@/components/SourcedBadge';
 
 // Đợt 10 — thẻ việc làm theo mục 4 đặc tả: tiêu đề đậm + badge (MỚI) chữ đỏ trong ngoặc (không phải
 // pill), dòng lương đỏ, nhiều tỉnh ngăn bởi "|", hạn nộp/cập nhật, tag phúc lợi có icon, nút đỏ
@@ -102,7 +103,10 @@ export function JobCard({
             </span>
           )}
         </div>
-        <div className="text-xs text-ink-muted mt-0.5 truncate">{job.company.name}</div>
+        <div className="text-xs text-ink-muted mt-0.5 truncate flex items-center gap-1.5">
+          <span className="truncate">{job.company.name}</span>
+          {isCompanyUnverified(job.company) && <SourcedBadge />}
+        </div>
 
         <div className="text-critical font-bold text-[12.5px] mt-1.5">
           $ {formatSalaryTag(job.salaryMin, job.salaryMax)}

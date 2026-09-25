@@ -6,6 +6,7 @@ import Link from 'next/link';
 import SiteHeader from '@/components/SiteHeader';
 import { JobCard } from '@/components/JobCard';
 import { CompanyLogo } from '@/components/CompanyLogo';
+import { SourcedBadge, isCompanyUnverified } from '@/components/SourcedBadge';
 import { companiesApi, candidatesApi, ApiError, type CompanyProfileResponse } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { formatNumber } from '@/lib/format';
@@ -97,7 +98,10 @@ export default function CongTyPage() {
           <div className="flex items-center gap-4">
             <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={64} variant="light" className="text-lg" />
             <div>
-              <div className="text-white text-xl font-extrabold">{company.name}</div>
+              <div className="text-white text-xl font-extrabold flex items-center gap-2 flex-wrap">
+                {company.name}
+                {isCompanyUnverified(company) && <SourcedBadge />}
+              </div>
               <div className="text-white/75 text-[13px] mt-1">
                 {formatNumber(totalJobs)} tin đang tuyển{company.industry ? ` · ${company.industry}` : ''}
                 {' · '}
@@ -117,6 +121,11 @@ export default function CongTyPage() {
             </button>
           )}
         </div>
+
+        {/* Đợt 17 (25/09/2026) — "Đây là công ty của bạn?": chỉ hiện khi công ty đang ở trạng thái
+            "chưa xác thực" (isAdminSourced && !claimedAt) — công ty tự đăng ký từ đầu hoặc đã claim
+            rồi thì không cần nút này. */}
+        {isCompanyUnverified(company) && <ClaimCompanySection companyId={company.id} />}
 
         <div className="grid lg:grid-cols-[1fr_280px] gap-5 mt-5 items-start">
           <div>
@@ -162,6 +171,96 @@ export default function CongTyPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+// Đợt 17 (25/09/2026) — "Đây là công ty của bạn?": form công khai, không cần đăng nhập (công ty thật
+// chưa có tài khoản để đăng nhập vào lúc này — xem ghi chú ở company-claim-request.entity.ts). Admin
+// xác minh thông tin NGOÀI hệ thống rồi mới duyệt/chuyển giao ở tab "Nguồn ngoài".
+function ClaimCompanySection({ companyId }: { companyId: string }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [sent, setSent] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim() || !email.trim()) return;
+    setBusy(true);
+    setError('');
+    try {
+      await companiesApi.submitClaimRequest(companyId, {
+        requesterName: name.trim(),
+        requesterEmail: email.trim(),
+        requesterPhone: phone.trim() || undefined,
+        note: note.trim() || undefined,
+      });
+      setSent(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Không gửi được yêu cầu, vui lòng thử lại');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-warning/30 bg-warning-tint p-4">
+      <div className="text-[12.5px] text-warning font-semibold">
+        Hồ sơ công ty này do đội ngũ tổng hợp từ nguồn khác — nếu bạn là đại diện công ty, hãy gửi yêu cầu để
+        &ldquo;nhận lại&rdquo; và tự quản lý tài khoản này.
+      </div>
+      {sent ? (
+        <div className="text-[12.5px] text-ink-muted mt-2">
+          ✓ Đã gửi yêu cầu. Đội ngũ sẽ liên hệ xác minh và bàn giao tài khoản trong thời gian sớm nhất.
+        </div>
+      ) : open ? (
+        <form onSubmit={handleSubmit} className="mt-3 grid sm:grid-cols-2 gap-2.5 text-xs max-w-lg">
+          <input
+            required
+            placeholder="Họ tên của bạn *"
+            className="tvl-input text-sm"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <input
+            required
+            type="email"
+            placeholder="Email liên hệ *"
+            className="tvl-input text-sm"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <input
+            placeholder="Số điện thoại (không bắt buộc)"
+            className="tvl-input text-sm sm:col-span-2"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+          <textarea
+            placeholder="Ghi chú thêm (chức vụ, cách xác minh...)"
+            className="tvl-input text-sm sm:col-span-2"
+            rows={2}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+          {error && <div className="text-critical font-semibold sm:col-span-2">{error}</div>}
+          <button type="submit" disabled={busy} className="tvl-btn-primary !w-auto px-5 sm:col-span-2 self-start">
+            Gửi yêu cầu
+          </button>
+        </form>
+      ) : (
+        <button
+          onClick={() => setOpen(true)}
+          className="mt-2.5 !w-auto px-4 py-2 rounded-lg text-xs font-bold bg-white text-warning border border-warning/30"
+        >
+          Đây là công ty của bạn?
+        </button>
+      )}
+    </div>
   );
 }
 

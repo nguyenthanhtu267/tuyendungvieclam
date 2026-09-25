@@ -14,6 +14,7 @@ import { Invoice } from '../database/entities/invoice.entity';
 import { SearchHistory } from '../database/entities/search-history.entity';
 import { AdminAuditLog } from '../database/entities/admin-audit-log.entity';
 import { AdminSetting } from '../database/entities/admin-setting.entity';
+import { CompanyClaimRequest } from '../database/entities/company-claim-request.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
@@ -31,6 +32,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       SearchHistory,
       AdminAuditLog,
       AdminSetting,
+      CompanyClaimRequest,
     ]),
     NotificationsModule,
   ],

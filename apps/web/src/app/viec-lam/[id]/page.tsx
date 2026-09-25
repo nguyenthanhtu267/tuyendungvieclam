@@ -7,6 +7,7 @@ import SiteHeader from '@/components/SiteHeader';
 import { JobCard } from '@/components/JobCard';
 import { RichTextView } from '@/components/RichTextView';
 import { CompanyLogo } from '@/components/CompanyLogo';
+import { SourcedBadge, isCompanyUnverified } from '@/components/SourcedBadge';
 import { CompatibilityRadar } from '@/components/CompatibilityRadar';
 import { CompatibilityChecklist } from '@/components/CompatibilityChecklist';
 import {
@@ -235,9 +236,12 @@ function JobDetailInner() {
                 </span>
               )}
             </div>
-            <Link href={`/cong-ty/${job.company.id}`} className="text-white/75 text-[13px] mt-1 inline-block hover:text-white hover:underline">
-              {job.company.name}
-            </Link>
+            <div className="flex items-center gap-2 flex-wrap mt-1">
+              <Link href={`/cong-ty/${job.company.id}`} className="text-white/75 text-[13px] hover:text-white hover:underline">
+                {job.company.name}
+              </Link>
+              {isCompanyUnverified(job.company) && <SourcedBadge />}
+            </div>
           </div>
           <div className="flex gap-2 items-center">
             <button
@@ -482,9 +486,12 @@ function JobDetailInner() {
                   <div className="flex items-center gap-3">
                     <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={48} className="text-sm" />
                     <div>
-                      <Link href={`/cong-ty/${job.company.id}`} className="font-bold text-ink text-sm hover:text-primary hover:underline">
-                        {job.company.name}
-                      </Link>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Link href={`/cong-ty/${job.company.id}`} className="font-bold text-ink text-sm hover:text-primary hover:underline">
+                          {job.company.name}
+                        </Link>
+                        {isCompanyUnverified(job.company) && <SourcedBadge />}
+                      </div>
                       <div className="text-ink-faint text-xs">Mã số thuế: {job.company.taxCode}</div>
                     </div>
                   </div>
@@ -542,9 +549,16 @@ function JobDetailInner() {
             <div className="rounded-xl border border-border bg-white p-4">
               <div className="flex items-center gap-2.5">
                 <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={40} className="text-xs" />
-                <Link href={`/cong-ty/${job.company.id}`} className="font-bold text-[13px] hover:text-primary hover:underline">
-                  {job.company.name}
-                </Link>
+                <div>
+                  <Link href={`/cong-ty/${job.company.id}`} className="font-bold text-[13px] hover:text-primary hover:underline">
+                    {job.company.name}
+                  </Link>
+                  {isCompanyUnverified(job.company) && (
+                    <div className="mt-1">
+                      <SourcedBadge />
+                    </div>
+                  )}
+                </div>
               </div>
               {me?.role === 'candidate' && (
                 <button onClick={toggleFollow} disabled={followBusy} className="tvl-btn-ghost mt-3 disabled:opacity-60">

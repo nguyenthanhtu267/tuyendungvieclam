@@ -114,4 +114,11 @@ export class CreateJobDto {
   @IsOptional()
   @IsString()
   contactNote?: string;
+
+  // Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp": chỉ dùng khi Admin tạo tin hộ (xem
+  // AdminService.createJobForCompany()) — NTD tự đăng tin bình thường không gửi trường này (bị
+  // EmployerService.createJob() bỏ qua vì không nằm trong danh sách trường được gán).
+  @IsOptional()
+  @IsString()
+  sourceUrl?: string;
 }

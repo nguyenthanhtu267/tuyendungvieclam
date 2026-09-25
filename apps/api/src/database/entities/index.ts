@@ -21,3 +21,4 @@ export * from './company-follow.entity';
 export * from './candidate-note.entity';
 export * from './work-location.entity';
 export * from './admin-setting.entity';
+export * from './company-claim-request.entity';
