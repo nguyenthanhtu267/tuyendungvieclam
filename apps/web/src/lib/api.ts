@@ -125,7 +125,9 @@ export interface JobPosting {
   headcount: number;
   description?: string;
   requirements?: string;
-  benefits?: string[];
+  // Đợt 14 (25/09/2026) — mục 15: đổi từ mảng chip sang rich text tự do (HTML), giống
+  // description/requirements — xem job-posting.entity.ts.
+  benefits?: string;
   deadline?: string;
   // Đợt 12k (21/09/2026) — khối "Địa điểm làm việc" (địa chỉ chi tiết) và "Thông tin khác".
   address?: string;
@@ -143,6 +145,8 @@ export interface JobPosting {
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
+  // Đợt 14 (25/09/2026) — mục 15: khung mô tả thêm tự do cạnh 3 trường liên hệ ở trên.
+  contactNote?: string;
   approvalStatus?: JobApprovalStatus;
   // Đợt 12l (21/09/2026) — dùng ở trang Xem trước NTD để hiện đúng trạng thái "Tạm ngưng".
   isPaused?: boolean;
@@ -709,7 +713,8 @@ export interface CreateJobPayload {
   headcount?: number;
   description?: string;
   requirements?: string;
-  benefits?: string[];
+  // Đợt 14 (25/09/2026) — mục 15: đổi từ mảng chip sang rich text tự do (HTML).
+  benefits?: string;
   deadline?: string;
   // Đợt 12k (21/09/2026) — khối "Địa điểm làm việc" (địa chỉ chi tiết) và "Thông tin khác".
   address?: string;
@@ -721,6 +726,8 @@ export interface CreateJobPayload {
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
+  // Đợt 14 (25/09/2026) — mục 15: khung mô tả thêm tự do cạnh 3 trường liên hệ ở trên.
+  contactNote?: string;
 }
 
 // ===== B5 — Tài khoản & Hồ sơ công ty =====

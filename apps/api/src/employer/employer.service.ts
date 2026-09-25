@@ -22,7 +22,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { EmployerJobStatus } from './dto/list-jobs-query.dto';
 import { ListApplicantsQueryDto } from './dto/list-applicants-query.dto';
 import { sanitizeRichText } from '../common/sanitize-html.util';
-import { JOB_EDITABLE_FIELDS } from '../common/job-editable-fields';
+import { JOB_EDITABLE_FIELDS, JOB_RICH_TEXT_FIELDS } from '../common/job-editable-fields';
 
 const LEGAL_DOC_MAX_BYTES = 3 * 1024 * 1024; // 3MB — theo Mục 9 SRS
 
@@ -209,6 +209,7 @@ export class EmployerService {
       contactName: job.contactName,
       contactEmail: job.contactEmail,
       contactPhone: job.contactPhone,
+      contactNote: job.contactNote,
       approvalStatus: JobApprovalStatus.PENDING,
       isPaused: false,
     });
@@ -237,7 +238,9 @@ export class EmployerService {
       headcount: dto.headcount ?? 1,
       description: sanitizeRichText(dto.description),
       requirements: sanitizeRichText(dto.requirements),
-      benefits: dto.benefits,
+      // Đợt 14 (25/09/2026) — mục 15: "Quyền lợi được hưởng" nay là rich text (HTML) như
+      // description/requirements, cần khử độc tương tự.
+      benefits: sanitizeRichText(dto.benefits),
       deadline: dto.deadline,
       address: dto.address,
       gender: dto.gender,
@@ -247,6 +250,7 @@ export class EmployerService {
       contactName: dto.contactName,
       contactEmail: dto.contactEmail,
       contactPhone: dto.contactPhone,
+      contactNote: sanitizeRichText(dto.contactNote),
       approvalStatus: JobApprovalStatus.PENDING,
     });
     return this.jobRepo.save(job);
@@ -279,7 +283,9 @@ export class EmployerService {
     const job = await this.getOwnedJob(userId, jobId);
     for (const key of JOB_EDITABLE_FIELDS) {
       if (Object.prototype.hasOwnProperty.call(dto, key)) {
-        const value = key === 'description' || key === 'requirements' ? sanitizeRichText(dto[key]) : dto[key];
+        const value = (JOB_RICH_TEXT_FIELDS as readonly string[]).includes(key)
+          ? sanitizeRichText(dto[key] as string | undefined)
+          : dto[key];
         (job as unknown as Record<string, unknown>)[key] = value;
       }
     }

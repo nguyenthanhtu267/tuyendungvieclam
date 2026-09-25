@@ -8,6 +8,7 @@ import { candidatesApi, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { benefitIcon } from '@/lib/benefit-icons';
 import { formatDate, formatSalaryTag, isNewJob } from '@/lib/format';
+import { richTextListItems } from '@/lib/richtext';
 import { CompanyLogo } from '@/components/CompanyLogo';
 
 // Đợt 10 — thẻ việc làm theo mục 4 đặc tả: tiêu đề đậm + badge (MỚI) chữ đỏ trong ngoặc (không phải
@@ -28,6 +29,7 @@ export function JobCard({
   const [busy, setBusy] = useState(false);
 
   const locationText = job.provinces?.length ? job.provinces.join(' | ') : job.location;
+  const benefitItems = richTextListItems(job.benefits, 3);
 
   async function handleToggleSave(e: React.MouseEvent) {
     e.preventDefault();
@@ -63,10 +65,17 @@ export function JobCard({
   // Đợt 12aa (24/09/2026) — badge "URGENT" (tin khẩn cấp) thiết kế lại theo mẫu careerviet.vn: thẻ
   // nền hồng nhạt + viền hồng, badge có icon tia sét ⚡ và chữ tiếng Anh "URGENT" giống mẫu (thay
   // cho pill "KHẨN CẤP" nhỏ trước đây), để nổi bật hơn giữa danh sách tin thường.
+  // Đợt 14 (25/09/2026) — mục 13 danh sách lỗi: 2 thay đổi theo yêu cầu người dùng (không có ảnh
+  // mẫu cụ thể, tự thiết kế theo mô tả bằng lời):
+  //  1. Badge "URGENT" chuyển vào CÙNG dòng tiêu đề, ngay sau "(MỚI)" — trước đây là 1 khối riêng
+  //     phía trên tiêu đề, tách biệt với "(MỚI)".
+  //  2. Nút "ỨNG TUYỂN NGAY" to hơn, chuyển sang cột riêng bên PHẢI thẻ (căn giữa theo chiều dọc so
+  //     với khối nội dung), thay vì nằm ở dòng cuối cùng bên dưới tag phúc lợi như trước. Dùng
+  //     flex-wrap để tự động xuống dòng khi thẻ quá hẹp (vẫn giữ đúng bố cục ở lưới sm:grid-cols-2).
   return (
     <Link
       href={`/viec-lam/${job.id}`}
-      className={`relative flex gap-3 rounded-xl border p-4 transition-all ${
+      className={`relative flex flex-wrap sm:flex-nowrap items-center gap-3 rounded-xl border p-4 transition-all ${
         job.isUrgent
           ? 'border-critical/30 bg-critical-tint/50 hover:border-critical hover:shadow-sm'
           : 'border-border bg-white hover:border-primary hover:shadow-sm'
@@ -87,14 +96,14 @@ export function JobCard({
           initials theo tỷ lệ để không bị vỡ layout khi công ty chưa có logoUrl. */}
       <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={60} className="text-sm" />
       <div className="flex-1 min-w-0 pr-6">
-        {job.isUrgent && (
-          <div className="inline-flex items-center gap-1 mb-1 text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-critical text-white tracking-wide">
-            ⚡ URGENT
-          </div>
-        )}
         <div className="font-bold text-[13.5px] text-ink">
           {job.title}
           {isNewJob(job.createdAt) && <span className="text-critical font-extrabold ml-1.5">(MỚI)</span>}
+          {job.isUrgent && (
+            <span className="inline-flex items-center gap-1 ml-1.5 align-middle text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-critical text-white tracking-wide">
+              ⚡ URGENT
+            </span>
+          )}
         </div>
         <div className="text-xs text-ink-muted mt-0.5 truncate">{job.company.name}</div>
 
@@ -108,11 +117,15 @@ export function JobCard({
           <span>Cập nhật: {formatDate(job.updatedAt ?? job.createdAt)}</span>
         </div>
 
-        {job.benefits && job.benefits.length > 0 && (
+        {/* Đợt 14 (25/09/2026) — mục 15: `benefits` nay là rich text tự do (HTML), không còn mảng
+            chip. richTextListItems() tách tối đa 3 "mục" ngắn (theo khối <li>/<p> nếu có, hoặc theo
+            dấu phẩy cho dữ liệu cũ) để vẫn hiện dạng chip có icon như trước — chỉ đổi CÁCH LẤY dữ
+            liệu, giao diện thẻ giữ nguyên. */}
+        {benefitItems.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
-            {job.benefits.slice(0, 3).map((b) => (
+            {benefitItems.map((b, i) => (
               <span
-                key={b}
+                key={i}
                 className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-surface-alt text-ink-muted"
               >
                 {benefitIcon(b)} {b}
@@ -120,16 +133,16 @@ export function JobCard({
             ))}
           </div>
         )}
+      </div>
 
-        <div className="mt-2.5">
-          <button
-            type="button"
-            onClick={handleApplyNow}
-            className="inline-block bg-critical text-white text-[11.5px] font-extrabold tracking-wide rounded-lg px-4 py-1.5 hover:brightness-95"
-          >
-            ỨNG TUYỂN NGAY
-          </button>
-        </div>
+      <div className="w-full sm:w-auto shrink-0 pt-1 sm:pt-0">
+        <button
+          type="button"
+          onClick={handleApplyNow}
+          className="w-full sm:w-auto bg-critical text-white text-[13px] font-extrabold tracking-wide rounded-lg px-6 py-2.5 hover:brightness-95"
+        >
+          ỨNG TUYỂN NGAY
+        </button>
       </div>
     </Link>
   );

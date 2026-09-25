@@ -64,9 +64,11 @@ export class CreateJobDto {
   @IsString()
   requirements?: string;
 
+  // Đợt 14 (25/09/2026) — mục 15: "Quyền lợi được hưởng" đổi từ mảng chip sang rich text tự do
+  // (HTML), giống `description`/`requirements`.
   @IsOptional()
-  @IsArray()
-  benefits?: string[];
+  @IsString()
+  benefits?: string;
 
   @IsOptional()
   @IsString()
@@ -107,4 +109,9 @@ export class CreateJobDto {
   @IsOptional()
   @IsString()
   contactPhone?: string;
+
+  // Đợt 14 (25/09/2026) — mục 15: khung mô tả thêm tự do cạnh 3 trường liên hệ có cấu trúc ở trên.
+  @IsOptional()
+  @IsString()
+  contactNote?: string;
 }

@@ -15,6 +15,7 @@ import { RichTextEditor } from '@/components/RichTextEditor';
 import { ChipsInput } from '@/components/profile/ui';
 import { MultiSelectPopover } from '@/components/search/MultiSelectPopover';
 import { adminApi, ApiError } from '@/lib/api';
+import { isRichTextEmpty } from '@/lib/richtext';
 import {
   EMPLOYMENT_TYPES,
   EXPERIENCE_LEVELS,
@@ -34,7 +35,13 @@ const DISTRICT_SUPPORTED_PROVINCES = ['Hồ Chí Minh', 'Hà Nội'];
 // Đợt 13 (24/09/2026) — đồng bộ với wizard Đăng tin NTD: "Quyền lợi được hưởng" đổi sang nhập tự
 // do (ChipsInput), không còn giới hạn 6 lựa chọn dựng sẵn — danh sách này chỉ còn dùng làm gợi ý
 // nhanh để bấm thêm cho tiện.
+// Đợt 14 (25/09/2026) — mục 15: đồng bộ tiếp với wizard Đăng tin NTD — đổi sang RichTextEditor.
 const BENEFIT_SUGGESTIONS = ['Bảo hiểm sức khỏe', 'Thưởng KPI', 'Laptop', 'Du lịch hằng năm', 'Tăng lương định kỳ', 'Đào tạo chuyên môn'];
+
+function appendRichTextSuggestion(current: string, suggestion: string): string {
+  const clean = isRichTextEmpty(current) ? '' : current;
+  return `${clean}<p>${suggestion}</p>`;
+}
 
 interface FormState {
   title: string;
@@ -55,13 +62,16 @@ interface FormState {
   negotiable: boolean;
   description: string;
   requirements: string;
-  benefits: string[];
+  // Đợt 14 (25/09/2026) — mục 15: rich text tự do (HTML), không còn mảng chip.
+  benefits: string;
   deadline: string;
   tags: string[];
   // Đợt 12aa (24/09/2026) — "Thông tin liên hệ", đồng bộ với wizard Đăng tin NTD.
   contactName: string;
   contactEmail: string;
   contactPhone: string;
+  // Đợt 14 (25/09/2026) — mục 15: ghi chú liên hệ tự do (rich text).
+  contactNote: string;
 }
 
 export default function AdminSuaTinPage() {
@@ -102,12 +112,13 @@ export default function AdminSuaTinPage() {
           negotiable: job.salaryMin == null && job.salaryMax == null,
           description: job.description ?? '',
           requirements: job.requirements ?? '',
-          benefits: job.benefits ?? [],
+          benefits: job.benefits ?? '',
           deadline: job.deadline ?? '',
           tags: job.tags ?? [],
           contactName: job.contactName ?? '',
           contactEmail: job.contactEmail ?? '',
           contactPhone: job.contactPhone ?? '',
+          contactNote: job.contactNote ?? '',
         });
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Không thể tải tin để sửa'))
@@ -139,12 +150,13 @@ export default function AdminSuaTinPage() {
       headcount: Number(form.headcount) || 1,
       description: form.description || undefined,
       requirements: form.requirements || undefined,
-      benefits: form.benefits.length ? form.benefits : undefined,
+      benefits: isRichTextEmpty(form.benefits) ? undefined : form.benefits,
       deadline: form.deadline || undefined,
       tags: form.tags.length ? form.tags : undefined,
       contactName: form.contactName.trim() || undefined,
       contactEmail: form.contactEmail.trim() || undefined,
       contactPhone: form.contactPhone.trim() || undefined,
+      contactNote: isRichTextEmpty(form.contactNote) ? undefined : form.contactNote,
     };
     try {
       await adminApi.updateJob(token, params.id, payload);
@@ -282,15 +294,21 @@ export default function AdminSuaTinPage() {
             </Field>
 
             {/* Đợt 13 (24/09/2026) — "Quyền lợi được hưởng" chuyển lên ngay sau "Yêu cầu ứng viên",
-                đồng bộ với wizard Đăng tin NTD. */}
-            <Field label="Quyền lợi được hưởng" hint="Nhập rồi Enter, hoặc bấm gợi ý bên dưới">
-              <ChipsInput value={form.benefits} onChange={(v) => setForm({ ...form, benefits: v })} placeholder="VD: Bảo hiểm sức khỏe, thưởng KPI..." />
+                đồng bộ với wizard Đăng tin NTD.
+                Đợt 14 (25/09/2026) — mục 15: đổi sang RichTextEditor, đồng bộ với wizard Đăng tin NTD. */}
+            <Field label="Quyền lợi được hưởng" hint="Gõ tự do, hoặc bấm gợi ý bên dưới để chèn thêm">
+              <RichTextEditor
+                value={form.benefits}
+                onChange={(html) => setForm({ ...form, benefits: html })}
+                placeholder="VD: Bảo hiểm sức khỏe, thưởng KPI, laptop..."
+                minHeight={140}
+              />
               <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {BENEFIT_SUGGESTIONS.filter((opt) => !form.benefits.includes(opt)).map((opt) => (
                   <button
                     key={opt}
                     type="button"
-                    onClick={() => setForm({ ...form, benefits: [...form.benefits, opt] })}
+                    onClick={() => setForm({ ...form, benefits: appendRichTextSuggestion(form.benefits, opt) })}
                     className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-surface-alt text-ink-muted hover:bg-primary-tint hover:text-primary"
                   >
                     + {opt}
@@ -299,11 +317,9 @@ export default function AdminSuaTinPage() {
               </div>
             </Field>
 
-            <Field label="Job tags / Kỹ năng (không bắt buộc)" hint="Nhập rồi Enter">
-              <ChipsInput value={form.tags} onChange={(v) => setForm({ ...form, tags: v })} placeholder="Nhập rồi Enter" />
-            </Field>
-
-            {/* Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc), đồng bộ với wizard Đăng tin NTD. */}
+            {/* Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc), đồng bộ với wizard Đăng tin NTD.
+                Đợt 14 (25/09/2026) — mục 15: thêm "Thông tin khác" (rich text tự do) + chuyển khối này
+                lên TRƯỚC "Job tags / Kỹ năng", đồng bộ với wizard Đăng tin NTD. */}
             <div className="border-t border-border pt-4 flex flex-col gap-3">
               <h3 className="font-bold text-xs uppercase tracking-wide text-primary">
                 Thông tin liên hệ (không bắt buộc)
@@ -319,7 +335,19 @@ export default function AdminSuaTinPage() {
               <Field label="Email liên hệ">
                 <input type="email" className="tvl-input" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} placeholder="VD: tuyendung@congty.vn" />
               </Field>
+              <Field label="Thông tin khác" hint="không bắt buộc — ghi chú tự do">
+                <RichTextEditor
+                  value={form.contactNote}
+                  onChange={(html) => setForm({ ...form, contactNote: html })}
+                  placeholder="VD: Vui lòng ghi rõ tiêu đề email là 'Ứng tuyển [vị trí] - [Họ tên]'..."
+                  minHeight={120}
+                />
+              </Field>
             </div>
+
+            <Field label="Job tags / Kỹ năng (không bắt buộc)" hint="Nhập rồi Enter">
+              <ChipsInput value={form.tags} onChange={(v) => setForm({ ...form, tags: v })} placeholder="Nhập rồi Enter" />
+            </Field>
 
             <h2 className="font-bold text-sm border-t border-border pt-5">Hạn nộp hồ sơ</h2>
             <Field label="Hạn nộp hồ sơ">

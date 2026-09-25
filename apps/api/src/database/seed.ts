@@ -250,7 +250,9 @@ async function run() {
           headcount: 1,
           description: job.description,
           requirements: job.requirements,
-          benefits: job.benefits,
+          // Đợt 14 (25/09/2026) — `benefits` ở entity đổi sang rich text (string) — SEED constant ở
+          // trên vẫn giữ dạng mảng cho dễ đọc/sửa, chuyển thành các đoạn <p> khi ghi vào CSDL.
+          benefits: job.benefits.map((b) => `<p>${b}</p>`).join(''),
           deadline: job.deadline,
           approvalStatus: JobApprovalStatus.APPROVED,
         }),

@@ -98,8 +98,14 @@ export class JobPosting {
   @Column({ type: 'text', nullable: true })
   requirements?: string;
 
-  @Column({ type: 'simple-array', nullable: true })
-  benefits?: string[];
+  // Đợt 14 (25/09/2026) — mục 15 danh sách lỗi: đổi từ mảng chip (simple-array) sang rich text tự
+  // do (HTML, giống `requirements`), theo yêu cầu người dùng xác nhận lại muốn khung soạn thảo kiểu
+  // Word thay vì chọn/gõ từng tag rời. Cột CSDL vẫn là `text` như trước (simple-array vốn cũng lưu
+  // dưới dạng text nối bằng dấu phẩy) nên KHÔNG cần migration đổi kiểu cột — chỉ đổi cách diễn giải
+  // ở tầng code. Dữ liệu tin cũ (dạng "A,B,C") vẫn đọc được, hiển thị dạng text thường cho tới khi
+  // NTD sửa lại bằng RichTextEditor mới (xem RichTextView.tsx + lib/richtext.ts ở frontend).
+  @Column({ type: 'text', nullable: true })
+  benefits?: string;
 
   @Column({ name: 'banner_image_url', nullable: true })
   bannerImageUrl?: string;
@@ -146,6 +152,13 @@ export class JobPosting {
 
   @Column({ name: 'contact_phone', nullable: true })
   contactPhone?: string;
+
+  // Đợt 14 (25/09/2026) — mục 15: khung mô tả thêm tự do (RichTextEditor) cạnh 3 trường liên hệ có
+  // cấu trúc ở trên — GIỮ NGUYÊN 3 trường trên để không mất link bấm gọi/gửi mail tự động ở trang
+  // chi tiết tin, chỉ THÊM trường này cho NTD ghi chú tự do (VD giờ làm việc liên hệ, hướng dẫn nộp
+  // hồ sơ...). Xem migration AddJobContactNote1789947000000.
+  @Column({ name: 'contact_note', type: 'text', nullable: true })
+  contactNote?: string;
 
   // Đợt 12x (21/09/2026) — "Sửa tin trước khi duyệt" + "Bắt buộc nhập lý do khi Từ chối" (theo yêu
   // cầu người dùng): khi Admin từ chối 1 tin, chọn ≥1 lý do từ danh mục cố định (JOB_REJECTION_REASONS

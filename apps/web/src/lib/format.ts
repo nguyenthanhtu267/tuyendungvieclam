@@ -67,6 +67,25 @@ export function formatDateTime(dateStr?: string): string {
   return `${d.toLocaleDateString('vi-VN')} ${d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
+// Đợt 14 (25/09/2026) — mục 5 danh sách lỗi: khối "mini dashboard" mới ở hero trang chủ cần hiện
+// "hoạt động gần đây" (tin mới đăng/cập nhật) theo kiểu thời gian tương đối ("5 phút trước") cho
+// cảm giác sống động hơn là ngày tháng tĩnh — formatDate()/formatDateTime() đã có nhưng không phù
+// hợp ở đây vì luôn ra định dạng ngày cố định.
+export function formatRelativeTime(dateStr?: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '';
+  const diffMs = Date.now() - d.getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'vừa xong';
+  if (minutes < 60) return `${minutes} phút trước`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} giờ trước`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} ngày trước`;
+  return formatDate(dateStr);
+}
+
 export const APPLICATION_STATUS_LABEL: Record<string, string> = {
   new: 'Mới ứng tuyển',
   reviewing: 'Đang xem xét',

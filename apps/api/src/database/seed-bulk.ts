@@ -441,7 +441,10 @@ async function run() {
         headcount: chance(70) ? randInt(1, 3) : randInt(4, 15),
         description: pick(DESCRIPTION_TEMPLATES)(title),
         requirements: pick(REQUIREMENT_TEMPLATES)(level),
-        benefits: sample(BENEFITS_POOL, randInt(2, 5)),
+        // Đợt 14 (25/09/2026) — `benefits` ở entity đổi sang rich text (string).
+        benefits: sample(BENEFITS_POOL, randInt(2, 5))
+          .map((b) => `<p>${b}</p>`)
+          .join(''),
         deadline,
         approvalStatus,
         createdAt: daysAgo(randInt(0, 90)),

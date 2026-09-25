@@ -44,3 +44,36 @@ export function isRichTextEmpty(value?: string | null): boolean {
   const stripped = value.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
   return stripped.length === 0;
 }
+
+// Đợt 14 (25/09/2026) — mục 15 danh sách lỗi: "Quyền lợi được hưởng" đổi từ mảng chip sang rich
+// text tự do (xem job-posting.entity.ts). Ở những nơi có không gian hẹp (JobCard, khung "Xem
+// trước"), vẫn muốn tách được từng ý thành chip ngắn kèm icon như giao diện cũ — hàm này lấy tối đa
+// `max` "mục" từ nội dung rich text: ưu tiên tách theo khối <li>/<p> nếu có (nội dung MỚI, nhập qua
+// RichTextEditor); nếu không có cấu trúc HTML nào (dữ liệu CŨ trước Đợt 14, lưu dạng
+// "A,B,C" do cột từng là simple-array) thì tách theo dấu phẩy/chấm phẩy/xuống dòng để tương thích
+// ngược, không hiện nguyên 1 chuỗi dính liền dấu phẩy.
+// Đợt 14 (25/09/2026) — hiển thị đầy đủ (không giới hạn số mục) qua <RichTextView listFallback>: dữ
+// liệu MỚI (HTML) truyền thẳng; dữ liệu CŨ (trước Đợt 14, dạng "A,B,C" nối bằng dấu phẩy do cột
+// từng là simple-array) không có ký tự xuống dòng nên RichTextView's fallback tách theo '\n' sẽ ra
+// nguyên 1 dòng dính liền — đổi dấu phẩy thành xuống dòng trước khi truyền vào để mỗi mục vẫn hiện
+// thành 1 dòng riêng như giao diện chip cũ.
+export function benefitsRichTextValue(value?: string | null): string | undefined {
+  if (!value) return undefined;
+  if (isHtmlContent(value)) return value;
+  return value.split(',').map((s) => s.trim()).filter(Boolean).join('\n');
+}
+
+export function richTextListItems(value?: string | null, max = 3): string[] {
+  if (!value) return [];
+  const blocks = value.match(/<(li|p)[^>]*>([\s\S]*?)<\/\1>/gi);
+  let items: string[];
+  if (blocks && blocks.length > 0) {
+    items = blocks.map((b) => b.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim());
+  } else {
+    items = value
+      .replace(/<[^>]*>/g, ' ')
+      .split(/[,;\n]+/)
+      .map((s) => s.trim());
+  }
+  return items.filter(Boolean).slice(0, max);
+}

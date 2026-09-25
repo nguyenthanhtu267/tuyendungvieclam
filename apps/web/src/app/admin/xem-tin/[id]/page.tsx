@@ -13,6 +13,7 @@ import { useAuth } from '@/lib/auth-context';
 import { RichTextView } from '@/components/RichTextView';
 import { adminApi, ApiError, type JobPosting } from '@/lib/api';
 import { formatDate, formatSalary } from '@/lib/format';
+import { benefitsRichTextValue } from '@/lib/richtext';
 import { scanJobContent } from '@/lib/content-moderation';
 import { JOB_REJECTION_REASONS } from '@/lib/catalogs';
 
@@ -144,16 +145,11 @@ export default function AdminJobReviewPage() {
                 <Detail label="🕒 Gửi lúc" value={formatDate(job.createdAt)} />
               </div>
 
-              {job.benefits && job.benefits.length > 0 && (
+              {/* Đợt 14 (25/09/2026) — mục 15: `benefits` nay là rich text tự do (HTML). */}
+              {job.benefits && (
                 <div className="mb-4">
                   <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Phúc lợi</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {job.benefits.map((b) => (
-                      <span key={b} className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full bg-surface-alt text-ink-muted">
-                        {b}
-                      </span>
-                    ))}
-                  </div>
+                  <RichTextView value={benefitsRichTextValue(job.benefits)} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
                 </div>
               )}
 
@@ -185,15 +181,26 @@ export default function AdminJobReviewPage() {
               )}
 
               {/* Đợt 12aa (24/09/2026) — "Thông tin liên hệ": Admin nên thấy khi duyệt để đối chiếu
-                  chống lừa đảo (VD email/SĐT liên hệ khác hẳn công ty đăng ký). */}
-              {(job.contactName || job.contactEmail || job.contactPhone) && (
+                  chống lừa đảo (VD email/SĐT liên hệ khác hẳn công ty đăng ký).
+                  Đợt 14 (25/09/2026) — mục 15: thêm `contactNote` (rich text tự do) song song. */}
+              {(job.contactName || job.contactEmail || job.contactPhone || job.contactNote) && (
                 <div>
                   <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Thông tin liên hệ</div>
-                  <ul className="text-[12.8px] text-ink-muted leading-loose list-disc pl-5">
-                    {job.contactName && <li>Người liên hệ: {job.contactName}</li>}
-                    {job.contactEmail && <li>Email: {job.contactEmail}</li>}
-                    {job.contactPhone && <li>Điện thoại: {job.contactPhone}</li>}
-                  </ul>
+                  {(job.contactName || job.contactEmail || job.contactPhone) && (
+                    <ul className="text-[12.8px] text-ink-muted leading-loose list-disc pl-5">
+                      {job.contactName && <li>Người liên hệ: {job.contactName}</li>}
+                      {job.contactEmail && <li>Email: {job.contactEmail}</li>}
+                      {job.contactPhone && <li>Điện thoại: {job.contactPhone}</li>}
+                    </ul>
+                  )}
+                  {job.contactNote && (
+                    <RichTextView
+                      value={job.contactNote}
+                      className={`text-[12.8px] text-ink-muted leading-loose${
+                        job.contactName || job.contactEmail || job.contactPhone ? ' mt-2' : ''
+                      }`}
+                    />
+                  )}
                 </div>
               )}
             </div>

@@ -17,7 +17,7 @@ import { AdminAuditLog } from '../database/entities/admin-audit-log.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UpdateJobDto } from '../employer/dto/update-job.dto';
 import { RejectJobDto } from './dto/reject-job.dto';
-import { JOB_EDITABLE_FIELDS } from '../common/job-editable-fields';
+import { JOB_EDITABLE_FIELDS, JOB_RICH_TEXT_FIELDS } from '../common/job-editable-fields';
 import { sanitizeRichText } from '../common/sanitize-html.util';
 
 // Đợt 12q (21/09/2026) — thông tin admin đang đăng nhập, lấy từ CurrentUser() (payload JWT), dùng để
@@ -238,7 +238,9 @@ export class AdminService {
     if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng');
     for (const key of JOB_EDITABLE_FIELDS) {
       if (Object.prototype.hasOwnProperty.call(dto, key)) {
-        const value = key === 'description' || key === 'requirements' ? sanitizeRichText(dto[key]) : dto[key];
+        const value = (JOB_RICH_TEXT_FIELDS as readonly string[]).includes(key)
+          ? sanitizeRichText(dto[key] as string | undefined)
+          : dto[key];
         (job as unknown as Record<string, unknown>)[key] = value;
       }
     }

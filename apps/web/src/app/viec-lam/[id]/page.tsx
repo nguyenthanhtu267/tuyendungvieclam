@@ -31,6 +31,7 @@ import {
   jobGenderDisplay,
   jobWorkScheduleDisplay,
 } from '@/lib/format';
+import { benefitsRichTextValue } from '@/lib/richtext';
 
 type Tab = 'details' | 'company';
 
@@ -365,16 +366,14 @@ function JobDetailInner() {
                     <Detail label="👥 Số lượng" value={String(job.headcount)} />
                   </div>
 
-                  {job.benefits && job.benefits.length > 0 && (
+                  {/* Đợt 14 (25/09/2026) — mục 15: "Quyền lợi được hưởng" nay là rich text tự do
+                      (HTML), hiển thị bằng RichTextView như Mô tả/Yêu cầu ứng viên thay vì mảng
+                      chip cố định. listFallback giữ đúng cách hiển thị cũ (tách dòng thành <li>)
+                      cho dữ liệu tin cũ trước Đợt 14 (dạng "A,B,C" từ cột simple-array). */}
+                  {job.benefits && (
                     <div className="mt-5">
                       <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Phúc lợi</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {job.benefits.map((b) => (
-                          <span key={b} className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full bg-surface-alt text-ink-muted">
-                            {b}
-                          </span>
-                        ))}
-                      </div>
+                      <RichTextView value={benefitsRichTextValue(job.benefits)} listFallback className="text-[12.8px] text-ink-muted leading-loose" />
                     </div>
                   )}
 
@@ -444,25 +443,37 @@ function JobDetailInner() {
                   )}
 
                   {/* Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc) NTD nhập khi đăng
-                      tin, chỉ hiện khi có ít nhất 1 trường, theo mẫu careerviet.vn. */}
-                  {(job.contactName || job.contactEmail || job.contactPhone) && (
+                      tin, chỉ hiện khi có ít nhất 1 trường, theo mẫu careerviet.vn.
+                      Đợt 14 (25/09/2026) — mục 15: thêm `contactNote` (rich text tự do) song song với
+                      3 trường có cấu trúc, để vẫn giữ link tự động mailto:/tel: mà thêm được ghi chú. */}
+                  {(job.contactName || job.contactEmail || job.contactPhone || job.contactNote) && (
                     <div className="mt-5">
                       <div className="text-xs font-bold text-primary uppercase tracking-wide mb-2">
                         Thông tin liên hệ
                       </div>
-                      <ul className="text-[12.8px] text-ink-muted leading-loose list-disc pl-5">
-                        {job.contactName && <li>Người liên hệ: {job.contactName}</li>}
-                        {job.contactEmail && (
-                          <li>
-                            Email: <a href={`mailto:${job.contactEmail}`} className="text-primary hover:underline">{job.contactEmail}</a>
-                          </li>
-                        )}
-                        {job.contactPhone && (
-                          <li>
-                            Điện thoại: <a href={`tel:${job.contactPhone}`} className="text-primary hover:underline">{job.contactPhone}</a>
-                          </li>
-                        )}
-                      </ul>
+                      {(job.contactName || job.contactEmail || job.contactPhone) && (
+                        <ul className="text-[12.8px] text-ink-muted leading-loose list-disc pl-5">
+                          {job.contactName && <li>Người liên hệ: {job.contactName}</li>}
+                          {job.contactEmail && (
+                            <li>
+                              Email: <a href={`mailto:${job.contactEmail}`} className="text-primary hover:underline">{job.contactEmail}</a>
+                            </li>
+                          )}
+                          {job.contactPhone && (
+                            <li>
+                              Điện thoại: <a href={`tel:${job.contactPhone}`} className="text-primary hover:underline">{job.contactPhone}</a>
+                            </li>
+                          )}
+                        </ul>
+                      )}
+                      {job.contactNote && (
+                        <RichTextView
+                          value={job.contactNote}
+                          className={`text-[12.8px] text-ink-muted leading-loose${
+                            job.contactName || job.contactEmail || job.contactPhone ? ' mt-2' : ''
+                          }`}
+                        />
+                      )}
                     </div>
                   )}
                 </>

@@ -9,8 +9,9 @@ import { jobsApi, type JobFacets, type JobPosting, type FeaturedEmployer, type H
 import { useAuth } from '@/lib/auth-context';
 import { PINNED_PROVINCES } from '@/lib/catalogs';
 import { CompanyLogo } from '@/components/CompanyLogo';
-import { formatNumber } from '@/lib/format';
+import { formatNumber, formatRelativeTime } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
+import { memberCountDisplay, profilesUpdatedTodayDisplay, applicationsTodayDisplay } from '@/lib/vanity-stats';
 
 export default function Home() {
   const router = useRouter();
@@ -30,6 +31,16 @@ export default function Home() {
   // thay vì điều hướng sang trang khác.
   const [showAllIndustries, setShowAllIndustries] = useState(false);
   const HOME_SECTION_PREVIEW_COUNT = 6;
+
+  // Đợt 14 (25/09/2026) — mục 14 danh sách lỗi: người dùng đổi ý so với Đợt 13, muốn 3/5 thẻ LUÔN
+  // hiện trên 1 ngưỡng tối thiểu, tăng nhẹ dần theo ngày (xem lib/vanity-stats.ts để biết lý do và
+  // cách tính chi tiết — chỉ là lớp hiển thị, API vẫn trả số thật 100%). 2 thẻ còn lại (Doanh
+  // nghiệp sử dụng, Việc làm đang tuyển) giữ nguyên số thật như quyết định cũ. Tính 1 lần ở đây để
+  // dùng chung cho cả khối "mini dashboard" ở hero (mục 5) lẫn 5 thẻ số liệu bên dưới, tránh 2 nơi
+  // hiện 2 con số lệch nhau.
+  const displayMemberCount = stats ? memberCountDisplay(stats.memberCount) : null;
+  const displayProfilesUpdatedToday = stats ? profilesUpdatedTodayDisplay(stats.profilesUpdatedToday) : null;
+  const displayApplicationsToday = stats ? applicationsTodayDisplay(stats.applicationsToday) : null;
 
   useEffect(() => {
     jobsApi
@@ -129,33 +140,80 @@ export default function Home() {
             )}
           </div>
 
-          <div className="rounded-2xl bg-primary min-h-[220px] flex items-center justify-center p-6 relative overflow-hidden">
-            <svg width="86%" height="82%" viewBox="0 0 300 220" fill="none">
-              <rect x="18" y="120" width="80" height="70" rx="6" fill="rgba(255,255,255,.12)" />
-              <circle cx="150" cy="90" r="30" fill="rgba(255,255,255,.16)" />
-              <rect x="118" y="128" width="64" height="60" rx="10" fill="rgba(255,255,255,.16)" />
-              <rect x="190" y="60" width="94" height="120" rx="10" fill="rgba(255,255,255,.10)" />
-              <rect x="205" y="76" width="64" height="10" rx="3" fill="rgba(255,255,255,.4)" />
-              <rect x="205" y="94" width="44" height="8" rx="3" fill="rgba(255,255,255,.25)" />
-              <rect x="205" y="118" width="64" height="34" rx="6" fill="rgba(255,90,54,.85)" />
-              <text x="237" y="139" fill="#fff" fontSize="10" fontWeight="700" textAnchor="middle">
-                Đã ứng tuyển
-              </text>
-            </svg>
+          {/* Đợt 14 (25/09/2026) — mục 5 danh sách lỗi: khối minh hoạ SVG tĩnh (vài hình khối trừu
+              tượng, không số liệu thật nào) đổi thành 1 "mini dashboard" thật — vài số liệu chính
+              (đồng bộ với 5 thẻ bên dưới, dùng chung biến displayXxx để không lệch số) + "Tin mới
+              nhất" lấy từ danh sách việc làm mới nhất đã fetch sẵn (jobs) — cho cảm giác sống động,
+              đúng nghĩa "dashboard" hơn là hình minh hoạ tĩnh trước đây. Lựa chọn người dùng qua
+              AskUserQuestion: "Mini dashboard số liệu thật + hoạt động gần đây". */}
+          <div className="rounded-2xl bg-primary min-h-[220px] flex items-center justify-center p-5 sm:p-6 relative overflow-hidden">
+            <div className="w-full rounded-xl bg-white/95 p-4 sm:p-5 shadow-lg">
+              <div className="flex items-center gap-1.5 mb-3">
+                <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                <span className="text-[11px] font-bold text-ink-muted uppercase tracking-wide">
+                  Hoạt động trực tuyến
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div>
+                  <div className="font-mono font-extrabold text-base text-primary tabular-nums">
+                    {facets ? formatNumber(facets.total) : '—'}
+                  </div>
+                  <div className="text-[10px] text-ink-faint leading-tight">Việc làm đang tuyển</div>
+                </div>
+                <div>
+                  <div className="font-mono font-extrabold text-base text-critical tabular-nums">
+                    {displayApplicationsToday !== null ? formatNumber(displayApplicationsToday) : '—'}
+                  </div>
+                  <div className="text-[10px] text-ink-faint leading-tight">Ứng tuyển hôm nay</div>
+                </div>
+                <div>
+                  <div className="font-mono font-extrabold text-base text-success tabular-nums">
+                    {displayProfilesUpdatedToday !== null ? formatNumber(displayProfilesUpdatedToday) : '—'}
+                  </div>
+                  <div className="text-[10px] text-ink-faint leading-tight">Hồ sơ cập nhật</div>
+                </div>
+              </div>
+              <div className="border-t border-border pt-2.5">
+                <div className="text-[10px] font-bold text-ink-faint uppercase tracking-wide mb-1.5">
+                  Tin mới nhất
+                </div>
+                {jobs === null && <div className="text-[11px] text-ink-faint">Đang tải...</div>}
+                {jobs !== null && jobs.length === 0 && (
+                  <div className="text-[11px] text-ink-faint">Chưa có tin tuyển dụng nào.</div>
+                )}
+                {jobs && jobs.length > 0 && (
+                  <div className="flex flex-col gap-1.5">
+                    {jobs.slice(0, 2).map((j) => (
+                      <div key={j.id} className="flex items-center justify-between gap-2 text-[11px]">
+                        <span className="truncate font-semibold text-ink">{j.title}</span>
+                        <span className="shrink-0 text-ink-faint">
+                          {formatRelativeTime(j.updatedAt ?? j.createdAt)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Đợt 13 (24/09/2026) — 5 số liệu THẬT lấy từ jobsApi.homepageStats() (mục 7 danh sách
             lỗi): trước đó 3/4 thẻ là số ảo hard-code ("2,4tr+", "9.600+", "18.200"), chỉ "Việc làm
             đang tuyển" là thật. Thêm "Lượt ứng tuyển hôm nay" theo gợi ý — số liệu thật khác tính
-            được từ dữ liệu sẵn có (bảng applications). */}
+            được từ dữ liệu sẵn có (bảng applications).
+            Đợt 14 (25/09/2026) — mục 14: 3/5 thẻ (Thành viên, Hồ sơ cập nhật hôm nay, Lượt ứng
+            tuyển hôm nay) nay dùng displayXxx (số thật CỘNG ngưỡng sàn tăng dần theo ngày — xem
+            lib/vanity-stats.ts). 2 thẻ còn lại (Doanh nghiệp sử dụng, Việc làm đang tuyển) vẫn giữ
+            số thật 100% như quyết định gốc — người dùng không yêu cầu đổi 2 thẻ này. */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6">
           {[
-            [stats ? formatNumber(stats.memberCount) : '—', 'Thành viên'],
+            [displayMemberCount !== null ? formatNumber(displayMemberCount) : '—', 'Thành viên'],
             [stats ? formatNumber(stats.companyCount) : '—', 'Doanh nghiệp sử dụng'],
             [facets ? formatNumber(facets.total) : '—', 'Việc làm đang tuyển'],
-            [stats ? formatNumber(stats.profilesUpdatedToday) : '—', 'Hồ sơ cập nhật hôm nay'],
-            [stats ? formatNumber(stats.applicationsToday) : '—', 'Lượt ứng tuyển hôm nay'],
+            [displayProfilesUpdatedToday !== null ? formatNumber(displayProfilesUpdatedToday) : '—', 'Hồ sơ cập nhật hôm nay'],
+            [displayApplicationsToday !== null ? formatNumber(displayApplicationsToday) : '—', 'Lượt ứng tuyển hôm nay'],
           ].map(([val, lbl]) => (
             <div key={lbl} className="rounded-xl border border-border bg-white p-4 text-center">
               <div className="font-mono font-extrabold text-lg tabular-nums">{val}</div>

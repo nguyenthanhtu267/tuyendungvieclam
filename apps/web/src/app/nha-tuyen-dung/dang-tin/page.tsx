@@ -8,6 +8,7 @@ import { RichTextEditor } from '@/components/RichTextEditor';
 import { useAuth } from '@/lib/auth-context';
 import { employerApi, ApiError, type WorkLocation } from '@/lib/api';
 import { formatSalary } from '@/lib/format';
+import { isRichTextEmpty, richTextListItems } from '@/lib/richtext';
 import { MultiSelectPopover } from '@/components/search/MultiSelectPopover';
 import { ChipsInput } from '@/components/profile/ui';
 import {
@@ -35,7 +36,15 @@ const DISTRICT_SUPPORTED_PROVINCES = ['Hồ Chí Minh', 'Hà Nội'];
 // tags" đã có) để NTD ghi đúng quyền lợi thực tế của công ty mình, không bị bó buộc. Icon hiển thị
 // (benefit-icons.ts) vốn đã khớp theo từ khoá trong chuỗi bất kỳ nên không cần đổi gì thêm ở phần
 // hiển thị (JobCard/trang chi tiết tin/trang xem trước) — chỉ đổi cách NHẬP LIỆU ở đây.
+// Đợt 14 (25/09/2026) — mục 15: đổi tiếp từ ChipsInput (mảng chip) sang RichTextEditor (rich text tự
+// do, giống ô "Yêu cầu ứng viên") theo yêu cầu người dùng. Các gợi ý nhanh bên dưới giờ bấm vào sẽ
+// CHÈN THÊM 1 đoạn <p> vào cuối nội dung đang có, thay vì thêm 1 phần tử vào mảng.
 const BENEFIT_SUGGESTIONS = ['Bảo hiểm sức khỏe', 'Thưởng KPI', 'Laptop', 'Du lịch hằng năm', 'Tăng lương định kỳ', 'Đào tạo chuyên môn'];
+
+function appendRichTextSuggestion(current: string, suggestion: string): string {
+  const clean = isRichTextEmpty(current) ? '' : current;
+  return `${clean}<p>${suggestion}</p>`;
+}
 
 interface FormState {
   title: string;
@@ -56,7 +65,8 @@ interface FormState {
   negotiable: boolean;
   description: string;
   requirements: string;
-  benefits: string[];
+  // Đợt 14 (25/09/2026) — mục 15: rich text tự do (HTML), không còn mảng chip.
+  benefits: string;
   deadline: string;
   // Đợt 12v (21/09/2026) — "JOB TAGS / SKILLS": thẻ từ khoá/kỹ năng NTD tự nhập tự do (VD "Tiktokshop
   // Specialist", "Admin E-commerce"), hiển thị dạng chip ở trang chi tiết tin.
@@ -65,6 +75,9 @@ interface FormState {
   contactName: string;
   contactEmail: string;
   contactPhone: string;
+  // Đợt 14 (25/09/2026) — mục 15: ghi chú liên hệ tự do (rich text), song song với 3 trường có cấu
+  // trúc ở trên để vẫn giữ link tự động mailto:/tel:.
+  contactNote: string;
 }
 
 const INITIAL: FormState = {
@@ -86,12 +99,13 @@ const INITIAL: FormState = {
   negotiable: false,
   description: '',
   requirements: '',
-  benefits: [],
+  benefits: '',
   deadline: '',
   tags: [],
   contactName: '',
   contactEmail: '',
   contactPhone: '',
+  contactNote: '',
 };
 
 // Đợt 12l (21/09/2026) — dùng chung wizard này cho cả "Đăng tin mới" và "Sửa tin" (nút Sửa ở trang
@@ -150,12 +164,13 @@ function DangTinInner() {
           negotiable: job.salaryMin == null && job.salaryMax == null,
           description: job.description ?? '',
           requirements: job.requirements ?? '',
-          benefits: job.benefits ?? [],
+          benefits: job.benefits ?? '',
           deadline: job.deadline ?? '',
           tags: job.tags ?? [],
           contactName: job.contactName ?? '',
           contactEmail: job.contactEmail ?? '',
           contactPhone: job.contactPhone ?? '',
+          contactNote: job.contactNote ?? '',
         });
         if (job.rejectionReasons && job.rejectionReasons.length > 0) {
           setRejectionInfo({ reasons: job.rejectionReasons, note: job.rejectionNote });
@@ -206,12 +221,13 @@ function DangTinInner() {
       headcount: Number(form.headcount) || 1,
       description: form.description || undefined,
       requirements: form.requirements || undefined,
-      benefits: form.benefits.length ? form.benefits : undefined,
+      benefits: isRichTextEmpty(form.benefits) ? undefined : form.benefits,
       deadline: form.deadline || undefined,
       tags: form.tags.length ? form.tags : undefined,
       contactName: form.contactName.trim() || undefined,
       contactEmail: form.contactEmail.trim() || undefined,
       contactPhone: form.contactPhone.trim() || undefined,
+      contactNote: isRichTextEmpty(form.contactNote) ? undefined : form.contactNote,
     };
     try {
       if (editId) await employerApi.updateJob(token, editId, payload);
@@ -470,16 +486,23 @@ function DangTinInner() {
               </Field>
 
               {/* Đợt 13 (24/09/2026) — "Quyền lợi được hưởng" chuyển từ bước "Phúc lợi & hạn nộp"
-                  lên ngay sau "Yêu cầu ứng viên" (theo yêu cầu người dùng), đổi từ chọn 6 lựa chọn
-                  dựng sẵn sang nhập tự do không giới hạn — vẫn giữ gợi ý nhanh để bấm thêm cho tiện. */}
-              <Field label="Quyền lợi được hưởng" hint="Nhập rồi Enter, hoặc bấm gợi ý bên dưới">
-                <ChipsInput value={form.benefits} onChange={(v) => setForm({ ...form, benefits: v })} placeholder="VD: Bảo hiểm sức khỏe, thưởng KPI..." />
+                  lên ngay sau "Yêu cầu ứng viên" (theo yêu cầu người dùng).
+                  Đợt 14 (25/09/2026) — mục 15: đổi tiếp sang RichTextEditor (khung gõ tự do như Word,
+                  giống ô "Yêu cầu ứng viên") thay vì ô chip — vẫn giữ gợi ý nhanh, bấm vào sẽ chèn
+                  thêm 1 đoạn vào cuối nội dung đang nhập. */}
+              <Field label="Quyền lợi được hưởng" hint="Gõ tự do, hoặc bấm gợi ý bên dưới để chèn thêm">
+                <RichTextEditor
+                  value={form.benefits}
+                  onChange={(html) => setForm({ ...form, benefits: html })}
+                  placeholder="VD: Bảo hiểm sức khỏe, thưởng KPI, laptop..."
+                  minHeight={140}
+                />
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
                   {BENEFIT_SUGGESTIONS.filter((opt) => !form.benefits.includes(opt)).map((opt) => (
                     <button
                       key={opt}
                       type="button"
-                      onClick={() => setForm({ ...form, benefits: [...form.benefits, opt] })}
+                      onClick={() => setForm({ ...form, benefits: appendRichTextSuggestion(form.benefits, opt) })}
                       className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-surface-alt text-ink-muted hover:bg-primary-tint hover:text-primary"
                     >
                       + {opt}
@@ -488,16 +511,13 @@ function DangTinInner() {
                 </div>
               </Field>
 
-              {/* Đợt 12v (21/09/2026) — "JOB TAGS / SKILLS": thẻ từ khoá/kỹ năng tự nhập tự do (không
-                  bắt buộc), hiển thị dạng chip ở trang chi tiết tin, dưới khối "Thông tin khác". */}
-              <Field label="Job tags / Kỹ năng (không bắt buộc)" hint="Nhập rồi Enter, VD: Tiktokshop Specialist">
-                <ChipsInput value={form.tags} onChange={(v) => setForm({ ...form, tags: v })} placeholder="Nhập rồi Enter" />
-              </Field>
-
               {/* Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc), theo mẫu careerviet.vn:
                   ứng viên xem tin thấy được người/kênh liên hệ trực tiếp thay vì chỉ liên hệ qua nút
                   "Nộp đơn ứng tuyển". Bỏ trống hoàn toàn cũng được — trang chi tiết tin sẽ không hiện
-                  khối này nếu cả 3 trường đều trống. */}
+                  khối này nếu tất cả các trường đều trống.
+                  Đợt 14 (25/09/2026) — mục 15: thêm ô "Thông tin khác" (rich text tự do) bên cạnh 3
+                  trường có cấu trúc, để NTD ghi chú thêm mà vẫn giữ link tự động mailto:/tel:. Đồng
+                  thời chuyển khối này lên TRƯỚC "Job tags / Kỹ năng" (theo yêu cầu người dùng). */}
               <div className="border-t border-border pt-4 flex flex-col gap-3">
                 <h3 className="font-bold text-xs uppercase tracking-wide text-primary">
                   Thông tin liên hệ (không bắt buộc)
@@ -529,7 +549,23 @@ function DangTinInner() {
                     placeholder="VD: tuyendung@congty.vn"
                   />
                 </Field>
+                <Field label="Thông tin khác" hint="không bắt buộc — ghi chú tự do">
+                  <RichTextEditor
+                    value={form.contactNote}
+                    onChange={(html) => setForm({ ...form, contactNote: html })}
+                    placeholder="VD: Vui lòng ghi rõ tiêu đề email là 'Ứng tuyển [vị trí] - [Họ tên]'..."
+                    minHeight={120}
+                  />
+                </Field>
               </div>
+
+              {/* Đợt 12v (21/09/2026) — "JOB TAGS / SKILLS": thẻ từ khoá/kỹ năng tự nhập tự do (không
+                  bắt buộc), hiển thị dạng chip ở trang chi tiết tin, dưới khối "Thông tin khác".
+                  Đợt 14 (25/09/2026) — mục 15: chuyển xuống SAU "Thông tin liên hệ" (theo yêu cầu
+                  người dùng, trước đây nằm giữa "Quyền lợi được hưởng" và "Thông tin liên hệ"). */}
+              <Field label="Job tags / Kỹ năng (không bắt buộc)" hint="Nhập rồi Enter, VD: Tiktokshop Specialist">
+                <ChipsInput value={form.tags} onChange={(v) => setForm({ ...form, tags: v })} placeholder="Nhập rồi Enter" />
+              </Field>
 
               <div className="text-[11px] text-ink-faint">
                 Ảnh/banner tin tuyển dụng: sẽ hỗ trợ ở bản cập nhật sau (khi kết nối lưu trữ tệp Cloudflare R2).
@@ -563,9 +599,12 @@ function DangTinInner() {
                   {form.district ? ` (${form.district})` : ''} ·{' '}
                   {form.negotiable ? 'Thoả thuận' : formatSalary(Number(form.salaryMin) || undefined, Number(form.salaryMax) || undefined)} · {form.employmentType} · {form.headcount} vị trí
                 </div>
+                {/* Đợt 14 (25/09/2026) — mục 15: `form.benefits` nay là rich text (HTML), không còn
+                    mảng chip để spread trực tiếp — dùng richTextListItems() lấy tối đa 5 mục ngắn để
+                    xem trước dạng chip như cũ. */}
                 <div className="flex flex-wrap gap-1.5 mt-2.5">
-                  {[...form.industries, ...form.benefits].map((tag) => (
-                    <span key={tag} className="text-[11px] font-semibold bg-primary-tint text-primary rounded-full px-2.5 py-1">{tag}</span>
+                  {[...form.industries, ...richTextListItems(form.benefits, 5)].map((tag, i) => (
+                    <span key={`${tag}-${i}`} className="text-[11px] font-semibold bg-primary-tint text-primary rounded-full px-2.5 py-1">{tag}</span>
                   ))}
                 </div>
                 {form.tags.length > 0 && (

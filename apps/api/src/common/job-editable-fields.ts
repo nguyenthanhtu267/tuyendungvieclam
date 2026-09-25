@@ -28,4 +28,12 @@ export const JOB_EDITABLE_FIELDS = [
   'contactName',
   'contactEmail',
   'contactPhone',
+  // Đợt 14 (25/09/2026) — mục 15: khung mô tả thêm tự do cạnh 3 trường liên hệ ở trên.
+  'contactNote',
 ] as const;
+
+// Đợt 14 (25/09/2026) — trường nào trong JOB_EDITABLE_FIELDS là rich text (HTML từ RichTextEditor),
+// cần khử độc (sanitizeRichText) khi lưu. Trước đó chỉ có 'description'/'requirements' được kiểm
+// tra trực tiếp bằng so sánh chuỗi ở cả EmployerService.updateJob() và AdminService.adminUpdateJob()
+// — nay 'benefits' cũng là rich text nên gộp thành 1 danh sách dùng chung, tránh 2 nơi lệch nhau.
+export const JOB_RICH_TEXT_FIELDS = ['description', 'requirements', 'benefits', 'contactNote'] as const;
