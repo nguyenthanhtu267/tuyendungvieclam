@@ -36,6 +36,11 @@ import {
   CvArchiveEntry,
   CandidateProfileRequest,
   AdminCandidateNote,
+  AnalyticsSession,
+  AnalyticsPageview,
+  AnalyticsEvent,
+  AnalyticsDaily,
+  AnalyticsBotHit,
 } from './entities';
 
 // Đợt 12a (20/09/2026) — DataSource riêng cho TypeORM CLI (migration:generate/run/revert), tách
@@ -82,6 +87,12 @@ export const AppDataSource = new DataSource({
     CvArchiveEntry,
     CandidateProfileRequest,
     AdminCandidateNote,
+    // Đợt 19 — phân tích truy cập thật.
+    AnalyticsSession,
+    AnalyticsPageview,
+    AnalyticsEvent,
+    AnalyticsDaily,
+    AnalyticsBotHit,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,

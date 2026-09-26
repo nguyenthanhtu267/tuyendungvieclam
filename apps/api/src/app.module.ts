@@ -55,9 +55,15 @@ import {
   CvArchiveEntry,
   CandidateProfileRequest,
   AdminCandidateNote,
+  AnalyticsSession,
+  AnalyticsPageview,
+  AnalyticsEvent,
+  AnalyticsDaily,
+  AnalyticsBotHit,
 } from './database/entities';
 import { CvArchiveModule } from './cv-archive/cv-archive.module';
 import { AdminToolsModule } from './admin-tools/admin-tools.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 const entities = [
   User,
@@ -97,6 +103,12 @@ const entities = [
   // Đợt 18c/18f — yêu cầu gỡ/nhận lại hồ sơ + nhãn/ghi chú nội bộ của Admin.
   CandidateProfileRequest,
   AdminCandidateNote,
+  // Đợt 19 — phân tích truy cập thật.
+  AnalyticsSession,
+  AnalyticsPageview,
+  AnalyticsEvent,
+  AnalyticsDaily,
+  AnalyticsBotHit,
 ];
 
 @Module({
@@ -139,6 +151,7 @@ const entities = [
     NotificationsModule,
     CvArchiveModule,
     AdminToolsModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

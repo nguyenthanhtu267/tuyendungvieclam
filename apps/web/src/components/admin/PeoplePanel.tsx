@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import {
   adminApi,
@@ -204,8 +203,7 @@ function PersonModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { me, setToken } = useAuth();
-  const router = useRouter();
+  const { me } = useAuth();
   const [d, setD] = useState<AdminPersonDetail | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -286,8 +284,11 @@ function PersonModal({
     try {
       const res = await adminPeopleApi.impersonate(token, d.user.id);
       startImpersonation(token, { email: res.user.email, role: res.user.role, expiresInMinutes: res.expiresInMinutes });
-      setToken(res.accessToken);
-      router.push(res.user.role === 'candidate' ? '/ho-so' : '/nha-tuyen-dung/dashboard');
+      // Đợt 19 (26/09/2026) — tải lại TRANG MỚI HOÀN TOÀN với token người dùng (thay vì đổi token tại chỗ
+      // rồi điều hướng nội bộ): tránh hẳn cảnh trang Admin còn đang hiển thị kịp đọc danh tính mới (không
+      // phải Admin) và tự chuyển hướng về trang chủ trước khi điều hướng sang trang NTD/ứng viên xong.
+      localStorage.setItem('tvl_token', res.accessToken);
+      window.location.assign(res.user.role === 'candidate' ? '/ho-so' : '/nha-tuyen-dung/dashboard');
     } catch (err) {
       setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Không đăng nhập thay được' });
       setBusy(null);

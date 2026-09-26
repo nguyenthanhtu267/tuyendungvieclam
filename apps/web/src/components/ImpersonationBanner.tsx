@@ -1,14 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { endImpersonation, getAdminBackupToken, getImpersonation, type ImpersonationInfo } from '@/lib/impersonation';
 
 // Đợt 18e (26/09/2026) — thanh cảnh báo luôn hiện khi Admin đang "Đăng nhập thay" 1 người dùng.
 export default function ImpersonationBanner() {
-  const { me, token, setToken } = useAuth();
-  const router = useRouter();
+  const { me, token } = useAuth();
   const [info, setInfo] = useState<ImpersonationInfo | null>(null);
 
   useEffect(() => {
@@ -36,8 +34,9 @@ export default function ImpersonationBanner() {
     const t = endImpersonation();
     setInfo(null);
     if (t) {
-      setToken(t);
-      router.push('/admin/dashboard');
+      // Đợt 19 — tải lại trang mới hoàn toàn với token Admin (cùng lý do như lúc bắt đầu "Đăng nhập thay").
+      localStorage.setItem('tvl_token', t);
+      window.location.assign('/admin/dashboard');
     }
   }
 

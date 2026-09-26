@@ -16,6 +16,7 @@ import {
   type UnlockedProfileRow,
   type EmployerJob,
 } from '@/lib/api';
+import { track } from '@/lib/analytics';
 import { formatSalary, formatDate, formatNumber } from '@/lib/format';
 import { ChipsInput, TextInput } from '@/components/profile/ui';
 
@@ -92,6 +93,10 @@ export default function TimHoSoPage() {
       const res = await cvSearchApi.search(token, { ...filters, page, pageSize: PAGE_SIZE });
       setItems(res.items);
       setTotal(res.total);
+      // Đợt 19 — ghi lượt NTD tìm hồ sơ (từ khoá + số kết quả) cho Admin "Phân tích truy cập".
+      if (page === 1 && (filters.q?.trim() || loadedOnce.current)) {
+        track('cv_search', { meta: { q: filters.q?.trim() || '', total: res.total } });
+      }
       loadedOnce.current = true;
     } finally {
       setLoading(false);

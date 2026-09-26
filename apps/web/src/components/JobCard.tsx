@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { JobPosting } from '@/lib/api';
+import { track } from '@/lib/analytics';
 import { candidatesApi, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { formatDate, formatSalaryTag, isNewJob } from '@/lib/format';
@@ -38,6 +39,7 @@ export function JobCard({
     }
     setBusy(true);
     try {
+      track(isSaved ? 'unsave_job' : 'save_job', { entityType: 'job', entityId: job.id });
       if (isSaved) {
         await candidatesApi.unsaveJob(token, job.id);
         setIsSaved(false);

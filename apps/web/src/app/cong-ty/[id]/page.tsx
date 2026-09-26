@@ -8,6 +8,7 @@ import { JobCard } from '@/components/JobCard';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { SourcedBadge, isCompanyUnverified } from '@/components/SourcedBadge';
 import { companiesApi, candidatesApi, ApiError, type CompanyProfileResponse } from '@/lib/api';
+import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth-context';
 import { formatNumber } from '@/lib/format';
 
@@ -44,6 +45,7 @@ export default function CongTyPage() {
     setFollowBusy(true);
     const next = !following;
     setFollowing(next);
+    track(next ? 'follow_company' : 'unfollow_company', { entityType: 'company', entityId: params.id });
     try {
       if (next) await candidatesApi.followCompany(token, params.id);
       else await candidatesApi.unfollowCompany(token, params.id);

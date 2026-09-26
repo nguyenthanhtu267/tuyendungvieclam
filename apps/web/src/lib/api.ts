@@ -2087,3 +2087,192 @@ export const adminCandidatesApi = {
       headers: authHeaders(token),
     }),
 };
+
+// ============================================================================================
+// Đợt 19 (26/09/2026) — Admin "Phân tích truy cập": 100% dữ liệu thật (bộ ghi truy cập + CSDL).
+// ============================================================================================
+export interface AnalyticsRangeInfo {
+  from: string;
+  to: string;
+  days: number;
+  mode: 'raw' | 'daily';
+  retentionStart: string;
+  clamped?: boolean;
+}
+export interface AnalyticsKpis {
+  views: number;
+  visitors: number;
+  visitorsApprox: boolean;
+  sessions: number;
+  clicks: number;
+  avgPageTimeMs: number;
+  avgSessionTimeMs: number;
+  bounceRate: number;
+  pagesPerSession: number;
+  newVisitorRate: number;
+  loggedInRate: number;
+  clicksPerView: number;
+}
+export interface AnalyticsDimRow {
+  key: string;
+  sessions: number;
+  visitors: number;
+  views: number;
+  avgSessionTimeMs: number;
+  bounceRate: number;
+  conversions: number;
+  conversionRate: number;
+}
+export interface AnalyticsPageRow {
+  route: string;
+  views: number;
+  visitors: number;
+  avgTimeMs: number;
+  avgScroll: number;
+  entries: number;
+  exits: number;
+  exitRate: number;
+}
+export interface AnalyticsOverview {
+  range: AnalyticsRangeInfo;
+  prevRange: { from: string; to: string };
+  kpis: AnalyticsKpis;
+  prevKpis: AnalyticsKpis;
+  daily: { day: string; views: number; visitors: number; sessions: number }[];
+  hours: { hour: number; views: number }[];
+  weekHour: number[][] | null;
+  topPages: AnalyticsPageRow[];
+  dims: Partial<Record<'source' | 'channel' | 'device' | 'browser' | 'os' | 'city' | 'role' | 'campaign', AnalyticsDimRow[]>>;
+  bots: { bot: string; hits: number }[];
+}
+export interface AnalyticsRealtime {
+  online: {
+    sessions: number;
+    visitors: number;
+    byRole: { candidate: number; employer: number; guest: number };
+    byDevice: { desktop: number; mobile: number; tablet: number };
+  };
+  homepageBanner: { real: number; displayed: number; virtual: number };
+  activePages: { route: string; path: string; count: number }[];
+  perMinute: { minute: string; views: number }[];
+  recentActions: {
+    type: string;
+    route: string;
+    path: string | null;
+    label: string | null;
+    role: string;
+    device: string;
+    at: string;
+    meta: Record<string, unknown> | null;
+    jobTitle: string | null;
+    companyName: string | null;
+  }[];
+  today: { views: number; visitors: number };
+  at: string;
+}
+export interface AnalyticsJobRow {
+  id: string;
+  title: string;
+  status: string | null;
+  industry: string | null;
+  companyId: string | null;
+  companyName: string | null;
+  views: number;
+  visitors: number;
+  avgTimeMs: number;
+  avgScroll: number;
+  applyClicks: number;
+  applyClickVisitors: number;
+  applications: number;
+  saves: number;
+  contacts: number;
+  clickRate: number;
+  conversionRate: number;
+}
+export interface AnalyticsContent {
+  range: AnalyticsRangeInfo;
+  funnel: {
+    siteVisitors: number;
+    searches: number;
+    jobViews: number;
+    jobVisitors: number;
+    applyClicks: number;
+    applyClickVisitors: number;
+    applySubmitsTracked: number;
+    applicationsDb: number;
+  };
+  jobs: AnalyticsJobRow[];
+  industries: { industry: string; views: number; visitors: number; applications: number; jobs: number }[];
+  companies: {
+    id: string;
+    name: string;
+    pageViews: number;
+    pageVisitors: number;
+    avgTimeMs: number;
+    jobViews: number;
+    jobVisitors: number;
+    follows: number;
+    applications: number;
+  }[];
+  searches: { q: string; count: number; visitors: number; zero: number }[];
+  zeroSearches: { q: string; count: number; zero: number }[];
+  cvSearches: { q: string; count: number; visitors: number; zero: number }[];
+  events: { type: string; count: number; visitors: number }[];
+}
+export interface AnalyticsBehavior {
+  range: AnalyticsRangeInfo;
+  dailyRoles: { day: string; candidate: number; employer: number; guest: number }[];
+  returning: { visitors: number; returningVisitors: number; returningRate: number; multiSessionVisitors: number };
+  frequency: { bucket: string; count: number }[];
+  depth: { bucket: string; count: number }[];
+  sessionLength: { bucket: string; count: number }[];
+  paths: { from: string; to: string; count: number }[];
+  entryPages: { route: string; count: number; views: number }[];
+  exitPages: { route: string; count: number; views: number; exitRate: number }[];
+  employer: { active: number; routes: { route: string; views: number; visitors: number }[]; cvSearches: number; cvUnlocks: number; jobsPosted: number };
+  candidate: {
+    active: number;
+    routes: { route: string; views: number; visitors: number }[];
+    applications: number;
+    applicants: number;
+    searches: number;
+    saves: number;
+    follows: number;
+    contacts: number;
+  };
+  registrations: { candidates: number; employers: number };
+  loggedInSessionRate: number;
+  topUsers: { userId: string; email: string; role: string; views: number; sessions: number; totalTimeMs: number; lastSeen: string }[];
+}
+export interface AnalyticsHeatmap {
+  range: { from: string; to: string };
+  route: string;
+  device: 'desktop' | 'mobile';
+  path: string | null;
+  clicks: number;
+  visitors: number;
+  docHeight: number;
+  points: { x: number; y: number; n: number }[];
+  elements: { label: string; count: number; visitors: number }[];
+  pageviews: number;
+  avgTimeMs: number;
+  scrollReach: { depth: number; rate: number }[];
+  samplePaths: { path: string; views: number }[];
+}
+
+export const adminAnalyticsApi = {
+  realtime: (token: string) => request<AnalyticsRealtime>('/admin/analytics/realtime', { headers: authHeaders(token) }),
+  overview: (token: string, from: string, to: string) =>
+    request<AnalyticsOverview>(`/admin/analytics/overview${qs({ from, to })}`, { headers: authHeaders(token) }),
+  content: (token: string, from: string, to: string) =>
+    request<AnalyticsContent>(`/admin/analytics/content${qs({ from, to })}`, { headers: authHeaders(token) }),
+  behavior: (token: string, from: string, to: string) =>
+    request<AnalyticsBehavior>(`/admin/analytics/behavior${qs({ from, to })}`, { headers: authHeaders(token) }),
+  heatmapPages: (token: string, from: string, to: string) =>
+    request<{ range: { from: string; to: string }; pages: { route: string; device: string; clicks: number }[] }>(
+      `/admin/analytics/heatmap/pages${qs({ from, to })}`,
+      { headers: authHeaders(token) },
+    ),
+  heatmap: (token: string, params: { route: string; device: string; from: string; to: string; path?: string }) =>
+    request<AnalyticsHeatmap>(`/admin/analytics/heatmap${qs(params)}`, { headers: authHeaders(token) }),
+};

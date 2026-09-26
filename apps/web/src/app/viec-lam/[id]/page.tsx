@@ -21,6 +21,7 @@ import {
   type CompatibilityResult,
   type CompanyProfileResponse,
 } from '@/lib/api';
+import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth-context';
 import {
   formatDate,
@@ -115,6 +116,7 @@ function JobDetailInner() {
     if (!me || !token) return;
     const next = !saved;
     setSaved(next);
+    track(next ? 'save_job' : 'unsave_job', { entityType: 'job', entityId: params.id });
     try {
       if (next) await candidatesApi.saveJob(token, params.id);
       else await candidatesApi.unsaveJob(token, params.id);
@@ -128,6 +130,7 @@ function JobDetailInner() {
     setFollowBusy(true);
     const next = !following;
     setFollowing(next);
+    track(next ? 'follow_company' : 'unfollow_company', { entityType: 'company', entityId: job.company.id });
     try {
       if (next) await candidatesApi.followCompany(token, job.company.id);
       else await candidatesApi.unfollowCompany(token, job.company.id);
@@ -139,6 +142,7 @@ function JobDetailInner() {
   }
 
   async function handleApplyClick() {
+    track('apply_click', { entityType: 'job', entityId: params.id, meta: { loggedIn: !!me } });
     if (!me || !token) {
       setApplyOpen(true);
       return;
@@ -174,6 +178,7 @@ function JobDetailInner() {
     setApplyError(null);
     try {
       await applicationsApi.apply(token, params.id, { cvId: selectedCvId, coverLetter: coverLetter || undefined });
+      track('apply_submit', { entityType: 'job', entityId: params.id });
       setApplyState('done');
     } catch (err) {
       setApplyState('idle');

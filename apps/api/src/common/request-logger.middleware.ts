@@ -14,7 +14,9 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
     const line = `${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms`;
     if (res.statusCode >= 500) logger.error(line);
     else if (res.statusCode >= 400) logger.warn(line);
-    else logger.log(line);
+    // Đợt 19 — bỏ log các lô ghi truy cập thành công (mỗi người xem gửi ~6 lô/phút, sẽ làm ngập log Render).
+    else if (!req.originalUrl.startsWith('/analytics/collect'))
+      logger.log(line);
   });
   next();
 }

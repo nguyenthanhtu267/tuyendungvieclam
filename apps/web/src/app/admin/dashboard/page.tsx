@@ -29,6 +29,7 @@ import { INDUSTRIES, PROVINCES } from '@/lib/catalogs';
 import { CvSourcingPanel } from '@/components/admin/CvSourcingPanel';
 import { PeoplePanel } from '@/components/admin/PeoplePanel';
 import { CandidatesPanel } from '@/components/admin/CandidatesPanel';
+import { AnalyticsPanel } from '@/components/admin/AnalyticsPanel';
 
 // Đợt 12f (21/09/2026) — bổ sung mục "Đổi mật khẩu" tự phục vụ cho Admin, còn thiếu sót ở Đợt
 // 12a (lúc đó chỉ làm cho Ứng viên và Nhà tuyển dụng). Trước khi có mục này, Admin chỉ có thể
@@ -43,6 +44,8 @@ const NAV_ITEMS = [
   { id: 'featured', label: '🌟 DN yêu thích' },
   // Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp" (mô hình "labeled aggregator").
   { id: 'sourced', label: '🏷️ Nguồn ngoài' },
+  // Đợt 19 (26/09/2026) — phân tích truy cập THẬT: lượt xem, thời gian ở lại, click, nguồn, bản đồ nhiệt.
+  { id: 'analytics', label: '🔎 Phân tích truy cập' },
   { id: 'stats', label: '📈 Thống kê' },
   { id: 'orders', label: '💰 Đơn hàng' },
   // Đợt 18e/18f (26/09/2026) — "Người dùng" sửa được mọi tài khoản + "Ứng viên" quản lý thông minh.
@@ -557,6 +560,8 @@ export default function AdminDashboardPage() {
           <FeaturedEmployersCard token={token} />
         ) : tab === 'sourced' ? (
           <SourcedTabs token={token} />
+        ) : tab === 'analytics' ? (
+          <AnalyticsPanel token={token} />
         ) : tab === 'stats' ? (
           <StatsCard token={token} />
         ) : tab === 'orders' ? (

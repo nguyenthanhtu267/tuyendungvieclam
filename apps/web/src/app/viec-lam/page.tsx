@@ -7,6 +7,7 @@ import { JobCard } from '@/components/JobCard';
 import { FilterBar } from '@/components/search/FilterBar';
 import { DistrictChips } from '@/components/search/DistrictChips';
 import { jobsApi, candidatesApi, type JobFacets, type JobListParams, type JobListResponse, type DistrictFacet } from '@/lib/api';
+import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth-context';
 import { formatNumber } from '@/lib/format';
 
@@ -64,7 +65,17 @@ function JobSearchPage() {
     setLoading(true);
     jobsApi
       .list({ ...filters, page, pageSize: 8 })
-      .then(setResult)
+      .then((res) => {
+        setResult(res);
+        // Đợt 19 — ghi lượt tìm việc (từ khoá, bộ lọc, số kết quả — kể cả khi KHÔNG ra kết quả nào) cho
+        // Admin "Phân tích truy cập". Chỉ tính trang 1 (lật trang không phải lượt tìm mới).
+        const used = Object.entries(filters).filter(([k, v]) => k !== 'q' && v !== undefined && v !== '' && !(Array.isArray(v) && !v.length));
+        if (page === 1 && (filters.q?.trim() || used.length)) {
+          track('search', {
+            meta: { q: filters.q?.trim() || '', total: res.total, filters: used.map(([k]) => k).join(',') },
+          });
+        }
+      })
       .catch(() => setResult({ items: [], total: 0, page: 1, pageSize: 8, totalPages: 1 }))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,4 +1,11 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+} from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { PresenceService } from './presence.service';
 import { PingDto } from './dto/ping.dto';

@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { authApi, ApiError } from '@/lib/api';
+import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth-context';
 import PasswordInput from '@/components/PasswordInput';
 
@@ -36,6 +37,7 @@ export default function DangNhapPage() {
     setLoading(true);
     try {
       const res = await authApi.login({ email: loginEmail, password: loginPassword });
+      track('login');
       setToken(res.accessToken);
       if (res.user.role.startsWith('employer')) router.push('/nha-tuyen-dung/dashboard');
       else if (res.user.role === 'admin' || res.user.role === 'moderator') router.push('/admin/dashboard');
@@ -58,6 +60,7 @@ export default function DangNhapPage() {
         fullName: regFullName,
         phone: regPhone || undefined,
       });
+      track('signup');
       setToken(res.accessToken);
       router.push('/');
     } catch (err) {

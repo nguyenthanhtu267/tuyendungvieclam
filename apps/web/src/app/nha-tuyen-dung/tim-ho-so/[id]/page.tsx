@@ -8,6 +8,7 @@ import EmployerHeader from '@/components/EmployerHeader';
 import { RichTextView } from '@/components/RichTextView';
 import { useAuth } from '@/lib/auth-context';
 import { cvSearchApi, ApiError, type CandidateDetail } from '@/lib/api';
+import { track } from '@/lib/analytics';
 import { formatDate } from '@/lib/format';
 
 // Đợt 9 — Trang chi tiết hồ sơ ứng viên cho nhà tuyển dụng (/nha-tuyen-dung/tim-ho-so/[id]).
@@ -82,6 +83,7 @@ export default function CandidateDetailPage() {
     setUnlocking(true);
     try {
       setDetail(await cvSearchApi.unlock(token, params.id));
+      track('cv_unlock', { entityType: 'candidate', entityId: params.id });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Không thể mở hồ sơ');
     } finally {

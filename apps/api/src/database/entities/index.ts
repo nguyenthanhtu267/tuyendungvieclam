@@ -24,3 +24,4 @@ export * from './admin-setting.entity';
 export * from './company-claim-request.entity';
 export * from './cv-archive.entity';
 export * from './admin-tools.entity';
+export * from './analytics.entity';

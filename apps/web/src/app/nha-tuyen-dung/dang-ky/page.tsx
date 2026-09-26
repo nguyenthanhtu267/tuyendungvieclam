@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { authApi, ApiError } from '@/lib/api';
+import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth-context';
 import PasswordInput from '@/components/PasswordInput';
 
@@ -40,6 +41,7 @@ export default function DangKyNtdPage() {
         size: size || undefined,
         website: website || undefined,
       });
+      track('signup', { meta: { role: 'employer' } });
       setToken(res.accessToken);
       router.push('/nha-tuyen-dung/dashboard');
     } catch (err) {

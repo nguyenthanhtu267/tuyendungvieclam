@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { authApi } from './api';
+import { ApiError, authApi } from './api';
 import { endImpersonation, getAdminBackupToken } from './impersonation';
 
 export interface MeInfo {
@@ -25,7 +25,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [me, setMe] = useState<MeInfo | null | undefined>(undefined);
   const [token, setTokenState] = useState<string | null>(null);
 
-  const load = useCallback(async (t: string | null) => {
+  const load = useCallback(async function loadMe(t: string | null, attempt = 0): Promise<void> {
     if (!t) {
       setMe(null);
       return;
@@ -33,7 +33,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await authApi.me(t);
       setMe(res);
-    } catch {
+    } catch (err) {
+      // Đợt 19 (26/09/2026) — sửa lỗi: trước đây MỌI lỗi khi gọi /auth/me (mất mạng chốc lát, máy chủ đang
+      // khởi động/triển khai trả 502, người dùng chuyển trang giữa chừng làm yêu cầu bị huỷ...) đều bị coi là
+      // "token hỏng" → xoá token → người dùng bị đăng xuất oan. Nay chỉ đăng xuất khi máy chủ TRẢ LỜI RÕ token
+      // không hợp lệ (401/403); lỗi tạm thời thì tự thử lại, vẫn giữ nguyên phiên đăng nhập.
+      if (!(err instanceof ApiError && (err.status === 401 || err.status === 403))) {
+        if (attempt < 2) setTimeout(() => loadMe(t, attempt + 1), attempt === 0 ? 2000 : 6000);
+        else setMe(null);
+        return;
+      }
       // Đợt 18e — token "Đăng nhập thay" hết hạn (2 giờ) → tự quay về phiên Admin đã cất.
       const backup = getAdminBackupToken();
       if (backup && backup !== t) {
