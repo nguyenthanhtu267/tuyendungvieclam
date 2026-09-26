@@ -22,3 +22,5 @@ export * from './candidate-note.entity';
 export * from './work-location.entity';
 export * from './admin-setting.entity';
 export * from './company-claim-request.entity';
+export * from './cv-archive.entity';
+export * from './admin-tools.entity';

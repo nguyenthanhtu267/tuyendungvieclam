@@ -166,6 +166,20 @@ export class CandidateProfile {
   @Column({ name: 'hide_contact_info', default: false })
   hideContactInfo: boolean;
 
+  // Đợt 18c (26/09/2026) — "Hồ sơ nguồn tổng hợp" do Admin tạo (từ Kho CV của NTD, dán nội dung/link
+  // hoặc file CV ngoài web). Là User + CandidateProfile thật (email giả, không ai đăng nhập được) để
+  // dùng lại nguyên Tìm CV/mở khoá trừ điểm/ghi chú/mời ứng tuyển; NTD chỉ thấy nhãn "Nguồn tổng hợp",
+  // KHÔNG thấy `source_label` (có thể chứa tên công ty gốc). `claimed_at` = người thật đã nhận lại.
+  @Index()
+  @Column({ name: 'is_admin_sourced', type: 'boolean', default: false })
+  isAdminSourced: boolean;
+
+  @Column({ name: 'source_label', type: 'varchar', nullable: true })
+  sourceLabel?: string | null;
+
+  @Column({ name: 'claimed_at', type: 'timestamp', nullable: true })
+  claimedAt?: Date | null;
+
   @OneToMany(() => CV, (cv) => cv.candidateProfile)
   cvs?: CV[];
 

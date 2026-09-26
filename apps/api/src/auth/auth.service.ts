@@ -7,7 +7,7 @@ import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import { RegisterEmployerDto } from './dto/register-employer.dto';
 import { LoginDto } from './dto/login.dto';
-import { User, UserRole } from '../database/entities/user.entity';
+import { User, UserRole, UserStatus } from '../database/entities/user.entity';
 import { Company, CompanyApprovalStatus } from '../database/entities/company.entity';
 import { CompanyUser, CompanyUserType } from '../database/entities/company-user.entity';
 
@@ -96,6 +96,10 @@ export class AuthService {
     const passwordOk = await argon2.verify(user.passwordHash, dto.password);
     if (!passwordOk) {
       throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+    }
+    // Đợt 18e (26/09/2026) — trước đây tài khoản bị khoá vẫn đăng nhập được bình thường.
+    if (user.status === UserStatus.SUSPENDED) {
+      throw new UnauthorizedException('Tài khoản đã bị khoá — vui lòng liên hệ quản trị viên');
     }
 
     return this.buildAuthResponse(user.id, user.email, user.role);

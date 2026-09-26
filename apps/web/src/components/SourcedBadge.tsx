@@ -16,3 +16,16 @@ export function SourcedBadge({ className = '' }: { className?: string }) {
     </span>
   );
 }
+
+// Đợt 18c (26/09/2026) — nhãn cho hồ sơ ứng viên "Nguồn tổng hợp" trong Tìm CV: hồ sơ do đội ngũ web tổng
+// hợp từ CV đã gửi cho NTD khác / nguồn công khai, ứng viên chưa tự quản lý tài khoản. Không lộ nguồn cụ thể.
+export function SourcedCandidateBadge({ className = '' }: { className?: string }) {
+  return (
+    <span
+      title="Hồ sơ do đội ngũ Tuyển Dụng Việc Làm tổng hợp — ứng viên chưa tự quản lý tài khoản trên hệ thống. Thông tin liên hệ lấy từ CV gốc."
+      className={`inline-flex items-center gap-1 text-[10px] font-extrabold rounded-full bg-warning-tint text-warning px-2 py-0.5 whitespace-nowrap ${className}`}
+    >
+      🏷️ Nguồn tổng hợp
+    </span>
+  );
+}

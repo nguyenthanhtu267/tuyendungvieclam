@@ -61,6 +61,14 @@ export class CvSearchService {
             AND (bc.company_id = :companyId OR bc.company_name_text ILIKE :companyName)
         )`,
         { companyId, companyName },
+      )
+      // Đợt 18c (26/09/2026) — hồ sơ "nguồn tổng hợp" sinh ra từ Kho CV của công ty nào thì KHÔNG hiện lại
+      // cho chính công ty đó (họ đã có bản gốc trong Kho CV).
+      .andWhere(
+        `NOT EXISTS (
+          SELECT 1 FROM cv_archive_candidates ac
+          WHERE ac.shared_profile_id = profile.id AND ac.company_id = :companyId
+        )`,
       );
     if (excludeHidden) {
       qb.andWhere(
@@ -229,6 +237,8 @@ export class CvSearchService {
       province: profile.province,
       visibility: profile.visibility,
       completionPercent: profile.completionPercent,
+      // Đợt 18c — nhãn "Nguồn tổng hợp" (không lộ nguồn cụ thể).
+      isAdminSourced: profile.isAdminSourced,
       skills: (profile.skills ?? []).map((s) => ({ skillName: s.skillName, level: s.level })),
       languages: (profile.languages ?? []).map((l) => ({ language: l.language, level: l.level })),
       latestExperience: this.latestExperienceSummary(profile, unlocked),
@@ -284,6 +294,14 @@ export class CvSearchService {
     );
     if (blocked.length > 0) {
       throw new ForbiddenException('Ứng viên này đã chặn công ty của bạn xem hồ sơ');
+    }
+    // Đợt 18c — bản "nguồn tổng hợp" không hiện cho công ty nguồn của nó.
+    if (profile.isAdminSourced) {
+      const own = await this.dataSource.query(
+        `SELECT 1 FROM cv_archive_candidates WHERE shared_profile_id = $1 AND company_id = $2 LIMIT 1`,
+        [profileId, company.id],
+      );
+      if (own.length > 0) throw new NotFoundException('Không tìm thấy hồ sơ');
     }
   }
 
@@ -344,6 +362,7 @@ export class CvSearchService {
         organizationName: unlocked ? a.organizationName : undefined,
       })),
       unlocked,
+      isAdminSourced: profile.isAdminSourced,
       contactHiddenByCandidate: unlocked && profile.hideContactInfo,
       // Đợt 12ac (24/09/2026) — ghi chú riêng + trạng thái ẩn (chỉ công ty đang xem thấy).
       note: note?.note,

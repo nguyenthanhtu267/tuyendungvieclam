@@ -26,6 +26,9 @@ import { CompanyLogo } from '@/components/CompanyLogo';
 import { isRichTextEmpty } from '@/lib/richtext';
 import { JobWizardSteps, JOB_WIZARD_INITIAL, type JobWizardFormState } from '@/components/JobWizardForm';
 import { INDUSTRIES, PROVINCES } from '@/lib/catalogs';
+import { CvSourcingPanel } from '@/components/admin/CvSourcingPanel';
+import { PeoplePanel } from '@/components/admin/PeoplePanel';
+import { CandidatesPanel } from '@/components/admin/CandidatesPanel';
 
 // Đợt 12f (21/09/2026) — bổ sung mục "Đổi mật khẩu" tự phục vụ cho Admin, còn thiếu sót ở Đợt
 // 12a (lúc đó chỉ làm cho Ứng viên và Nhà tuyển dụng). Trước khi có mục này, Admin chỉ có thể
@@ -42,7 +45,9 @@ const NAV_ITEMS = [
   { id: 'sourced', label: '🏷️ Nguồn ngoài' },
   { id: 'stats', label: '📈 Thống kê' },
   { id: 'orders', label: '💰 Đơn hàng' },
+  // Đợt 18e/18f (26/09/2026) — "Người dùng" sửa được mọi tài khoản + "Ứng viên" quản lý thông minh.
   { id: 'users', label: '👤 Người dùng' },
+  { id: 'candidates', label: '🧑‍💼 Ứng viên' },
   { id: 'audit-log', label: '📜 Nhật ký thao tác' },
   { id: 'settings', label: '🔒 Đổi mật khẩu' },
 ];
@@ -76,8 +81,13 @@ export default function AdminDashboardPage() {
   }, [me, router]);
 
   // Chỉ hiện "Đang tải…" toàn trang ở lần đầu — duyệt/xác nhận xong không cần che UI.
+  // Đợt 18 (26/09/2026) — sửa lỗi: khi Admin bấm "Đăng nhập thay" 1 người dùng, `token` đổi sang
+  // token của người đó NGAY (đồng bộ) trong khi trang Admin Console vẫn còn đang hiển thị (chưa kịp
+  // điều hướng sang trang NTD/ứng viên) — effect gọi lại loadAll() với token KHÔNG PHẢI admin, 5 API
+  // admin-only trả 403 cùng lúc và ném lỗi chưa bắt (unhandled rejection) ra console. Chỉ tải khi
+  // `me` đã xác nhận đúng là Admin/Điều phối viên; thêm catch để không bao giờ vãi lỗi ra console.
   const loadAll = useCallback(async () => {
-    if (!token) return;
+    if (!token || !me || (me.role !== 'admin' && me.role !== 'moderator')) return;
     if (!hasLoadedRef.current) setLoading(true);
     try {
       const [d, jobs, companies, orders, autoApprove] = await Promise.all([
@@ -93,10 +103,13 @@ export default function AdminDashboardPage() {
       setPendingOrders(orders);
       setAutoApproveEnabled(autoApprove.enabled);
       hasLoadedRef.current = true;
+    } catch {
+      // đang chuyển phiên (VD bắt đầu "Đăng nhập thay") hoặc lỗi mạng tạm thời — bỏ qua, trang sẽ
+      // tự điều hướng đi hoặc người dùng có thể tải lại.
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, me]);
 
   useEffect(() => {
     loadAll();
@@ -223,7 +236,10 @@ export default function AdminDashboardPage() {
   if (!me || (me.role !== 'admin' && me.role !== 'moderator') || !token) return null;
 
   return (
-    <main className="min-h-screen bg-bg grid md:grid-cols-[200px_1fr]">
+    // Đợt 18 (26/09/2026) — sửa lỗi: "grid" không khai báo cột trên điện thoại (cột chỉ khai báo từ
+    // "md:") khiến sidebar + nội dung bị ép nằm CÙNG 1 hàng và tràn ngang trang trên màn hình hẹp.
+    // Xếp chồng dọc (flex-col) trên điện thoại, chỉ chia 2 cột từ md trở lên.
+    <main className="min-h-screen bg-bg flex flex-col md:grid md:grid-cols-[200px_1fr]">
       <aside className="bg-primary-dark text-white p-3 flex flex-col gap-1 md:min-h-screen">
         <div className="font-extrabold text-sm px-2 pt-1.5 pb-3.5">⚙ Admin Console</div>
         {NAV_ITEMS.map((item) => (
@@ -540,7 +556,7 @@ export default function AdminDashboardPage() {
         ) : tab === 'featured' ? (
           <FeaturedEmployersCard token={token} />
         ) : tab === 'sourced' ? (
-          <SourcedCompaniesCard token={token} />
+          <SourcedTabs token={token} />
         ) : tab === 'stats' ? (
           <StatsCard token={token} />
         ) : tab === 'orders' ? (
@@ -595,7 +611,9 @@ export default function AdminDashboardPage() {
             )}
           </>
         ) : tab === 'users' ? (
-          <UsersCard token={token} />
+          <PeoplePanel token={token} />
+        ) : tab === 'candidates' ? (
+          <CandidatesPanel token={token} />
         ) : tab === 'audit-log' ? (
           <AuditLogCard token={token} />
         ) : (
@@ -611,104 +629,34 @@ export default function AdminDashboardPage() {
   );
 }
 
-// Đợt 12a (20/09/2026) — Admin tra cứu tài khoản theo email và đặt lại mật khẩu tạm, thay cho
-// "quên mật khẩu" tự phục vụ qua email (Giai đoạn 1 không có email/SMS). Mật khẩu tạm chỉ hiển thị
-// 1 lần ngay sau khi tạo — Admin cần tự báo cho người dùng qua kênh ngoài hệ thống.
-function UsersCard({ token }: { token: string }) {
-  const [email, setEmail] = useState('');
-  const [user, setUser] = useState<{ id: string; email: string; fullName?: string; role: string; status: string } | null>(
-    null,
-  );
-  const [tempPassword, setTempPassword] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  async function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    setError('');
-    setUser(null);
-    setTempPassword(null);
-    if (!email.trim()) return;
-    setLoading(true);
-    try {
-      const found = await adminApi.findUserByEmail(token, email.trim());
-      setUser(found);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không tìm thấy tài khoản');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleReset() {
-    if (!user) return;
-    setLoading(true);
-    setError('');
-    try {
-      const result = await adminApi.resetUserPassword(token, user.id);
-      setTempPassword(result.tempPassword);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể đặt lại mật khẩu');
-    } finally {
-      setLoading(false);
-    }
-  }
-
+// Đợt 18c (26/09/2026) — tab "Nguồn ngoài" chia 2 mục con: công ty & tin tuyển dụng (Đợt 17) và CV
+// ứng viên (hàng chờ chia sẻ, hồ sơ nguồn tổng hợp, yêu cầu gỡ/nhận lại).
+// Đợt 18e — ô "Tra cứu tài khoản & đặt lại mật khẩu" (Đợt 12a) được thay bằng tab "Người dùng" đầy đủ
+// (components/admin/PeoplePanel.tsx — vẫn có nút đặt lại mật khẩu tạm).
+function SourcedTabs({ token }: { token: string }) {
+  const [sub, setSub] = useState<'companies' | 'cv'>('companies');
   return (
-    <>
-      <h1 className="font-bold text-base mb-4">Tra cứu tài khoản & đặt lại mật khẩu</h1>
-      <div className="text-xs text-ink-faint -mt-2.5 mb-4 max-w-2xl">
-        Dùng khi người dùng quên mật khẩu và không tự đặt lại được (Giai đoạn 1 chưa gửi email/SMS).
-        Tìm tài khoản theo email, đặt lại thành mật khẩu tạm, rồi tự báo mật khẩu này cho người dùng qua kênh khác
-        (điện thoại, gặp trực tiếp...). Người dùng nên đổi lại mật khẩu ngay trong phần Cài đặt sau khi đăng nhập.
-      </div>
-      <div className="rounded-xl bg-white border border-border p-5 max-w-md">
-        <form onSubmit={handleSearch} className="flex gap-2">
-          <input
-            type="email"
-            required
-            placeholder="Email tài khoản…"
-            className="tvl-input text-sm"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <button type="submit" disabled={loading} className="tvl-btn-primary !w-auto px-4 whitespace-nowrap">
-            Tìm
+    <div className="flex flex-col gap-4">
+      <div className="flex gap-1.5">
+        {(
+          [
+            ['companies', '🏢 Công ty & tin tuyển dụng'],
+            ['cv', '📄 CV ứng viên'],
+          ] as const
+        ).map(([k, l]) => (
+          <button
+            key={k}
+            onClick={() => setSub(k)}
+            className={`text-xs font-bold rounded-lg px-3.5 py-2 border ${
+              sub === k ? 'bg-primary-dark text-white border-primary-dark' : 'bg-white text-ink-muted border-border'
+            }`}
+          >
+            {l}
           </button>
-        </form>
-        {error && <div className="text-critical text-xs font-semibold mt-3">{error}</div>}
-        {user && (
-          <div className="mt-4 text-xs flex flex-col gap-2">
-            <div>
-              <span className="text-ink-faint">Họ tên: </span>
-              <span className="font-bold">{user.fullName ?? '—'}</span>
-            </div>
-            <div>
-              <span className="text-ink-faint">Vai trò: </span>
-              <span className="font-bold">{user.role}</span>
-            </div>
-            <div>
-              <span className="text-ink-faint">Trạng thái: </span>
-              <span className="font-bold">{user.status}</span>
-            </div>
-            <button
-              onClick={handleReset}
-              disabled={loading}
-              className="tvl-btn-primary !w-auto px-4 mt-1.5 self-start"
-            >
-              Đặt lại mật khẩu (tạm)
-            </button>
-          </div>
-        )}
-        {tempPassword && (
-          <div className="mt-4 rounded-lg bg-warning-tint text-warning text-xs font-semibold px-3.5 py-2.5">
-            Mật khẩu tạm cho {user?.email}: <span className="font-mono">{tempPassword}</span>
-            <br />
-            Chỉ hiển thị 1 lần — hãy sao chép và báo ngay cho người dùng.
-          </div>
-        )}
+        ))}
       </div>
-    </>
+      {sub === 'companies' ? <SourcedCompaniesCard token={token} /> : <CvSourcingPanel token={token} />}
+    </div>
   );
 }
 
@@ -2361,6 +2309,23 @@ const AUDIT_ACTION_LABEL: Record<string, string> = {
   'company.toggle_featured': 'Bật/tắt DN yêu thích',
   'order.confirm_payment': 'Xác nhận thanh toán',
   'user.reset_password': 'Đặt lại mật khẩu',
+  // Đợt 18c–18f (26/09/2026)
+  'user.update': 'Sửa tài khoản',
+  'user.impersonate': 'Đăng nhập thay',
+  'company.admin_edit': 'Sửa thông tin công ty',
+  'candidate.admin_edit': 'Sửa hồ sơ ứng viên',
+  'candidate.invite': 'Mời ứng tuyển',
+  'candidate.to_sourced': 'Chuyển thành nguồn tổng hợp',
+  'cv.share': 'Chia sẻ CV cho NTD khác',
+  'cv.dismiss': 'Bỏ qua CV',
+  'cv.requeue': 'Đưa CV lại hàng chờ',
+  'cv.auto_share_on': 'Bật tự động chia sẻ CV',
+  'cv.auto_share_off': 'Tắt tự động chia sẻ CV',
+  'cv.sourced_create': 'Tạo hồ sơ nguồn tổng hợp',
+  'cv.sourced_delete': 'Xoá hồ sơ nguồn tổng hợp',
+  'cv.sourced_claim': 'Chuyển giao hồ sơ cho người thật',
+  'cv.share_already_public': 'CV đã công khai sẵn (không tạo bản sao)',
+  'cv.request_reject': 'Từ chối yêu cầu hồ sơ',
 };
 
 function AuditLogCard({ token }: { token: string }) {

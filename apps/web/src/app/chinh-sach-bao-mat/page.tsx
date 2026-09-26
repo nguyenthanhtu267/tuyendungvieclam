@@ -15,7 +15,7 @@ export default function ChinhSachBaoMatPage() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-10 py-10 flex flex-col gap-5 text-sm text-ink-muted">
         <div>
           <h1 className="font-extrabold text-2xl text-ink mb-1">Chính sách bảo mật</h1>
-          <p className="text-xs text-ink-faint">Cập nhật lần cuối: 20/09/2026</p>
+          <p className="text-xs text-ink-faint">Cập nhật lần cuối: 26/09/2026</p>
         </div>
 
         <Section title="1. Dữ liệu chúng tôi thu thập">
@@ -40,6 +40,19 @@ export default function ChinhSachBaoMatPage() {
           chế độ "Khoá" ẩn hoàn toàn khỏi tìm kiếm. Ứng viên có thể chặn từng công ty cụ thể xem hồ
           sơ của mình. Thông tin liên hệ (số điện thoại, email) chỉ hiển thị cho nhà tuyển dụng đã
           thực hiện "mở khoá hồ sơ" theo gói dịch vụ, trừ khi bạn chọn ẩn hẳn trong phần cài đặt.
+        </Section>
+
+        {/* Đợt 18 (26/09/2026) — minh bạch về Kho CV và hồ sơ "Nguồn tổng hợp". */}
+        <Section title="3a. CV đã nộp & hồ sơ “Nguồn tổng hợp”">
+          Khi bạn ứng tuyển, nhà tuyển dụng nhận một bản lưu hồ sơ và CV tại thời điểm nộp (Kho CV) — bản lưu này
+          vẫn còn kể cả khi bạn sửa hồ sơ hoặc xoá tài khoản. Đội ngũ Tuyển Dụng Việc Làm có thể đăng lại thông tin
+          nghề nghiệp từ CV đã nộp hoặc từ nguồn công khai thành hồ sơ gắn nhãn “Nguồn tổng hợp” để nhà tuyển dụng
+          khác tìm thấy; hồ sơ này không hiện với công ty bạn đã nộp CV và tôn trọng danh sách công ty bạn đã chặn.
+          Bạn có quyền yêu cầu gỡ hoặc nhận lại hồ sơ đó bất kỳ lúc nào tại trang{' '}
+          <a href="/yeu-cau-ho-so" className="text-primary font-semibold hover:underline">
+            Gỡ / nhận lại hồ sơ
+          </a>
+          .
         </Section>
 
         <Section title="4. Lưu trữ & bảo mật">

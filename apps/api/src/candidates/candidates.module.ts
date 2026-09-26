@@ -50,6 +50,7 @@ import { ProfileService } from './profile.service';
   ],
   controllers: [CandidatesController, ProfileController],
   providers: [CandidatesService, ProfileService],
-  exports: [CandidatesService],
+  // Đợt 18c — xuất ProfileService để AdminToolsModule tính lại % hoàn thành cho hồ sơ nguồn tổng hợp.
+  exports: [CandidatesService, ProfileService],
 })
 export class CandidatesModule {}

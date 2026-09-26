@@ -17,12 +17,16 @@ export default function Footer() {
     <footer className="border-t border-border bg-white mt-auto">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-ink-faint">
         <div>© {year} {t('footer.rights')} — tuyendungvieclam</div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-x-4 gap-y-1 flex-wrap justify-center">
           <Link href="/dieu-khoan-su-dung" className="hover:text-primary font-semibold">
             {t('footer.terms')}
           </Link>
           <Link href="/chinh-sach-bao-mat" className="hover:text-primary font-semibold">
             {t('footer.privacy')}
+          </Link>
+          {/* Đợt 18c (26/09/2026) — người thật yêu cầu gỡ / nhận lại hồ sơ "Nguồn tổng hợp". */}
+          <Link href="/yeu-cau-ho-so" className="hover:text-primary font-semibold">
+            {t('footer.profileRequest')}
           </Link>
         </div>
       </div>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { SourcedCandidateBadge } from '@/components/SourcedBadge';
 import EmployerHeader from '@/components/EmployerHeader';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -485,6 +486,7 @@ function CandidateCard({
             <Link href={`/nha-tuyen-dung/tim-ho-so/${item.id}`} className="font-extrabold text-[14.5px] hover:text-primary">
               {item.fullName}
             </Link>
+            {item.isAdminSourced && <SourcedCandidateBadge />}
             {item.visibility === 'urgent' && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-critical-tint text-critical">
                 Khẩn cấp

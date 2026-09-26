@@ -31,6 +31,11 @@ import {
   CandidateNote,
   WorkLocation,
   AdminSetting,
+  CompanyClaimRequest,
+  CvArchiveCandidate,
+  CvArchiveEntry,
+  CandidateProfileRequest,
+  AdminCandidateNote,
 } from './entities';
 
 // Đợt 12a (20/09/2026) — DataSource riêng cho TypeORM CLI (migration:generate/run/revert), tách
@@ -70,6 +75,13 @@ export const AppDataSource = new DataSource({
     CandidateNote,
     WorkLocation,
     AdminSetting,
+    // Đợt 18a — bổ sung CompanyClaimRequest (Đợt 17 quên khai báo ở đây, chỉ ảnh hưởng lệnh
+    // migration:generate, không ảnh hưởng migration:run) + 2 bảng Kho CV.
+    CompanyClaimRequest,
+    CvArchiveCandidate,
+    CvArchiveEntry,
+    CandidateProfileRequest,
+    AdminCandidateNote,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,

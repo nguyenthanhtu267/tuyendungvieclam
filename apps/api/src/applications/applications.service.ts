@@ -1,4 +1,11 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Application } from '../database/entities/application.entity';
@@ -7,9 +14,12 @@ import { CandidateProfile } from '../database/entities/candidate-profile.entity'
 import { CV } from '../database/entities/cv.entity';
 import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
 import { ApplyJobDto } from './dto/apply-job.dto';
+import { CvArchiveService } from '../cv-archive/cv-archive.service';
 
 @Injectable()
 export class ApplicationsService {
+  private readonly logger = new Logger(ApplicationsService.name);
+
   constructor(
     @InjectRepository(Application) private readonly applicationRepo: Repository<Application>,
     @InjectRepository(ApplicationStatusHistory)
@@ -17,6 +27,7 @@ export class ApplicationsService {
     @InjectRepository(CandidateProfile) private readonly profileRepo: Repository<CandidateProfile>,
     @InjectRepository(CV) private readonly cvRepo: Repository<CV>,
     @InjectRepository(JobPosting) private readonly jobRepo: Repository<JobPosting>,
+    private readonly cvArchiveService: CvArchiveService,
   ) {}
 
   async apply(userId: string, jobId: string, dto: ApplyJobDto): Promise<Application> {
@@ -50,6 +61,16 @@ export class ApplicationsService {
     // Đợt 12o (21/09/2026) — ghi dòng đầu tiên của "Nhật ký trạng thái ứng tuyển" ngay khi nộp hồ
     // sơ (status mặc định 'new'), để ứng viên thấy đủ dòng thời gian ngay từ lúc ứng tuyển.
     await this.historyRepo.save(this.historyRepo.create({ applicationId: saved.id, status: saved.status }));
+    // Đợt 18a (26/09/2026) — tự động chụp toàn bộ hồ sơ + bản sao file CV vào "Kho CV" của NTD ngay khi
+    // nộp. Lỗi ở bước này KHÔNG được làm hỏng việc ứng tuyển của ứng viên — chỉ ghi log; lần khởi động
+    // server kế tiếp CvArchiveService.backfillAll() sẽ tự lưu bù.
+    try {
+      await this.cvArchiveService.archiveApplication(saved.id);
+    } catch (err) {
+      this.logger.warn(
+        `Chưa lưu được Kho CV cho đơn ${saved.id}: ${(err as Error).message}`,
+      );
+    }
     return saved;
   }
 

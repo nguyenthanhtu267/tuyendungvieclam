@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { authApi } from './api';
+import { endImpersonation, getAdminBackupToken } from './impersonation';
 
 export interface MeInfo {
   id: string;
@@ -33,6 +34,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await authApi.me(t);
       setMe(res);
     } catch {
+      // Đợt 18e — token "Đăng nhập thay" hết hạn (2 giờ) → tự quay về phiên Admin đã cất.
+      const backup = getAdminBackupToken();
+      if (backup && backup !== t) {
+        endImpersonation();
+        localStorage.setItem('tvl_token', backup);
+        setTokenState(backup);
+        setMe(undefined);
+        try {
+          setMe(await authApi.me(backup));
+          return;
+        } catch {
+          /* token Admin cũng hết hạn → đăng xuất hẳn */
+        }
+      }
       localStorage.removeItem('tvl_token');
       setTokenState(null);
       setMe(null);
@@ -50,16 +65,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (t: string) => {
       localStorage.setItem('tvl_token', t);
       setTokenState(t);
+      // Đợt 18e — chuyển sang token KHÁC (VD "Đăng nhập thay"): đặt `me` về undefined (đang tải)
+      // ngay lập tức, tránh 1-2 lần render còn giữ danh tính CŨ (VD vẫn là Admin) trong lúc /auth/me
+      // với token mới chưa trả về — nếu không, các trang tự chuyển hướng theo `me.role` (VD
+      // /nha-tuyen-dung/dashboard) sẽ đọc nhầm vai trò cũ và đá người dùng về sai trang.
+      setMe(undefined);
       load(t);
     },
     [load],
   );
 
   const logout = useCallback(() => {
+    // Đợt 18e — đang "Đăng nhập thay" thì Đăng xuất = quay lại phiên Admin (không đăng xuất Admin).
+    const backup = endImpersonation();
+    if (backup) {
+      localStorage.setItem('tvl_token', backup);
+      setTokenState(backup);
+      setMe(undefined);
+      load(backup);
+      return;
+    }
     localStorage.removeItem('tvl_token');
     setTokenState(null);
     setMe(null);
-  }, []);
+  }, [load]);
 
   const refresh = useCallback(() => load(token), [load, token]);
 

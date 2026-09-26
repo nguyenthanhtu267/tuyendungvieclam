@@ -445,7 +445,8 @@ export class JobsService {
       profilesUpdatedToday,
       applicationsToday,
     ] = await Promise.all([
-      this.candidateProfileRepo.count(),
+      // Đợt 18c — không tính hồ sơ nguồn tổng hợp (do Admin tạo, không phải thành viên tự đăng ký).
+      this.candidateProfileRepo.count({ where: { isAdminSourced: false } }),
       this.companyRepo.count({ where: { approvalStatus: CompanyApprovalStatus.APPROVED } }),
       this.jobRepo.count({ where: { approvalStatus: JobApprovalStatus.APPROVED, isPaused: false } }),
       this.candidateProfileRepo.count({ where: { updatedAt: MoreThanOrEqual(since24h) } }),

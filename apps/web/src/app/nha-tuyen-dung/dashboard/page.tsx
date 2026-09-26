@@ -36,18 +36,26 @@ export default function EmployerDashboardPage() {
   }, [me, router]);
 
   useEffect(() => {
-    if (!token) return;
+    // Đợt 18 (26/09/2026) — sửa lỗi: khi Admin bấm "Quay lại Admin" lúc đang "Đăng nhập thay",
+    // `token` đổi sang token Admin NGAY (đồng bộ) trong khi trang này chưa kịp điều hướng đi — effect
+    // này từng chạy lại với token Admin (không gắn công ty nào) và ném lỗi 403 chưa bắt (unhandled
+    // promise rejection) ra console. Chỉ gọi API khi `me` đã xác nhận đúng là tài khoản NTD; thêm
+    // catch để không bao giờ vãi lỗi mạng ra console dù trường hợp nào.
+    if (!token || !me || !me.role.startsWith('employer')) return;
     (async () => {
       setLoading(true);
       try {
         const [c, d] = await Promise.all([employerApi.getCompany(token), employerApi.dashboard(token)]);
         setCompany(c);
         setDashboard(d);
+      } catch {
+        // đang chuyển phiên (VD thoát "Đăng nhập thay") hoặc lỗi mạng tạm thời — bỏ qua, trang sẽ
+        // tự điều hướng đi hoặc người dùng có thể tải lại.
       } finally {
         setLoading(false);
       }
     })();
-  }, [token]);
+  }, [token, me]);
 
   if (!me || !me.role.startsWith('employer')) return null;
 

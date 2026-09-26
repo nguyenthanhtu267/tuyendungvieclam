@@ -51,7 +51,13 @@ import {
   WorkLocation,
   AdminSetting,
   CompanyClaimRequest,
+  CvArchiveCandidate,
+  CvArchiveEntry,
+  CandidateProfileRequest,
+  AdminCandidateNote,
 } from './database/entities';
+import { CvArchiveModule } from './cv-archive/cv-archive.module';
+import { AdminToolsModule } from './admin-tools/admin-tools.module';
 
 const entities = [
   User,
@@ -85,6 +91,12 @@ const entities = [
   WorkLocation,
   AdminSetting,
   CompanyClaimRequest,
+  // Đợt 18a (26/09/2026) — Kho CV của nhà tuyển dụng.
+  CvArchiveCandidate,
+  CvArchiveEntry,
+  // Đợt 18c/18f — yêu cầu gỡ/nhận lại hồ sơ + nhãn/ghi chú nội bộ của Admin.
+  CandidateProfileRequest,
+  AdminCandidateNote,
 ];
 
 @Module({
@@ -125,6 +137,8 @@ const entities = [
     HealthModule,
     PresenceModule,
     NotificationsModule,
+    CvArchiveModule,
+    AdminToolsModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

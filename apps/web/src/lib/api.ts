@@ -1289,6 +1289,8 @@ export interface CandidateSearchItem {
   // Đợt 12ac (24/09/2026) — icon hành động: ghi chú riêng + đã ẩn (chỉ công ty đang xem thấy).
   note?: string;
   hidden: boolean;
+  // Đợt 18c (26/09/2026) — hồ sơ "Nguồn tổng hợp" do đội ngũ web tổng hợp (ứng viên chưa tự quản lý).
+  isAdminSourced?: boolean;
 }
 
 export interface CandidateSearchResult {
@@ -1363,6 +1365,7 @@ export interface CandidateDetail {
   // Đợt 12ac (24/09/2026) — ghi chú riêng + trạng thái ẩn (chỉ công ty đang xem thấy).
   note?: string;
   hidden: boolean;
+  isAdminSourced?: boolean;
 }
 
 export interface UnlockedProfileRow {
@@ -1450,4 +1453,637 @@ export const notificationsApi = {
     request<AppNotification>(`/notifications/${id}/read`, { method: 'PATCH', headers: authHeaders(token) }),
   markAllRead: (token: string) =>
     request<{ success: true }>('/notifications/read-all', { method: 'PATCH', headers: authHeaders(token) }),
+};
+
+// ===== Đợt 18a (26/09/2026) — "Kho CV" của nhà tuyển dụng =====
+// Mỗi lần ứng viên ứng tuyển, backend tự chụp lại TOÀN BỘ hồ sơ 13 mục + bản sao file CV vào kho riêng
+// của công ty — vẫn còn kể cả khi ứng viên xoá tài khoản. 1 thẻ = 1 người (gộp nhiều lần ứng tuyển).
+
+export interface CvArchiveSnapshot {
+  accountEmail?: string | null;
+  fullName: string;
+  profileTitle?: string | null;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  phone?: string | null;
+  contactEmail?: string | null;
+  nationality?: string | null;
+  maritalStatus?: string | null;
+  country?: string | null;
+  province?: string | null;
+  district?: string | null;
+  address?: string | null;
+  careerObjective?: string | null;
+  desiredPosition?: string | null;
+  desiredLevel?: string | null;
+  desiredSalaryMin?: number | null;
+  desiredSalaryMax?: number | null;
+  salaryCurrency?: string | null;
+  desiredIndustries?: string[] | null;
+  desiredLocations?: string[] | null;
+  desiredJobTypes?: string[] | null;
+  yearsOfExperience?: number | null;
+  currentLevel?: string | null;
+  highestDegree?: string | null;
+  experiences: {
+    position: string;
+    companyName?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    isCurrent: boolean;
+    description?: string | null;
+  }[];
+  educations: {
+    schoolName?: string | null;
+    degree?: string | null;
+    major?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+  }[];
+  certificates: { name: string; issuer?: string | null; issueDate?: string | null }[];
+  languages: { language: string; level: string }[];
+  skills: { skillName: string; level: string }[];
+  achievements: { title: string; description?: string | null; date?: string | null }[];
+  activities: {
+    title: string;
+    organizationName?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    description?: string | null;
+  }[];
+  references: {
+    fullName: string;
+    position?: string | null;
+    company?: string | null;
+    phone?: string | null;
+    email?: string | null;
+  }[];
+}
+
+export interface CvArchiveCard {
+  id: string;
+  fullName: string;
+  phone: string | null;
+  email: string | null;
+  province: string | null;
+  headline: string | null;
+  yearsOfExperience: number | null;
+  skills: string[];
+  applicationCount: number;
+  lastAppliedAt: string;
+  inTrash: boolean;
+  // Ứng viên đã xoá tài khoản — dữ liệu trong kho vẫn còn đủ.
+  accountDeleted: boolean;
+}
+
+export interface CvArchiveListItem extends CvArchiveCard {
+  positions: {
+    entryId: string;
+    jobPostingId: string | null;
+    jobTitle: string;
+    appliedAt: string;
+    entrySource?: 'application' | 'employer_import';
+  }[];
+}
+
+export interface CvArchiveListResponse {
+  items: CvArchiveListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  activeCount: number;
+  trashCount: number;
+}
+
+export interface CvArchiveEntryDetail {
+  id: string;
+  applicationId: string | null;
+  jobPostingId: string | null;
+  jobTitle: string;
+  appliedAt: string;
+  coverLetter: string | null;
+  cvType: string | null;
+  cvFileName: string | null;
+  cvHasFile: boolean;
+  cvExternalLink: string | null;
+  snapshot: CvArchiveSnapshot;
+  // Đợt 18b/18d (26/09/2026) — nội dung đọc từ file CV + nguồn của lần nộp.
+  entrySource?: 'application' | 'employer_import';
+  cvTextStatus?: 'ok' | 'empty' | 'unsupported' | 'error' | null;
+  cvParsed?: ParsedCv | null;
+  cvText?: string | null;
+}
+
+export interface CvArchiveDetail extends CvArchiveCard {
+  entries: CvArchiveEntryDetail[];
+}
+
+export interface CvArchiveJobOption {
+  jobId: string;
+  jobTitle: string;
+  count: number;
+}
+
+export interface CvArchiveListParams {
+  q?: string;
+  jobId?: string;
+  trash?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+
+export const cvArchiveApi = {
+  list: (token: string, params: CvArchiveListParams = {}) => {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set('q', params.q);
+    if (params.jobId) qs.set('jobId', params.jobId);
+    if (params.trash) qs.set('trash', 'true');
+    if (params.page) qs.set('page', String(params.page));
+    if (params.pageSize) qs.set('pageSize', String(params.pageSize));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return request<CvArchiveListResponse>(`/employer/cv-archive${suffix}`, { headers: authHeaders(token) });
+  },
+  listJobs: (token: string) =>
+    request<CvArchiveJobOption[]>('/employer/cv-archive/jobs', { headers: authHeaders(token) }),
+  getDetail: (token: string, id: string) =>
+    request<CvArchiveDetail>(`/employer/cv-archive/${id}`, { headers: authHeaders(token) }),
+  trash: (token: string, id: string) =>
+    request<{ success: true }>(`/employer/cv-archive/${id}/trash`, { method: 'POST', headers: authHeaders(token) }),
+  restore: (token: string, id: string) =>
+    request<{ success: true }>(`/employer/cv-archive/${id}/restore`, { method: 'POST', headers: authHeaders(token) }),
+  // Đợt 18d — NTD tự thêm CV từ nguồn ngoài (đã xem lại trên form) vào Kho CV.
+  importCv: (token: string, draft: CandidateDraft, file?: File | null) => {
+    const form = new FormData();
+    form.append('payload', JSON.stringify(draft));
+    if (file) form.append('file', file);
+    return requestForm<{ id: string }>('/employer/cv-archive/import', token, form);
+  },
+  // Tệp CV trong kho bắt buộc đăng nhập mới tải được → tải về dạng Blob kèm token rồi mở bằng URL tạm.
+  downloadFile: async (token: string, entryId: string): Promise<Blob> => {
+    const res = await fetch(`${API_URL}/employer/cv-archive/entries/${entryId}/file`, {
+      headers: authHeaders(token),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      throw new ApiError((data && data.message) || 'Không tải được tệp CV', res.status);
+    }
+    return res.blob();
+  },
+};
+
+// ===================================================================================================
+// Đợt 18b–18f (26/09/2026) — đọc/tách CV, nguồn CV tổng hợp, quản lý người dùng & ứng viên (Admin)
+// ===================================================================================================
+
+export interface ParsedCv {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  dateOfBirth?: string;
+  gender?: 'male' | 'female';
+  address?: string;
+  province?: string;
+  headline?: string;
+  careerObjective?: string;
+  yearsOfExperience?: number;
+  experiences: DraftExperience[];
+  educations: DraftEducation[];
+  skills: string[];
+  languages: { language: string; level?: string }[];
+  certificates: string[];
+  sections: { key: string; title: string; content: string }[];
+}
+
+export interface DraftExperience {
+  position: string;
+  companyName?: string;
+  startDate?: string;
+  endDate?: string;
+  isCurrent?: boolean;
+  description?: string;
+}
+
+export interface DraftEducation {
+  schoolName?: string;
+  degree?: string;
+  major?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+// Bản nháp hồ sơ ứng viên dùng chung cho form "Thêm CV" (NTD) và "Tạo hồ sơ nguồn tổng hợp" (Admin).
+export interface CandidateDraft {
+  fullName: string;
+  profileTitle?: string;
+  phone?: string;
+  email?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  province?: string;
+  address?: string;
+  desiredPosition?: string;
+  desiredLevel?: string;
+  desiredSalaryMin?: number;
+  desiredSalaryMax?: number;
+  yearsOfExperience?: number;
+  highestDegree?: string;
+  careerObjective?: string;
+  desiredIndustries?: string[];
+  desiredLocations?: string[];
+  experiences?: DraftExperience[];
+  educations?: DraftEducation[];
+  skills?: string[];
+  languages?: { language: string; level?: string }[];
+  certificates?: string[];
+  rawText?: string;
+  sourceLabel?: string;
+  sourceUrl?: string;
+  jobPostingId?: string;
+}
+
+export interface CvParseResult {
+  status: 'ok' | 'empty' | 'unsupported' | 'error';
+  text: string;
+  parsed: ParsedCv | null;
+  warning?: string;
+  draft: Partial<CandidateDraft>;
+}
+
+export const cvParseApi = {
+  text: (token: string, text: string) =>
+    request<CvParseResult>('/cv-parse/text', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ text }) }),
+  file: (token: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return requestForm<CvParseResult>('/cv-parse/file', token, form);
+  },
+  url: (token: string, url: string) =>
+    request<CvParseResult>('/cv-parse/url', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ url }) }),
+};
+
+export type CvShareStatus = 'pending' | 'shared' | 'already_public' | 'dismissed';
+export type RealProfileState = 'none' | 'deleted' | 'public' | 'locked' | 'not_searchable';
+
+export interface CvQueueItem {
+  id: string;
+  companyId: string;
+  companyName: string;
+  fullName: string;
+  headline: string | null;
+  phone: string | null;
+  email: string | null;
+  province: string | null;
+  yearsOfExperience: number | null;
+  skills: string[];
+  lastAppliedAt: string;
+  positions: string[];
+  fromImport: boolean;
+  realProfileState: RealProfileState;
+  shareStatus: CvShareStatus;
+  sharedProfileId: string | null;
+  shareDecidedAt: string | null;
+}
+
+export interface CvQueueResponse {
+  items: CvQueueItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  counts: Record<CvShareStatus, number>;
+}
+
+export interface CvCardDraftResponse {
+  card: CvArchiveDetail;
+  companyName: string;
+  realProfileState: RealProfileState;
+  draft: CandidateDraft | null;
+  shareStatus: CvShareStatus;
+}
+
+export interface SourcedProfileRow {
+  id: string;
+  userId: string;
+  fullName: string;
+  profileTitle: string | null;
+  phone: string | null;
+  email: string | null;
+  province: string | null;
+  sourceLabel: string | null;
+  completionPercent: number;
+  unlockCount: number;
+  createdAt: string;
+}
+
+export interface ProfileRequestRow {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  requestType: 'remove' | 'claim';
+  note: string | null;
+  status: 'pending' | 'resolved' | 'rejected';
+  adminNote: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  matches: { id: string; fullName: string; profileTitle: string | null; phone: string | null; email: string | null; sourceLabel: string | null }[];
+}
+
+function qs(params: Record<string, string | number | boolean | undefined | null>) {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== '') q.set(k, String(v));
+  const str = q.toString();
+  return str ? `?${str}` : '';
+}
+
+export const adminSourcingApi = {
+  summary: (token: string) =>
+    request<{ pending: number; sourced: number; requests: number; sharedLast7Days: number }>('/admin/cv-sourcing/summary', {
+      headers: authHeaders(token),
+    }),
+  getAutoShare: (token: string) =>
+    request<{ enabled: boolean; enabledAt: string | null }>('/admin/cv-sourcing/settings/auto-share', { headers: authHeaders(token) }),
+  setAutoShare: (token: string, enabled: boolean) =>
+    request<{ enabled: boolean; enabledAt: string | null }>('/admin/cv-sourcing/settings/auto-share', {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify({ enabled }),
+    }),
+  queue: (token: string, params: { status?: CvShareStatus; q?: string; page?: number; pageSize?: number }) =>
+    request<CvQueueResponse>(`/admin/cv-sourcing/queue${qs(params)}`, { headers: authHeaders(token) }),
+  draft: (token: string, id: string) =>
+    request<CvCardDraftResponse>(`/admin/cv-sourcing/queue/${id}/draft`, { headers: authHeaders(token) }),
+  share: (token: string, id: string, draft?: CandidateDraft) =>
+    request<{ status: 'shared' | 'already_public'; profileId: string | null }>(`/admin/cv-sourcing/queue/${id}/share`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(draft ? { draft } : {}),
+    }),
+  dismiss: (token: string, id: string) =>
+    request<{ dismissed: number }>(`/admin/cv-sourcing/queue/${id}/dismiss`, { method: 'POST', headers: authHeaders(token) }),
+  requeue: (token: string, id: string) =>
+    request<{ success: true }>(`/admin/cv-sourcing/queue/${id}/requeue`, { method: 'POST', headers: authHeaders(token) }),
+  bulkShare: (token: string, ids: string[]) =>
+    request<{ shared: number; alreadyPublic: number; failed: number }>('/admin/cv-sourcing/queue/bulk-share', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ ids }),
+    }),
+  bulkDismiss: (token: string, ids: string[]) =>
+    request<{ dismissed: number }>('/admin/cv-sourcing/queue/bulk-dismiss', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ ids }),
+    }),
+  downloadEntryFile: async (token: string, entryId: string): Promise<Blob> => {
+    const res = await fetch(`${API_URL}/admin/cv-sourcing/entries/${entryId}/file`, { headers: authHeaders(token) });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      throw new ApiError((data && data.message) || 'Không tải được tệp CV', res.status);
+    }
+    return res.blob();
+  },
+  profiles: (token: string, params: { q?: string; page?: number; pageSize?: number }) =>
+    request<{ items: SourcedProfileRow[]; total: number; page: number; pageSize: number }>(
+      `/admin/cv-sourcing/profiles${qs(params)}`,
+      { headers: authHeaders(token) },
+    ),
+  createProfile: (token: string, draft: CandidateDraft, file?: File | null) => {
+    const form = new FormData();
+    form.append('payload', JSON.stringify(draft));
+    if (file) form.append('file', file);
+    return requestForm<{ id: string }>('/admin/cv-sourcing/profiles', token, form);
+  },
+  deleteProfile: (token: string, id: string) =>
+    request<{ success: true }>(`/admin/cv-sourcing/profiles/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
+  requests: (token: string, status: 'pending' | 'resolved' | 'rejected' = 'pending') =>
+    request<ProfileRequestRow[]>(`/admin/cv-sourcing/requests?status=${status}`, { headers: authHeaders(token) }),
+  resolveRemove: (token: string, id: string, profileId: string, adminNote?: string) =>
+    request<{ success: true }>(`/admin/cv-sourcing/requests/${id}/remove`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ profileId, adminNote }),
+    }),
+  resolveClaim: (token: string, id: string, profileId: string, adminNote?: string) =>
+    request<{ email: string; tempPassword: string }>(`/admin/cv-sourcing/requests/${id}/claim`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ profileId, adminNote }),
+    }),
+  reject: (token: string, id: string, adminNote?: string) =>
+    request<{ success: true }>(`/admin/cv-sourcing/requests/${id}/reject`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ adminNote }),
+    }),
+};
+
+export const publicProfileRequestApi = {
+  create: (payload: { fullName: string; email: string; phone?: string; requestType: 'remove' | 'claim'; note?: string }) =>
+    request<{ id: string; success: true }>('/public/candidate-profile-requests', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+};
+
+// ---------- 18e — Người dùng ----------
+
+export interface AdminPersonRow {
+  id: string;
+  email: string;
+  fullName: string | null;
+  phone: string | null;
+  role: string;
+  status: string;
+  createdAt: string;
+  companyId: string | null;
+  companyName: string | null;
+  companyUserType: string | null;
+  profileId: string | null;
+  isAdminSourced: boolean;
+}
+
+export interface AdminPersonDetail {
+  user: { id: string; email: string; fullName: string | null; phone: string | null; role: string; status: string; createdAt: string };
+  company: {
+    id: string;
+    name: string;
+    taxCode: string;
+    industry: string | null;
+    size: string | null;
+    website: string | null;
+    logoUrl: string | null;
+    description: string | null;
+    approvalStatus: string;
+    companyUserType: string | null;
+  } | null;
+  profile: {
+    id: string;
+    fullName: string;
+    profileTitle: string | null;
+    phone: string | null;
+    contactEmail: string | null;
+    province: string | null;
+    desiredPosition: string | null;
+    visibility: ProfileVisibility;
+    hideContactInfo: boolean;
+    completionPercent: number;
+    isAdminSourced: boolean;
+    sourceLabel: string | null;
+  } | null;
+}
+
+export interface ImpersonateResult {
+  accessToken: string;
+  user: { id: string; email: string; role: string; fullName?: string | null };
+  expiresInMinutes: number;
+}
+
+export const adminPeopleApi = {
+  list: (
+    token: string,
+    params: { q?: string; role?: 'candidate' | 'employer' | 'admin'; status?: string; page?: number; pageSize?: number },
+  ) =>
+    request<{ items: AdminPersonRow[]; total: number; page: number; pageSize: number }>(`/admin/people${qs(params)}`, {
+      headers: authHeaders(token),
+    }),
+  detail: (token: string, userId: string) => request<AdminPersonDetail>(`/admin/people/${userId}`, { headers: authHeaders(token) }),
+  updateUser: (
+    token: string,
+    userId: string,
+    payload: { fullName?: string; email?: string; phone?: string; status?: string; role?: string },
+  ) =>
+    request<AdminPersonDetail>(`/admin/people/${userId}`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    }),
+  updateCompany: (
+    token: string,
+    companyId: string,
+    payload: { name?: string; taxCode?: string; industry?: string; size?: string; website?: string; logoUrl?: string; description?: string },
+  ) =>
+    request<{ success: true }>(`/admin/people/companies/${companyId}`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    }),
+  updateCandidate: (
+    token: string,
+    profileId: string,
+    payload: {
+      fullName?: string;
+      profileTitle?: string;
+      phone?: string;
+      contactEmail?: string;
+      province?: string;
+      desiredPosition?: string;
+      visibility?: ProfileVisibility;
+      hideContactInfo?: boolean;
+    },
+  ) =>
+    request<{ success: true }>(`/admin/people/candidates/${profileId}`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    }),
+  impersonate: (token: string, userId: string) =>
+    request<ImpersonateResult>(`/admin/people/${userId}/impersonate`, { method: 'POST', headers: authHeaders(token) }),
+};
+
+// ---------- 18f — Ứng viên ----------
+
+export interface AdminCandidateRow {
+  id: string;
+  userId: string;
+  fullName: string;
+  email: string | null;
+  userStatus: string;
+  phone: string | null;
+  contactEmail: string | null;
+  profileTitle: string | null;
+  desiredPosition: string | null;
+  province: string | null;
+  visibility: ProfileVisibility;
+  completionPercent: number;
+  yearsOfExperience: number | null;
+  isAdminSourced: boolean;
+  updatedAt: string;
+  tags: string[];
+  note: string | null;
+  applicationCount: number;
+  lastAppliedAt: string | null;
+}
+
+export interface AdminCandidateDetail {
+  id: string;
+  userId: string;
+  email: string | null;
+  userStatus: string | null;
+  visibility: ProfileVisibility;
+  hideContactInfo: boolean;
+  completionPercent: number;
+  isAdminSourced: boolean;
+  sourceLabel: string | null;
+  claimedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  snapshot: CvArchiveSnapshot | null;
+  tags: string[];
+  note: string | null;
+  noteUpdatedBy: string | null;
+  applications: { id: string; jobId: string; jobTitle: string; companyName: string; appliedAt: string; status: string }[];
+  archiveCards: { id: string; companyName: string; shareStatus: CvShareStatus; sharedProfileId: string | null }[];
+}
+
+export interface SuggestedJob {
+  id: string;
+  title: string;
+  companyName: string;
+  provinces: string[];
+  salaryMin: number | null;
+  salaryMax: number | null;
+  score: number;
+  reasons: string[];
+}
+
+export interface AdminCandidateQuery {
+  q?: string;
+  applied?: 'none' | 'any';
+  visibility?: ProfileVisibility;
+  completionMin?: number;
+  province?: string;
+  skill?: string;
+  tag?: string;
+  sourced?: 'only' | 'exclude';
+  page?: number;
+  pageSize?: number;
+}
+
+export const adminCandidatesApi = {
+  list: (token: string, params: AdminCandidateQuery) =>
+    request<{ items: AdminCandidateRow[]; total: number; page: number; pageSize: number }>(
+      `/admin/candidates${qs({ ...params })}`,
+      { headers: authHeaders(token) },
+    ),
+  tags: (token: string) => request<{ tag: string; count: number }[]>('/admin/candidates/tags', { headers: authHeaders(token) }),
+  detail: (token: string, id: string) => request<AdminCandidateDetail>(`/admin/candidates/${id}`, { headers: authHeaders(token) }),
+  setNote: (token: string, id: string, payload: { tags?: string[]; note?: string }) =>
+    request<{ tags: string[]; note: string | null }>(`/admin/candidates/${id}/note`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    }),
+  suggestedJobs: (token: string, id: string) =>
+    request<SuggestedJob[]>(`/admin/candidates/${id}/suggested-jobs`, { headers: authHeaders(token) }),
+  invite: (token: string, id: string, jobPostingId: string) =>
+    request<{ success: true }>(`/admin/candidates/${id}/invite`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ jobPostingId }),
+    }),
+  toSourced: (token: string, id: string) =>
+    request<{ status: 'shared' | 'already_public'; profileId: string | null }>(`/admin/candidates/${id}/to-sourced`, {
+      method: 'POST',
+      headers: authHeaders(token),
+    }),
 };

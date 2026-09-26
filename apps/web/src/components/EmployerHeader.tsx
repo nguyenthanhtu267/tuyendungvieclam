@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -11,6 +12,8 @@ const NAV_LINKS = [
   { href: '/nha-tuyen-dung/dang-tin', label: 'Đăng Tuyển', enabled: true },
   { href: '/nha-tuyen-dung/tin-dang', label: 'Quản Lý Tin', enabled: true },
   { href: '/nha-tuyen-dung/ung-vien', label: 'Ứng Viên', enabled: true },
+  // Đợt 18a (26/09/2026) — Kho CV: mọi CV ứng viên đã nộp, lưu vĩnh viễn, tìm lại được.
+  { href: '/nha-tuyen-dung/kho-cv', label: 'Kho CV', enabled: true },
   { href: '/nha-tuyen-dung/tim-ho-so', label: 'Tìm CV', enabled: true },
 ];
 
@@ -26,6 +29,10 @@ const ACCOUNT_MENU = [
 export default function EmployerHeader() {
   const { me, token, logout } = useAuth();
   const pathname = usePathname();
+  // Đợt 18 (26/09/2026) — sửa lỗi: trên điện thoại menu điều hướng NTD bị ẩn hoàn toàn (chỉ còn
+  // "Tài Khoản") → thêm nút ☰ mở ngăn kéo chứa đủ các mục.
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  useEffect(() => setDrawerOpen(false), [pathname]);
 
   return (
     <div className="flex items-center gap-5 px-4 sm:px-6 lg:px-10 h-14 bg-primary text-white sticky top-0 z-30">
@@ -63,6 +70,13 @@ export default function EmployerHeader() {
       <div className="flex-1 md:hidden" />
 
       <div className="flex items-center gap-3">
+        <button
+          className="md:hidden w-9 h-9 rounded-lg border border-white/30 flex items-center justify-center text-white"
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Mở menu nhà tuyển dụng"
+        >
+          ☰
+        </button>
         <Link
           href="/"
           className="hidden sm:inline-flex items-center rounded-lg bg-success text-white text-xs font-bold px-3 py-1.5 hover:bg-success/85 transition-colors"
@@ -74,6 +88,7 @@ export default function EmployerHeader() {
             không có chuông); dùng chung component với SiteHeader, biến thể "dark" cho nền primary. */}
         {me && token && <NotificationBell token={token} variant="dark" />}
 
+        <div className="hidden md:block">
         <NavDropdown
           trigger={
             <span className={pathname?.startsWith('/nha-tuyen-dung/tai-khoan') ? 'text-white' : 'text-white/80'}>
@@ -102,7 +117,64 @@ export default function EmployerHeader() {
             Đăng xuất
           </button>
         </NavDropdown>
+        </div>
       </div>
+
+      {drawerOpen && (
+        <div className="fixed inset-0 z-40 md:hidden text-ink">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setDrawerOpen(false)} />
+          <nav className="absolute right-0 top-0 bottom-0 w-72 max-w-[86vw] bg-white shadow-xl flex flex-col overflow-y-auto">
+            <div className="flex items-center justify-between px-4 h-14 border-b border-border shrink-0">
+              <span className="font-extrabold text-[13px] tracking-tight">Nhà tuyển dụng</span>
+              <button
+                onClick={() => setDrawerOpen(false)}
+                className="w-8 h-8 flex items-center justify-center text-lg"
+                aria-label="Đóng menu"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex flex-col p-3 gap-0.5 text-sm font-semibold">
+              {me && <div className="px-3 py-2 text-[11px] text-ink-faint truncate">{me.email}</div>}
+              {NAV_LINKS.filter((l) => l.enabled).map((link) => (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  onClick={() => setDrawerOpen(false)}
+                  className={`px-3 py-2.5 rounded-lg ${
+                    pathname?.startsWith(link.href) ? 'bg-primary/10 text-primary' : 'text-ink hover:bg-surface-alt'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              ))}
+              <div className="border-t border-border my-2" />
+              {ACCOUNT_MENU.map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  onClick={() => setDrawerOpen(false)}
+                  className="px-3 py-2.5 rounded-lg text-ink-muted hover:bg-surface-alt"
+                >
+                  {item.label}
+                </Link>
+              ))}
+              <Link href="/" onClick={() => setDrawerOpen(false)} className="px-3 py-2.5 rounded-lg text-success">
+                Dành cho Ứng Viên
+              </Link>
+              <button
+                onClick={() => {
+                  setDrawerOpen(false);
+                  logout();
+                }}
+                className="text-left px-3 py-2.5 rounded-lg text-critical hover:bg-critical-tint"
+              >
+                Đăng xuất
+              </button>
+            </div>
+          </nav>
+        </div>
+      )}
     </div>
   );
 }

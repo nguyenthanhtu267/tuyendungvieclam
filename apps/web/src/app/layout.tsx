@@ -10,6 +10,7 @@ import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
 import { LanguageProvider } from '@/lib/i18n';
 import Footer from '@/components/Footer';
+import ImpersonationBanner from '@/components/ImpersonationBanner';
 
 // Font Inter (to, rõ, sắc nét — quyết định 18/09/2026) + IBM Plex Mono cho số liệu dạng bảng,
 // nạp qua @fontsource (đóng gói sẵn file font) vì fonts.googleapis.com bị chặn bởi chính sách
@@ -29,6 +30,7 @@ export default function RootLayout({
       <body className="font-sans antialiased bg-bg text-ink flex flex-col min-h-screen">
         <AuthProvider>
           <LanguageProvider>
+            <ImpersonationBanner />
             <div className="flex-1 flex flex-col">{children}</div>
             <Footer />
           </LanguageProvider>

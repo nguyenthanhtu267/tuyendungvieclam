@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { SourcedCandidateBadge } from '@/components/SourcedBadge';
 import EmployerHeader from '@/components/EmployerHeader';
 import { RichTextView } from '@/components/RichTextView';
 import { useAuth } from '@/lib/auth-context';
@@ -149,6 +150,7 @@ export default function CandidateDetailPage() {
             <div className="flex-1 min-w-[200px]">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-lg font-extrabold text-ink">{detail.fullName}</h1>
+                {detail.isAdminSourced && <SourcedCandidateBadge />}
                 {detail.visibility === 'urgent' && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-critical-tint text-critical">Khẩn cấp</span>
                 )}

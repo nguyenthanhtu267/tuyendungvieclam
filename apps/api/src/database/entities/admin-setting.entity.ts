@@ -17,6 +17,15 @@ export class AdminSetting {
   @Column({ name: 'auto_approve_enabled', type: 'boolean', default: false })
   autoApproveEnabled: boolean;
 
+  // Đợt 18c (26/09/2026) — công tắc chung "Tự động chia sẻ CV sau 15 phút" (cùng mô hình với "Tự động
+  // duyệt tin"). CHỈ áp dụng cho CV nộp SAU thời điểm bật (`cv_auto_share_enabled_at`) để không "xả"
+  // hàng nghìn CV cũ ra cùng lúc khi vừa bật — CV cũ Admin tự duyệt tay.
+  @Column({ name: 'cv_auto_share_enabled', type: 'boolean', default: false })
+  cvAutoShareEnabled: boolean;
+
+  @Column({ name: 'cv_auto_share_enabled_at', type: 'timestamp', nullable: true })
+  cvAutoShareEnabledAt?: Date | null;
+
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
