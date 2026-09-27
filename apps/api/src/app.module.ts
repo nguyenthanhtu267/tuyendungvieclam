@@ -60,10 +60,12 @@ import {
   AnalyticsEvent,
   AnalyticsDaily,
   AnalyticsBotHit,
+  StoredFile,
 } from './database/entities';
 import { CvArchiveModule } from './cv-archive/cv-archive.module';
 import { AdminToolsModule } from './admin-tools/admin-tools.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { StorageModule } from './storage/storage.module';
 
 const entities = [
   User,
@@ -109,6 +111,8 @@ const entities = [
   AnalyticsEvent,
   AnalyticsDaily,
   AnalyticsBotHit,
+  // Đợt 20 — sổ theo dõi file trên Google Drive.
+  StoredFile,
 ];
 
 @Module({
@@ -152,6 +156,7 @@ const entities = [
     CvArchiveModule,
     AdminToolsModule,
     AnalyticsModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

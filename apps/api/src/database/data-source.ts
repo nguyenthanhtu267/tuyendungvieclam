@@ -41,6 +41,7 @@ import {
   AnalyticsEvent,
   AnalyticsDaily,
   AnalyticsBotHit,
+  StoredFile,
 } from './entities';
 
 // Đợt 12a (20/09/2026) — DataSource riêng cho TypeORM CLI (migration:generate/run/revert), tách
@@ -93,6 +94,8 @@ export const AppDataSource = new DataSource({
     AnalyticsEvent,
     AnalyticsDaily,
     AnalyticsBotHit,
+    // Đợt 20 — sổ theo dõi file trên Google Drive.
+    StoredFile,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,

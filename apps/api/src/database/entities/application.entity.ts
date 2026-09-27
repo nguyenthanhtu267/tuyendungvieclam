@@ -33,7 +33,9 @@ export class Application {
   @Column({ name: 'job_posting_id' })
   jobPostingId: string;
 
-  @ManyToOne(() => JobPosting, (jobPosting) => jobPosting.applications, { onDelete: 'CASCADE' })
+  @ManyToOne(() => JobPosting, (jobPosting) => jobPosting.applications, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'job_posting_id' })
   jobPosting: JobPosting;
 
@@ -46,7 +48,11 @@ export class Application {
   cv: CV;
 
   @Index()
-  @Column({ type: 'enum', enum: ApplicationStatus, default: ApplicationStatus.NEW })
+  @Column({
+    type: 'enum',
+    enum: ApplicationStatus,
+    default: ApplicationStatus.NEW,
+  })
   status: ApplicationStatus;
 
   @Column({ name: 'cover_letter', type: 'text', nullable: true })

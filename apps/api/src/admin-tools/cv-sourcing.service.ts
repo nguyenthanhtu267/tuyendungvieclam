@@ -38,6 +38,7 @@ import {
 } from './sourced-profile.factory';
 import { AdminActor, SYSTEM_ACTOR, logAdminAction } from './admin-audit';
 import { CreateProfileRequestDto } from './dto/admin-tools.dto';
+import { FileStorageService } from '../storage/file-storage.service';
 
 // Đợt 18c (26/09/2026) — Admin "Nguồn ngoài → CV ứng viên":
 //  1. HÀNG CHỜ CHIA SẺ: mỗi người trong Kho CV của các NTD (CV ứng tuyển + CV NTD tự nhập — theo lựa
@@ -63,6 +64,7 @@ export class CvSourcingService implements OnModuleInit, OnModuleDestroy {
   private sweeping = false;
 
   constructor(
+    private readonly storage: FileStorageService,
     private readonly dataSource: DataSource,
     @InjectRepository(CvArchiveCandidate)
     private readonly cardRepo: Repository<CvArchiveCandidate>,

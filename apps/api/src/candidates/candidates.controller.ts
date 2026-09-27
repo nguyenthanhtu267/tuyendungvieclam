@@ -20,6 +20,7 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { CreateCvLinkDto } from './dto/create-cv-link.dto';
 import { BlockCompanyDto } from './dto/block-company.dto';
 import { SaveSearchDto } from './dto/save-search.dto';
+import { fixMulterFilename } from '../common/multer-filename.util';
 
 const ALLOWED_CV_MIME = new Set([
   'application/pdf',
@@ -64,6 +65,8 @@ export class CandidatesController {
     }),
   )
   uploadCv(@CurrentUser() user: { userId: string }, @UploadedFile() file: Express.Multer.File) {
+    // Đợt 21 — tên file Tiếng Việt bị lỗi font do multer đọc nhầm bảng mã, sửa ngay khi nhận file.
+    file.originalname = fixMulterFilename(file.originalname) ?? file.originalname;
     return this.candidatesService.addCvFromUpload(user.userId, file);
   }
 

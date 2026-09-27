@@ -21,6 +21,7 @@ import {
 } from '../database/entities/candidate-sections.entity';
 import { CandidateDraftDto } from '../common/dto/candidate-draft.dto';
 import { ProfileService } from '../candidates/profile.service';
+import { FileStorageService } from '../storage/file-storage.service';
 
 // Đợt 18c (26/09/2026) — tạo "hồ sơ nguồn tổng hợp": 1 User + 1 CandidateProfile THẬT (để dùng lại
 // nguyên Tìm CV / mở khoá trừ điểm / ghi chú / mời ứng tuyển có sẵn), nhưng:
@@ -40,6 +41,7 @@ const trimOrUndef = (v?: string | null) =>
 @Injectable()
 export class SourcedProfileFactory {
   constructor(
+    private readonly storage: FileStorageService,
     private readonly dataSource: DataSource,
     private readonly profileService: ProfileService,
   ) {}
@@ -182,6 +184,12 @@ export class SourcedProfileFactory {
           );
         }
         if (opts.file) {
+          // Đợt 20 — file lên Google Drive nếu đã kết nối (lỗi thì lưu CSDL; file thừa khi huỷ giao dịch tự được dọn).
+          const storageKey = await this.storage.put(opts.file.buffer, {
+            name: opts.file.originalname,
+            mime: opts.file.mimetype,
+            category: 'cv',
+          });
           const cv = await m.save(
             CV,
             m.create(CV, {
@@ -189,7 +197,8 @@ export class SourcedProfileFactory {
               type: CvType.UPLOAD,
               originalFileName: opts.file.originalname,
               fileMimeType: opts.file.mimetype,
-              fileData: opts.file.buffer,
+              fileData: storageKey ? undefined : opts.file.buffer,
+              fileStorageKey: storageKey,
               isPrimary: true,
             }),
           );

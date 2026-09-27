@@ -25,7 +25,11 @@ export interface ParsedCvEducation {
   endDate?: string;
 }
 
+// Đợt 20 — tăng mỗi khi quy tắc tách thay đổi, để "lưu bù" tự tách lại các CV cũ đã lưu toàn văn.
+export const CV_PARSER_VERSION = 2;
+
 export interface ParsedCv {
+  parserVersion?: number;
   fullName?: string;
   email?: string;
   phone?: string;
@@ -375,6 +379,66 @@ function findDob(lines: string[]): string | undefined {
   return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
+// Đợt 20 (27/09/2026) — nhận diện họ tên chắc chắn hơn (người dùng gửi ảnh CV "NGUYỄN THỊ KIM NHUNG" bị
+// tách nhầm họ tên thành "Chuyên Ngành Kế Toán"): ưu tiên dòng BẮT ĐẦU bằng họ phổ biến của người Việt,
+// loại dòng chứa từ chỉ nghề/chuyên ngành, và ghép tên bị xuống 2 dòng (chữ to ở CV thiết kế 2 cột).
+const VN_SURNAMES = new Set(
+  'nguyen tran le pham hoang huynh phan vu vo dang bui do ho ngo duong ly dinh dao trinh truong lam mai to ha cao luu thai chau ta quach kieu doan tang la luong tong chu phung mac au trieu khuc hua diep nghiem than thach vuong tu giang doan quan lai kha ong ton bach la dong han pho trinh tieu nong son hau van'.split(
+    ' ',
+  ),
+);
+const JOB_WORDS =
+  /(k[eế] to[aá]n|t[aà]i ch[ií]nh|chuy[eê]n (ng[aà]nh|vi[eê]n|m[oô]n)|nh[aâ]n vi[eê]n|tr[uư][oở]ng|qu[aả]n l[yý]|gi[aá]m [dđ][oố]c|k[yỹ] s[uư]|k[yỹ] thu[aậ]t|l[aậ]p tr[iì]nh|kinh doanh|marketing|b[aá]n h[aà]ng|h[aà]nh ch[ií]nh|nh[aâ]n s[uự]|th[uư] k[yý]|tr[oợ] l[yý]|gi[aá]o vi[eê]n|t[uư] v[aấ]n|thi[eế]t k[eế]|c[oô]ng nh[aâ]n|lao [dđ][oộ]ng|developer|engineer|manager|accountant|executive|assistant|officer|specialist|designer|staff|intern|sales|director|leader|analyst|consultant)/i;
+// Danh từ chỉ VỊ TRÍ công việc (chặt hơn JOB_WORDS) — để nhận 1 dòng là chức danh (không nhận dòng chỉ
+// ghi lĩnh vực như "TÀI CHÍNH").
+const ROLE_WORDS =
+  /(nh[aâ]n vi[eê]n|tr[uư][oở]ng|ph[oó] (ph[oò]ng|gi[aá]m)|qu[aả]n l[yý]|gi[aá]m [dđ][oố]c|k[yỹ] s[uư]|chuy[eê]n vi[eê]n|k[eế] to[aá]n|l[aậ]p tr[iì]nh vi[eê]n|th[uư] k[yý]|tr[oợ] l[yý]|gi[aá]o vi[eê]n|t[uư] v[aấ]n vi[eê]n|thi[eế]t k[eế] vi[eê]n|c[oô]ng nh[aâ]n|t[aà]i x[eế]|th[uự]c t[aậ]p sinh|developer|engineer|manager|accountant|executive|assistant|officer|specialist|designer|staff|intern|director|leader|analyst|consultant|sales)/i;
+
+const NOT_NAME_WORDS =
+  /(c[oô]ng ty|[dđ][aạ]i h[oọ]c|ch[uứ]ng ch[iỉ]|b[oộ] |c[aấ]p\b|thành phố|quận|huyện|tỉnh|vi[eệ]t nam|curriculum|resume|h[oồ] s[oơ]|s[oơ] y[eế]u)/i;
+
+function nameScore(line: string): number {
+  const s = line.replace(/\s+/g, ' ').trim();
+  if (!s || s.length > 40 || /\d|@|:|\/|http|[,;()]/i.test(s)) return 0;
+  const words = s.split(' ');
+  if (words.length < 2 || words.length > 5) return 0;
+  if (detectSectionKey(s) || JOB_WORDS.test(s) || NOT_NAME_WORDS.test(s))
+    return 0;
+  if (!words.every((w) => /^[A-ZÀ-Ỹ]/u.test(w))) return 0;
+  let score = 1;
+  if (VN_SURNAMES.has(normalizeSearchText(words[0]))) score += 5;
+  if (s === s.toUpperCase()) score += 1;
+  if (words.length >= 3 && words.length <= 4) score += 1;
+  return score;
+}
+
+// Tìm họ tên trong toàn bộ CV: dòng có điểm cao nhất (ưu tiên gần đầu). Ghép tên bị tách 2 dòng.
+function findName(allLines: string[]): string | undefined {
+  let best: { name: string; score: number } | undefined;
+  const limit = Math.min(allLines.length, 120);
+  for (let i = 0; i < limit; i++) {
+    const cur = allLines[i].replace(/\s+/g, ' ').trim();
+    const next = allLines[i + 1]?.replace(/\s+/g, ' ').trim();
+    const candidates = [cur];
+    // "NGUYỄN THỊ" + "KIM NHUNG" (2 dòng chữ hoa ngắn liền nhau, dòng đầu bắt đầu bằng họ).
+    if (
+      next &&
+      cur === cur.toUpperCase() &&
+      next === next.toUpperCase() &&
+      cur.split(' ').length <= 3 &&
+      next.split(' ').length <= 3 &&
+      VN_SURNAMES.has(normalizeSearchText(cur.split(' ')[0]))
+    )
+      candidates.push(`${cur} ${next}`);
+    for (const c of candidates) {
+      const sc =
+        nameScore(c) + (i < 15 ? 1 : 0) + (c.split(' ').length >= 3 ? 0.5 : 0);
+      if (sc > 1 && (!best || sc > best.score)) best = { name: c, score: sc };
+    }
+  }
+  return best?.name;
+}
+
 function looksLikeName(line: string): boolean {
   const s = line.trim();
   if (!s || s.length > 40 || /\d|@|:|\/|http/i.test(s)) return false;
@@ -390,19 +454,45 @@ function looksLikeName(line: string): boolean {
   return words.every((w) => /^[A-ZÀ-Ỹ]/u.test(w) || w === w.toUpperCase());
 }
 
-function splitList(content: string): string[] {
-  return [
-    ...new Set(
-      content
-        .split(/\n|[,;|•●▪]/)
-        .map((s) =>
-          stripBullet(s)
-            .replace(/[.:]+$/, '')
-            .trim(),
-        )
-        .filter((s) => s.length >= 2 && s.length <= 50 && !detectSectionKey(s)),
-    ),
-  ];
+// Dòng chỉ là năm / ngày tháng / "Bộ Tài Chính cấp" / "cấp bởi ..." → là chi tiết của mục ngay trước,
+// không phải 1 kỹ năng/chứng chỉ riêng (lỗi trong ảnh người dùng gửi 27/09/2026).
+const DETAIL_ONLY =
+  /^(?:(?:0?[1-9]|[12]\d|3[01])[/.-])?(?:(?:0?[1-9]|1[0-2])[/.-])?(?:19|20)\d{2}$|^(?:ng[aà]y|n[aă]m|th[aá]ng)\s|(?:\s|^)c[aấ]p$|^c[aấ]p (?:b[oở]i|ng[aà]y)|^(?:issued|awarded|by)\b|^(?:do|b[oở]i)\s/i;
+
+function splitList(content: string, nameParts: string[] = []): string[] {
+  const nameNorm = nameParts.map((p) => normalizeSearchText(p)).filter(Boolean);
+  const out: string[] = [];
+  const items = content
+    .split(/\n|[,;|•●▪]/)
+    .map((s) =>
+      stripBullet(s)
+        .replace(/[.:]+$/, '')
+        .trim(),
+    )
+    .filter((s) => s.length >= 2 && s.length <= 60 && !detectSectionKey(s));
+  for (const it of items) {
+    const n = normalizeSearchText(it);
+    // Bỏ mảnh họ tên người lọt vào danh sách (CV 2 cột: tên nằm cạnh mục Chứng chỉ).
+    if (
+      nameNorm.some(
+        (full) =>
+          full === n ||
+          (n.split(' ').length <= 3 && full.includes(n) && n.length >= 4),
+      )
+    )
+      continue;
+    if (DETAIL_ONLY.test(it) || /^\d+$/.test(it)) {
+      if (out.length) {
+        const last = out[out.length - 1];
+        out[out.length - 1] = last.endsWith(')')
+          ? `${last.slice(0, -1)}, ${it})`
+          : `${last} (${it})`;
+      }
+      continue;
+    }
+    if (!out.some((o) => normalizeSearchText(o) === n)) out.push(it);
+  }
+  return out;
 }
 
 const LANGUAGE_NAMES: [RegExp, string][] = [
@@ -595,27 +685,60 @@ export function parseCvText(input: string): ParsedCv {
     headLines,
     /h[oọ] v[aà] t[eê]n|h[oọ] t[eê]n|full ?name|name/,
   );
-  const nameGuess = headLines.slice(0, 8).find(looksLikeName);
+  const scored = findName(allLines);
+  const nameGuess =
+    scored ??
+    headLines.slice(0, 8).find((l) => looksLikeName(l) && !JOB_WORDS.test(l));
   const fullName = (nameLabeled ?? nameGuess)?.replace(/\s+/g, ' ').trim();
+  const nameParts = fullName
+    ? [
+        fullName,
+        ...fullName.split(' ').reduce<string[]>((acc, _w, i, arr) => {
+          // các mảnh 2-3 chữ liên tiếp của tên (VD "NGUYỄN THỊ", "KIM NHUNG")
+          for (let k = 2; k <= 3 && i + k <= arr.length; k++)
+            acc.push(arr.slice(i, i + k).join(' '));
+          return acc;
+        }, []),
+      ]
+    : [];
   const headlineLabeled = labeled(
     allLines.slice(0, 40),
     /v[iị] tr[ií] [uứ]ng tuy[eể]n|v[iị] tr[ií] mong mu[oố]n|v[iị] tr[ií]|ch[uứ]c danh|position|job title|applying for/,
   );
   let headline = headlineLabeled;
+  const okHeadline = (l?: string) =>
+    !!l &&
+    l.length <= 60 &&
+    !findEmail(l) &&
+    !findPhone(l) &&
+    !/\d{4}/.test(l) &&
+    !detectSectionKey(l) &&
+    !/^chuy[eê]n ng[aà]nh|^ng[aà]nh\b|^major/i.test(l) &&
+    normalizeSearchText(l) !== normalizeSearchText(fullName ?? '') &&
+    !nameParts.some((p) => normalizeSearchText(p) === normalizeSearchText(l));
   if (!headline && nameGuess) {
-    const idx = sections[0].lines.indexOf(nameGuess);
-    const next = sections[0].lines[idx + 1];
-    if (
-      next &&
-      next.length <= 60 &&
-      !findEmail(next) &&
-      !findPhone(next) &&
-      !/\d{4}/.test(next) &&
-      !detectSectionKey(next)
-    ) {
-      headline = next;
+    // Dòng ngay sau họ tên (bỏ qua dòng thứ 2 của tên bị tách) — chỉ nhận nếu giống 1 chức danh.
+    const idx = allLines.findIndex(
+      (l) =>
+        !!fullName &&
+        l.trim().length >= 4 &&
+        normalizeSearchText(fullName).startsWith(
+          normalizeSearchText(l.replace(/\s+/g, ' ').trim()),
+        ),
+    );
+    for (const cand of idx >= 0 ? [allLines[idx + 1], allLines[idx + 2]] : []) {
+      if (okHeadline(cand) && ROLE_WORDS.test(cand!)) {
+        headline = cand;
+        break;
+      }
     }
   }
+  if (!headline)
+    headline = allLines
+      .slice(0, 12)
+      .find(
+        (l) => okHeadline(l) && ROLE_WORDS.test(l) && l.split(' ').length <= 8,
+      );
   const genderRaw = labeled(headLines, /gi[oớ]i t[ií]nh|gender|sex/);
   const gender = genderRaw
     ? /n[uữ]|female/i.test(genderRaw)
@@ -632,7 +755,7 @@ export function parseCvText(input: string): ParsedCv {
   // 3. Các mục chính.
   const experiences = parseExperiences(content('experience'));
   const educations = parseEducations(content('education'));
-  const skills = splitList(content('skills')).slice(0, 30);
+  const skills = splitList(content('skills'), nameParts).slice(0, 30);
   const languageText = content('languages');
   const languages: { language: string; level?: string }[] = [];
   for (const line of languageText.split('\n')) {
@@ -642,7 +765,19 @@ export function parseCvText(input: string): ParsedCv {
       }
     }
   }
-  const certificates = splitList(content('certificates')).slice(0, 20);
+  const certificates = splitList(content('certificates'), nameParts).slice(
+    0,
+    20,
+  );
+  // CV không có mục "Ngoại ngữ" riêng nhưng ghi trong mục Chứng chỉ (VD "Tiếng Anh", "TOEIC (2012)").
+  if (!languages.length) {
+    for (const c of certificates) {
+      for (const [re, lang] of LANGUAGE_NAMES) {
+        if (re.test(c) && !languages.some((l) => l.language === lang))
+          languages.push({ language: lang, level: languageLevel(c) });
+      }
+    }
+  }
   const objective = content('objective');
 
   // 4. Số năm kinh nghiệm: ghi rõ trong CV, hoặc tự tính từ các mốc thời gian kinh nghiệm.
@@ -671,7 +806,16 @@ export function parseCvText(input: string): ParsedCv {
     }
   }
 
+  // Không đoán được chức danh ở đầu CV → lấy chức danh công việc gần nhất.
+  if (
+    !headline &&
+    experiences[0]?.position &&
+    experiences[0].position !== 'Chưa rõ chức danh'
+  )
+    headline = experiences[0].position;
+
   return {
+    parserVersion: CV_PARSER_VERSION,
     fullName: fullName ? titleCaseIfUpper(fullName) : undefined,
     email,
     phone,

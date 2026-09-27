@@ -25,7 +25,9 @@ export class CV {
   @Column({ name: 'candidate_profile_id' })
   candidateProfileId: string;
 
-  @ManyToOne(() => CandidateProfile, (profile) => profile.cvs, { onDelete: 'CASCADE' })
+  @ManyToOne(() => CandidateProfile, (profile) => profile.cvs, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'candidate_profile_id' })
   candidateProfile: CandidateProfile;
 
@@ -43,6 +45,10 @@ export class CV {
   // `select: false` để không tự động tải theo mỗi lần truy vấn danh sách CV — chỉ lấy khi tải xuống.
   @Column({ name: 'file_data', type: 'bytea', nullable: true, select: false })
   fileData?: Buffer;
+
+  // Đợt 20 — file đã chuyển lên Google Drive: "gd:<id file>" (file_data khi đó để trống).
+  @Column({ name: 'file_storage_key', type: 'varchar', nullable: true })
+  fileStorageKey?: string | null;
 
   @Column({ name: 'file_mime_type', nullable: true })
   fileMimeType?: string;

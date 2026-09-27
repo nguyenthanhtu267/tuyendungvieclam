@@ -648,7 +648,13 @@ export interface ApplicationStatusHistoryItem {
 }
 
 export const applicationsApi = {
-  apply: (token: string, jobId: string, dto: { cvId: string; coverLetter?: string }) =>
+  // Đợt 21 (27/09/2026) — 2 cách chia sẻ hồ sơ khi ứng tuyển: cvId (CV file/link có sẵn) HOẶC
+  // useOnlineProfile=true (dùng thẳng "Hồ sơ trực tuyến", không cần file) — chọn đúng 1 trong 2.
+  apply: (
+    token: string,
+    jobId: string,
+    dto: { cvId?: string; useOnlineProfile?: boolean; coverLetter?: string },
+  ) =>
     request<Application>(`/jobs/${jobId}/apply`, {
       method: 'POST',
       headers: authHeaders(token),
@@ -700,6 +706,9 @@ export interface EmployerApplication {
   deletedAt?: string;
   cv: {
     id: string;
+    // Đợt 21 (27/09/2026) — 'template' = ứng viên dùng thẳng "Hồ sơ trực tuyến" (cách 2, không có
+    // file) — xem employerApi.getApplicantOnlineProfile().
+    type: 'template' | 'upload';
     fileUrl?: string;
     originalFileName?: string;
     externalLinkUrl?: string;
@@ -952,6 +961,11 @@ export const employerApi = {
       method: 'PATCH',
       headers: authHeaders(token),
       body: JSON.stringify({ folder }),
+    }),
+  // Đợt 21 (27/09/2026) — xem "Hồ sơ trực tuyến" của ứng viên ứng tuyển bằng cách 2 (không có file).
+  getApplicantOnlineProfile: (token: string, applicationId: string) =>
+    request<CandidateDetail>(`/employer/applications/${applicationId}/online-profile`, {
+      headers: authHeaders(token),
     }),
   trashApplication: (token: string, applicationId: string) =>
     request<{ success: boolean }>(`/employer/applications/${applicationId}/trash`, {
@@ -1324,6 +1338,16 @@ export interface CandidateDetailEducation {
   endDate?: string;
 }
 
+// Đợt 21 (27/09/2026) — file CV ứng viên tải lên/dán link, tách khỏi nội dung nhập liệu "Hồ sơ trực
+// tuyến" (2 cách chia sẻ hồ sơ: điền mẫu trực tuyến, hoặc chỉ điền thông tin cơ bản + đính kèm file).
+export interface CandidateDetailCv {
+  id: string;
+  originalFileName?: string;
+  fileUrl?: string;
+  externalLinkUrl?: string;
+  isPrimary: boolean;
+}
+
 export interface CandidateDetail {
   id: string;
   fullName: string;
@@ -1360,6 +1384,7 @@ export interface CandidateDetail {
   skills: SkillItem[];
   achievements: AchievementItem[];
   activities: (ActivityItem & { organizationName?: string })[];
+  cvs: CandidateDetailCv[];
   unlocked: boolean;
   contactHiddenByCandidate: boolean;
   // Đợt 12ac (24/09/2026) — ghi chú riêng + trạng thái ẩn (chỉ công ty đang xem thấy).
@@ -2275,4 +2300,31 @@ export const adminAnalyticsApi = {
     ),
   heatmap: (token: string, params: { route: string; device: string; from: string; to: string; path?: string }) =>
     request<AnalyticsHeatmap>(`/admin/analytics/heatmap${qs(params)}`, { headers: authHeaders(token) }),
+};
+
+// ============================================================================================
+// Đợt 20 (27/09/2026) — Admin "Lưu trữ file": lưu file lên Google Drive của chủ web.
+// ============================================================================================
+export interface StorageStatus {
+  configured: boolean;
+  connected: boolean;
+  accountEmail: string | null;
+  connectedAt: string | null;
+  lastError: string | null;
+  migrationPaused: boolean;
+  redirectUri: string | null;
+  databaseBytes: number;
+  quota: { limit: number | null; usage: number; usageInDrive: number; email: string | null } | null;
+  categories: { category: string; label: string; dbCount: number; dbBytes: number; driveCount: number; driveBytes: number }[];
+}
+
+export const adminStorageApi = {
+  status: (token: string) => request<StorageStatus>('/admin/storage/status', { headers: authHeaders(token) }),
+  connectUrl: (token: string, returnTo: string) =>
+    request<{ url: string }>(`/admin/storage/google/connect-url${qs({ returnTo })}`, { headers: authHeaders(token) }),
+  disconnect: (token: string) =>
+    request<StorageStatus>('/admin/storage/google/disconnect', { method: 'POST', headers: authHeaders(token) }),
+  setMigrationPaused: (token: string, paused: boolean) =>
+    request<StorageStatus>('/admin/storage/migration', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ paused }) }),
+  migrateNow: (token: string) => request<{ moved: number }>('/admin/storage/migrate-now', { method: 'POST', headers: authHeaders(token) }),
 };

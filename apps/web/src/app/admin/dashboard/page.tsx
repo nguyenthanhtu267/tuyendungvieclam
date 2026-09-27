@@ -30,6 +30,7 @@ import { CvSourcingPanel } from '@/components/admin/CvSourcingPanel';
 import { PeoplePanel } from '@/components/admin/PeoplePanel';
 import { CandidatesPanel } from '@/components/admin/CandidatesPanel';
 import { AnalyticsPanel } from '@/components/admin/AnalyticsPanel';
+import { StoragePanel } from '@/components/admin/StoragePanel';
 
 // Đợt 12f (21/09/2026) — bổ sung mục "Đổi mật khẩu" tự phục vụ cho Admin, còn thiếu sót ở Đợt
 // 12a (lúc đó chỉ làm cho Ứng viên và Nhà tuyển dụng). Trước khi có mục này, Admin chỉ có thể
@@ -51,6 +52,8 @@ const NAV_ITEMS = [
   // Đợt 18e/18f (26/09/2026) — "Người dùng" sửa được mọi tài khoản + "Ứng viên" quản lý thông minh.
   { id: 'users', label: '👤 Người dùng' },
   { id: 'candidates', label: '🧑‍💼 Ứng viên' },
+  // Đợt 20 (27/09/2026) — lưu file lên Google Drive.
+  { id: 'storage', label: '🗄️ Lưu trữ file' },
   { id: 'audit-log', label: '📜 Nhật ký thao tác' },
   { id: 'settings', label: '🔒 Đổi mật khẩu' },
 ];
@@ -61,6 +64,15 @@ export default function AdminDashboardPage() {
   // Đợt 15 (25/09/2026) — mặc định mở ở tab "Duyệt tin" (theo yêu cầu người dùng: "để tôi duyệt tin
   // nhanh nhất") thay vì "Tổng quan" như trước — Admin vào Console là thấy ngay hàng chờ duyệt.
   const [tab, setTab] = useState('jobs');
+  // Đợt 20 — mở thẳng 1 tab qua ?tab=... (VD quay về từ trang cấp quyền Google Drive).
+  useEffect(() => {
+    try {
+      const t = new URLSearchParams(window.location.search).get('tab');
+      if (t && NAV_ITEMS.some((n) => n.id === t)) setTab(t);
+    } catch {
+      /* bỏ qua */
+    }
+  }, []);
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [pendingJobs, setPendingJobs] = useState<JobPosting[]>([]);
   const [pendingCompanies, setPendingCompanies] = useState<Company[]>([]);
@@ -560,6 +572,8 @@ export default function AdminDashboardPage() {
           <FeaturedEmployersCard token={token} />
         ) : tab === 'sourced' ? (
           <SourcedTabs token={token} />
+        ) : tab === 'storage' ? (
+          <StoragePanel token={token} />
         ) : tab === 'analytics' ? (
           <AnalyticsPanel token={token} />
         ) : tab === 'stats' ? (
@@ -2303,6 +2317,11 @@ function MetricChart({
 
 // Đợt 12q (21/09/2026) — Batch 5 mục #4 "Nhật ký thao tác admin".
 const AUDIT_ACTION_LABEL: Record<string, string> = {
+  // Đợt 20 — lưu trữ file Google Drive.
+  'storage.gdrive_connect': 'Kết nối Google Drive',
+  'storage.gdrive_disconnect': 'Ngắt kết nối Google Drive',
+  'storage.migration_pause': 'Tạm dừng chuyển file sang Drive',
+  'storage.migration_resume': 'Tiếp tục chuyển file sang Drive',
   'job.approve': 'Duyệt tin',
   'job.reject': 'Từ chối tin',
   'job.bulk_approve': 'Duyệt hàng loạt tin',

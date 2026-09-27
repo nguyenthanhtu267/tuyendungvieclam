@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  Index,
+} from 'typeorm';
 
 // Đợt 12q (21/09/2026) — Batch 5 mục #4 "Nhật ký thao tác admin": ghi lại mỗi hành động thay đổi dữ
 // liệu do Admin/Moderator thực hiện (duyệt/từ chối tin & công ty — kể cả duyệt hàng loạt, đặt lại mật

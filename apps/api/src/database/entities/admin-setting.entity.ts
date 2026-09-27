@@ -23,8 +23,34 @@ export class AdminSetting {
   @Column({ name: 'cv_auto_share_enabled', type: 'boolean', default: false })
   cvAutoShareEnabled: boolean;
 
-  @Column({ name: 'cv_auto_share_enabled_at', type: 'timestamp', nullable: true })
+  @Column({
+    name: 'cv_auto_share_enabled_at',
+    type: 'timestamp',
+    nullable: true,
+  })
   cvAutoShareEnabledAt?: Date | null;
+
+  // Đợt 20 (27/09/2026) — lưu file lên Google Drive của chủ web. Mã làm mới (refresh token) được MÃ HOÁ
+  // (AES-256-GCM, khoá suy ra từ JWT_SECRET) trước khi lưu — xem storage/file-storage.service.ts.
+  @Column({ name: 'gdrive_refresh_token_enc', type: 'text', nullable: true })
+  gdriveRefreshTokenEnc?: string | null;
+
+  @Column({ name: 'gdrive_account_email', type: 'varchar', nullable: true })
+  gdriveAccountEmail?: string | null;
+
+  @Column({ name: 'gdrive_connected_at', type: 'timestamptz', nullable: true })
+  gdriveConnectedAt?: Date | null;
+
+  // id các thư mục trên Drive: { root, cv, archive, legal, avatar }.
+  @Column({ name: 'gdrive_folders', type: 'jsonb', nullable: true })
+  gdriveFolders?: Record<string, string> | null;
+
+  @Column({ name: 'gdrive_last_error', type: 'text', nullable: true })
+  gdriveLastError?: string | null;
+
+  // Tạm dừng việc tự chuyển file cũ từ CSDL sang Drive.
+  @Column({ name: 'storage_migration_paused', type: 'boolean', default: false })
+  storageMigrationPaused: boolean;
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;

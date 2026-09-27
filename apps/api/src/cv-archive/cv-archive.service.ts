@@ -35,11 +35,17 @@ import {
   stripHtml,
 } from '../common/search-text.util';
 import { extractCvText, CvTextStatus } from '../common/cv-text.util';
-import { parseCvText, ParsedCv } from '../common/cv-parser.util';
+import {
+  CV_PARSER_VERSION,
+  parseCvText,
+  ParsedCv,
+} from '../common/cv-parser.util';
 import { fetchPageText } from '../common/page-text.util';
 import { CandidateDraftDto } from '../common/dto/candidate-draft.dto';
 import { draftToSnapshot, parsedToDraft } from '../common/candidate-draft.util';
+import { fixMulterFilename } from '../common/multer-filename.util';
 import { ListCvArchiveQueryDto } from './dto/list-cv-archive-query.dto';
+import { FileStorageService } from '../storage/file-storage.service';
 
 // Đợt 18a (26/09/2026) — "Kho CV" của nhà tuyển dụng. Xem cv-archive.entity.ts để biết lý do thiết
 // kế 2 bảng tách khỏi chuỗi CASCADE của tài khoản ứng viên.
@@ -71,6 +77,7 @@ export class CvArchiveService implements OnApplicationBootstrap {
   private backfillRunning = false;
 
   constructor(
+    private readonly storage: FileStorageService,
     private readonly dataSource: DataSource,
     @InjectRepository(CvArchiveCandidate)
     private readonly cardRepo: Repository<CvArchiveCandidate>,
@@ -112,8 +119,47 @@ export class CvArchiveService implements OnApplicationBootstrap {
     if (process.env.NODE_ENV === 'test') return;
     // Chạy nền, KHÔNG chặn server khởi động (Render cần cổng mở sớm để báo "Live").
     setTimeout(() => {
-      void this.backfillAll().then(() => this.backfillCvText());
+      void this.backfillAll()
+        .then(() => this.backfillCvText())
+        .then(() => this.reparseOutdated())
+        .then(() => this.fixCorruptedFilenames());
     }, 5_000);
+  }
+
+  // Đợt 21 (27/09/2026) — sửa lỗi tên file Tiếng Việt bị lỗi font ĐÃ LƯU TỪ TRƯỚC (bản vá
+  // fixMulterFilename ở common/multer-filename.util.ts chỉ chặn được lỗi phát sinh từ nay). Quét lại
+  // 3 bảng có thể dính lỗi: cvs (CV ứng viên), cv_archive_entries (Kho CV — "cào CV"), companies
+  // (giấy phép kinh doanh). Idempotent — fixMulterFilename tự nhận biết tên đã đúng và bỏ qua, chạy
+  // lại bao nhiêu lần cũng an toàn nên không cần cờ đánh dấu "đã chạy".
+  async fixCorruptedFilenames(): Promise<number> {
+    let fixed = 0;
+    const targets: Array<{ table: string; column: string }> = [
+      { table: 'cvs', column: 'original_file_name' },
+      { table: 'cv_archive_entries', column: 'cv_file_name' },
+      { table: 'companies', column: 'legal_doc_original_file_name' },
+    ];
+    for (const { table, column } of targets) {
+      const rows: Array<{ id: string; name: string }> =
+        await this.dataSource.query(
+          `SELECT id, ${column} AS name FROM ${table} WHERE ${column} IS NOT NULL`,
+        );
+      for (const row of rows) {
+        const repaired = fixMulterFilename(row.name);
+        if (repaired && repaired !== row.name) {
+          await this.dataSource.query(
+            `UPDATE ${table} SET ${column} = $1 WHERE id = $2`,
+            [repaired, row.id],
+          );
+          fixed += 1;
+        }
+      }
+    }
+    if (fixed > 0) {
+      this.logger.log(
+        `Đợt 21: đã sửa ${fixed} tên file bị lỗi font Tiếng Việt`,
+      );
+    }
+    return fixed;
   }
 
   // Lưu bù mọi đơn ứng tuyển chưa có bản chụp. Theo lô 200 đơn, bộ nhớ đệm bản chụp theo hồ sơ trong
@@ -172,6 +218,7 @@ export class CvArchiveService implements OnApplicationBootstrap {
             id: true,
             archiveCandidateId: true,
             cvFileData: true,
+            cvFileStorageKey: true,
             cvMimeType: true,
             cvFileName: true,
           },
@@ -179,8 +226,12 @@ export class CvArchiveService implements OnApplicationBootstrap {
         });
         if (batch.length === 0) break;
         for (const e of batch) {
+          // Đợt 20 — file có thể đã nằm trên Google Drive.
+          const data = await this.storage
+            .resolve(e.cvFileData, e.cvFileStorageKey)
+            .catch(() => null);
           const { status, text, parsed } = await this.readFile(
-            e.cvFileData,
+            data,
             e.cvMimeType,
             e.cvFileName,
           );
@@ -199,6 +250,43 @@ export class CvArchiveService implements OnApplicationBootstrap {
     } catch (err) {
       this.logger.error(
         `Kho CV: lỗi khi đọc bù file CV — ${(err as Error).message}`,
+      );
+    }
+    return done;
+  }
+
+  // Đợt 20 (27/09/2026) — quy tắc tách CV được cải thiện (họ tên, chức danh, chứng chỉ...) → tách lại các
+  // bản chụp cũ từ toàn văn đã lưu (không cần đọc lại file). Chạy nền, mỗi lần 50 bản.
+  async reparseOutdated(): Promise<number> {
+    let done = 0;
+    try {
+      for (;;) {
+        const rows: {
+          id: string;
+          archive_candidate_id: string;
+          cv_text: string;
+        }[] = await this.dataSource.query(
+          `SELECT id, archive_candidate_id, cv_text FROM cv_archive_entries
+           WHERE cv_text IS NOT NULL AND coalesce((cv_parsed->>'parserVersion')::int, 0) < $1 LIMIT 50`,
+          [CV_PARSER_VERSION],
+        );
+        if (!rows.length) break;
+        for (const r of rows) {
+          await this.entryRepo.update(
+            { id: r.id },
+            { cvParsed: parseCvText(r.cv_text) },
+          );
+          await this.dataSource.transaction((m) =>
+            this.refreshCard(m, r.archive_candidate_id),
+          );
+          done++;
+        }
+      }
+      if (done > 0)
+        this.logger.log(`Kho CV: đã tách lại ${done} CV theo quy tắc mới.`);
+    } catch (err) {
+      this.logger.error(
+        `Kho CV: lỗi khi tách lại CV — ${(err as Error).message}`,
       );
     }
     return done;
@@ -244,6 +332,7 @@ export class CvArchiveService implements OnApplicationBootstrap {
         originalFileName: true,
         fileMimeType: true,
         fileData: true,
+        fileStorageKey: true,
         externalLinkUrl: true,
       },
     });
@@ -256,9 +345,27 @@ export class CvArchiveService implements OnApplicationBootstrap {
       cache?.set(cv.candidateProfileId, snapshot);
     }
 
+    // Đợt 20 — nội dung file (trong CSDL hoặc trên Google Drive) + bản sao RIÊNG của Kho CV: trên Drive thì
+    // sao chép file ngay trên Drive (không tải về/tải lên lại); còn trong CSDL thì thử đẩy lên Drive.
+    const fileBytes = await this.storage
+      .resolve(cv.fileData, cv.fileStorageKey)
+      .catch(() => null);
+    let archiveKey: string | null = null;
+    if (cv.fileStorageKey)
+      archiveKey = await this.storage.copy(cv.fileStorageKey, {
+        name: cv.originalFileName,
+        category: 'archive',
+      });
+    else if (fileBytes)
+      archiveKey = await this.storage.put(fileBytes, {
+        name: cv.originalFileName,
+        mime: cv.fileMimeType,
+        category: 'archive',
+      });
+
     // Đợt 18b — đọc chữ file CV (nếu có) TRƯỚC giao dịch (có thể mất vài trăm ms với PDF dài).
-    const file = cv.fileData
-      ? await this.readFile(cv.fileData, cv.fileMimeType, cv.originalFileName)
+    const file = fileBytes
+      ? await this.readFile(fileBytes, cv.fileMimeType, cv.originalFileName)
       : null;
 
     const identity: CardIdentity = {
@@ -300,8 +407,9 @@ export class CvArchiveService implements OnApplicationBootstrap {
           cvType: cv.type ?? null,
           cvFileName: cv.originalFileName ?? null,
           cvMimeType: cv.fileMimeType ?? null,
-          cvFileData: cv.fileData ?? null,
-          cvHasFile: !!cv.fileData,
+          cvFileData: archiveKey ? null : (fileBytes ?? null),
+          cvFileStorageKey: archiveKey,
+          cvHasFile: !!(archiveKey || fileBytes),
           cvExternalLink: cv.externalLinkUrl ?? null,
           cvText: file?.text || null,
           cvParsed: file?.parsed ?? null,
@@ -640,6 +748,14 @@ export class CvArchiveService implements OnApplicationBootstrap {
     const fileRead = file
       ? await this.readFile(file.buffer, file.mimetype, file.originalname)
       : null;
+    // Đợt 20 — file lên Google Drive nếu đã kết nối.
+    const importKey = file
+      ? await this.storage.put(file.buffer, {
+          name: file.originalname,
+          mime: file.mimetype,
+          category: 'archive',
+        })
+      : null;
     const rawText = (dto.rawText ?? '').trim() || fileRead?.text || '';
     const parsed = rawText ? parseCvText(rawText) : null;
     const identity: CardIdentity = {
@@ -664,7 +780,8 @@ export class CvArchiveService implements OnApplicationBootstrap {
           cvType: file ? 'upload' : null,
           cvFileName: file?.originalname ?? null,
           cvMimeType: file?.mimetype ?? null,
-          cvFileData: file?.buffer ?? null,
+          cvFileData: importKey ? null : (file?.buffer ?? null),
+          cvFileStorageKey: importKey,
           cvHasFile: !!file,
           cvExternalLink: dto.sourceUrl?.trim() || null,
           cvText: rawText || null,
@@ -842,13 +959,17 @@ export class CvArchiveService implements OnApplicationBootstrap {
       select: {
         id: true,
         cvFileData: true,
+        cvFileStorageKey: true,
         cvMimeType: true,
         cvFileName: true,
       },
     });
-    if (!entry || !entry.cvFileData)
-      throw new NotFoundException('Không tìm thấy tệp CV');
-    return entry;
+    // Đợt 20 — lấy nội dung dù file đang ở CSDL hay trên Google Drive.
+    const data = entry
+      ? await this.storage.resolve(entry.cvFileData, entry.cvFileStorageKey)
+      : null;
+    if (!entry || !data) throw new NotFoundException('Không tìm thấy tệp CV');
+    return { ...entry, cvFileData: data };
   }
 
   async trash(userId: string, id: string) {

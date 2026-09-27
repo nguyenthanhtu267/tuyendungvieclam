@@ -12,6 +12,8 @@ import { ServicePackage } from '../database/entities/service-package.entity';
 import { Order } from '../database/entities/order.entity';
 import { WorkLocation } from '../database/entities/work-location.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
+// Đợt 21 (27/09/2026) — NTD xem "Hồ sơ trực tuyến" của ứng viên đã ứng tuyển thẳng vào tin của họ.
+import { CvSearchModule } from '../cv-search/cv-search.module';
 
 @Module({
   imports: [
@@ -27,6 +29,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       WorkLocation,
     ]),
     NotificationsModule,
+    CvSearchModule,
   ],
   controllers: [EmployerController],
   providers: [EmployerService],

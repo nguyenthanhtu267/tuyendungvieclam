@@ -1,11 +1,19 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CandidateProfile } from '../database/entities/candidate-profile.entity';
 import { CV, CvType } from '../database/entities/cv.entity';
 import { SavedJob } from '../database/entities/saved-job.entity';
 import { BlockedCompany } from '../database/entities/blocked-company.entity';
-import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
+import {
+  JobPosting,
+  JobApprovalStatus,
+} from '../database/entities/job-posting.entity';
 import { SearchHistory } from '../database/entities/search-history.entity';
 import { UnlockedProfile } from '../database/entities/unlocked-profile.entity';
 import { CompanyFollow } from '../database/entities/company-follow.entity';
@@ -15,6 +23,7 @@ import { BlockCompanyDto } from './dto/block-company.dto';
 import { SaveSearchDto } from './dto/save-search.dto';
 import { resolveCompanyLogoUrl } from '../common/company-logo.util';
 import { ProfileService } from './profile.service';
+import { FileStorageService } from '../storage/file-storage.service';
 
 const CV_MAX_BYTES = 2 * 1024 * 1024; // 2MB — theo Mục 9 SRS
 // Đợt 12ab (24/09/2026) — "làm mới hồ sơ" tối đa 2 CV theo yêu cầu (mẫu careerviet.vn).
@@ -26,6 +35,7 @@ const REFRESH_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 @Injectable()
 export class CandidatesService {
   constructor(
+    private readonly storage: FileStorageService,
     @InjectRepository(CandidateProfile)
     private readonly profileRepo: Repository<CandidateProfile>,
     @InjectRepository(CV)
@@ -50,42 +60,85 @@ export class CandidatesService {
     private readonly profileService: ProfileService,
   ) {}
 
-  async getOwnProfile(userId: string): Promise<CandidateProfile> {
-    const profile = await this.profileRepo.findOne({ where: { userId }, relations: { cvs: true } });
-    if (!profile) throw new NotFoundException('Không tìm thấy hồ sơ ứng viên');
+  // Đợt 21 (27/09/2026) — bỏ CV type=TEMPLATE (bản đại diện "Hồ sơ trực tuyến", tự tạo khi ứng tuyển
+  // bằng cách 2 — xem ApplicationsService.apply()) khỏi `profile.cvs` mọi nơi service này trả ra: mục
+  // "CV & tệp đính kèm (x/2)" ở /ho-so và giới hạn CV_MAX_COUNT chỉ tính CV file/link thật.
+  private onlyUploadCvs(profile: CandidateProfile): CandidateProfile {
+    profile.cvs = (profile.cvs ?? []).filter((c) => c.type === CvType.UPLOAD);
     return profile;
   }
 
-  async updateOwnProfile(userId: string, dto: UpdateProfileDto): Promise<CandidateProfile> {
+  async getOwnProfile(userId: string): Promise<CandidateProfile> {
+    const profile = await this.profileRepo.findOne({
+      where: { userId },
+      relations: { cvs: true },
+    });
+    if (!profile) throw new NotFoundException('Không tìm thấy hồ sơ ứng viên');
+    return this.onlyUploadCvs(profile);
+  }
+
+  async updateOwnProfile(
+    userId: string,
+    dto: UpdateProfileDto,
+  ): Promise<CandidateProfile> {
     const profile = await this.getOwnProfile(userId);
     Object.assign(profile, dto);
     const saved = await this.profileRepo.save(profile);
     await this.profileService.refreshCompletion(profile.id);
     // refreshCompletion() lưu completionPercent mới ở bản ghi riêng của nó — nạp lại để trả về đúng
     // giá trị mới nhất cho FE thay vì bản `saved` đã cũ (chưa có % mới).
-    return (await this.profileRepo.findOne({ where: { id: profile.id }, relations: { cvs: true } })) ?? saved;
+    const reloaded = await this.profileRepo.findOne({
+      where: { id: profile.id },
+      relations: { cvs: true },
+    });
+    return reloaded ? this.onlyUploadCvs(reloaded) : this.onlyUploadCvs(saved);
   }
 
   async listOwnCvs(userId: string): Promise<CV[]> {
     const profile = await this.getOwnProfile(userId);
-    return this.cvRepo.find({ where: { candidateProfileId: profile.id }, order: { createdAt: 'DESC' } });
+    // Đợt 21 (27/09/2026) — chỉ trả CV dạng file/link (type=UPLOAD) cho trang "CV của tôi": CV
+    // type=TEMPLATE (đại diện "Hồ sơ trực tuyến", tự tạo khi ứng tuyển bằng cách 2 — xem
+    // ApplicationsService.apply()) không có file, không thuộc danh sách này và không tính vào
+    // CV_MAX_COUNT.
+    return this.cvRepo.find({
+      where: { candidateProfileId: profile.id, type: CvType.UPLOAD },
+      order: { createdAt: 'DESC' },
+    });
   }
 
-  async addCvFromUpload(userId: string, file: Express.Multer.File): Promise<CV> {
+  private countUploadCvs(profile: CandidateProfile): number {
+    return (profile.cvs ?? []).filter((c) => c.type === CvType.UPLOAD).length;
+  }
+
+  async addCvFromUpload(
+    userId: string,
+    file: Express.Multer.File,
+  ): Promise<CV> {
     if (!file) throw new BadRequestException('Vui lòng chọn tệp CV');
     if (file.size > CV_MAX_BYTES) {
-      throw new BadRequestException('Tệp CV vượt quá 2MB — vui lòng dán link Google Drive thay thế');
+      throw new BadRequestException(
+        'Tệp CV vượt quá 2MB — vui lòng dán link Google Drive thay thế',
+      );
     }
     const profile = await this.getOwnProfile(userId);
-    if ((profile.cvs?.length ?? 0) >= CV_MAX_COUNT) {
-      throw new BadRequestException(`Bạn chỉ có thể đính kèm tối đa ${CV_MAX_COUNT} CV — vui lòng xoá bớt trước khi thêm CV mới`);
+    if (this.countUploadCvs(profile) >= CV_MAX_COUNT) {
+      throw new BadRequestException(
+        `Bạn chỉ có thể đính kèm tối đa ${CV_MAX_COUNT} CV — vui lòng xoá bớt trước khi thêm CV mới`,
+      );
     }
-    const isFirst = (profile.cvs?.length ?? 0) === 0;
+    const isFirst = this.countUploadCvs(profile) === 0;
+    // Đợt 20 — lưu file lên Google Drive (nếu đã kết nối), không được thì lưu CSDL như cũ.
+    const storageKey = await this.storage.put(file.buffer, {
+      name: file.originalname,
+      mime: file.mimetype,
+      category: 'cv',
+    });
     const cv = this.cvRepo.create({
       candidateProfileId: profile.id,
       type: CvType.UPLOAD,
       originalFileName: file.originalname,
-      fileData: file.buffer,
+      fileData: storageKey ? undefined : file.buffer,
+      fileStorageKey: storageKey,
       fileMimeType: file.mimetype,
       isPrimary: isFirst,
     });
@@ -99,10 +152,12 @@ export class CandidatesService {
 
   async addCvFromLink(userId: string, externalLinkUrl: string): Promise<CV> {
     const profile = await this.getOwnProfile(userId);
-    if ((profile.cvs?.length ?? 0) >= CV_MAX_COUNT) {
-      throw new BadRequestException(`Bạn chỉ có thể đính kèm tối đa ${CV_MAX_COUNT} CV — vui lòng xoá bớt trước khi thêm CV mới`);
+    if (this.countUploadCvs(profile) >= CV_MAX_COUNT) {
+      throw new BadRequestException(
+        `Bạn chỉ có thể đính kèm tối đa ${CV_MAX_COUNT} CV — vui lòng xoá bớt trước khi thêm CV mới`,
+      );
     }
-    const isFirst = (profile.cvs?.length ?? 0) === 0;
+    const isFirst = this.countUploadCvs(profile) === 0;
     const cv = this.cvRepo.create({
       candidateProfileId: profile.id,
       type: CvType.UPLOAD,
@@ -117,10 +172,14 @@ export class CandidatesService {
   async removeCv(userId: string, cvId: string): Promise<void> {
     const profile = await this.getOwnProfile(userId);
     const cv = await this.cvRepo.findOne({ where: { id: cvId } });
-    if (!cv || cv.candidateProfileId !== profile.id) throw new NotFoundException('Không tìm thấy CV');
+    if (!cv || cv.candidateProfileId !== profile.id)
+      throw new NotFoundException('Không tìm thấy CV');
     await this.cvRepo.remove(cv);
     if (cv.isPrimary) {
-      const remaining = await this.cvRepo.find({ where: { candidateProfileId: profile.id }, order: { createdAt: 'ASC' } });
+      const remaining = await this.cvRepo.find({
+        where: { candidateProfileId: profile.id, type: CvType.UPLOAD },
+        order: { createdAt: 'ASC' },
+      });
       if (remaining[0]) {
         remaining[0].isPrimary = true;
         await this.cvRepo.save(remaining[0]);
@@ -131,7 +190,9 @@ export class CandidatesService {
 
   async setPrimaryCv(userId: string, cvId: string): Promise<CV> {
     const profile = await this.getOwnProfile(userId);
-    const cvs = await this.cvRepo.find({ where: { candidateProfileId: profile.id } });
+    const cvs = await this.cvRepo.find({
+      where: { candidateProfileId: profile.id, type: CvType.UPLOAD },
+    });
     const target = cvs.find((c) => c.id === cvId);
     if (!target) throw new NotFoundException('Không tìm thấy CV');
     for (const c of cvs) {
@@ -150,7 +211,10 @@ export class CandidatesService {
     });
     // Đợt 16 (25/09/2026) — mục 22a danh sách lỗi: favicon tự động theo website khi chưa có logoUrl.
     for (const r of rows) {
-      if (r.jobPosting?.company) r.jobPosting.company.logoUrl = resolveCompanyLogoUrl(r.jobPosting.company);
+      if (r.jobPosting?.company)
+        r.jobPosting.company.logoUrl = resolveCompanyLogoUrl(
+          r.jobPosting.company,
+        );
     }
     return rows;
   }
@@ -164,13 +228,19 @@ export class CandidatesService {
     });
     if (existing) return existing;
     return this.savedJobRepo.save(
-      this.savedJobRepo.create({ candidateProfileId: profile.id, jobPostingId: jobId }),
+      this.savedJobRepo.create({
+        candidateProfileId: profile.id,
+        jobPostingId: jobId,
+      }),
     );
   }
 
   async unsaveJob(userId: string, jobId: string) {
     const profile = await this.getOwnProfile(userId);
-    await this.savedJobRepo.delete({ candidateProfileId: profile.id, jobPostingId: jobId });
+    await this.savedJobRepo.delete({
+      candidateProfileId: profile.id,
+      jobPostingId: jobId,
+    });
   }
 
   async listBlockedCompanies(userId: string) {
@@ -198,8 +268,11 @@ export class CandidatesService {
 
   async unblockCompany(userId: string, blockId: string) {
     const profile = await this.getOwnProfile(userId);
-    const row = await this.blockedCompanyRepo.findOne({ where: { id: blockId } });
-    if (!row || row.candidateProfileId !== profile.id) throw new ForbiddenException();
+    const row = await this.blockedCompanyRepo.findOne({
+      where: { id: blockId },
+    });
+    if (!row || row.candidateProfileId !== profile.id)
+      throw new ForbiddenException();
     await this.blockedCompanyRepo.remove(row);
   }
 
@@ -230,7 +303,11 @@ export class CandidatesService {
   async removeSavedSearch(userId: string, id: string) {
     const profile = await this.getOwnProfile(userId);
     const row = await this.searchHistoryRepo.findOne({ where: { id } });
-    if (!row || row.ownerType !== 'candidate_profile' || row.ownerId !== profile.id) {
+    if (
+      !row ||
+      row.ownerType !== 'candidate_profile' ||
+      row.ownerId !== profile.id
+    ) {
       throw new ForbiddenException();
     }
     await this.searchHistoryRepo.remove(row);
@@ -242,46 +319,74 @@ export class CandidatesService {
   // kỹ năng/vị trí mong muốn (khớp tiêu đề tin) — cộng dồn điểm rồi sắp theo điểm cao nhất, mới nhất.
   // Chỉ trả tin có điểm > 0 (khớp ít nhất 1 tiêu chí) để tránh gợi ý ngẫu nhiên không liên quan.
   async getRecommendedJobs(userId: string, limit = 6) {
-    const profile = await this.profileRepo.findOne({ where: { userId }, relations: { skills: true } });
+    const profile = await this.profileRepo.findOne({
+      where: { userId },
+      relations: { skills: true },
+    });
     if (!profile) throw new NotFoundException('Không tìm thấy hồ sơ ứng viên');
 
     const industries = (profile.desiredIndustries ?? []).filter(Boolean);
-    const locations = [...(profile.desiredLocations ?? []), profile.province].filter(Boolean) as string[];
+    const locations = [
+      ...(profile.desiredLocations ?? []),
+      profile.province,
+    ].filter(Boolean) as string[];
     const jobTypes = (profile.desiredJobTypes ?? []).filter(Boolean);
-    const skillNames = (profile.skills ?? []).map((s) => s.skillName).filter(Boolean);
-    const keywords = [profile.desiredPosition, ...skillNames].filter(Boolean) as string[];
+    const skillNames = (profile.skills ?? [])
+      .map((s) => s.skillName)
+      .filter(Boolean);
+    const keywords = [profile.desiredPosition, ...skillNames].filter(
+      Boolean,
+    ) as string[];
 
     // Hồ sơ chưa đủ thông tin để gợi ý có ý nghĩa — trả rỗng, FE hiện hướng dẫn điền hồ sơ.
-    if (!industries.length && !locations.length && !jobTypes.length && !keywords.length && !profile.desiredLevel) {
+    if (
+      !industries.length &&
+      !locations.length &&
+      !jobTypes.length &&
+      !keywords.length &&
+      !profile.desiredLevel
+    ) {
       return [];
     }
 
-    const blocked = await this.blockedCompanyRepo.find({ where: { candidateProfileId: profile.id } });
+    const blocked = await this.blockedCompanyRepo.find({
+      where: { candidateProfileId: profile.id },
+    });
     const blockedCompanyIds = blocked.map((b) => b.companyId);
 
     const qb = this.jobRepo
       .createQueryBuilder('job')
       .leftJoinAndSelect('job.company', 'company')
-      .where('job.approvalStatus = :status', { status: JobApprovalStatus.APPROVED })
+      .where('job.approvalStatus = :status', {
+        status: JobApprovalStatus.APPROVED,
+      })
       .andWhere('job.isPaused = false');
 
     if (blockedCompanyIds.length) {
-      qb.andWhere('job.companyId NOT IN (:...blockedCompanyIds)', { blockedCompanyIds });
+      qb.andWhere('job.companyId NOT IN (:...blockedCompanyIds)', {
+        blockedCompanyIds,
+      });
     }
 
     const scoreParts: string[] = [];
     if (industries.length) {
       qb.setParameter('industries', industries);
-      scoreParts.push('(CASE WHEN job.industry IN (:...industries) THEN 3 ELSE 0 END)');
+      scoreParts.push(
+        '(CASE WHEN job.industry IN (:...industries) THEN 3 ELSE 0 END)',
+      );
     }
     if (locations.length) {
       const locConds = locations.map((_, i) => `job.provinces ILIKE :loc${i}`);
       locations.forEach((v, i) => qb.setParameter(`loc${i}`, `%${v}%`));
-      scoreParts.push(`(CASE WHEN (${locConds.join(' OR ')}) THEN 3 ELSE 0 END)`);
+      scoreParts.push(
+        `(CASE WHEN (${locConds.join(' OR ')}) THEN 3 ELSE 0 END)`,
+      );
     }
     if (jobTypes.length) {
       qb.setParameter('jobTypes', jobTypes);
-      scoreParts.push('(CASE WHEN job.employmentType IN (:...jobTypes) THEN 2 ELSE 0 END)');
+      scoreParts.push(
+        '(CASE WHEN job.employmentType IN (:...jobTypes) THEN 2 ELSE 0 END)',
+      );
     }
     if (profile.desiredLevel) {
       qb.setParameter('level', profile.desiredLevel);
@@ -290,11 +395,15 @@ export class CandidatesService {
     if (keywords.length) {
       const kwConds = keywords.map((_, i) => `job.title ILIKE :kw${i}`);
       keywords.forEach((v, i) => qb.setParameter(`kw${i}`, `%${v}%`));
-      scoreParts.push(`(CASE WHEN (${kwConds.join(' OR ')}) THEN 2 ELSE 0 END)`);
+      scoreParts.push(
+        `(CASE WHEN (${kwConds.join(' OR ')}) THEN 2 ELSE 0 END)`,
+      );
     }
     if (profile.desiredSalaryMin) {
       qb.setParameter('salaryMin', profile.desiredSalaryMin);
-      scoreParts.push('(CASE WHEN job.salaryMax IS NULL OR job.salaryMax >= :salaryMin THEN 1 ELSE 0 END)');
+      scoreParts.push(
+        '(CASE WHEN job.salaryMax IS NULL OR job.salaryMax >= :salaryMin THEN 1 ELSE 0 END)',
+      );
     }
 
     const scoreExpr = scoreParts.length ? scoreParts.join(' + ') : '0';
@@ -317,8 +426,12 @@ export class CandidatesService {
     const profile = await this.getOwnProfile(userId);
     const msSinceUpdate = Date.now() - new Date(profile.updatedAt).getTime();
     if (msSinceUpdate < REFRESH_COOLDOWN_MS) {
-      const hoursLeft = Math.ceil((REFRESH_COOLDOWN_MS - msSinceUpdate) / (60 * 60 * 1000));
-      throw new BadRequestException(`Bạn vừa làm mới hồ sơ gần đây — vui lòng thử lại sau khoảng ${hoursLeft} giờ nữa`);
+      const hoursLeft = Math.ceil(
+        (REFRESH_COOLDOWN_MS - msSinceUpdate) / (60 * 60 * 1000),
+      );
+      throw new BadRequestException(
+        `Bạn vừa làm mới hồ sơ gần đây — vui lòng thử lại sau khoảng ${hoursLeft} giờ nữa`,
+      );
     }
     // .save() với entity đã tải sẵn sẽ tự cập nhật updated_at (UpdateDateColumn) dù không đổi field
     // nào khác — không cần chạm dữ liệu thật, chỉ cần "chạm" bản ghi.
@@ -367,13 +480,17 @@ export class CandidatesService {
 
   async followCompany(userId: string, companyId: string) {
     const profile = await this.getOwnProfile(userId);
-    const company = await this.companyRepo.findOne({ where: { id: companyId } });
+    const company = await this.companyRepo.findOne({
+      where: { id: companyId },
+    });
     if (!company) throw new NotFoundException('Không tìm thấy công ty');
     const existing = await this.followRepo.findOne({
       where: { candidateProfileId: profile.id, companyId },
     });
     if (existing) return existing;
-    return this.followRepo.save(this.followRepo.create({ candidateProfileId: profile.id, companyId }));
+    return this.followRepo.save(
+      this.followRepo.create({ candidateProfileId: profile.id, companyId }),
+    );
   }
 
   async unfollowCompany(userId: string, companyId: string) {

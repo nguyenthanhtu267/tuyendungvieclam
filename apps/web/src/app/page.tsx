@@ -236,7 +236,9 @@ export default function Home() {
             {t('home.seeMore')}
           </a>
         </div>
-        <div className="grid sm:grid-cols-2 gap-3">
+        {/* Đợt 21 — thêm "grid-cols-1" tường minh (cùng lỗi tràn ngang mobile như trang chi tiết tin,
+            xem viec-lam/[id]/page.tsx). */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {jobs === null && <div className="text-ink-faint text-sm py-8">{t('home.loadingJobs')}</div>}
           {jobs?.length === 0 && <div className="text-ink-faint text-sm py-8">{t('home.noJobs')}</div>}
           {jobs?.map((job) => <JobCard key={job.id} job={job} />)}

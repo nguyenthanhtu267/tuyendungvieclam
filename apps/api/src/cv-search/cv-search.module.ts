@@ -20,5 +20,8 @@ import { JobPosting } from '../database/entities/job-posting.entity';
   ],
   controllers: [CvSearchController],
   providers: [CvSearchService],
+  // Đợt 21 (27/09/2026) — EmployerModule cần gọi getDetailForApplicant() để NTD xem "Hồ sơ trực tuyến"
+  // của ứng viên đã ứng tuyển thẳng vào tin của họ (không qua "Tìm hồ sơ"/không tốn điểm mở khoá).
+  exports: [CvSearchService],
 })
 export class CvSearchModule {}

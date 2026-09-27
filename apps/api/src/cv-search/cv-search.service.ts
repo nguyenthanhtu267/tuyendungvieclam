@@ -260,6 +260,30 @@ export class CvSearchService {
     return { position: latest.position, companyName: unlocked ? latest.companyName : undefined, isCurrent: latest.isCurrent };
   }
 
+  // Đợt 21 (27/09/2026) — NTD xem "Hồ sơ trực tuyến" của ứng viên đã ứng tuyển TRỰC TIẾP vào tin của
+  // họ (dùng cách 2: cvId type=TEMPLATE, không kèm file). Khác getDetail() ở trên: đây là quan hệ có
+  // thật (ứng viên đã tự nộp đơn cho ĐÚNG công ty này) — không qua "Tìm hồ sơ", không tốn điểm mở
+  // khoá, không áp assertVisibleToCompany() (hồ sơ có thể đặt visibility LOCKED — vẫn ứng tuyển được
+  // bình thường, xem ApplicationsService.apply() — NTD nhận đơn vẫn phải xem được nội dung đã nộp).
+  // EmployerService.getApplicantOnlineProfile() tự kiểm tra đơn ứng tuyển đó có thuộc công ty gọi hay
+  // không TRƯỚC khi gọi hàm này.
+  async getDetailForApplicant(profileId: string) {
+    const profile = await this.profileRepo.findOne({
+      where: { id: profileId },
+      relations: {
+        experiences: true,
+        educations: true,
+        certificates: true,
+        languages: true,
+        skills: true,
+        achievements: true,
+        activities: true,
+      },
+    });
+    if (!profile) throw new NotFoundException('Không tìm thấy hồ sơ');
+    return this.toDetail(profile, true);
+  }
+
   async getDetail(userId: string, profileId: string) {
     const company = await this.getCompany(userId);
     await this.assertVisibleToCompany(company, profileId);
@@ -274,6 +298,9 @@ export class CvSearchService {
         skills: true,
         achievements: true,
         activities: true,
+        // Đợt 21 (27/09/2026) — cần để hiện file CV ứng viên đã tải lên/dán link (mục "File CV đính
+        // kèm"), tách biệt với nội dung nhập liệu "Hồ sơ trực tuyến" (2 cách chia sẻ hồ sơ).
+        cvs: true,
       },
     });
     if (!profile) throw new NotFoundException('Không tìm thấy hồ sơ');
@@ -361,6 +388,21 @@ export class CvSearchService {
         ...a,
         organizationName: unlocked ? a.organizationName : undefined,
       })),
+      // Đợt 21 (27/09/2026) — "File CV đính kèm": ứng viên có 2 cách chia sẻ hồ sơ — điền "Hồ sơ trực
+      // tuyến" (nội dung nhập liệu ở trên) hoặc tải lên/dán link file CV riêng. Trước đây trang này chỉ
+      // hiện nội dung nhập liệu, dù ứng viên có file — nay hiện thêm để NTD không bỏ lỡ file CV thật.
+      // Cũng như thông tin liên hệ, chỉ hiện SAU khi đã mở hồ sơ (file có thể chứa SĐT/email trong đó).
+      cvs: unlocked
+        ? (profile.cvs ?? [])
+            .filter((c) => c.fileUrl || c.externalLinkUrl)
+            .map((c) => ({
+              id: c.id,
+              originalFileName: c.originalFileName,
+              fileUrl: c.fileUrl,
+              externalLinkUrl: c.externalLinkUrl,
+              isPrimary: c.isPrimary,
+            }))
+        : [],
       unlocked,
       isAdminSourced: profile.isAdminSourced,
       contactHiddenByCandidate: unlocked && profile.hideContactInfo,

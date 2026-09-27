@@ -199,6 +199,33 @@ export default function CandidateDetailPage() {
           )}
         </div>
 
+        {detail.unlocked && detail.cvs.length > 0 && (
+          <Section title="File CV đính kèm">
+            <p className="text-[11.5px] text-ink-faint mb-2">
+              Ứng viên còn chia sẻ {detail.cvs.length > 1 ? 'các' : ''} file CV riêng dưới đây, ngoài nội
+              dung nhập liệu ở hồ sơ này.
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {detail.cvs.map((cv) => (
+                <a
+                  key={cv.id}
+                  href={
+                    cv.fileUrl
+                      ? `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}${cv.fileUrl}`
+                      : cv.externalLinkUrl
+                  }
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-primary font-semibold text-[12.5px] hover:underline w-fit"
+                >
+                  📄 {cv.originalFileName || (cv.fileUrl ? 'Xem CV' : 'Xem CV (Drive)')}
+                  {cv.isPrimary ? ' (CV chính)' : ''}
+                </a>
+              ))}
+            </div>
+          </Section>
+        )}
+
         {detail.careerObjective && (
           <Section title="Mục tiêu nghề nghiệp">
             <RichTextView value={detail.careerObjective} className="text-[12.5px] text-ink-muted" />

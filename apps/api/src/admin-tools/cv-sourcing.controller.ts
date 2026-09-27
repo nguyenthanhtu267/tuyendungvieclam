@@ -22,6 +22,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { UserRole } from '../database/entities/user.entity';
 import { BulkIdsDto } from '../admin/dto/bulk-ids.dto';
 import { parseDraftPayload } from '../common/dto/candidate-draft.dto';
+import { fixMulterFilename } from '../common/multer-filename.util';
 import {
   cvUploadInterceptor,
   sendCvFile,
@@ -136,6 +137,11 @@ export class CvSourcingController {
     @Body('payload') payload: string,
     @UploadedFile() file?: Express.Multer.File,
   ) {
+    // Đợt 21 — tên file Tiếng Việt bị lỗi font do multer đọc nhầm bảng mã, sửa ngay khi nhận file.
+    if (file) {
+      const fixed = fixMulterFilename(file.originalname);
+      if (fixed) file.originalname = fixed;
+    }
     return this.sourcing.createSourced(
       admin,
       parseDraftPayload(payload),

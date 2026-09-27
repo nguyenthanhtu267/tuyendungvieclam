@@ -4,13 +4,16 @@ import { Suspense, useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import EmployerHeader from '@/components/EmployerHeader';
+import { RichTextView } from '@/components/RichTextView';
 import { useAuth } from '@/lib/auth-context';
 import {
   employerApi,
+  ApiError,
   type EmployerJob,
   type EmployerApplication,
   type ApplicationStatus,
   type ApplicantFilters,
+  type CandidateDetail,
 } from '@/lib/api';
 import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatNumber } from '@/lib/format';
 
@@ -141,6 +144,28 @@ function UngVienPageInner() {
   const [loadingApplicants, setLoadingApplicants] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Đợt 21 (27/09/2026) — xem "Hồ sơ trực tuyến" của ứng viên ứng tuyển bằng cách 2 (không có file).
+  const [profileModal, setProfileModal] = useState<{
+    detail: CandidateDetail | null;
+    loading: boolean;
+    error: string | null;
+  } | null>(null);
+
+  async function openOnlineProfile(applicationId: string) {
+    if (!token) return;
+    setProfileModal({ detail: null, loading: true, error: null });
+    try {
+      const detail = await employerApi.getApplicantOnlineProfile(token, applicationId);
+      setProfileModal({ detail, loading: false, error: null });
+    } catch (err) {
+      setProfileModal({
+        detail: null,
+        loading: false,
+        error: err instanceof ApiError ? err.message : 'Không thể tải hồ sơ',
+      });
+    }
+  }
 
   useEffect(() => {
     if (me === null) router.replace('/dang-nhap');
@@ -498,6 +523,14 @@ function UngVienPageInner() {
                               <a className="text-primary font-semibold" href={app.cv.externalLinkUrl} target="_blank" rel="noreferrer">
                                 Xem CV (Drive)
                               </a>
+                            ) : app.cv.type === 'template' ? (
+                              // Đợt 21 — ứng viên ứng tuyển bằng "Hồ sơ trực tuyến" (cách 2, không có file).
+                              <button
+                                onClick={() => openOnlineProfile(app.id)}
+                                className="text-primary font-semibold hover:underline"
+                              >
+                                📝 Hồ sơ trực tuyến
+                              </button>
                             ) : (
                               <span className="text-ink-faint">—</span>
                             )}
@@ -555,7 +588,141 @@ function UngVienPageInner() {
           </>
         )}
       </div>
+
+      {profileModal && (
+        <OnlineProfileModal
+          detail={profileModal.detail}
+          loading={profileModal.loading}
+          error={profileModal.error}
+          onClose={() => setProfileModal(null)}
+        />
+      )}
     </main>
+  );
+}
+
+// Đợt 21 (27/09/2026) — hiện nội dung "Hồ sơ trực tuyến" của ứng viên ứng tuyển bằng cách 2 (không có
+// file CV), ngay trong trang danh sách ứng viên — không cần điều hướng sang trang khác.
+function fmtDateShort(v?: string | null) {
+  if (!v) return '';
+  const [y, m, d] = v.split('-');
+  return d && m && y ? `${d}/${m}/${y}` : v;
+}
+function fmtRangeShort(s?: string | null, e?: string | null, current?: boolean) {
+  const from = fmtDateShort(s);
+  const to = current ? 'Hiện tại' : fmtDateShort(e);
+  return [from, to].filter(Boolean).join(' – ');
+}
+
+function OnlineProfileModal({
+  detail,
+  loading,
+  error,
+  onClose,
+}: {
+  detail: CandidateDetail | null;
+  loading: boolean;
+  error: string | null;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 flex flex-col gap-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <div className="font-extrabold text-sm">Hồ sơ trực tuyến của ứng viên</div>
+          <button onClick={onClose} className="text-ink-faint hover:text-ink text-lg leading-none">
+            ✕
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="text-center text-ink-faint text-sm py-10">Đang tải...</div>
+        ) : error ? (
+          <div className="text-critical text-sm font-semibold py-6 text-center">{error}</div>
+        ) : !detail ? null : (
+          <div className="flex flex-col gap-4 text-[12.5px]">
+            <div>
+              <div className="font-extrabold text-base text-ink">{detail.fullName}</div>
+              {detail.profileTitle && <div className="text-primary font-bold mt-0.5">{detail.profileTitle}</div>}
+              <div className="text-ink-faint mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                {detail.phone && <span>📞 {detail.phone}</span>}
+                {detail.contactEmail && <span>✉️ {detail.contactEmail}</span>}
+                {detail.address && <span>📍 {detail.address}</span>}
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1 rounded-lg bg-surface-alt px-3.5 py-3">
+              <div>
+                <span className="font-semibold text-ink">Vị trí mong muốn: </span>
+                <span className="text-ink-muted">{detail.desiredPosition || 'Chưa cập nhật'}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-ink">Số năm kinh nghiệm: </span>
+                <span className="text-ink-muted">
+                  {detail.yearsOfExperience != null ? `${detail.yearsOfExperience} năm` : 'Chưa cập nhật'}
+                </span>
+              </div>
+            </div>
+
+            {detail.careerObjective && (
+              <div>
+                <div className="font-bold text-ink mb-1">Mục tiêu nghề nghiệp</div>
+                <RichTextView value={detail.careerObjective} className="text-ink-muted" />
+              </div>
+            )}
+
+            {detail.experiences.length > 0 && (
+              <div>
+                <div className="font-bold text-ink mb-1.5">Kinh nghiệm làm việc</div>
+                <div className="flex flex-col gap-2">
+                  {detail.experiences.map((e) => (
+                    <div key={e.id} className="border-b border-border/60 pb-2 last:border-0 last:pb-0">
+                      <div className="flex justify-between gap-2">
+                        <span className="font-semibold text-ink">{e.position}</span>
+                        <span className="text-ink-faint text-[11px] shrink-0">
+                          {fmtRangeShort(e.startDate, e.endDate, e.isCurrent)}
+                        </span>
+                      </div>
+                      {e.companyName && <div className="text-primary font-semibold text-[11.5px]">{e.companyName}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {detail.educations.length > 0 && (
+              <div>
+                <div className="font-bold text-ink mb-1.5">Học vấn</div>
+                <div className="flex flex-col gap-1.5">
+                  {detail.educations.map((e) => (
+                    <div key={e.id} className="flex justify-between gap-2">
+                      <span className="font-semibold text-ink">{e.schoolName}</span>
+                      <span className="text-ink-faint text-[11px] shrink-0">{fmtRangeShort(e.startDate, e.endDate)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {detail.skills.length > 0 && (
+              <div>
+                <div className="font-bold text-ink mb-1.5">Kỹ năng</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {detail.skills.map((s) => (
+                    <span key={s.id} className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-surface-alt text-ink-muted">
+                      {s.skillName}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

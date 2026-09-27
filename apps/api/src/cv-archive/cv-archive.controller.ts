@@ -23,6 +23,7 @@ import { UserRole } from '../database/entities/user.entity';
 import { CvArchiveService } from './cv-archive.service';
 import { ListCvArchiveQueryDto } from './dto/list-cv-archive-query.dto';
 import { parseDraftPayload } from '../common/dto/candidate-draft.dto';
+import { fixMulterFilename } from '../common/multer-filename.util';
 
 // Đợt 18a (26/09/2026) — "Kho CV" của nhà tuyển dụng. Mọi route đều giới hạn trong công ty gắn với tài
 // khoản đang đăng nhập (tra bảng company_users, giống EmployerService). Tệp CV trong kho BẮT BUỘC đăng
@@ -83,6 +84,11 @@ export class CvArchiveController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     const dto = parseDraftPayload(payload);
+    // Đợt 21 — tên file Tiếng Việt bị lỗi font do multer đọc nhầm bảng mã, sửa ngay khi nhận file.
+    if (file) {
+      const fixed = fixMulterFilename(file.originalname);
+      if (fixed) file.originalname = fixed;
+    }
     return this.cvArchiveService.importFromDraft(user.userId, dto, file);
   }
 
@@ -186,10 +192,11 @@ export class CvParseController {
   ) {
     this.assertRole(user.role);
     if (!file) throw new BadRequestException('Vui lòng chọn file CV');
+    // Đợt 21 — tên file Tiếng Việt bị lỗi font do multer đọc nhầm bảng mã, sửa ngay khi nhận file.
     return this.cvArchiveService.parseFile(
       file.buffer,
       file.mimetype,
-      file.originalname,
+      fixMulterFilename(file.originalname),
     );
   }
 

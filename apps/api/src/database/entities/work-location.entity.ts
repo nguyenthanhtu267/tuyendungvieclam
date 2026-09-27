@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Index,
+} from 'typeorm';
 import { Company } from './company.entity';
 
 // Đợt 12ac (24/09/2026) — "Quản lý địa điểm làm việc" (theo mẫu careerviet.vn): NTD lưu sẵn danh

@@ -181,6 +181,10 @@ export class CvArchiveEntry {
   })
   cvFileData?: Buffer | null;
 
+  // Đợt 20 — bản sao file đã chuyển lên Google Drive (bản riêng của Kho CV): "gd:<id file>".
+  @Column({ name: 'cv_file_storage_key', type: 'varchar', nullable: true })
+  cvFileStorageKey?: string | null;
+
   @Column({ name: 'cv_has_file', default: false })
   cvHasFile: boolean;
 

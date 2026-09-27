@@ -53,6 +53,11 @@ function JobDetailInner() {
   const [coverLetter, setCoverLetter] = useState('');
   const [applyState, setApplyState] = useState<'idle' | 'submitting' | 'done'>('idle');
   const [applyError, setApplyError] = useState<string | null>(null);
+  // Đợt 21 (27/09/2026) — 2 cách chia sẻ hồ sơ khi ứng tuyển: chọn 1 CV file/link có sẵn, HOẶC dùng
+  // thẳng "Hồ sơ trực tuyến" đã điền (không cần file) nếu đã đủ 3 mục bắt buộc (100%).
+  const [onlineProfilePercent, setOnlineProfilePercent] = useState<number | null>(null);
+  const [useOnlineProfile, setUseOnlineProfile] = useState(false);
+  const onlineProfileAvailable = (onlineProfilePercent ?? 0) >= 100;
 
   // Đợt 12ab (24/09/2026) — "Theo dõi công ty" (nút trước đó chỉ là UI tĩnh) + "Đánh giá mức độ
   // tương thích" (radar chart), chỉ ứng viên đã đăng nhập mới thấy/dùng được.
@@ -151,10 +156,17 @@ function JobDetailInner() {
     setApplyError(null);
     if (cvs === null) {
       try {
-        const list = await candidatesApi.listCvs(token);
+        const [list, profile] = await Promise.all([
+          candidatesApi.listCvs(token),
+          candidatesApi.getProfile(token).catch(() => null),
+        ]);
         setCvs(list);
+        const percent = profile?.completionPercent ?? 0;
+        setOnlineProfilePercent(percent);
         const primary = list.find((c) => c.isPrimary) ?? list[0];
         if (primary) setSelectedCvId(primary.id);
+        // Chưa có CV file nào nhưng hồ sơ trực tuyến đã đủ dùng → chọn sẵn cách 2, khỏi chặn ứng tuyển.
+        if (list.length === 0 && percent >= 100) setUseOnlineProfile(true);
       } catch {
         setCvs([]);
       }
@@ -173,12 +185,16 @@ function JobDetailInner() {
   }, [job, searchParams]);
 
   async function submitApply() {
-    if (!token || !selectedCvId) return;
+    if (!token) return;
+    if (!useOnlineProfile && !selectedCvId) return;
     setApplyState('submitting');
     setApplyError(null);
     try {
-      await applicationsApi.apply(token, params.id, { cvId: selectedCvId, coverLetter: coverLetter || undefined });
-      track('apply_submit', { entityType: 'job', entityId: params.id });
+      await applicationsApi.apply(token, params.id, {
+        ...(useOnlineProfile ? { useOnlineProfile: true } : { cvId: selectedCvId }),
+        coverLetter: coverLetter || undefined,
+      });
+      track('apply_submit', { entityType: 'job', entityId: params.id, meta: { useOnlineProfile } });
       setApplyState('done');
     } catch (err) {
       setApplyState('idle');
@@ -281,10 +297,14 @@ function JobDetailInner() {
               </div>
             ) : cvs === null ? (
               <div className="text-sm text-ink-faint">Đang tải CV của bạn...</div>
-            ) : cvs.length === 0 ? (
+            ) : cvs.length === 0 && !onlineProfileAvailable ? (
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <span className="text-sm text-ink-muted">
-                  Bạn chưa có CV nào trong hồ sơ. Thêm CV trước khi ứng tuyển.
+                  Bạn chưa có CV nào trong hồ sơ. Thêm CV, hoặc hoàn thiện{' '}
+                  <Link href="/ho-so/truc-tuyen" className="text-primary font-semibold hover:underline">
+                    Hồ sơ trực tuyến
+                  </Link>{' '}
+                  (Tiêu đề hồ sơ, Thông tin cá nhân, Kinh nghiệm làm việc) để ứng tuyển không cần file.
                 </span>
                 <Link href="/ho-so#cvs" className="tvl-btn-primary !w-auto px-5">
                   Thêm CV ngay
@@ -293,21 +313,64 @@ function JobDetailInner() {
             ) : (
               <div className="flex flex-col gap-3">
                 <div className="font-bold text-sm">Nộp hồ sơ ứng tuyển — {job.title}</div>
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-bold">Chọn CV</span>
-                  <select
-                    className="tvl-input"
-                    value={selectedCvId}
-                    onChange={(e) => setSelectedCvId(e.target.value)}
-                  >
-                    {cvs.map((cv) => (
-                      <option key={cv.id} value={cv.id}>
-                        {cv.fileUrl ? (cv.originalFileName ?? cv.fileUrl.split('/').pop()) : cv.externalLinkUrl}
-                        {cv.isPrimary ? ' (CV chính)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                {/* Đợt 21 — 2 cách chia sẻ hồ sơ: CV file/link có sẵn, hoặc "Hồ sơ trực tuyến" (không
+                    cần file). Chỉ hiện lựa chọn khi ứng viên thực sự có cả 2 cách để chọn. */}
+                {cvs.length > 0 && onlineProfileAvailable && (
+                  <div className="flex gap-2 text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setUseOnlineProfile(false)}
+                      className={`px-3 py-1.5 rounded-lg border ${
+                        !useOnlineProfile ? 'bg-primary text-white border-primary' : 'border-border text-ink-muted'
+                      }`}
+                    >
+                      Chọn CV đã có
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUseOnlineProfile(true)}
+                      className={`px-3 py-1.5 rounded-lg border ${
+                        useOnlineProfile ? 'bg-primary text-white border-primary' : 'border-border text-ink-muted'
+                      }`}
+                    >
+                      Dùng Hồ sơ trực tuyến
+                    </button>
+                  </div>
+                )}
+                {useOnlineProfile ? (
+                  <div className="rounded-lg bg-surface-alt px-3.5 py-3 text-[12px] text-ink-muted">
+                    Nhà tuyển dụng sẽ nhận toàn bộ nội dung trong{' '}
+                    <Link href="/ho-so/truc-tuyen" className="text-primary font-semibold hover:underline">
+                      Hồ sơ trực tuyến
+                    </Link>{' '}
+                    của bạn — không kèm file CV.
+                  </div>
+                ) : (
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-bold">Chọn CV</span>
+                    <select
+                      className="tvl-input"
+                      value={selectedCvId}
+                      onChange={(e) => setSelectedCvId(e.target.value)}
+                    >
+                      {cvs.map((cv) => (
+                        <option key={cv.id} value={cv.id}>
+                          {cv.fileUrl ? (cv.originalFileName ?? cv.fileUrl.split('/').pop()) : cv.externalLinkUrl}
+                          {cv.isPrimary ? ' (CV chính)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {!onlineProfileAvailable && (
+                      <span className="text-[11px] text-ink-faint">
+                        Muốn ứng tuyển không cần file? Hoàn thiện{' '}
+                        <Link href="/ho-so/truc-tuyen" className="text-primary hover:underline">
+                          Hồ sơ trực tuyến
+                        </Link>{' '}
+                        (Tiêu đề hồ sơ, Thông tin cá nhân, Kinh nghiệm làm việc).
+                      </span>
+                    )}
+                  </label>
+                )}
                 <label className="flex flex-col gap-1.5">
                   <span className="text-xs font-bold">Thư ứng tuyển (không bắt buộc)</span>
                   <textarea
@@ -321,7 +384,7 @@ function JobDetailInner() {
                 <div className="flex gap-2">
                   <button
                     onClick={submitApply}
-                    disabled={applyState === 'submitting'}
+                    disabled={applyState === 'submitting' || (!useOnlineProfile && !selectedCvId)}
                     className="tvl-btn-accent !w-auto px-6"
                   >
                     {applyState === 'submitting' ? 'Đang gửi...' : 'Gửi hồ sơ ứng tuyển'}
@@ -606,7 +669,10 @@ function JobDetailInner() {
         {related.length > 0 && (
           <div className="mt-8">
             <h2 className="font-extrabold text-base uppercase tracking-wide mb-3">Các công việc tương tự</h2>
-            <div className="grid sm:grid-cols-2 gap-3">
+            {/* Đợt 21 — thêm "grid-cols-1" tường minh: thiếu khai báo cột ở mobile khiến track "auto"
+                không bị giới hạn theo container, đẩy thẻ việc làm (flex-wrap bên trong) tràn ngang
+                trang trên điện thoại (phát hiện qua kiểm thử tự động ui21.js, không liên quan Đợt 21). */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {related.map((r) => (
                 <JobCard key={r.id} job={r} />
               ))}

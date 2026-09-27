@@ -1,11 +1,26 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as argon2 from 'argon2';
 import { Company } from '../database/entities/company.entity';
-import { CompanyUser, CompanyUserType } from '../database/entities/company-user.entity';
-import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
-import { Application, ApplicationStatus } from '../database/entities/application.entity';
+import {
+  CompanyUser,
+  CompanyUserType,
+} from '../database/entities/company-user.entity';
+import {
+  JobPosting,
+  JobApprovalStatus,
+} from '../database/entities/job-posting.entity';
+import {
+  Application,
+  ApplicationStatus,
+} from '../database/entities/application.entity';
 import { ApplicationStatusHistory } from '../database/entities/application-status-history.entity';
 import { User, UserRole } from '../database/entities/user.entity';
 import { ServicePackage } from '../database/entities/service-package.entity';
@@ -22,23 +37,37 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { EmployerJobStatus } from './dto/list-jobs-query.dto';
 import { ListApplicantsQueryDto } from './dto/list-applicants-query.dto';
 import { sanitizeRichText } from '../common/sanitize-html.util';
-import { JOB_EDITABLE_FIELDS, JOB_RICH_TEXT_FIELDS } from '../common/job-editable-fields';
+import {
+  JOB_EDITABLE_FIELDS,
+  JOB_RICH_TEXT_FIELDS,
+} from '../common/job-editable-fields';
+import { FileStorageService } from '../storage/file-storage.service';
+// Đợt 21 (27/09/2026) — NTD xem "Hồ sơ trực tuyến" của ứng viên đã ứng tuyển thẳng vào tin của họ.
+import { CvSearchService } from '../cv-search/cv-search.service';
 
 const LEGAL_DOC_MAX_BYTES = 3 * 1024 * 1024; // 3MB — theo Mục 9 SRS
 
 @Injectable()
 export class EmployerService {
   constructor(
-    @InjectRepository(Company) private readonly companyRepo: Repository<Company>,
-    @InjectRepository(CompanyUser) private readonly companyUserRepo: Repository<CompanyUser>,
-    @InjectRepository(JobPosting) private readonly jobRepo: Repository<JobPosting>,
-    @InjectRepository(Application) private readonly applicationRepo: Repository<Application>,
+    private readonly storage: FileStorageService,
+    private readonly cvSearchService: CvSearchService,
+    @InjectRepository(Company)
+    private readonly companyRepo: Repository<Company>,
+    @InjectRepository(CompanyUser)
+    private readonly companyUserRepo: Repository<CompanyUser>,
+    @InjectRepository(JobPosting)
+    private readonly jobRepo: Repository<JobPosting>,
+    @InjectRepository(Application)
+    private readonly applicationRepo: Repository<Application>,
     @InjectRepository(ApplicationStatusHistory)
     private readonly applicationHistoryRepo: Repository<ApplicationStatusHistory>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
-    @InjectRepository(ServicePackage) private readonly packageRepo: Repository<ServicePackage>,
+    @InjectRepository(ServicePackage)
+    private readonly packageRepo: Repository<ServicePackage>,
     @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
-    @InjectRepository(WorkLocation) private readonly workLocationRepo: Repository<WorkLocation>,
+    @InjectRepository(WorkLocation)
+    private readonly workLocationRepo: Repository<WorkLocation>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -54,7 +83,9 @@ export class EmployerService {
 
   async getMyCompany(userId: string) {
     const companyId = await this.getCompanyIdForUser(userId);
-    const company = await this.companyRepo.findOne({ where: { id: companyId } });
+    const company = await this.companyRepo.findOne({
+      where: { id: companyId },
+    });
     if (!company) throw new NotFoundException('Không tìm thấy công ty');
     return company;
   }
@@ -86,7 +117,9 @@ export class EmployerService {
     const recentJobsWithCounts = await Promise.all(
       recentJobs.map(async (job) => ({
         ...job,
-        applicationCount: await this.applicationRepo.count({ where: { jobPostingId: job.id } }),
+        applicationCount: await this.applicationRepo.count({
+          where: { jobPostingId: job.id },
+        }),
       })),
     );
 
@@ -116,7 +149,8 @@ export class EmployerService {
     if (job.approvalStatus === JobApprovalStatus.APPROVED) {
       const startOfToday = new Date();
       startOfToday.setHours(0, 0, 0, 0);
-      if (job.deadline && new Date(job.deadline) < startOfToday) return 'het_han';
+      if (job.deadline && new Date(job.deadline) < startOfToday)
+        return 'het_han';
       if (job.isPaused) return 'tam_ngung';
       return 'dang_dang';
     }
@@ -127,15 +161,22 @@ export class EmployerService {
 
   async listMyJobs(userId: string, status?: EmployerJobStatus) {
     const companyId = await this.getCompanyIdForUser(userId);
-    const jobs = await this.jobRepo.find({ where: { companyId }, order: { createdAt: 'DESC' } });
+    const jobs = await this.jobRepo.find({
+      where: { companyId },
+      order: { createdAt: 'DESC' },
+    });
     const withCounts = await Promise.all(
       jobs.map(async (job) => ({
         ...job,
-        applicationCount: await this.applicationRepo.count({ where: { jobPostingId: job.id } }),
+        applicationCount: await this.applicationRepo.count({
+          where: { jobPostingId: job.id },
+        }),
         employerStatus: this.computeEmployerStatus(job),
       })),
     );
-    return status ? withCounts.filter((j) => j.employerStatus === status) : withCounts;
+    return status
+      ? withCounts.filter((j) => j.employerStatus === status)
+      : withCounts;
   }
 
   // Đếm số tin theo từng trạng thái — dùng cho số trên tab (giống mockup NTD-02/04: "4 tab trạng
@@ -160,7 +201,9 @@ export class EmployerService {
   async pauseJob(userId: string, jobId: string) {
     const job = await this.getOwnedJob(userId, jobId);
     if (this.computeEmployerStatus(job) !== 'dang_dang') {
-      throw new BadRequestException('Chỉ tạm ngưng được tin đang ở trạng thái "Đang đăng"');
+      throw new BadRequestException(
+        'Chỉ tạm ngưng được tin đang ở trạng thái "Đang đăng"',
+      );
     }
     job.isPaused = true;
     return this.jobRepo.save(job);
@@ -170,10 +213,14 @@ export class EmployerService {
     const job = await this.getOwnedJob(userId, jobId);
     const current = this.computeEmployerStatus(job);
     if (current === 'het_han') {
-      throw new BadRequestException('Tin đã hết hạn — vui lòng sao chép tin để đăng lại với hạn nộp mới');
+      throw new BadRequestException(
+        'Tin đã hết hạn — vui lòng sao chép tin để đăng lại với hạn nộp mới',
+      );
     }
     if (current !== 'tam_ngung') {
-      throw new BadRequestException('Chỉ đăng lại được tin đang ở trạng thái "Tạm ngưng"');
+      throw new BadRequestException(
+        'Chỉ đăng lại được tin đang ở trạng thái "Tạm ngưng"',
+      );
     }
     job.isPaused = false;
     return this.jobRepo.save(job);
@@ -256,14 +303,22 @@ export class EmployerService {
     return this.jobRepo.save(job);
   }
 
-  private async getOwnedJob(userId: string, jobId: string): Promise<JobPosting> {
+  private async getOwnedJob(
+    userId: string,
+    jobId: string,
+  ): Promise<JobPosting> {
     const companyId = await this.getCompanyIdForUser(userId);
     // Đợt 12l (21/09/2026) — nạp thêm quan hệ company để trang Xem trước (NTD) có đủ thông tin
     // công ty hiển thị giống hệt trang chi tiết tin công khai, không cần truy vấn thêm.
-    const job = await this.jobRepo.findOne({ where: { id: jobId }, relations: { company: true } });
+    const job = await this.jobRepo.findOne({
+      where: { id: jobId },
+      relations: { company: true },
+    });
     if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng');
     if (job.companyId !== companyId) {
-      throw new ForbiddenException('Bạn không có quyền truy cập tin tuyển dụng này');
+      throw new ForbiddenException(
+        'Bạn không có quyền truy cập tin tuyển dụng này',
+      );
     }
     return job;
   }
@@ -295,7 +350,11 @@ export class EmployerService {
 
   // Đợt 11b — Mục #4 ATS: bộ lọc nâng cao (trạng thái, thư mục, đánh giá tối thiểu, từ khoá, khoảng
   // ngày nộp). Mặc định KHÔNG lấy hồ sơ đã vào thùng rác (soft-delete) — xem listTrashedApplicants().
-  async listApplicants(userId: string, jobId: string, filters: ListApplicantsQueryDto = {}) {
+  async listApplicants(
+    userId: string,
+    jobId: string,
+    filters: ListApplicantsQueryDto = {},
+  ) {
     await this.getOwnedJob(userId, jobId);
     const qb = this.applicationRepo
       .createQueryBuilder('app')
@@ -304,16 +363,26 @@ export class EmployerService {
       .where('app.job_posting_id = :jobId', { jobId })
       .andWhere('app.deleted_at IS NULL')
       .orderBy('app.applied_at', 'DESC');
-    if (filters.status) qb.andWhere('app.status = :status', { status: filters.status });
-    if (filters.folder) qb.andWhere('app.folder = :folder', { folder: filters.folder });
-    if (filters.ratingMin != null) qb.andWhere('app.rating >= :ratingMin', { ratingMin: filters.ratingMin });
+    if (filters.status)
+      qb.andWhere('app.status = :status', { status: filters.status });
+    if (filters.folder)
+      qb.andWhere('app.folder = :folder', { folder: filters.folder });
+    if (filters.ratingMin != null)
+      qb.andWhere('app.rating >= :ratingMin', { ratingMin: filters.ratingMin });
     if (filters.q) {
-      qb.andWhere('(candidateProfile.fullName ILIKE :q OR candidateProfile.desiredPosition ILIKE :q)', {
-        q: `%${filters.q}%`,
-      });
+      qb.andWhere(
+        '(candidateProfile.fullName ILIKE :q OR candidateProfile.desiredPosition ILIKE :q)',
+        {
+          q: `%${filters.q}%`,
+        },
+      );
     }
-    if (filters.dateFrom) qb.andWhere('app.applied_at >= :dateFrom', { dateFrom: filters.dateFrom });
-    if (filters.dateTo) qb.andWhere('app.applied_at <= :dateTo', { dateTo: filters.dateTo });
+    if (filters.dateFrom)
+      qb.andWhere('app.applied_at >= :dateFrom', {
+        dateFrom: filters.dateFrom,
+      });
+    if (filters.dateTo)
+      qb.andWhere('app.applied_at <= :dateTo', { dateTo: filters.dateTo });
     return qb.getMany();
   }
 
@@ -346,30 +415,64 @@ export class EmployerService {
       .getMany();
   }
 
-  private async getOwnedApplication(userId: string, applicationId: string, withDeleted = false): Promise<Application> {
+  private async getOwnedApplication(
+    userId: string,
+    applicationId: string,
+    withDeleted = false,
+  ): Promise<Application> {
     const companyId = await this.getCompanyIdForUser(userId);
     const application = await this.applicationRepo.findOne({
       where: { id: applicationId },
       relations: { jobPosting: true, cv: { candidateProfile: true } },
       withDeleted,
     });
-    if (!application) throw new NotFoundException('Không tìm thấy đơn ứng tuyển');
+    if (!application)
+      throw new NotFoundException('Không tìm thấy đơn ứng tuyển');
     if (application.jobPosting.companyId !== companyId) {
-      throw new ForbiddenException('Bạn không có quyền truy cập đơn ứng tuyển này');
+      throw new ForbiddenException(
+        'Bạn không có quyền truy cập đơn ứng tuyển này',
+      );
     }
     return application;
   }
 
+  // Đợt 21 (27/09/2026) — ứng viên có 2 cách chia sẻ hồ sơ khi ứng tuyển: CV file/link, HOẶC dùng
+  // thẳng "Hồ sơ trực tuyến" (cv.type=TEMPLATE, không có file). Trước đây cột "CV" ở danh sách ứng
+  // viên chỉ hiện "—" cho cách 2, khiến NTD tưởng đơn không có nội dung gì. Nay NTD bấm xem được đầy
+  // đủ nội dung nhập liệu ngay tại đây — không qua "Tìm hồ sơ", không tốn điểm mở khoá (ứng viên đã tự
+  // nộp đơn thẳng cho công ty này).
+  async getApplicantOnlineProfile(userId: string, applicationId: string) {
+    const application = await this.getOwnedApplication(
+      userId,
+      applicationId,
+      true,
+    );
+    const profileId = application.cv?.candidateProfileId;
+    if (!profileId) {
+      throw new NotFoundException('Không tìm thấy hồ sơ ứng viên');
+    }
+    return this.cvSearchService.getDetailForApplicant(profileId);
+  }
+
   // Đợt 12m (21/09/2026) — báo cho ứng viên khi NTD đổi trạng thái đơn ứng tuyển. `getOwnedApplication`
   // đã nạp sẵn quan hệ jobPosting + cv.candidateProfile nên có đủ dữ liệu, không cần truy vấn thêm.
-  private static readonly APPLICATION_STATUS_NOTIFICATION: Partial<Record<ApplicationStatus, string>> = {
-    [ApplicationStatus.REVIEWING]: 'Nhà tuyển dụng đang xem xét hồ sơ ứng tuyển của bạn cho vị trí',
-    [ApplicationStatus.SUITABLE]: 'Hồ sơ ứng tuyển của bạn được đánh giá Phù hợp cho vị trí',
+  private static readonly APPLICATION_STATUS_NOTIFICATION: Partial<
+    Record<ApplicationStatus, string>
+  > = {
+    [ApplicationStatus.REVIEWING]:
+      'Nhà tuyển dụng đang xem xét hồ sơ ứng tuyển của bạn cho vị trí',
+    [ApplicationStatus.SUITABLE]:
+      'Hồ sơ ứng tuyển của bạn được đánh giá Phù hợp cho vị trí',
     [ApplicationStatus.INTERVIEW]: 'Bạn được mời phỏng vấn cho vị trí',
-    [ApplicationStatus.REJECTED]: 'Rất tiếc, hồ sơ ứng tuyển của bạn không phù hợp với vị trí',
+    [ApplicationStatus.REJECTED]:
+      'Rất tiếc, hồ sơ ứng tuyển của bạn không phù hợp với vị trí',
   };
 
-  async updateApplicationStatus(userId: string, applicationId: string, status: ApplicationStatus) {
+  async updateApplicationStatus(
+    userId: string,
+    applicationId: string,
+    status: ApplicationStatus,
+  ) {
     const application = await this.getOwnedApplication(userId, applicationId);
     const statusChanged = application.status !== status;
     application.status = status;
@@ -379,13 +482,23 @@ export class EmployerService {
       // Đợt 12o (21/09/2026) — ghi "Nhật ký trạng thái ứng tuyển" mỗi lần NTD đổi trạng thái, để
       // ứng viên xem lại được dòng thời gian xử lý hồ sơ của mình (GET /me/applications/:id/history).
       await this.applicationHistoryRepo.save(
-        this.applicationHistoryRepo.create({ applicationId: application.id, status }),
+        this.applicationHistoryRepo.create({
+          applicationId: application.id,
+          status,
+        }),
       );
       const message = EmployerService.APPLICATION_STATUS_NOTIFICATION[status];
       const candidateUserId = application.cv?.candidateProfile?.userId;
       if (message && candidateUserId) {
-        const type = status === ApplicationStatus.INTERVIEW ? 'interview_invite' : 'application_status';
-        await this.notificationsService.create(candidateUserId, type, `${message} "${application.jobPosting.title}".`);
+        const type =
+          status === ApplicationStatus.INTERVIEW
+            ? 'interview_invite'
+            : 'application_status';
+        await this.notificationsService.create(
+          candidateUserId,
+          type,
+          `${message} "${application.jobPosting.title}".`,
+        );
       }
     }
     return saved;
@@ -397,9 +510,14 @@ export class EmployerService {
     return this.applicationRepo.save(application);
   }
 
-  async setApplicationFolder(userId: string, applicationId: string, folder?: string) {
+  async setApplicationFolder(
+    userId: string,
+    applicationId: string,
+    folder?: string,
+  ) {
     const application = await this.getOwnedApplication(userId, applicationId);
-    application.folder = folder && folder.trim().length > 0 ? folder.trim() : null;
+    application.folder =
+      folder && folder.trim().length > 0 ? folder.trim() : null;
     return this.applicationRepo.save(application);
   }
 
@@ -410,16 +528,26 @@ export class EmployerService {
   }
 
   async restoreApplication(userId: string, applicationId: string) {
-    const application = await this.getOwnedApplication(userId, applicationId, true);
+    const application = await this.getOwnedApplication(
+      userId,
+      applicationId,
+      true,
+    );
     await this.applicationRepo.restore(application.id);
     return { success: true };
   }
 
   // Xoá vĩnh viễn — chỉ cho phép với hồ sơ ĐÃ ở trong thùng rác (bước xoá 2 lần, tránh xoá nhầm).
   async permanentlyDeleteApplication(userId: string, applicationId: string) {
-    const application = await this.getOwnedApplication(userId, applicationId, true);
+    const application = await this.getOwnedApplication(
+      userId,
+      applicationId,
+      true,
+    );
     if (!application.deletedAt) {
-      throw new BadRequestException('Chỉ xoá vĩnh viễn được hồ sơ đang ở trong thùng rác');
+      throw new BadRequestException(
+        'Chỉ xoá vĩnh viễn được hồ sơ đang ở trong thùng rác',
+      );
     }
     await this.applicationRepo.delete(application.id);
     return { success: true };
@@ -429,14 +557,18 @@ export class EmployerService {
 
   async updateCompany(userId: string, dto: UpdateCompanyDto) {
     const companyId = await this.getCompanyIdForUser(userId);
-    const company = await this.companyRepo.findOne({ where: { id: companyId } });
+    const company = await this.companyRepo.findOne({
+      where: { id: companyId },
+    });
     if (!company) throw new NotFoundException('Không tìm thấy công ty');
     if (dto.size !== undefined) company.size = dto.size;
     if (dto.industry !== undefined) company.industry = dto.industry;
     if (dto.website !== undefined) company.website = dto.website;
-    if (dto.logoUrl !== undefined) company.logoUrl = dto.logoUrl.trim() || undefined;
+    if (dto.logoUrl !== undefined)
+      company.logoUrl = dto.logoUrl.trim() || undefined;
     // Đợt 12ac (24/09/2026) — "Giới thiệu công ty" cho tab Tổng quan công ty (trang chi tiết tin).
-    if (dto.description !== undefined) company.description = dto.description.trim() || undefined;
+    if (dto.description !== undefined)
+      company.description = dto.description.trim() || undefined;
     return this.companyRepo.save(company);
   }
 
@@ -446,7 +578,10 @@ export class EmployerService {
 
   async listWorkLocations(userId: string) {
     const companyId = await this.getCompanyIdForUser(userId);
-    return this.workLocationRepo.find({ where: { companyId }, order: { createdAt: 'DESC' } });
+    return this.workLocationRepo.find({
+      where: { companyId },
+      order: { createdAt: 'DESC' },
+    });
   }
 
   async createWorkLocation(userId: string, dto: CreateWorkLocationDto) {
@@ -461,10 +596,17 @@ export class EmployerService {
     return this.workLocationRepo.save(location);
   }
 
-  async updateWorkLocation(userId: string, id: string, dto: UpdateWorkLocationDto) {
+  async updateWorkLocation(
+    userId: string,
+    id: string,
+    dto: UpdateWorkLocationDto,
+  ) {
     const companyId = await this.getCompanyIdForUser(userId);
-    const location = await this.workLocationRepo.findOne({ where: { id, companyId } });
-    if (!location) throw new NotFoundException('Không tìm thấy địa điểm làm việc');
+    const location = await this.workLocationRepo.findOne({
+      where: { id, companyId },
+    });
+    if (!location)
+      throw new NotFoundException('Không tìm thấy địa điểm làm việc');
     if (dto.label !== undefined) location.label = dto.label;
     if (dto.province !== undefined) location.province = dto.province;
     if (dto.district !== undefined) location.district = dto.district;
@@ -474,8 +616,11 @@ export class EmployerService {
 
   async deleteWorkLocation(userId: string, id: string) {
     const companyId = await this.getCompanyIdForUser(userId);
-    const location = await this.workLocationRepo.findOne({ where: { id, companyId } });
-    if (!location) throw new NotFoundException('Không tìm thấy địa điểm làm việc');
+    const location = await this.workLocationRepo.findOne({
+      where: { id, companyId },
+    });
+    if (!location)
+      throw new NotFoundException('Không tìm thấy địa điểm làm việc');
     await this.workLocationRepo.remove(location);
     return { success: true };
   }
@@ -483,16 +628,27 @@ export class EmployerService {
   async addLegalDocFromUpload(userId: string, file: Express.Multer.File) {
     if (!file) throw new ConflictException('Vui lòng chọn tệp để tải lên');
     if (file.size > LEGAL_DOC_MAX_BYTES) {
-      throw new ConflictException('Tệp vượt quá 3MB — vui lòng dán link Google Drive thay thế');
+      throw new ConflictException(
+        'Tệp vượt quá 3MB — vui lòng dán link Google Drive thay thế',
+      );
     }
     const companyId = await this.getCompanyIdForUser(userId);
-    const company = await this.companyRepo.findOne({ where: { id: companyId } });
+    const company = await this.companyRepo.findOne({
+      where: { id: companyId },
+    });
     if (!company) throw new NotFoundException('Không tìm thấy công ty');
     // Lưu buffer thẳng vào CSDL thay vì ổ đĩa (đợt 7, 18/09/2026) — id công ty đã biết trước nên
     // đặt luôn được legalDocUrl trỏ vào route phục vụ tệp (FilesController), không cần lưu 2 lần.
     company.legalDocUrl = `/files/legal-doc/${company.id}`;
     company.legalDocOriginalFileName = file.originalname;
-    company.legalDocData = file.buffer;
+    // Đợt 20 — lên Google Drive nếu đã kết nối, không được thì lưu CSDL như cũ.
+    const storageKey = await this.storage.put(file.buffer, {
+      name: file.originalname,
+      mime: file.mimetype,
+      category: 'legal',
+    });
+    company.legalDocData = storageKey ? null : file.buffer;
+    company.legalDocStorageKey = storageKey;
     company.legalDocMimeType = file.mimetype;
     // Lưu ý TypeORM: gán `undefined` khiến save() BỎ QUA cột đó (không xoá giá trị cũ trong DB) —
     // phải gán `null` mới thực sự xoá link cũ khi chuyển từ "dán link" sang "tải tệp lên".
@@ -502,13 +658,16 @@ export class EmployerService {
 
   async addLegalDocFromLink(userId: string, externalLinkUrl: string) {
     const companyId = await this.getCompanyIdForUser(userId);
-    const company = await this.companyRepo.findOne({ where: { id: companyId } });
+    const company = await this.companyRepo.findOne({
+      where: { id: companyId },
+    });
     if (!company) throw new NotFoundException('Không tìm thấy công ty');
     company.legalDocExternalLink = externalLinkUrl;
     // Như trên: dùng `null` (không phải `undefined`) để thực sự xoá tệp đã tải lên trước đó.
     company.legalDocUrl = null;
     company.legalDocOriginalFileName = null;
     company.legalDocData = null;
+    company.legalDocStorageKey = null;
     company.legalDocMimeType = null;
     return this.companyRepo.save(company);
   }
@@ -524,13 +683,20 @@ export class EmployerService {
       id: link.id,
       type: link.type,
       createdAt: link.createdAt,
-      user: { id: link.user.id, email: link.user.email, fullName: link.user.fullName, status: link.user.status },
+      user: {
+        id: link.user.id,
+        email: link.user.email,
+        fullName: link.user.fullName,
+        status: link.user.status,
+      },
     }));
   }
 
   async addSubAccount(userId: string, dto: CreateSubAccountDto) {
     const companyId = await this.getCompanyIdForUser(userId);
-    const existing = await this.userRepo.findOne({ where: { email: dto.email } });
+    const existing = await this.userRepo.findOne({
+      where: { email: dto.email },
+    });
     if (existing) throw new ConflictException('Email này đã được đăng ký');
 
     const passwordHash = await argon2.hash(dto.password);
@@ -544,19 +710,30 @@ export class EmployerService {
       }),
     );
     const link = await this.companyUserRepo.save(
-      this.companyUserRepo.create({ companyId, userId: subUser.id, type: CompanyUserType.SUB }),
+      this.companyUserRepo.create({
+        companyId,
+        userId: subUser.id,
+        type: CompanyUserType.SUB,
+      }),
     );
     return {
       id: link.id,
       type: link.type,
       createdAt: link.createdAt,
-      user: { id: subUser.id, email: subUser.email, fullName: subUser.fullName, status: subUser.status },
+      user: {
+        id: subUser.id,
+        email: subUser.email,
+        fullName: subUser.fullName,
+        status: subUser.status,
+      },
     };
   }
 
   async removeSubAccount(userId: string, companyUserId: string) {
     const companyId = await this.getCompanyIdForUser(userId);
-    const link = await this.companyUserRepo.findOne({ where: { id: companyUserId } });
+    const link = await this.companyUserRepo.findOne({
+      where: { id: companyUserId },
+    });
     if (!link || link.companyId !== companyId) {
       throw new NotFoundException('Không tìm thấy tài khoản phụ');
     }
@@ -570,7 +747,10 @@ export class EmployerService {
   // ===== B4 — Gói dịch vụ & Đơn hàng =====
 
   listPackages() {
-    return this.packageRepo.find({ where: { active: true }, order: { price: 'ASC' } });
+    return this.packageRepo.find({
+      where: { active: true },
+      order: { price: 'ASC' },
+    });
   }
 
   async listOrders(userId: string) {
@@ -588,7 +768,9 @@ export class EmployerService {
   // đơn hàng luôn ở trạng thái PENDING chờ Admin xác nhận, không tự động kích hoạt.
   async createOrder(userId: string, dto: CreateOrderDto) {
     const companyId = await this.getCompanyIdForUser(userId);
-    const pkg = await this.packageRepo.findOne({ where: { id: dto.servicePackageId, active: true } });
+    const pkg = await this.packageRepo.findOne({
+      where: { id: dto.servicePackageId, active: true },
+    });
     if (!pkg) throw new NotFoundException('Không tìm thấy gói dịch vụ');
 
     const order = this.orderRepo.create({

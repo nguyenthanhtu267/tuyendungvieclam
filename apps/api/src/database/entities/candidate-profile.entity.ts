@@ -52,7 +52,9 @@ export class CandidateProfile {
   @Column({ name: 'user_id', unique: true })
   userId: string;
 
-  @OneToOne(() => User, (user) => user.candidateProfile, { onDelete: 'CASCADE' })
+  @OneToOne(() => User, (user) => user.candidateProfile, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'user_id' })
   user: User;
 
@@ -113,7 +115,12 @@ export class CandidateProfile {
   @Column({ nullable: true })
   nationality?: string;
 
-  @Column({ name: 'marital_status', type: 'enum', enum: MaritalStatus, nullable: true })
+  @Column({
+    name: 'marital_status',
+    type: 'enum',
+    enum: MaritalStatus,
+    nullable: true,
+  })
   maritalStatus?: MaritalStatus;
 
   @Column({ nullable: true })
@@ -132,6 +139,10 @@ export class CandidateProfile {
   // Ảnh đại diện lưu trong CSDL (bytea) — cùng chiến lược file nhẹ với CV.entity.ts (đợt 7).
   @Column({ name: 'avatar_data', type: 'bytea', nullable: true, select: false })
   avatarData?: Buffer;
+
+  // Đợt 20 — ảnh đã chuyển lên Google Drive: "gd:<id file>".
+  @Column({ name: 'avatar_storage_key', type: 'varchar', nullable: true })
+  avatarStorageKey?: string | null;
 
   @Column({ name: 'avatar_mime_type', nullable: true })
   avatarMimeType?: string;

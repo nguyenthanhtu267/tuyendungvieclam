@@ -35,7 +35,9 @@ export class CandidateExperience {
   @Column({ name: 'candidate_profile_id' })
   candidateProfileId: string;
 
-  @ManyToOne(() => CandidateProfile, (p) => p.experiences, { onDelete: 'CASCADE' })
+  @ManyToOne(() => CandidateProfile, (p) => p.experiences, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'candidate_profile_id' })
   candidateProfile: CandidateProfile;
 
@@ -72,7 +74,9 @@ export class CandidateEducation {
   @Column({ name: 'candidate_profile_id' })
   candidateProfileId: string;
 
-  @ManyToOne(() => CandidateProfile, (p) => p.educations, { onDelete: 'CASCADE' })
+  @ManyToOne(() => CandidateProfile, (p) => p.educations, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'candidate_profile_id' })
   candidateProfile: CandidateProfile;
 
@@ -106,7 +110,9 @@ export class CandidateCertificate {
   @Column({ name: 'candidate_profile_id' })
   candidateProfileId: string;
 
-  @ManyToOne(() => CandidateProfile, (p) => p.certificates, { onDelete: 'CASCADE' })
+  @ManyToOne(() => CandidateProfile, (p) => p.certificates, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'candidate_profile_id' })
   candidateProfile: CandidateProfile;
 
@@ -134,7 +140,9 @@ export class CandidateLanguage {
   @Column({ name: 'candidate_profile_id' })
   candidateProfileId: string;
 
-  @ManyToOne(() => CandidateProfile, (p) => p.languages, { onDelete: 'CASCADE' })
+  @ManyToOne(() => CandidateProfile, (p) => p.languages, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'candidate_profile_id' })
   candidateProfile: CandidateProfile;
 
@@ -184,7 +192,9 @@ export class CandidateAchievement {
   @Column({ name: 'candidate_profile_id' })
   candidateProfileId: string;
 
-  @ManyToOne(() => CandidateProfile, (p) => p.achievements, { onDelete: 'CASCADE' })
+  @ManyToOne(() => CandidateProfile, (p) => p.achievements, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'candidate_profile_id' })
   candidateProfile: CandidateProfile;
 
@@ -212,7 +222,9 @@ export class CandidateActivity {
   @Column({ name: 'candidate_profile_id' })
   candidateProfileId: string;
 
-  @ManyToOne(() => CandidateProfile, (p) => p.activities, { onDelete: 'CASCADE' })
+  @ManyToOne(() => CandidateProfile, (p) => p.activities, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'candidate_profile_id' })
   candidateProfile: CandidateProfile;
 
@@ -246,7 +258,9 @@ export class CandidateReference {
   @Column({ name: 'candidate_profile_id' })
   candidateProfileId: string;
 
-  @ManyToOne(() => CandidateProfile, (p) => p.references, { onDelete: 'CASCADE' })
+  @ManyToOne(() => CandidateProfile, (p) => p.references, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'candidate_profile_id' })
   candidateProfile: CandidateProfile;
 

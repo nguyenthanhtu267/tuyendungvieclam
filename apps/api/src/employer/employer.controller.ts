@@ -30,6 +30,7 @@ import { RateApplicationDto } from './dto/rate-application.dto';
 import { SetApplicationFolderDto } from './dto/set-application-folder.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { fixMulterFilename } from '../common/multer-filename.util';
 
 const ALLOWED_LEGAL_DOC_MIME = new Set([
   'application/pdf',
@@ -71,6 +72,8 @@ export class EmployerController {
     }),
   )
   uploadLegalDoc(@CurrentUser() user: { userId: string }, @UploadedFile() file: Express.Multer.File) {
+    // Đợt 21 — tên file Tiếng Việt bị lỗi font do multer đọc nhầm bảng mã, sửa ngay khi nhận file.
+    file.originalname = fixMulterFilename(file.originalname) ?? file.originalname;
     return this.employerService.addLegalDocFromUpload(user.userId, file);
   }
 
@@ -205,6 +208,12 @@ export class EmployerController {
     @Body() dto: SetApplicationFolderDto,
   ) {
     return this.employerService.setApplicationFolder(user.userId, id, dto.folder);
+  }
+
+  // Đợt 21 (27/09/2026) — xem "Hồ sơ trực tuyến" của ứng viên đã ứng tuyển bằng cách 2 (không có file).
+  @Get('employer/applications/:id/online-profile')
+  getApplicantOnlineProfile(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.employerService.getApplicantOnlineProfile(user.userId, id);
   }
 
   @Post('employer/applications/:id/trash')

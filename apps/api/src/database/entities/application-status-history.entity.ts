@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Index,
+} from 'typeorm';
 import { Application, ApplicationStatus } from './application.entity';
 
 // Đợt 12o (21/09/2026) — "Nhật ký/lịch sử trạng thái ứng tuyển": 1 trong các tính năng thông minh
@@ -20,7 +28,11 @@ export class ApplicationStatusHistory {
   @JoinColumn({ name: 'application_id' })
   application: Application;
 
-  @Column({ type: 'enum', enum: ApplicationStatus, enumName: 'applications_status_enum' })
+  @Column({
+    type: 'enum',
+    enum: ApplicationStatus,
+    enumName: 'applications_status_enum',
+  })
   status: ApplicationStatus;
 
   @CreateDateColumn({ name: 'created_at' })

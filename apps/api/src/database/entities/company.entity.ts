@@ -69,8 +69,17 @@ export class Company {
 
   // Nội dung tệp lưu trực tiếp trong CSDL (thay vì ổ đĩa máy chủ) — lý do giống CV.entity.ts:
   // tránh mất tệp khi triển khai lên máy chủ miễn phí không có ổ đĩa cố định (đợt 7, 18/09/2026).
-  @Column({ name: 'legal_doc_data', type: 'bytea', nullable: true, select: false })
+  @Column({
+    name: 'legal_doc_data',
+    type: 'bytea',
+    nullable: true,
+    select: false,
+  })
   legalDocData?: Buffer;
+
+  // Đợt 20 — file đã chuyển lên Google Drive: "gd:<id file>".
+  @Column({ name: 'legal_doc_storage_key', type: 'varchar', nullable: true })
+  legalDocStorageKey?: string | null;
 
   @Column({ name: 'legal_doc_mime_type', nullable: true })
   legalDocMimeType?: string;

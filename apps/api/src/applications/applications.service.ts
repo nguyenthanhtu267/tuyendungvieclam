@@ -11,7 +11,7 @@ import { Repository } from 'typeorm';
 import { Application } from '../database/entities/application.entity';
 import { ApplicationStatusHistory } from '../database/entities/application-status-history.entity';
 import { CandidateProfile } from '../database/entities/candidate-profile.entity';
-import { CV } from '../database/entities/cv.entity';
+import { CV, CvType } from '../database/entities/cv.entity';
 import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
 import { ApplyJobDto } from './dto/apply-job.dto';
 import { CvArchiveService } from '../cv-archive/cv-archive.service';
@@ -39,9 +39,39 @@ export class ApplicationsService {
       throw new NotFoundException('Không tìm thấy tin tuyển dụng');
     }
 
-    const cv = await this.cvRepo.findOne({ where: { id: dto.cvId } });
-    if (!cv || cv.candidateProfileId !== profile.id) {
-      throw new BadRequestException('CV không hợp lệ — vui lòng chọn CV trong hồ sơ của bạn');
+    // Đợt 21 (27/09/2026) — ứng viên chọn 1 trong 2 cách chia sẻ hồ sơ: (a) 1 CV có sẵn (file đã tải
+    // lên hoặc link Google Drive), hoặc (b) dùng thẳng "Hồ sơ trực tuyến" đã điền (không cần file) —
+    // tự tạo/dùng lại 1 bản ghi CV type=TEMPLATE gắn với hồ sơ (không tính vào giới hạn 2 CV file của
+    // CandidatesService, xem cv.entity.ts CvType).
+    let cv: CV;
+    if (dto.useOnlineProfile) {
+      if ((profile.completionPercent ?? 0) < 100) {
+        throw new BadRequestException(
+          'Hồ sơ trực tuyến chưa điền đủ 3 mục bắt buộc (Tiêu đề hồ sơ, Thông tin cá nhân, Kinh nghiệm làm việc) — vui lòng hoàn thiện hồ sơ hoặc chọn CV dạng file để ứng tuyển',
+        );
+      }
+      const existingTemplate = await this.cvRepo.findOne({
+        where: { candidateProfileId: profile.id, type: CvType.TEMPLATE },
+      });
+      cv =
+        existingTemplate ??
+        (await this.cvRepo.save(
+          this.cvRepo.create({
+            candidateProfileId: profile.id,
+            type: CvType.TEMPLATE,
+          }),
+        ));
+    } else {
+      if (!dto.cvId) {
+        throw new BadRequestException(
+          'Vui lòng chọn CV hoặc dùng Hồ sơ trực tuyến để ứng tuyển',
+        );
+      }
+      const found = await this.cvRepo.findOne({ where: { id: dto.cvId } });
+      if (!found || found.candidateProfileId !== profile.id) {
+        throw new BadRequestException('CV không hợp lệ — vui lòng chọn CV trong hồ sơ của bạn');
+      }
+      cv = found;
     }
 
     const existing = await this.applicationRepo.findOne({

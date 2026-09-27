@@ -1,4 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+} from 'typeorm';
 
 // SRS Mục 10: dùng chung cho cả tìm CV (NTD) và tìm việc (ứng viên) — phân biệt qua ownerType.
 @Entity({ name: 'search_histories' })

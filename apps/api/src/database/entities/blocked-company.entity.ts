@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { CandidateProfile } from './candidate-profile.entity';
 import { Company } from './company.entity';
 
@@ -12,7 +19,9 @@ export class BlockedCompany {
   @Column({ name: 'candidate_profile_id' })
   candidateProfileId: string;
 
-  @ManyToOne(() => CandidateProfile, (profile) => profile.blockedCompanies, { onDelete: 'CASCADE' })
+  @ManyToOne(() => CandidateProfile, (profile) => profile.blockedCompanies, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'candidate_profile_id' })
   candidateProfile: CandidateProfile;
 
