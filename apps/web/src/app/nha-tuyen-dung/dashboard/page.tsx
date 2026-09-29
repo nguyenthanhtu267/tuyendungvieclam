@@ -134,7 +134,7 @@ export default function EmployerDashboardPage() {
                     {dashboard.recentApplications.map((app) => (
                       <div key={app.id} className="flex justify-between items-start gap-2">
                         <div>
-                          <div className="font-bold">{app.cv.candidateProfile.fullName}</div>
+                          <div className="font-bold">{app.cv.candidateProfile?.fullName ?? app.cv.guestFullName ?? 'Ứng viên'}</div>
                           <div className="text-ink-faint mt-0.5">
                             {app.jobPosting?.title} · {formatDate(app.appliedAt)}
                           </div>

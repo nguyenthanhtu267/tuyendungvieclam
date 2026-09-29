@@ -5,7 +5,7 @@ import { ApplicationStatusHistory } from '../database/entities/application-statu
 import { CandidateProfile } from '../database/entities/candidate-profile.entity';
 import { CV } from '../database/entities/cv.entity';
 import { JobPosting } from '../database/entities/job-posting.entity';
-import { ApplicationsController } from './applications.controller';
+import { ApplicationsController, PublicApplicationsController } from './applications.controller';
 import { ApplicationsService } from './applications.service';
 import { CvArchiveModule } from '../cv-archive/cv-archive.module';
 
@@ -21,7 +21,7 @@ import { CvArchiveModule } from '../cv-archive/cv-archive.module';
     // Đợt 18a (26/09/2026) — tự động lưu vào Kho CV của NTD mỗi lần ứng tuyển.
     CvArchiveModule,
   ],
-  controllers: [ApplicationsController],
+  controllers: [ApplicationsController, PublicApplicationsController],
   providers: [ApplicationsService],
 })
 export class ApplicationsModule {}

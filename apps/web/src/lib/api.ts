@@ -648,6 +648,20 @@ export interface ApplicationStatusHistoryItem {
 }
 
 export const applicationsApi = {
+  // Đợt 22 (29/09/2026) — ứng tuyển KHÔNG cần đăng nhập (khách): họ tên/SĐT/email + file CV HOẶC link CV.
+  applyAsGuest: async (jobId: string, form: FormData) => {
+    const res = await fetch(`${API_URL}/public/jobs/${jobId}/apply`, { method: 'POST', body: form });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      const message =
+        (data && (Array.isArray(data.message) ? data.message.join(', ') : data.message)) ||
+        (res.status === 429
+          ? 'Bạn thao tác quá nhanh, vui lòng thử lại sau ít phút'
+          : 'Đã có lỗi xảy ra, vui lòng thử lại');
+      throw new ApiError(message, res.status);
+    }
+    return data as { id: string; message: string };
+  },
   // Đợt 21 (27/09/2026) — 2 cách chia sẻ hồ sơ khi ứng tuyển: cvId (CV file/link có sẵn) HOẶC
   // useOnlineProfile=true (dùng thẳng "Hồ sơ trực tuyến", không cần file) — chọn đúng 1 trong 2.
   apply: (
@@ -712,7 +726,11 @@ export interface EmployerApplication {
     fileUrl?: string;
     originalFileName?: string;
     externalLinkUrl?: string;
-    candidateProfile: EmployerApplicantProfile;
+    // Đợt 22 — null với đơn của KHÁCH ứng tuyển không đăng nhập (thông tin nằm ở guest*).
+    candidateProfile: EmployerApplicantProfile | null;
+    guestFullName?: string | null;
+    guestPhone?: string | null;
+    guestEmail?: string | null;
   };
 }
 

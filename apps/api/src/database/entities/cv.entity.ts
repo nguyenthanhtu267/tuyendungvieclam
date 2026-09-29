@@ -22,14 +22,26 @@ export class CV {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'candidate_profile_id' })
-  candidateProfileId: string;
+  // Đợt 22 — rỗng với CV của KHÁCH ứng tuyển không đăng nhập (xem guest* bên dưới).
+  @Column({ name: 'candidate_profile_id', type: 'uuid', nullable: true })
+  candidateProfileId: string | null;
 
   @ManyToOne(() => CandidateProfile, (profile) => profile.cvs, {
     onDelete: 'CASCADE',
+    nullable: true,
   })
   @JoinColumn({ name: 'candidate_profile_id' })
-  candidateProfile: CandidateProfile;
+  candidateProfile: CandidateProfile | null;
+
+  // Đợt 22 (29/09/2026) — thông tin khách ứng tuyển không cần đăng nhập (chỉ có khi candidate_profile_id rỗng).
+  @Column({ name: 'guest_full_name', type: 'varchar', nullable: true })
+  guestFullName?: string | null;
+
+  @Column({ name: 'guest_phone', type: 'varchar', nullable: true })
+  guestPhone?: string | null;
+
+  @Column({ name: 'guest_email', type: 'varchar', nullable: true })
+  guestEmail?: string | null;
 
   @Column({ type: 'enum', enum: CvType, default: CvType.TEMPLATE })
   type: CvType;

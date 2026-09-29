@@ -42,7 +42,7 @@ import {
 } from '../common/cv-parser.util';
 import { fetchPageText } from '../common/page-text.util';
 import { CandidateDraftDto } from '../common/dto/candidate-draft.dto';
-import { draftToSnapshot, parsedToDraft } from '../common/candidate-draft.util';
+import { draftToSnapshot, guestSnapshot, parsedToDraft } from '../common/candidate-draft.util';
 import { fixMulterFilename } from '../common/multer-filename.util';
 import { ListCvArchiveQueryDto } from './dto/list-cv-archive-query.dto';
 import { FileStorageService } from '../storage/file-storage.service';
@@ -328,6 +328,9 @@ export class CvArchiveService implements OnApplicationBootstrap {
       select: {
         id: true,
         candidateProfileId: true,
+        guestFullName: true,
+        guestPhone: true,
+        guestEmail: true,
         type: true,
         originalFileName: true,
         fileMimeType: true,
@@ -338,11 +341,19 @@ export class CvArchiveService implements OnApplicationBootstrap {
     });
     if (!cv) return false;
 
-    let snapshot = cache?.get(cv.candidateProfileId);
-    if (!snapshot) {
-      snapshot = (await this.buildSnapshot(cv.candidateProfileId)) ?? undefined;
-      if (!snapshot) return false;
-      cache?.set(cv.candidateProfileId, snapshot);
+    // Đợt 22 — đơn của KHÁCH không đăng nhập (candidate_profile_id rỗng): không có hồ sơ 13 mục để chụp, bản
+    // chụp dựng từ họ tên/SĐT/email khách nhập + nội dung đọc được từ file CV (bên dưới).
+    const isGuest = !cv.candidateProfileId;
+    let snapshot: CvArchiveSnapshot | undefined;
+    if (!isGuest) {
+      snapshot = cache?.get(cv.candidateProfileId as string);
+      if (!snapshot) {
+        snapshot =
+          (await this.buildSnapshot(cv.candidateProfileId as string)) ??
+          undefined;
+        if (!snapshot) return false;
+        cache?.set(cv.candidateProfileId as string, snapshot);
+      }
     }
 
     // Đợt 20 — nội dung file (trong CSDL hoặc trên Google Drive) + bản sao RIÊNG của Kho CV: trên Drive thì
@@ -368,8 +379,21 @@ export class CvArchiveService implements OnApplicationBootstrap {
       ? await this.readFile(fileBytes, cv.fileMimeType, cv.originalFileName)
       : null;
 
+    if (isGuest) {
+      snapshot = guestSnapshot(
+        {
+          fullName: cv.guestFullName ?? '',
+          phone: cv.guestPhone,
+          email: cv.guestEmail,
+        },
+        file?.parsed ?? null,
+        file?.text,
+      );
+    }
+    if (!snapshot) return false;
+
     const identity: CardIdentity = {
-      profileId: cv.candidateProfileId,
+      profileId: cv.candidateProfileId ?? null,
       email:
         (
           snapshot.contactEmail ||

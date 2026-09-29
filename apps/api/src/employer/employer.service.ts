@@ -371,7 +371,7 @@ export class EmployerService {
       qb.andWhere('app.rating >= :ratingMin', { ratingMin: filters.ratingMin });
     if (filters.q) {
       qb.andWhere(
-        '(candidateProfile.fullName ILIKE :q OR candidateProfile.desiredPosition ILIKE :q)',
+        '(candidateProfile.fullName ILIKE :q OR candidateProfile.desiredPosition ILIKE :q OR cv.guestFullName ILIKE :q OR cv.guestEmail ILIKE :q OR cv.guestPhone ILIKE :q)',
         {
           q: `%${filters.q}%`,
         },
@@ -449,7 +449,9 @@ export class EmployerService {
     );
     const profileId = application.cv?.candidateProfileId;
     if (!profileId) {
-      throw new NotFoundException('Không tìm thấy hồ sơ ứng viên');
+      throw new NotFoundException(
+        'Đơn này do khách ứng tuyển không đăng nhập — không có hồ sơ trực tuyến, xem thông tin liên hệ và file/link CV ngay trong danh sách',
+      );
     }
     return this.cvSearchService.getDetailForApplicant(profileId);
   }

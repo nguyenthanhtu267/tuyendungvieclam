@@ -164,3 +164,21 @@ export function parsedToDraft(
     rawText: rawText || undefined,
   };
 }
+
+// Đợt 22 (29/09/2026) — bản chụp Kho CV cho đơn KHÁCH không đăng nhập: họ tên/SĐT/email khách nhập là chính
+// xác nhất (ưu tiên), phần còn lại (chức danh, kinh nghiệm, học vấn, kỹ năng...) lấy từ nội dung đọc được
+// của file CV nếu có — nhờ vậy thẻ tự vào hàng chờ Admin "Nguồn ngoài" đã có sẵn dữ liệu đã tách.
+export function guestSnapshot(
+  guest: { fullName: string; phone?: string | null; email?: string | null },
+  parsed?: ParsedCv | null,
+  rawText?: string,
+): CvArchiveSnapshot {
+  const base = parsedToDraft(parsed ?? null, rawText);
+  const draft = {
+    ...base,
+    fullName: guest.fullName.trim() || base.fullName || 'Ứng viên',
+    phone: guest.phone?.trim() || base.phone,
+    email: guest.email?.trim() || base.email,
+  } as CandidateDraftDto;
+  return draftToSnapshot(draft);
+}

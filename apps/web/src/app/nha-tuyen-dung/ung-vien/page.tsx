@@ -472,10 +472,36 @@ function UngVienPageInner() {
                       {applicants.map((app) => (
                         <tr key={app.id} className="border-t border-border align-top">
                           <td className="py-3 px-4">
-                            <div className="font-bold">{app.cv.candidateProfile.fullName}</div>
-                            <div className="text-ink-faint mt-0.5">
-                              {app.cv.candidateProfile.desiredPosition ?? 'Chưa cập nhật vị trí mong muốn'}
-                            </div>
+                            {app.cv.candidateProfile ? (
+                              <>
+                                <div className="font-bold">{app.cv.candidateProfile.fullName}</div>
+                                <div className="text-ink-faint mt-0.5">
+                                  {app.cv.candidateProfile.desiredPosition ?? 'Chưa cập nhật vị trí mong muốn'}
+                                </div>
+                              </>
+                            ) : (
+                              // Đợt 22 — khách ứng tuyển không đăng nhập: hiện thẳng thông tin liên hệ họ đã nhập.
+                              <>
+                                <div className="font-bold">
+                                  {app.cv.guestFullName ?? 'Ứng viên'}{' '}
+                                  <span className="ml-1 rounded-full bg-surface-alt border border-border px-1.5 py-0.5 text-[10px] font-semibold text-ink-muted align-middle">
+                                    Khách
+                                  </span>
+                                </div>
+                                <div className="text-ink-faint mt-0.5 flex flex-col">
+                                  {app.cv.guestPhone && (
+                                    <a className="text-primary" href={`tel:${app.cv.guestPhone}`}>
+                                      📞 {app.cv.guestPhone}
+                                    </a>
+                                  )}
+                                  {app.cv.guestEmail && (
+                                    <a className="text-primary break-all" href={`mailto:${app.cv.guestEmail}`}>
+                                      ✉ {app.cv.guestEmail}
+                                    </a>
+                                  )}
+                                </div>
+                              </>
+                            )}
                             {app.coverLetter && (
                               <div className="text-ink-faint mt-1 italic max-w-xs">&quot;{app.coverLetter}&quot;</div>
                             )}

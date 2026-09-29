@@ -9,6 +9,7 @@ import { RichTextView } from '@/components/RichTextView';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { SourcedBadge, isCompanyUnverified } from '@/components/SourcedBadge';
 import { CompatibilityRadar } from '@/components/CompatibilityRadar';
+import { GuestApplyForm } from '@/components/GuestApplyForm';
 import { CompatibilityChecklist } from '@/components/CompatibilityChecklist';
 import {
   jobsApi,
@@ -281,12 +282,8 @@ function JobDetailInner() {
         {applyOpen && (
           <div className="mt-3 rounded-xl border border-border bg-white p-5">
             {!me ? (
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <span className="text-sm text-ink-muted">Vui lòng đăng nhập để nộp hồ sơ ứng tuyển.</span>
-                <Link href="/dang-nhap" className="tvl-btn-primary !w-auto px-5">
-                  Đăng nhập / Đăng ký
-                </Link>
-              </div>
+              // Đợt 22 — khách chưa đăng nhập vẫn ứng tuyển được (họ tên/SĐT/email + file hoặc link CV).
+              <GuestApplyForm jobId={params.id} jobTitle={job.title} onCancel={() => setApplyOpen(false)} />
             ) : applyState === 'done' ? (
               <div className="flex items-center gap-3 text-success text-sm font-semibold">
                 ✅ Đã gửi hồ sơ ứng tuyển thành công! Bạn có thể theo dõi trạng thái ở{' '}

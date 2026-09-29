@@ -18,6 +18,15 @@ async function bootstrap() {
     origin: resolveCorsOrigins(process.env.CORS_ORIGIN),
     credentials: true,
   });
+  // Đợt 22 (29/09/2026) — API chạy sau proxy của Render: nếu không khai báo "trust proxy" thì req.ip luôn là
+  // địa chỉ proxy nội bộ → mọi khách dùng CHUNG 1 bộ đếm giới hạn tốc độ (ứng tuyển không đăng nhập, đăng nhập...)
+  // và bị chặn oan. Tin 1 lớp proxy (đổi bằng biến TRUST_PROXY_HOPS nếu hạ tầng thay đổi; 0 = tắt, dùng khi chạy
+  // trực tiếp ở máy dev).
+  const hops = Number(
+    process.env.TRUST_PROXY_HOPS ??
+      (process.env.NODE_ENV === 'production' ? 1 : 0),
+  );
+  if (hops > 0) app.set('trust proxy', hops);
   app.use(requestLogger);
   // Đợt 19 (26/09/2026) — bộ ghi truy cập gửi lô dữ liệu bằng navigator.sendBeacon dạng text/plain (loại
   // "simple request" nên không cần preflight CORS, vẫn gửi được lúc người dùng đóng tab).
