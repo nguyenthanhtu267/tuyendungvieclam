@@ -7,6 +7,8 @@ import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/i18n';
 import { NavDropdown } from '@/components/nav/NavDropdown';
 import { NotificationBell } from '@/components/NotificationBell';
+import { PromoBadge } from '@/components/PromoBadge';
+import { AdSlot } from '@/components/ads/AdSlot';
 import { CANDIDATE_ACCOUNT_MENU, EMPLOYER_CTA_MENU, JOBS_MEGA_MENU, UTILITY_TOOLS } from '@/lib/nav-menu';
 
 // Đợt 11 — mega-menu điều hướng nhiều cấp theo claude/06-spec-tim-kiem-nang-cao.md mục 5:
@@ -32,6 +34,9 @@ export default function SiteHeader() {
   return (
     <>
       <div className="flex items-center gap-4 px-4 sm:px-6 lg:px-10 h-16 border-b border-border bg-surface sticky top-0 z-30">
+        {/* Đợt 23 (29/09/2026) — khung `relative` để đặt nhãn quảng bá nhấp nháy ngay góc trên chữ
+            "MIỄN PHÍ" (nhãn là link riêng, KHÔNG lồng trong <Link> logo vì <a> không được lồng <a>). */}
+        <div className="relative shrink-0">
         <Link href="/" className="flex items-center gap-2 shrink-0">
           {/* Đợt 12j (21/09/2026) — đổi biểu tượng logo từ icon dấu tích sang chữ "V" đơn giản
               theo yêu cầu người dùng. */}
@@ -46,6 +51,8 @@ export default function SiteHeader() {
             ĐĂNG TUYỂN <span className="text-accent">MIỄN PHÍ</span>
           </span>
         </Link>
+        <PromoBadge />
+        </div>
 
         <nav className="hidden md:flex items-center gap-4 lg:gap-5 text-[13px] font-semibold text-ink-muted flex-1 min-w-0">
           <NavDropdown
@@ -313,6 +320,8 @@ export default function SiteHeader() {
                 </Link>
               )}
             </div>
+            {/* Đợt 24 — banner nhỏ cuối menu điện thoại. */}
+            <AdSlot slot="mobile-menu" className="px-4 pb-5 mt-auto" />
           </nav>
         </div>
       )}

@@ -31,6 +31,8 @@ import { PeoplePanel } from '@/components/admin/PeoplePanel';
 import { CandidatesPanel } from '@/components/admin/CandidatesPanel';
 import { AnalyticsPanel } from '@/components/admin/AnalyticsPanel';
 import { StoragePanel } from '@/components/admin/StoragePanel';
+import { PromoBadgePanel } from '@/components/admin/PromoBadgePanel';
+import { AdsPanel } from '@/components/admin/AdsPanel';
 
 // Đợt 12f (21/09/2026) — bổ sung mục "Đổi mật khẩu" tự phục vụ cho Admin, còn thiếu sót ở Đợt
 // 12a (lúc đó chỉ làm cho Ứng viên và Nhà tuyển dụng). Trước khi có mục này, Admin chỉ có thể
@@ -54,6 +56,10 @@ const NAV_ITEMS = [
   { id: 'candidates', label: '🧑‍💼 Ứng viên' },
   // Đợt 20 (27/09/2026) — lưu file lên Google Drive.
   { id: 'storage', label: '🗄️ Lưu trữ file' },
+  // Đợt 23 (29/09/2026) — nhãn quảng bá nhấp nháy cạnh logo (chữ + link mở tab mới).
+  { id: 'promo', label: '📣 Nhãn logo' },
+  // Đợt 24 (29/09/2026) — banner quảng cáo (chiến dịch + khu vực).
+  { id: 'ads', label: '📢 Banner quảng cáo' },
   { id: 'audit-log', label: '📜 Nhật ký thao tác' },
   { id: 'settings', label: '🔒 Đổi mật khẩu' },
 ];
@@ -572,6 +578,10 @@ export default function AdminDashboardPage() {
           <FeaturedEmployersCard token={token} />
         ) : tab === 'sourced' ? (
           <SourcedTabs token={token} />
+        ) : tab === 'ads' ? (
+          <AdsPanel token={token} />
+        ) : tab === 'promo' ? (
+          <PromoBadgePanel token={token} />
         ) : tab === 'storage' ? (
           <StoragePanel token={token} />
         ) : tab === 'analytics' ? (

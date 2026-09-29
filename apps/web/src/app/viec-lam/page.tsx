@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Fragment, Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import SiteHeader from '@/components/SiteHeader';
 import { JobCard } from '@/components/JobCard';
@@ -10,6 +10,7 @@ import { jobsApi, candidatesApi, type JobFacets, type JobListParams, type JobLis
 import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth-context';
 import { formatNumber } from '@/lib/format';
+import { AdSlot } from '@/components/ads/AdSlot';
 
 // Đợt 10 — trang tìm việc làm nâng cao đầy đủ (claude/06-spec-tim-kiem-nang-cao.md): thanh lọc
 // FilterBar (tỉnh/thành + ngành nghề multi-select, 5 dropdown đơn, khẩn cấp, doanh nghiệp yêu thích),
@@ -218,7 +219,13 @@ function JobSearchPage() {
             )}
 
             <div className="flex flex-col gap-3">
-              {result?.items.map((job) => <JobCard key={job.id} job={job} />)}
+              {/* Đợt 24 — banner xen giữa danh sách: sau tin thứ 5 (ít hơn 5 tin thì sau tin cuối). */}
+              {result?.items.map((job, i, arr) => (
+                <Fragment key={job.id}>
+                  <JobCard job={job} />
+                  {i === Math.min(4, arr.length - 1) && <AdSlot slot="jobs-inline" />}
+                </Fragment>
+              ))}
             </div>
 
             {result && result.totalPages > 1 && (
@@ -326,6 +333,8 @@ function JobSearchPage() {
                 )}
               </div>
             )}
+            {/* Đợt 24 — banner cột phải (chỉ máy tính). */}
+            <AdSlot slot="jobs-sidebar" className="hidden lg:block" />
           </div>
         </div>
       </div>

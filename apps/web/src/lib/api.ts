@@ -1046,6 +1046,18 @@ export interface BulkActionResult {
   failed: string[];
 }
 
+export interface PromoBadgeSetting {
+  enabled: boolean;
+  text: string;
+  url: string | null;
+}
+
+// Đợt 23 — cấu hình công khai (không cần đăng nhập) cho header.
+export const publicSettingsApi = {
+  getPromoBadge: () =>
+    request<{ badge: { text: string; url: string } | null }>('/public/settings/promo-badge'),
+};
+
 export const adminApi = {
   dashboard: (token: string) => request<AdminDashboard>('/admin/dashboard', { headers: authHeaders(token) }),
   listPendingJobs: (token: string) =>
@@ -1064,6 +1076,15 @@ export const adminApi = {
       method: 'PATCH',
       headers: authHeaders(token),
       body: JSON.stringify({ enabled }),
+    }),
+  // Đợt 23 (29/09/2026) — nhãn quảng bá cạnh logo: Admin bật/tắt + sửa chữ + link (mở tab mới).
+  getPromoBadge: (token: string) =>
+    request<PromoBadgeSetting>('/admin/settings/promo-badge', { headers: authHeaders(token) }),
+  setPromoBadge: (token: string, dto: { enabled: boolean; text: string; url: string }) =>
+    request<PromoBadgeSetting>('/admin/settings/promo-badge', {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(dto),
     }),
   markJobReviewed: (token: string, id: string) =>
     request<JobPosting>(`/admin/jobs/${id}/mark-reviewed`, { method: 'PATCH', headers: authHeaders(token) }),
@@ -2345,4 +2366,81 @@ export const adminStorageApi = {
   setMigrationPaused: (token: string, paused: boolean) =>
     request<StorageStatus>('/admin/storage/migration', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ paused }) }),
   migrateNow: (token: string) => request<{ moved: number }>('/admin/storage/migrate-now', { method: 'POST', headers: authHeaders(token) }),
+};
+
+// ------------------------------------------------------------------ Đợt 24 — banner quảng cáo (Admin)
+export interface AdCampaignInput {
+  name: string;
+  eyebrow: string | null;
+  title: string;
+  subtitle: string | null;
+  ctaText: string | null;
+  url: string;
+  addUtm: boolean;
+  bgMode: 'generated' | 'image';
+  bgPrompt: string;
+  bgTheme: string | null;
+  bgSeed: number;
+  textColor: 'auto' | 'light' | 'dark';
+  slots: string[];
+  audiences: string[];
+  device: 'all' | 'desktop' | 'mobile';
+  weight: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  enabled: boolean;
+}
+
+export interface AdCampaignRow extends AdCampaignInput {
+  id: string;
+  status: 'running' | 'scheduled' | 'ended' | 'paused';
+  hasImage: boolean;
+  bgImageUrl: string | null;
+  bgImageTone: 'light' | 'dark' | null;
+  impressions?: number;
+  clicks?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdStats {
+  days: number;
+  since: string;
+  bySlot: { campaignId: string; slot: string; impressions: number; clicks: number }[];
+  daily: { day: string; impressions: number; clicks: number }[];
+}
+
+export const adminAdsApi = {
+  list: (token: string) => request<AdCampaignRow[]>('/admin/ads', { headers: authHeaders(token) }),
+  settings: (token: string) =>
+    request<{ enabled: boolean; disabledSlots: string[] }>('/admin/ads/settings', { headers: authHeaders(token) }),
+  setSettings: (token: string, dto: { enabled: boolean; disabledSlots: string[] }) =>
+    request<{ enabled: boolean; disabledSlots: string[] }>('/admin/ads/settings', {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(dto),
+    }),
+  stats: (token: string, days = 30) => request<AdStats>(`/admin/ads/stats?days=${days}`, { headers: authHeaders(token) }),
+  create: (token: string, dto: AdCampaignInput) =>
+    request<AdCampaignRow>('/admin/ads', { method: 'POST', headers: authHeaders(token), body: JSON.stringify(dto) }),
+  update: (token: string, id: string, dto: AdCampaignInput) =>
+    request<AdCampaignRow>(`/admin/ads/${id}`, { method: 'PUT', headers: authHeaders(token), body: JSON.stringify(dto) }),
+  setEnabled: (token: string, id: string, enabled: boolean) =>
+    request<AdCampaignRow>(`/admin/ads/${id}/enabled`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify({ enabled }),
+    }),
+  duplicate: (token: string, id: string) =>
+    request<AdCampaignRow>(`/admin/ads/${id}/duplicate`, { method: 'POST', headers: authHeaders(token) }),
+  remove: (token: string, id: string) =>
+    request<{ ok: boolean }>(`/admin/ads/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
+  uploadImage: (token: string, id: string, file: File, tone: 'light' | 'dark') => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('tone', tone);
+    return requestForm<AdCampaignRow>(`/admin/ads/${id}/image`, token, form);
+  },
+  removeImage: (token: string, id: string) =>
+    request<AdCampaignRow>(`/admin/ads/${id}/image`, { method: 'DELETE', headers: authHeaders(token) }),
 };

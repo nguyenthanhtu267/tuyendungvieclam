@@ -11,6 +11,7 @@ import { companiesApi, candidatesApi, ApiError, type CompanyProfileResponse } fr
 import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth-context';
 import { formatNumber } from '@/lib/format';
+import { AdSlot } from '@/components/ads/AdSlot';
 
 // Đợt 12k (21/09/2026) — trang công ty công khai: bấm tên công ty trong tin tuyển dụng sẽ tới đây,
 // xem thông tin công ty + toàn bộ tin đang tuyển khác của công ty đó (theo mẫu careerviet.vn).
@@ -171,6 +172,8 @@ export default function CongTyPage() {
             )}
           </div>
         </div>
+        {/* Đợt 24 — banner cuối trang công ty. */}
+        <AdSlot slot="company-bottom" className="mt-6" />
       </div>
     </main>
   );

@@ -42,7 +42,7 @@ import {
 //  - File cũ trong CSDL được chuyển dần lên Drive (vòng chạy nền), chuyển xong thì xoá bản trong CSDL.
 //  - File "mồ côi" (bản ghi gốc đã xoá: ứng viên xoá CV/tài khoản, đổi ảnh...) được tự dọn khỏi Drive.
 
-export type StorageCategory = 'cv' | 'archive' | 'legal' | 'avatar';
+export type StorageCategory = 'cv' | 'archive' | 'legal' | 'avatar' | 'ad';
 
 interface CategoryDef {
   table: string;
@@ -90,6 +90,16 @@ export const CATEGORIES: Record<StorageCategory, CategoryDef> = {
     mimeCol: 'avatar_mime_type',
     folder: 'Ảnh đại diện ứng viên',
     label: 'Ảnh đại diện ứng viên',
+  },
+  // Đợt 24 — ảnh nền banner quảng cáo do Admin tải lên.
+  ad: {
+    table: 'ad_campaigns',
+    dataCol: 'bg_image_data',
+    keyCol: 'bg_image_key',
+    nameCol: 'name',
+    mimeCol: 'bg_image_mime',
+    folder: 'Ảnh nền banner quảng cáo',
+    label: 'Ảnh nền banner quảng cáo',
   },
 };
 const ROOT_FOLDER = 'TuyenDungViecLam - File cua web (khong xoa)';

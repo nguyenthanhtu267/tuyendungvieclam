@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { applicationsApi, ApiError } from '@/lib/api';
 import { track } from '@/lib/analytics';
+import { AdSlot } from '@/components/ads/AdSlot';
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const ACCEPT = '.pdf,.doc,.docx,.jpg,.jpeg,.png';
@@ -73,6 +74,8 @@ export function GuestApplyForm({
             Đăng ký
           </Link>
         </div>
+        {/* Đợt 24 — banner nhỏ gọn sau khi khách nộp đơn thành công. */}
+        <AdSlot slot="apply-success" className="mt-2 font-normal" />
       </div>
     );
   }

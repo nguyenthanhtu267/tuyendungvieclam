@@ -23,6 +23,7 @@ import {
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatSalary } from '@/lib/format';
 import ChangePasswordCard from '@/components/ChangePasswordCard';
+import { AdSlot } from '@/components/ads/AdSlot';
 
 // Đợt 12m (21/09/2026) — hiển thị lại tiêu chí "Tìm kiếm đã lưu" và dựng lại URL /viec-lam tương
 // ứng (đối xứng với cách viec-lam/page.tsx đọc query params thành filters).
@@ -165,6 +166,8 @@ export default function MyCenterPage() {
       )}
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+        {/* Đợt 24 — banner đầu trang My Center của ứng viên. */}
+        <AdSlot slot="candidate-top" className="mb-5" />
         <div className="grid md:grid-cols-[210px_1fr] gap-5 items-start">
           <nav className="hidden md:flex flex-col gap-1 rounded-xl border border-border bg-white p-2.5 sticky top-20">
             {NAV_ITEMS.map((item) => (

@@ -31,6 +31,8 @@ async function bootstrap() {
   // Đợt 19 (26/09/2026) — bộ ghi truy cập gửi lô dữ liệu bằng navigator.sendBeacon dạng text/plain (loại
   // "simple request" nên không cần preflight CORS, vẫn gửi được lúc người dùng đóng tab).
   app.use('/analytics/collect', text({ type: 'text/plain', limit: '100kb' }));
+  // Đợt 24 — lượt hiển thị/bấm banner quảng cáo cũng gửi bằng sendBeacon dạng text/plain.
+  app.use('/public/ads/events', text({ type: 'text/plain', limit: '20kb' }));
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   // CV / giấy tờ pháp lý nay lưu trong CSDL (bytea) và phục vụ qua FilesController — không còn
   // dùng ổ đĩa cục bộ (đợt 7, 18/09/2026: máy chủ miễn phí không có ổ đĩa cố định). Kế hoạch dài

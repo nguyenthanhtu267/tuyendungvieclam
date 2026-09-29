@@ -35,6 +35,7 @@ import {
   jobWorkScheduleDisplay,
 } from '@/lib/format';
 import { benefitsRichTextValue } from '@/lib/richtext';
+import { AdSlot } from '@/components/ads/AdSlot';
 
 type Tab = 'details' | 'company';
 
@@ -285,13 +286,17 @@ function JobDetailInner() {
               // Đợt 22 — khách chưa đăng nhập vẫn ứng tuyển được (họ tên/SĐT/email + file hoặc link CV).
               <GuestApplyForm jobId={params.id} jobTitle={job.title} onCancel={() => setApplyOpen(false)} />
             ) : applyState === 'done' ? (
-              <div className="flex items-center gap-3 text-success text-sm font-semibold">
-                ✅ Đã gửi hồ sơ ứng tuyển thành công! Bạn có thể theo dõi trạng thái ở{' '}
-                <Link href="/ho-so#applications" className="underline">
-                  My Center
-                </Link>
-                .
-              </div>
+              <>
+                <div className="flex items-center gap-3 text-success text-sm font-semibold">
+                  ✅ Đã gửi hồ sơ ứng tuyển thành công! Bạn có thể theo dõi trạng thái ở{' '}
+                  <Link href="/ho-so#applications" className="underline">
+                    My Center
+                  </Link>
+                  .
+                </div>
+                {/* Đợt 24 — banner nhỏ gọn ngay sau khi nộp đơn (người xem vừa xong việc chính). */}
+                <AdSlot slot="apply-success" className="mt-3" />
+              </>
             ) : cvs === null ? (
               <div className="text-sm text-ink-faint">Đang tải CV của bạn...</div>
             ) : cvs.length === 0 && !onlineProfileAvailable ? (
@@ -658,8 +663,13 @@ function JobDetailInner() {
                 <CompatibilityChecklist checklist={compatibility.checklist} missingSkills={compatibility.missingSkills} />
               </div>
             )}
+            {/* Đợt 24 — banner cột phải (chỉ máy tính). */}
+            <AdSlot slot="job-sidebar" className="hidden lg:block" />
           </div>
         </div>
+
+        {/* Đợt 24 — banner cuối nội dung tin (mọi thiết bị). */}
+        <AdSlot slot="job-bottom" className="mt-6" />
 
         {/* Đợt 12n (21/09/2026) — "Các công việc tương tự" chuyển từ khối nhỏ trên sidebar xuống
             cuối trang, dạng lưới đầy đủ như JobCard ở trang tìm việc, theo mẫu tham khảo. */}

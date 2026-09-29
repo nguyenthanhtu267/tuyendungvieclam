@@ -234,6 +234,51 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     return { enabled };
   }
 
+  // Đợt 23 (29/09/2026) — nhãn quảng bá cạnh logo. `getPromoBadge()` (Admin xem đủ cấu hình) và
+  // `getPublicPromoBadge()` (trang công khai: chỉ trả khi BẬT + có link, còn lại null).
+  async getPromoBadge(): Promise<{ enabled: boolean; text: string; url: string | null }> {
+    let setting = await this.adminSettingRepo.findOne({ where: { id: AUTO_APPROVE_SETTING_ID } });
+    if (!setting) {
+      setting = await this.adminSettingRepo.save(
+        this.adminSettingRepo.create({ id: AUTO_APPROVE_SETTING_ID }),
+      );
+    }
+    return {
+      enabled: !!setting.promoBadgeEnabled,
+      text: setting.promoBadgeText || 'Phần mềm Nhân sự Toàn diện',
+      url: setting.promoBadgeUrl || null,
+    };
+  }
+
+  async getPublicPromoBadge(): Promise<{ text: string; url: string } | null> {
+    const b = await this.getPromoBadge();
+    return b.enabled && b.url ? { text: b.text, url: b.url } : null;
+  }
+
+  async setPromoBadge(
+    admin: AdminActor,
+    dto: { enabled: boolean; text: string; url?: string | null },
+  ): Promise<{ enabled: boolean; text: string; url: string | null }> {
+    let setting = await this.adminSettingRepo.findOne({ where: { id: AUTO_APPROVE_SETTING_ID } });
+    if (!setting) setting = this.adminSettingRepo.create({ id: AUTO_APPROVE_SETTING_ID });
+    const url = (dto.url ?? '').trim() || null;
+    if (dto.enabled && !url) {
+      throw new BadRequestException('Cần nhập link trước khi bật nhãn quảng bá.');
+    }
+    setting.promoBadgeEnabled = dto.enabled;
+    setting.promoBadgeText = dto.text.trim();
+    setting.promoBadgeUrl = url;
+    await this.adminSettingRepo.save(setting);
+    await this.logAction(
+      admin,
+      'settings.promo_badge',
+      'admin_setting',
+      AUTO_APPROVE_SETTING_ID,
+      `Nhãn quảng bá logo: ${dto.enabled ? 'BẬT' : 'TẮT'} · "${setting.promoBadgeText}" · ${url ?? '(chưa có link)'}`,
+    );
+    return this.getPromoBadge();
+  }
+
   // Đợt 15 (25/09/2026) — quét định kỳ (mỗi phút, xem onModuleInit() ở trên): nếu công tắc đang BẬT,
   // tự động duyệt mọi tin PENDING đã đủ 15 phút kể từ lần gửi/gửi lại gần nhất (updatedAt — bao gồm
   // CẢ tin từng bị từ chối rồi NTD sửa gửi lại, theo đúng lựa chọn của người dùng: "tính như nhau,

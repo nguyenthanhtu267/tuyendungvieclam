@@ -26,6 +26,18 @@ import { CreateDraftCompanyDto } from './dto/create-draft-company.dto';
 import { ClaimCompanyDto } from './dto/claim-company.dto';
 import { ResolveClaimRequestDto } from './dto/resolve-claim-request.dto';
 import { ExtractJobUrlDto } from './dto/extract-job-url.dto';
+import { UpdatePromoBadgeDto } from './dto/promo-badge.dto';
+
+// Đợt 23 — endpoint CÔNG KHAI (không cần đăng nhập) cho header đọc nhãn quảng bá.
+@Controller('public/settings')
+export class PublicSettingsController {
+  constructor(private readonly adminService: AdminService) {}
+
+  @Get('promo-badge')
+  async promoBadge() {
+    return { badge: await this.adminService.getPublicPromoBadge() };
+  }
+}
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -51,6 +63,20 @@ export class AdminController {
     @Body('enabled') enabled: boolean,
   ) {
     return this.adminService.setAutoApproveSetting(admin, !!enabled);
+  }
+
+  // Đợt 23 (29/09/2026) — nhãn quảng bá nhấp nháy cạnh logo (Admin bật/tắt, sửa chữ + link).
+  @Get('settings/promo-badge')
+  getPromoBadge() {
+    return this.adminService.getPromoBadge();
+  }
+
+  @Patch('settings/promo-badge')
+  setPromoBadge(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Body() dto: UpdatePromoBadgeDto,
+  ) {
+    return this.adminService.setPromoBadge(admin, dto);
   }
 
   // Đợt 12q (21/09/2026) — Batch 5 mục #3: chuỗi thời gian cho biểu đồ dashboard, mặc định 14 ngày.

@@ -7,6 +7,7 @@ import EmployerHeader from '@/components/EmployerHeader';
 import { useAuth } from '@/lib/auth-context';
 import { employerApi, type Company, type EmployerDashboard } from '@/lib/api';
 import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatNumber } from '@/lib/format';
+import { AdSlot } from '@/components/ads/AdSlot';
 
 const JOB_STATUS_LABEL: Record<string, string> = {
   draft: 'Nháp',
@@ -76,6 +77,9 @@ export default function EmployerDashboardPage() {
             </Link>
           </div>
         </div>
+
+        {/* Đợt 24 — banner cho nhà tuyển dụng (dưới lời chào). */}
+        <AdSlot slot="employer-top" />
 
         {loading ? (
           <div className="text-center text-ink-faint py-10 text-sm">Đang tải…</div>

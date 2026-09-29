@@ -52,6 +52,28 @@ export class AdminSetting {
   @Column({ name: 'storage_migration_paused', type: 'boolean', default: false })
   storageMigrationPaused: boolean;
 
+  // Đợt 23 (29/09/2026) — nhãn quảng bá nhấp nháy cạnh logo trên header: bật/tắt, chữ hiển thị và link
+  // (mở tab mới). Chỉ hiện ra ngoài khi BẬT và có link hợp lệ.
+  @Column({ name: 'promo_badge_enabled', type: 'boolean', default: false })
+  promoBadgeEnabled: boolean;
+
+  @Column({
+    name: 'promo_badge_text',
+    type: 'varchar',
+    default: 'Phần mềm Nhân sự Toàn diện',
+  })
+  promoBadgeText: string;
+
+  @Column({ name: 'promo_badge_url', type: 'varchar', nullable: true })
+  promoBadgeUrl?: string | null;
+
+  // Đợt 24 (29/09/2026) — banner quảng cáo: công tắc chung + danh sách vùng đang tắt (mã vùng).
+  @Column({ name: 'ads_enabled', type: 'boolean', default: true })
+  adsEnabled: boolean;
+
+  @Column({ name: 'ad_disabled_slots', type: 'jsonb', default: () => `'[]'` })
+  adDisabledSlots: string[];
+
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }

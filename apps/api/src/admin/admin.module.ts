@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdminService } from './admin.service';
-import { AdminController } from './admin.controller';
+import { AdminController, PublicSettingsController } from './admin.controller';
 import { Company } from '../database/entities/company.entity';
 import { CompanyUser } from '../database/entities/company-user.entity';
 import { JobPosting } from '../database/entities/job-posting.entity';
@@ -36,7 +36,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ]),
     NotificationsModule,
   ],
-  controllers: [AdminController],
+  controllers: [AdminController, PublicSettingsController],
   providers: [AdminService],
 })
 export class AdminModule {}

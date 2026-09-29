@@ -12,6 +12,7 @@ import { CompanyLogo } from '@/components/CompanyLogo';
 import { formatNumber } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
 import { memberCountDisplay, profilesUpdatedTodayDisplay, applicationsTodayDisplay } from '@/lib/vanity-stats';
+import { AdSlot } from '@/components/ads/AdSlot';
 
 export default function Home() {
   const router = useRouter();
@@ -230,6 +231,9 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Đợt 24 — banner quảng cáo (vùng home-top). */}
+        <AdSlot slot="home-top" className="mt-8" />
+
         <div className="flex items-center justify-between mt-9 mb-3">
           <h2 className="font-extrabold text-lg">{t('home.latestJobs')}</h2>
           <a href="/viec-lam" className="text-primary text-xs font-bold">
@@ -274,6 +278,9 @@ export default function Home() {
             </div>
           </>
         )}
+
+        {/* Đợt 24 — banner giữa trang chủ (chỉ máy tính; điện thoại đã có home-top). */}
+        <AdSlot slot="home-mid" className="mt-9 hidden lg:block" />
 
         {featured && featured.length > 0 && (
           <>

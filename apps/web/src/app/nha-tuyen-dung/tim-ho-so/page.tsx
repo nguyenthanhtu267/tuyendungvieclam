@@ -19,6 +19,7 @@ import {
 import { track } from '@/lib/analytics';
 import { formatSalary, formatDate, formatNumber } from '@/lib/format';
 import { ChipsInput, TextInput } from '@/components/profile/ui';
+import { AdSlot } from '@/components/ads/AdSlot';
 
 // Đợt 9 — Tìm kiếm hồ sơ ứng viên cho nhà tuyển dụng (/nha-tuyen-dung/tim-ho-so). Bộ lọc + danh
 // sách + 2 tab (Tìm kiếm / Hồ sơ đã mở) + khối điểm còn lại, theo claude/05-dot-9-tim-ho-so-ung-vien.md.
@@ -199,6 +200,8 @@ export default function TimHoSoPage() {
     <main className="min-h-screen bg-bg">
       <EmployerHeader />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col gap-4">
+        {/* Đợt 24 — banner đầu trang Tìm hồ sơ của NTD. */}
+        <AdSlot slot="employer-search" />
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex gap-1 border-b border-border flex-1">
             <button
