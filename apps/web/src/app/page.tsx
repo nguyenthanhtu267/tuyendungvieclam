@@ -238,7 +238,7 @@ export default function Home() {
                     className="flex items-center justify-between rounded-lg border border-border bg-white px-3.5 py-2.5 text-[12.5px] font-semibold hover:border-primary transition-colors"
                   >
                     <span>{f.industry}</span>
-                    <b className="font-mono tabular-nums text-ink-faint">{f.count}</b>
+                    <b className="tabular-nums text-ink-faint">{f.count}</b>
                   </a>
                 ),
               )}

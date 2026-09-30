@@ -261,7 +261,7 @@ function CompanyInfoCard({
           <label htmlFor="tk-gallery" className="text-xs font-semibold text-ink-faint mb-1 block">
             Hình ảnh công ty — mỗi dòng 1 link ảnh (tối đa 12)
           </label>
-          <textarea id="tk-gallery" className="tvl-input !h-auto font-mono text-[12px]" rows={3} placeholder={'https://.../van-phong.jpg\nhttps://.../team.jpg'} value={gallery} onChange={(e) => setGallery(e.target.value)} />
+          <textarea id="tk-gallery" className="tvl-input !h-auto text-[12px]" rows={3} placeholder={'https://.../van-phong.jpg\nhttps://.../team.jpg'} value={gallery} onChange={(e) => setGallery(e.target.value)} />
           {galleryList.length > 0 && (
             <div className="flex gap-2 mt-2 flex-wrap">
               {galleryList.slice(0, 12).map((u) => (

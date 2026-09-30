@@ -251,7 +251,7 @@ export function StoragePanel({ token }: { token: string }) {
       {st.configured && !st.connected && (
         <div className="rounded-xl bg-info-tint text-ink text-[12px] p-4">
           Máy chủ đã có mã ứng dụng Google. Bấm <b>“Kết nối Google Drive”</b>, đăng nhập đúng tài khoản Google bạn muốn dùng để lưu file, tích ô cho phép rồi bấm
-          “Tiếp tục”. Nếu Google báo lỗi <i>redirect_uri_mismatch</i>, kiểm tra “Authorized redirect URIs” của ứng dụng trong Google Cloud phải đúng y hệt: <code className="font-mono text-[11px]">{st.redirectUri}</code>
+          “Tiếp tục”. Nếu Google báo lỗi <i>redirect_uri_mismatch</i>, kiểm tra “Authorized redirect URIs” của ứng dụng trong Google Cloud phải đúng y hệt: <code className="text-[11px]">{st.redirectUri}</code>
         </div>
       )}
     </div>
@@ -277,7 +277,7 @@ function SetupGuide({ redirectUri, copied, onCopy }: { redirectUri: string | nul
           Vào <b>Clients</b> (hoặc “Credentials”) → <b>Create client</b> → loại <b>Web application</b>. Ở “Authorized redirect URIs” dán đúng địa chỉ:
           {redirectUri && (
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <code className="font-mono text-[11.5px] bg-surface-alt border border-border rounded px-2 py-1 break-all">{redirectUri}</code>
+              <code className="text-[11.5px] bg-surface-alt border border-border rounded px-2 py-1 break-all">{redirectUri}</code>
               <button
                 onClick={() => {
                   navigator.clipboard?.writeText(redirectUri).then(onCopy).catch(() => undefined);
@@ -291,7 +291,7 @@ function SetupGuide({ redirectUri, copied, onCopy }: { redirectUri: string | nul
         </li>
         <li>
           Bấm Create → chép <b>Client ID</b> và <b>Client secret</b>. Trên <b>Render</b> → dịch vụ API → <b>Environment</b> → thêm 2 biến{' '}
-          <code className="font-mono">GOOGLE_CLIENT_ID</code> và <code className="font-mono">GOOGLE_CLIENT_SECRET</code> → Save (Render tự khởi động lại).
+          <code>GOOGLE_CLIENT_ID</code> và <code>GOOGLE_CLIENT_SECRET</code> → Save (Render tự khởi động lại).
         </li>
         <li>Quay lại trang này, tải lại → bấm “Kết nối Google Drive”.</li>
       </ol>

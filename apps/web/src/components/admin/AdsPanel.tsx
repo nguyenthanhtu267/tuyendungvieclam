@@ -139,7 +139,7 @@ export function AdsPanel({ token }: { token: string }) {
         ].map(([l, val]) => (
           <div key={l} className="rounded-xl bg-white border border-border p-3.5">
             <div className="text-[11px] text-ink-faint">{l}</div>
-            <div className="font-extrabold text-lg font-mono tabular-nums mt-0.5">{val}</div>
+            <div className="font-extrabold text-lg tabular-nums mt-0.5">{val}</div>
           </div>
         ))}
       </div>
@@ -196,7 +196,7 @@ export function AdsPanel({ token }: { token: string }) {
                     <span className={`text-[11px] font-bold rounded-full px-2.5 py-1 ${STATUS[r.status].cls}`}>{STATUS[r.status].label}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div className="text-[11.5px] text-ink-muted font-mono tabular-nums">
+                    <div className="text-[11.5px] text-ink-muted tabular-nums">
                       👁 {formatNumber(views)} · 👆 {formatNumber(clicks)} · CTR {pct(clicks, views)}
                     </div>
                     <div className="flex gap-1.5 flex-wrap">
@@ -275,8 +275,8 @@ export function AdsPanel({ token }: { token: string }) {
                       <td className="py-2.5 px-3 text-ink-muted whitespace-nowrap">
                         {s.devices === 'all' ? 'Mọi thiết bị' : s.devices === 'desktop' ? 'Máy tính' : 'Điện thoại'}
                       </td>
-                      <td className={`py-2.5 px-3 text-right font-mono tabular-nums ${cov ? '' : 'text-ink-faint'}`}>{cov || 'trống'}</td>
-                      <td className="py-2.5 px-3 text-right font-mono tabular-nums whitespace-nowrap">
+                      <td className={`py-2.5 px-3 text-right tabular-nums ${cov ? '' : 'text-ink-faint'}`}>{cov || 'trống'}</td>
+                      <td className="py-2.5 px-3 text-right tabular-nums whitespace-nowrap">
                         {formatNumber(st?.v ?? 0)} · {formatNumber(st?.c ?? 0)}
                       </td>
                       <td className="py-2.5 px-4 text-right">

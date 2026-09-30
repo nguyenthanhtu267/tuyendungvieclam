@@ -1147,8 +1147,8 @@ function CreateDraftCompanyForm({ token, onCreated }: { token: string; onCreated
   if (result) {
     return (
       <div className="mt-3 rounded-lg bg-warning-tint text-warning text-xs font-semibold px-3.5 py-2.5">
-        Đã tạo công ty &ldquo;{result.company.name}&rdquo;. Tài khoản tạm: <span className="font-mono">{result.draftAccount.email}</span>{' '}
-        / mật khẩu: <span className="font-mono">{result.draftAccount.tempPassword}</span>
+        Đã tạo công ty &ldquo;{result.company.name}&rdquo;. Tài khoản tạm: <span>{result.draftAccount.email}</span>{' '}
+        / mật khẩu: <span>{result.draftAccount.tempPassword}</span>
         <br />
         {result.draftAccount.note}
         <br />
@@ -1801,8 +1801,8 @@ function ClaimCompanyForm({
   if (result) {
     return (
       <div className="mt-3 rounded-lg bg-warning-tint text-warning text-xs font-semibold px-3.5 py-2.5">
-        Đã chuyển giao. Tài khoản: <span className="font-mono">{result.email}</span> / mật khẩu tạm:{' '}
-        <span className="font-mono">{result.tempPassword}</span>
+        Đã chuyển giao. Tài khoản: <span>{result.email}</span> / mật khẩu tạm:{' '}
+        <span>{result.tempPassword}</span>
         <br />
         Chỉ hiển thị 1 lần — hãy báo ngay cho công ty qua kênh ngoài hệ thống.
       </div>

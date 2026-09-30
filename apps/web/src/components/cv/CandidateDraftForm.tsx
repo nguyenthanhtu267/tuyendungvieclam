@@ -486,7 +486,7 @@ export function CandidateDraftForm({
           {showRaw && (
             <textarea
               id="draft-raw"
-              className="tvl-input text-[12px] min-h-[160px] mt-2 font-mono"
+              className="tvl-input text-[12px] min-h-[160px] mt-2"
               value={draft.rawText ?? ''}
               onChange={(e) => set('rawText', e.target.value)}
             />

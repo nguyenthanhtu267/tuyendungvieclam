@@ -289,7 +289,7 @@ export default function MyCenterPage() {
                               </Link>
                             </td>
                             <td className="py-2 px-1 min-w-[180px]"><span className="co-name">{a.jobPosting.company.name}</span></td>
-                            <td className="py-2 px-1 text-ink-muted font-mono tabular-nums">
+                            <td className="py-2 px-1 text-ink-muted tabular-nums">
                               {formatDate(a.appliedAt)}
                             </td>
                             <td className="py-2 px-1">
@@ -765,7 +765,7 @@ function OverviewCard({
           [String(interviewCount), 'Được mời phỏng vấn'],
         ].map(([val, lbl]) => (
           <div key={lbl} className="rounded-lg bg-surface-alt p-3 text-center">
-            <div className="font-mono font-extrabold text-base tabular-nums">{val}</div>
+            <div className="font-extrabold text-base tabular-nums">{val}</div>
             <div className="text-[10.5px] text-ink-muted mt-0.5">{lbl}</div>
           </div>
         ))}

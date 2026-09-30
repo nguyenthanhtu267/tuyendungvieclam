@@ -24,7 +24,7 @@ export default function FacebookConnectCard() {
       <p className="text-xs text-ink-muted leading-relaxed">
         Tự động đăng tin tuyển dụng mới lên Fanpage Facebook của công ty ngay khi được duyệt. Tính
         năng này cần công ty có sẵn 1 Facebook App đã được Meta duyệt quyền đăng bài Trang (
-        <span className="font-mono text-[11px]">pages_manage_posts</span>) — một quy trình do Meta
+        <span className="text-[11px]">pages_manage_posts</span>) — một quy trình do Meta
         yêu cầu (xác minh doanh nghiệp, xem xét thủ công), không thể tự bật trong vài phút.
       </p>
       <p className="text-xs text-ink-muted leading-relaxed">

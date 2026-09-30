@@ -85,7 +85,7 @@ export default function DangNhapPage() {
           </span>
         </div>
         <div>
-          <h1 className="text-3xl font-extrabold leading-snug text-balance">
+          <h1 className="text-3xl font-extrabold leading-snug text-balance !text-white">
             Kết nối việc làm — đúng người, đúng việc
           </h1>
           <p className="mt-3 text-white/95 max-w-sm">
@@ -94,11 +94,11 @@ export default function DangNhapPage() {
         </div>
         <div className="flex gap-8 text-sm">
           <div>
-            <div className="text-2xl font-extrabold font-mono">10.000+</div>
+            <div className="text-2xl font-extrabold text-white">10.000+</div>
             <div className="text-white/95">Việc làm đang tuyển</div>
           </div>
           <div>
-            <div className="text-2xl font-extrabold font-mono">2.000+</div>
+            <div className="text-2xl font-extrabold text-white">2.000+</div>
             <div className="text-white/95">Doanh nghiệp</div>
           </div>
         </div>
@@ -106,7 +106,7 @@ export default function DangNhapPage() {
 
       {/* Phải: form đăng nhập / đăng ký */}
       <div className="flex items-center justify-center p-6 sm:p-10">
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-sm rounded-2xl border border-border bg-white p-6 sm:p-8 shadow-sm">
           <div className="flex gap-1 border-b border-border mb-6">
             <button
               className={`px-4 py-2.5 text-sm font-bold border-b-2 -mb-px ${

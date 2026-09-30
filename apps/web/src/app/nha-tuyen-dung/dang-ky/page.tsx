@@ -75,11 +75,11 @@ export default function DangKyNtdPage() {
         </div>
         <div className="flex gap-8 text-sm">
           <div>
-            <div className="text-2xl font-extrabold font-mono">10.000+</div>
+            <div className="text-2xl font-extrabold">10.000+</div>
             <div className="text-white/95">Việc làm đang tuyển</div>
           </div>
           <div>
-            <div className="text-2xl font-extrabold font-mono">2.000+</div>
+            <div className="text-2xl font-extrabold">2.000+</div>
             <div className="text-white/95">Doanh nghiệp</div>
           </div>
         </div>

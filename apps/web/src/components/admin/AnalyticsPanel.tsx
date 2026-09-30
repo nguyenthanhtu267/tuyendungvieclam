@@ -52,7 +52,7 @@ function RouteCell({ route }: { route: string }) {
   return (
     <span>
       <span className="text-ink">{routeName(route)}</span>
-      {ROUTE_LABEL[route] && <span className="ml-1.5 font-mono text-[10.5px] text-ink-faint">{route}</span>}
+      {ROUTE_LABEL[route] && <span className="ml-1.5 text-[10.5px] text-ink-faint">{route}</span>}
     </span>
   );
 }
@@ -340,7 +340,7 @@ function RealtimeCard({ token }: { token: string }) {
               {rt.activePages.slice(0, 5).map((p) => (
                 <li key={p.path} className="flex justify-between gap-2">
                   <span className="truncate">
-                    {routeName(p.route)} <span className="text-ink-faint font-mono text-[10px]">{p.path !== p.route ? p.path.slice(0, 40) : ''}</span>
+                    {routeName(p.route)} <span className="text-ink-faint text-[10px]">{p.path !== p.route ? p.path.slice(0, 40) : ''}</span>
                   </span>
                   <b className="tabular-nums">{p.count}</b>
                 </li>
@@ -1045,7 +1045,7 @@ function HeatCanvas({ hm }: { hm: AnalyticsHeatmap }) {
   return (
     <div className="rounded-xl bg-white border border-border p-3 min-w-0">
       <div className="text-[11px] text-ink-faint mb-2">
-        Trang thật đang hiển thị: <span className="font-mono">{src}</span> (bề ngang {W}px). Vị trí đỏ = được bấm nhiều. Nội dung trang có thể đã thay đổi so với lúc
+        Trang thật đang hiển thị: <span>{src}</span> (bề ngang {W}px). Vị trí đỏ = được bấm nhiều. Nội dung trang có thể đã thay đổi so với lúc
         người xem bấm.
       </div>
       <div ref={wrapRef} className="w-full overflow-hidden rounded-lg border border-border bg-surface-alt" style={{ height: H * scale }}>

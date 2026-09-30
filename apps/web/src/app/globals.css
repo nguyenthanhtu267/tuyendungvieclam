@@ -27,7 +27,7 @@
     @apply w-full rounded-lg bg-accent text-white font-bold text-sm py-2.5 hover:bg-accent-dark transition-colors disabled:opacity-60;
   }
   .tvl-btn-ghost {
-    @apply w-full rounded-lg border border-border-strong bg-white text-ink font-semibold text-sm py-2.5 hover:bg-surface-alt transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply w-full rounded-lg border border-border-strong bg-white text-ink font-semibold text-sm py-2.5 hover:bg-surface-alt transition-colors disabled:bg-white disabled:text-ink-muted disabled:cursor-not-allowed;
   }
 
   /* Đợt 12n (21/09/2026) — trình soạn thảo định dạng (RichTextEditor.tsx) thay cho <textarea> ở
