@@ -8,7 +8,7 @@ import { jobsApi } from '@/lib/api';
 // trong 30 ngày (xem JobsService.getPopularKeywords). Bấm vào một từ khoá → mở danh sách việc làm đã tìm sẵn.
 let cache: string[] | null = null;
 
-export function PopularKeywords() {
+export function PopularKeywords({ sticky = false }: { sticky?: boolean } = {}) {
   const [kws, setKws] = useState<string[] | null>(cache);
   useEffect(() => {
     if (cache) return;
@@ -22,8 +22,8 @@ export function PopularKeywords() {
   }, []);
   if (!kws || kws.length === 0) return null;
   return (
-    <section className="rounded-xl border border-border bg-white overflow-hidden" aria-label="Việc làm được tìm kiếm nhiều nhất">
-      <h2 className="bg-primary-tint text-ink font-extrabold text-[15px] px-3 py-2">Việc làm được tìm kiếm nhiều nhất</h2>
+    <section className={`rounded-xl border border-border bg-white overflow-hidden ${sticky ? 'lg:sticky lg:top-20' : ''}`} aria-label="Việc làm được tìm kiếm nhiều nhất">
+      <h2 className="bg-primary-tint text-ink font-extrabold text-[13.5px] whitespace-nowrap truncate tracking-tight px-2.5 py-2">Việc làm được tìm kiếm nhiều nhất</h2>
       <div className="flex flex-wrap gap-1.5 p-3">
         {kws.map((k) => (
           <Link

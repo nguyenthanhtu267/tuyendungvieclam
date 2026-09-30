@@ -668,13 +668,13 @@ function JobDetailInner() {
                 <CompatibilityChecklist checklist={compatibility.checklist} missingSkills={compatibility.missingSkills} />
               </div>
             )}
-            <PopularKeywords />
-            {/* Đợt 24 — banner cột phải (chỉ máy tính). */}
-            <AdStack>
+            {/* Đợt 33 — banner cột phải nằm TRÊN khối "Việc làm được tìm kiếm nhiều nhất"; khối từ khoá dính theo khi cuộn. */}
+            <AdStack sticky={false}>
               <AdSlot slot="job-sidebar" />
               <AdSlot slot="job-sidebar-2" />
               <AdSlot slot="job-sidebar-3" />
             </AdStack>
+            <PopularKeywords sticky />
           </div>
         </div>
 
