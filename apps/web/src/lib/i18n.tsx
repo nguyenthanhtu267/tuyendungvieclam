@@ -47,7 +47,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     'home.searchButton': 'Tìm Việc Ngay',
     'home.advancedSearch': 'Tìm kiếm nâng cao',
     'home.featured': 'Nổi bật:',
-    'home.urgentJobs': 'Việc làm khẩn cấp',
+    'home.urgentJobs': 'Việc làm URGENT',
     'home.noAccount': 'Chưa có tài khoản?',
     'home.noAccountDesc': 'Đăng ký để lưu việc làm yêu thích và ứng tuyển nhanh hơn',
     'home.register': 'Đăng ký',

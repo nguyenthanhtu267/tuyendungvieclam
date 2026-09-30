@@ -190,7 +190,7 @@ export class EmployerController {
     @Param('id') id: string,
     @Body() dto: UpdateApplicationStatusDto,
   ) {
-    return this.employerService.updateApplicationStatus(user.userId, id, dto.status);
+    return this.employerService.updateApplicationStatus(user.userId, id, dto.status, dto.message);
   }
 
   @Post('employer/applications/:id/viewed')

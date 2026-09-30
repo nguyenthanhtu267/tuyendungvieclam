@@ -57,14 +57,21 @@ export class ApplicationRemindersService implements OnModuleInit, OnModuleDestro
       for (const a of stale) {
         const userId = a.cv?.candidateProfileId ? await this.userIdOfProfile(a.cv.candidateProfileId) : null;
         if (!userId) continue;
-        const link = `/ho-so?app=${a.id}#applications`;
+        // Đợt 63 — liên kết dẫn thẳng tới danh sách VIỆC TƯƠNG TỰ (cùng ngành/cấp bậc/tỉnh) để ứng viên nộp thêm trong lúc chờ.
+        const j = a.jobPosting;
+        const qs = new URLSearchParams();
+        if (j?.industry) qs.set('industries', j.industry);
+        if (j?.level) qs.set('level', j.level);
+        if (j?.provinces?.[0]) qs.set('provinces', j.provinces[0]);
+        qs.set('ref', `wait-${a.id}`);
+        const link = `/viec-lam?${qs.toString()}`;
         const exists = await this.notifRepo.exists({ where: { userId, type: 'application_reminder', link } });
         if (exists) continue;
         const days = Math.floor((Date.now() - a.appliedAt.getTime()) / DAY);
         await this.notifications.create(
           userId,
           'application_reminder',
-          `${a.jobPosting?.company?.name ?? 'Nhà tuyển dụng'} chưa phản hồi đơn "${a.jobPosting?.title ?? ''}" sau ${days} ngày. Bạn có thể xem thêm việc tương tự trong lúc chờ.`,
+          `${a.jobPosting?.company?.name ?? 'Nhà tuyển dụng'} chưa phản hồi đơn "${a.jobPosting?.title ?? ''}" sau ${days} ngày. Bấm để xem việc tương tự và nộp thêm trong lúc chờ.`,
           link,
         );
         candidates++;

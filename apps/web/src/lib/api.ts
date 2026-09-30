@@ -2571,3 +2571,84 @@ export interface SalaryStats {
   industries: string[];
   provinces: string[];
 }
+
+// Đợt 63 — 11 tính năng thông minh (xem api/src/smart).
+export interface JobInsights {
+  hasProfile: boolean;
+  score?: number;
+  matchedSkills?: string[];
+  missingSkills?: string[];
+  tips?: string[];
+  chance?: { percent: number; level: 'high' | 'medium' | 'low'; applicants: number; reasons: string[] };
+  salary?: { n: number; p25: number; median: number; p75: number; scope: string; offer: number | null; expected: number | null; advice: string } | null;
+  career?: { current: string | null; next: string; industry: string; skillsToLearn: string[]; nextMedianSalary: number | null; openings: number; searchQuery: string } | null;
+}
+export interface JobHealthItem {
+  jobId: string;
+  title: string;
+  views: number;
+  applications: number;
+  severity: 'warn' | 'info';
+  problem: string;
+  advice: string;
+  fix: string;
+}
+export interface QualityOverview {
+  scanned: number;
+  duplicates: { title: string; company: string; jobs: { id: string; createdAt: string; source: string }[] }[];
+  suspicious: { id: string; title: string; company: string; score: number; reasons: string[] }[];
+  lowQuality: { id: string; title: string; company: string; score: number; missing: string[] }[];
+}
+export const smartApi = {
+  jobInsights: (token: string, jobId: string) => request<JobInsights>(`/jobs/${jobId}/insights`, { headers: authHeaders(token) }),
+  applicantScores: (token: string, jobId: string) =>
+    request<{ scores: Record<string, { score: number; reasons: string[]; gaps: string[] }> }>(`/employer/applicant-scores?jobId=${jobId}`, { headers: authHeaders(token) }),
+  jobHealth: (token: string) => request<{ items: JobHealthItem[] }>('/employer/job-health', { headers: authHeaders(token) }),
+  qualityOverview: (token: string) => request<QualityOverview>('/admin/quality/overview', { headers: authHeaders(token) }),
+};
+
+// Đợt 64
+export interface CompanyResponseStats {
+  enough: boolean;
+  total: number;
+  responseRate?: number;
+  interviewRate?: number;
+  medianHours?: number | null;
+  medianLabel?: string | null;
+  level?: 'good' | 'fair' | 'poor';
+}
+export interface JobForecast {
+  enough: boolean;
+  scope?: string;
+  sample?: number;
+  medianApplications21d?: number;
+  shareReaching10?: number;
+  daysTo10?: number | null;
+  salary?: { p25: number; median: number; p75: number; scope: string } | null;
+  advice?: string[];
+}
+export interface SystemHealth {
+  metrics: { pendingJobs: number; pendingCompanies: number; users24h: number; jobs24h: number; apps24h: number; rejected7d: number };
+  alerts: { level: 'warn' | 'info'; text: string }[];
+  spam: { burst: { who: string; count: number }[]; sameLetter: { who: string; count: number; sample: string }[] };
+}
+export const smartApi2 = {
+  responseStats: (companyId: string) => request<CompanyResponseStats>(`/companies/${companyId}/response-stats`),
+  forecast: (token: string, p: { industry?: string; level?: string; salaryMin?: number; salaryMax?: number }) => {
+    const qs = new URLSearchParams();
+    if (p.industry) qs.set('industry', p.industry);
+    if (p.level) qs.set('level', p.level);
+    if (p.salaryMin) qs.set('salaryMin', String(p.salaryMin));
+    if (p.salaryMax) qs.set('salaryMax', String(p.salaryMax));
+    return request<JobForecast>(`/employer/job-forecast?${qs.toString()}`, { headers: authHeaders(token) });
+  },
+  systemHealth: (token: string) => request<SystemHealth>('/admin/quality/system', { headers: authHeaders(token) }),
+  autofill: (token: string, parsed: unknown) =>
+    request<{ filled: string[] }>('/me/profile/autofill', { method: 'POST', headers: authHeaders(token), body: JSON.stringify(parsed) }),
+  updateStatusWithMessage: (token: string, applicationId: string, status: string, message?: string) =>
+    request<unknown>(`/employer/applications/${applicationId}/status`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify({ status, message }),
+    }),
+};

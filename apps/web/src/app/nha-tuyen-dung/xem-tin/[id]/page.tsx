@@ -117,7 +117,7 @@ export default function XemTinNtdPage() {
               {job.title}
               {job.isUrgent && (
                 <span className="text-[10.5px] font-bold px-2 py-0.5 rounded bg-white/20 text-white align-middle">
-                  KHẨN CẤP
+                  URGENT
                 </span>
               )}
             </div>

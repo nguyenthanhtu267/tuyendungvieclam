@@ -302,6 +302,85 @@ export class ProfileService {
     return saved;
   }
 
+  // Đợt 64 — "Tự điền hồ sơ từ CV": nhận kết quả tách CV, chỉ điền chỗ còn trống. Trả danh sách mục đã điền.
+  async autofillFromParsed(userId: string, raw: Record<string, unknown>) {
+    const profile = await this.getOwnProfileEntity(userId);
+    const str = (v: unknown, max = 500) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
+    const filled: string[] = [];
+    const set = (key: keyof CandidateProfile, val: unknown, label: string) => {
+      if (val === undefined || val === null) return;
+      const cur = (profile as unknown as Record<string, unknown>)[key as string];
+      if (cur === undefined || cur === null || cur === '') {
+        (profile as unknown as Record<string, unknown>)[key as string] = val;
+        filled.push(label);
+      }
+    };
+    set('phone', str(raw.phone, 30), 'Số điện thoại');
+    set('province', str(raw.province, 80), 'Tỉnh/thành');
+    set('address', str(raw.address, 300), 'Địa chỉ');
+    set('profileTitle', str(raw.headline, 150), 'Chức danh hồ sơ');
+    const obj = str(raw.careerObjective, 2000);
+    if (obj) set('careerObjective', sanitizeRichText(obj), 'Mục tiêu nghề nghiệp');
+    const yrs = typeof raw.yearsOfExperience === 'number' && raw.yearsOfExperience >= 0 && raw.yearsOfExperience < 60 ? Math.round(raw.yearsOfExperience) : undefined;
+    set('yearsOfExperience', yrs, 'Số năm kinh nghiệm');
+    if (filled.length) await this.profileRepo.save(profile);
+
+    const dateOk = (d: unknown) => (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : undefined);
+    const existing = async (repo: Repository<any>) => repo.count({ where: { candidateProfileId: profile.id } });
+    // Kỹ năng: thêm các kỹ năng chưa có (tối đa 15)
+    const skills = Array.isArray(raw.skills) ? (raw.skills as unknown[]).map((x) => str(x, 60)).filter(Boolean) as string[] : [];
+    if (skills.length) {
+      const have = new Set((await this.skillRepo.find({ where: { candidateProfileId: profile.id } })).map((k) => k.skillName.toLowerCase()));
+      let added = 0;
+      for (const name of skills.slice(0, 15)) {
+        if (have.has(name.toLowerCase())) continue;
+        await this.skillRepo.save(this.skillRepo.create({ candidateProfileId: profile.id, skillName: name, level: 'intermediate' as never }));
+        added++;
+      }
+      if (added) filled.push(`${added} kỹ năng`);
+    }
+    if (Array.isArray(raw.experiences) && (await existing(this.experienceRepo)) === 0) {
+      let n = 0;
+      for (const e of (raw.experiences as Record<string, unknown>[]).slice(0, 10)) {
+        const position = str(e?.position, 150);
+        if (!position) continue;
+        await this.experienceRepo.save(
+          this.experienceRepo.create({
+            candidateProfileId: profile.id,
+            position,
+            companyName: str(e.companyName, 150),
+            startDate: dateOk(e.startDate) as never,
+            endDate: dateOk(e.endDate) as never,
+            isCurrent: !!e.isCurrent,
+            description: str(e.description, 3000) ? sanitizeRichText(str(e.description, 3000)!) : undefined,
+          } as never),
+        );
+        n++;
+      }
+      if (n) filled.push(`${n} kinh nghiệm làm việc`);
+    }
+    if (Array.isArray(raw.educations) && (await existing(this.educationRepo)) === 0) {
+      let n = 0;
+      for (const e of (raw.educations as Record<string, unknown>[]).slice(0, 6)) {
+        if (!str(e?.schoolName) && !str(e?.major)) continue;
+        await this.educationRepo.save(
+          this.educationRepo.create({
+            candidateProfileId: profile.id,
+            schoolName: str(e.schoolName, 200),
+            degree: str(e.degree, 100),
+            major: str(e.major, 150),
+            startDate: dateOk(e.startDate) as never,
+            endDate: dateOk(e.endDate) as never,
+          } as never),
+        );
+        n++;
+      }
+      if (n) filled.push(`${n} học vấn`);
+    }
+    await this.refreshCompletion(profile.id);
+    return { filled };
+  }
+
   async updateQuickFields(userId: string, dto: QuickFieldsDto) {
     const profile = await this.getOwnProfileEntity(userId);
     Object.assign(profile, dto);

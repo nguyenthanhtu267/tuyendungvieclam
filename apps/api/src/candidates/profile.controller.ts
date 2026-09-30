@@ -49,6 +49,12 @@ export class ProfileController {
     return this.profileService.updateCareerInfo(user.userId, dto);
   }
 
+  // Đợt 64 — điền hồ sơ từ CV đã tách: chỉ điền vào chỗ còn TRỐNG, không ghi đè dữ liệu đã có.
+  @Post('autofill')
+  autofill(@CurrentUser() user: { userId: string }, @Body() body: Record<string, unknown>) {
+    return this.profileService.autofillFromParsed(user.userId, body);
+  }
+
   @Patch('quick')
   updateQuick(
     @CurrentUser() user: { userId: string },

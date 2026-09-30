@@ -7,6 +7,7 @@ import SiteHeader from '@/components/SiteHeader';
 import OnlineBanner from '@/components/OnlineBanner';
 import { JobCard } from '@/components/JobCard';
 import { RecommendedJobs } from '@/components/RecommendedJobs';
+import ContinueBlock from '@/components/ContinueBlock';
 import { jobsApi, type JobFacets, type JobPosting, type FeaturedEmployer, type HomepageStats } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { PINNED_PROVINCES } from '@/lib/catalogs';
@@ -193,6 +194,8 @@ export default function Home() {
 
         {/* Đợt 24 — banner quảng cáo (vùng home-top). */}
         <AdSlot slot="home-top" className="mt-3" />
+
+        <ContinueBlock />
 
         <RecommendedJobs />
 

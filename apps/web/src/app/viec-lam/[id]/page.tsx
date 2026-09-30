@@ -14,6 +14,10 @@ import { SourcedBadge, isCompanyUnverified } from '@/components/SourcedBadge';
 import { CompatibilityRadar } from '@/components/CompatibilityRadar';
 import { GuestApplyForm } from '@/components/GuestApplyForm';
 import { CompatibilityChecklist } from '@/components/CompatibilityChecklist';
+import JobInsightsPanel from '@/components/JobInsightsPanel';
+import InterviewPrepPanel from '@/components/InterviewPrepPanel';
+import CompanyResponseBadge from '@/components/CompanyResponseBadge';
+import { scamWarnings } from '@/lib/scam';
 import {
   jobsApi,
   candidatesApi,
@@ -269,7 +273,7 @@ function JobDetailInner() {
               {job.title}
               {job.isUrgent && (
                 <span className="text-[10.5px] font-bold px-2 py-0.5 rounded bg-white/20 text-white align-middle">
-                  KHẨN CẤP
+                  URGENT
                 </span>
               )}
             </div>
@@ -474,6 +478,18 @@ function JobDetailInner() {
               {tab === 'details' ? (
                 <>
                   
+                  {scamWarnings(job).length > 0 && (
+                    <div className="mb-4 rounded-xl border border-warning bg-warning-tint p-3 text-[13px]" role="alert">
+                      <div className="font-extrabold text-[#7A4A00]">⚠ Tin này có dấu hiệu cần thận trọng</div>
+                      <ul className="list-disc pl-5 text-ink">
+                        {scamWarnings(job).map((w) => (
+                          <li key={w}>{w}</li>
+                        ))}
+                      </ul>
+                      <div className="text-ink-muted mt-1">Đừng chuyển tiền hay cung cấp CCCD/số tài khoản trước khi gặp trực tiếp và kiểm tra công ty. Nếu nghi ngờ, hãy báo cho chúng tôi.</div>
+                    </div>
+                  )}
+                  <div className="rounded-xl border border-border bg-[#F7F9FC] p-4">
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-[12.5px]">
                     <Detail
                       label="📍 Địa điểm"
@@ -504,9 +520,10 @@ function JobDetailInner() {
                       * Ước lượng từ {salaryEst.count} tin ghi rõ lương ngành {salaryEst.scope} trên web — chỉ mang tính tham khảo.
                     </div>
                   )}
+                  </div>
 
                   {job.description && (
-                    <div className="mt-5">
+                    <div className="mt-6">
                       <h3 className="font-bold text-sm mb-2">Mô tả công việc</h3>
                       <RichTextView value={job.description} className="text-[12.8px] text-ink-muted" />
                     </div>
@@ -661,6 +678,7 @@ function JobDetailInner() {
                   </div>
                 )}
               </div>
+              <CompanyResponseBadge companyId={job.company.id} />
               {me?.role === 'candidate' && (
                 <button onClick={toggleFollow} disabled={followBusy} className="tvl-btn-ghost mt-3 disabled:opacity-60">
                   {following ? '✓ Đang theo dõi' : '+ Theo dõi'}
@@ -691,6 +709,8 @@ function JobDetailInner() {
                 <CompatibilityChecklist checklist={compatibility.checklist} missingSkills={compatibility.missingSkills} />
               </div>
             )}
+            {me?.role === 'candidate' && compatibility && <JobInsightsPanel jobId={job.id} />}
+            {me?.role === 'candidate' && <InterviewPrepPanel job={job as never} />}
             {/* Đợt 33 — banner cột phải nằm TRÊN khối "Việc làm được tìm kiếm nhiều nhất"; khối từ khoá dính theo khi cuộn. */}
             <AdStack sticky={false}>
               <AdSlot slot="job-sidebar" />

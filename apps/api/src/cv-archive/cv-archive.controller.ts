@@ -158,6 +158,7 @@ class ParseUrlDto {
 }
 
 const PARSE_ROLES = new Set<string>([
+  UserRole.CANDIDATE, // Đợt 64 — ứng viên tự điền hồ sơ từ CV
   UserRole.EMPLOYER_MAIN,
   UserRole.EMPLOYER_SUB,
   UserRole.ADMIN,

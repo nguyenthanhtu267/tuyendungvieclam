@@ -1,6 +1,9 @@
 'use client';
 
 import InterviewChooser from '@/components/InterviewChooser';
+import CvAutofill from '@/components/CvAutofill';
+import BulkApplyModal from '@/components/BulkApplyModal';
+import ApplicationTracker from '@/components/ApplicationTracker';
 import ApplicationStepper from '@/components/ApplicationStepper';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -67,6 +70,8 @@ export default function MyCenterPage() {
   const [profile, setProfile] = useState<CandidateProfile | null>(null);
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [appView, setAppView] = useState<'board' | 'table'>('board');
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [blocked, setBlocked] = useState<BlockedCompany[]>([]);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [viewedByCompanies, setViewedByCompanies] = useState<ViewedByCompanyRow[]>([]);
@@ -194,6 +199,8 @@ export default function MyCenterPage() {
               onToast={showToast}
             />
 
+            <CvAutofill token={token} onDone={() => window.location.reload()} />
+
             <CvSection
               profile={profile}
               token={token}
@@ -242,10 +249,19 @@ export default function MyCenterPage() {
               <div className="rounded-xl border border-border bg-white p-[18px]">
                 <div className="flex items-center justify-between mb-2">
                   <h2 className="font-extrabold text-[15px]">Việc làm của tôi</h2>
-                  <span className="text-[11px] text-ink-faint">{applications.length} đơn ứng tuyển</span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-[11px] text-ink-faint">{applications.length} đơn ứng tuyển</span>
+                    {applications.length > 0 && (
+                      <button type="button" onClick={() => setAppView((v) => (v === 'board' ? 'table' : 'board'))} className="rounded-full border border-border px-2 py-0.5 text-[11.5px] font-bold text-primary">
+                        {appView === 'board' ? 'Xem dạng bảng' : 'Xem dạng cột'}
+                      </button>
+                    )}
+                  </span>
                 </div>
                 {applications.length === 0 ? (
                   <div className="text-[12.5px] text-ink-muted py-4">Bạn chưa ứng tuyển việc làm nào.</div>
+                ) : appView === 'board' ? (
+                  <ApplicationTracker applications={applications} />
                 ) : (
                   <div className="overflow-x-auto -mx-1">
                     <table className="w-full text-[12px]">
@@ -299,7 +315,14 @@ export default function MyCenterPage() {
               <div className="rounded-xl border border-border bg-white p-[18px]">
                 <div className="flex items-center justify-between mb-2">
                   <h2 className="font-extrabold text-[15px]">Việc làm đã lưu</h2>
-                  <span className="text-[11px] text-ink-faint">{savedJobs.length} việc</span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-[11px] text-ink-faint">{savedJobs.length} việc</span>
+                    {savedJobs.length > 0 && (
+                      <button type="button" onClick={() => setBulkOpen(true)} className="rounded-full bg-primary text-white px-2.5 py-0.5 text-[11.5px] font-bold">
+                        Nộp nhiều việc một lần
+                      </button>
+                    )}
+                  </span>
                 </div>
                 {savedJobs.length === 0 ? (
                   <div className="text-[12.5px] text-ink-muted py-4">Bạn chưa lưu việc làm nào.</div>
@@ -331,6 +354,16 @@ export default function MyCenterPage() {
                 )}
               </div>
             </div>
+
+            {bulkOpen && token && (
+              <BulkApplyModal
+                token={token}
+                savedJobs={savedJobs}
+                appliedJobIds={new Set(applications.map((a) => a.jobPostingId))}
+                onClose={() => setBulkOpen(false)}
+                onApplied={() => applicationsApi.listOwn(token).then(setApplications).catch(() => undefined)}
+              />
+            )}
 
             {/* Đợt 12ab (24/09/2026) — "Nhà tuyển dụng của tôi": công ty đã xem hồ sơ (qua
                 unlocked_profiles có sẵn từ Đợt 9) + công ty đang theo dõi (CompanyFollow mới). Cài đặt
@@ -977,7 +1010,7 @@ function SettingsSection({
               [
                 ['locked', '🔒 Khoá', 'NTD không tìm thấy hồ sơ'],
                 ['public', '🌐 Công khai', 'NTD tìm thấy hồ sơ bình thường'],
-                ['urgent', '⚡ Khẩn cấp', 'Ưu tiên hiện trước trong kết quả tìm kiếm NTD'],
+                ['urgent', '⚡ URGENT', 'Ưu tiên hiện trước trong kết quả tìm kiếm NTD'],
               ] as [CandidateProfile['visibility'], string, string][]
             ).map(([value, label, desc]) => (
               <button

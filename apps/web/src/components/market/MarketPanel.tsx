@@ -6,7 +6,6 @@ import { jobsApi, type JobPosting, type MarketStats } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
 import { useAuth } from '@/lib/auth-context';
 import { audienceOf } from '@/lib/ads';
-import { DigitalBg } from './DigitalBg';
 
 // Đợt 27 (30/09/2026) — "Bảng thị trường việc làm" thay cho khối "Hoạt động trực tuyến" thô sơ ở hero trang chủ.
 // - 5 thẻ số liệu (số chạy lên, đường mini 7–14 ngày) — 3 thẻ dùng số hiển thị trang chủ như cũ (vanity-stats).
@@ -24,7 +23,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'salary', label: 'Mức lương' },
 ];
 // Bảng màu SÁNG (biểu đồ nằm trên nền tối của khung số liệu).
-const PALETTE = ['#7FB2FF', '#FF8A6B', '#4FE0B0', '#FFC857', '#9DB8FF', '#C4A8FF'];
+const PALETTE = ['#2F6FDB', '#E8663F', '#12A06B', '#D99A0B', '#5B7FD6', '#7A4FD6'];
 const ROTATE_MS = 7000;
 
 function reducedMotion() {
@@ -90,7 +89,7 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
 function Kpi({ label, value, color, series, change }: { label: string; value: number | null; color: string; series?: number[]; change?: number | null }) {
   const shown = useCountUp(value);
   return (
-    <div className="mp-tile rounded-lg border border-white/20 px-2 py-1.5 min-w-0">
+    <div className="mp-tile rounded-lg border border-border px-2 py-1.5 min-w-0">
       <div className="font-extrabold text-[19px] leading-none tabular-nums" style={{ color }}>
         {shown === null ? '—' : formatNumber(shown)}
       </div>
@@ -158,13 +157,13 @@ function AreaChart({ data, color, title }: { data: { day: string; n: number }[];
               </linearGradient>
             </defs>
             {[0.33, 0.66].map((f) => (
-              <line key={f} x1={padL} x2={w - padR} y1={padT + f * (H - padT - padB)} y2={padT + f * (H - padT - padB)} stroke="#fff" strokeOpacity="0.22" strokeDasharray="3 4" />
+              <line key={f} x1={padL} x2={w - padR} y1={padT + f * (H - padT - padB)} y2={padT + f * (H - padT - padB)} stroke="#94A3B8" strokeOpacity="0.5" strokeDasharray="3 4" />
             ))}
             <path d={area} fill={`url(#${gid})`} />
             <path d={line} fill="none" stroke={color} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" />
             {hover !== null && cur && (
               <>
-                <line x1={x(hover)} x2={x(hover)} y1={padT} y2={H - padB} stroke="#fff" strokeOpacity="0.6" />
+                <line x1={x(hover)} x2={x(hover)} y1={padT} y2={H - padB} stroke="#64748B" strokeOpacity="0.8" />
                 <circle cx={x(hover)} cy={y(cur.n)} r="4.5" fill="#fff" stroke={color} strokeWidth="2.4" />
               </>
             )}
@@ -172,7 +171,7 @@ function AreaChart({ data, color, title }: { data: { day: string; n: number }[];
         )}
         {cur && w > 0 && (
           <div
-            className="absolute top-0 -translate-x-1/2 rounded-md bg-white text-[#0A0E14] shadow text-[12px] font-bold px-2 py-0.5 pointer-events-none whitespace-nowrap"
+            className="absolute top-0 -translate-x-1/2 rounded-md bg-ink text-white shadow text-[12px] font-bold px-2 py-0.5 pointer-events-none whitespace-nowrap"
             style={{ left: Math.max(40, Math.min(w - 40, x(hover as number))) }}
           >
             {dm(cur.day)}: {formatNumber(cur.n)}
@@ -237,7 +236,7 @@ function Donut({ rows, href }: { rows: { label: string; count: number }[]; href:
   return (
     <div className="flex items-center gap-4">
       <svg viewBox="0 0 120 120" className="w-[78px] h-[78px] shrink-0 -rotate-90" role="img" aria-label="Cơ cấu việc làm theo hình thức">
-        <circle cx="60" cy="60" r={R} fill="none" stroke="#fff" strokeOpacity="0.2" strokeWidth="16" />
+        <circle cx="60" cy="60" r={R} fill="none" stroke="#E2E8F0" strokeWidth="16" />
         {rows.map((r, i) => {
           const len = (r.count / total) * C;
           const seg = (
@@ -257,8 +256,8 @@ function Donut({ rows, href }: { rows: { label: string; count: number }[]; href:
           return seg;
         })}
         <g className="rotate-90" style={{ transformOrigin: '60px 60px' }}>
-          <text x="60" y="58" textAnchor="middle" fontSize="17" fontWeight="800" fill="#fff">{formatNumber(total)}</text>
-          <text x="60" y="74" textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#DCE6FA">việc làm</text>
+          <text x="60" y="58" textAnchor="middle" fontSize="17" fontWeight="800" fill="#0F2957">{formatNumber(total)}</text>
+          <text x="60" y="74" textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#475569">việc làm</text>
         </g>
       </svg>
       <ul className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-x-3">
@@ -365,21 +364,20 @@ export function MarketPanel(p: MarketPanelProps) {
 
   return (
     <div
-      className="rounded-2xl min-h-[180px] relative overflow-hidden p-3 flex"
+      className="rounded-2xl min-h-[180px] relative overflow-hidden p-3 flex bg-white border border-border"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
     >
-      <DigitalBg />
-      <div className="relative w-full flex flex-col gap-2.5">
+            <div className="relative w-full flex flex-col gap-2.5">
         <div className="flex items-center justify-between gap-2 flex-wrap pt-1 px-1">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#5CE1E6] animate-pulse" />
-            <h2 className="text-[15px] sm:text-[16px] font-extrabold uppercase tracking-wide !text-white drop-shadow">Bảng thị trường việc làm</h2>
+            <span className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" />
+            <h2 className="text-[15px] sm:text-[16px] font-extrabold uppercase tracking-wide text-ink">Bảng thị trường việc làm</h2>
           </div>
           {market && (
-            <span className="text-[12px] font-semibold text-white/95">
+            <span className="text-[12px] font-semibold text-ink-muted">
               Cập nhật {new Date(market.updatedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
@@ -396,35 +394,35 @@ export function MarketPanel(p: MarketPanelProps) {
                 setAuto(false);
               }}
               className={`shrink-0 rounded-full px-3 py-1 text-[13.5px] font-bold transition-colors ${
-                tab === t.id ? 'bg-white text-ink shadow' : 'bg-white/20 text-white hover:bg-white/30 ring-1 ring-white/30'
+                tab === t.id ? 'bg-primary text-white' : 'bg-primary-tint text-ink hover:bg-border'
               }`}
             >
               {t.label}
             </button>
           ))}
-          {auto && !paused && <span className="self-center ml-1 text-[12px] font-semibold text-white/90 shrink-0">tự chuyển…</span>}
+          {auto && !paused && <span className="self-center ml-1 text-[12px] font-semibold text-ink-muted shrink-0">tự chuyển…</span>}
         </div>
-        <div className="mp-dark w-full rounded-xl bg-[#04122e]/60 ring-1 ring-white/25 p-3 sm:p-3.5 shadow-lg flex flex-col gap-2.5">
+        <div className="w-full p-1 flex flex-col gap-2.5">
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-          <Kpi label="Việc làm" value={p.openJobs} color="#8DBBFF" series={jobsSeries} change={market ? delta(market.newJobsDaily) : null} />
-          <Kpi label="Ứng tuyển" value={p.applicationsToday} color="#FF9AA0" series={appsSeries} change={market ? delta(market.applicationsDaily) : null} />
-          <Kpi label="Hồ sơ mới" value={p.profilesToday} color="#5EEAB0" />
-          <Kpi label="Thành viên" value={p.members} color="#FFFFFF" />
-          <Kpi label="Doanh nghiệp" value={p.companies} color="#C4A8FF" />
+          <Kpi label="Việc làm" value={p.openJobs} color="#2F6FDB" series={jobsSeries} change={market ? delta(market.newJobsDaily) : null} />
+          <Kpi label="Ứng tuyển" value={p.applicationsToday} color="#E0424E" series={appsSeries} change={market ? delta(market.applicationsDaily) : null} />
+          <Kpi label="Hồ sơ mới" value={p.profilesToday} color="#12A06B" />
+          <Kpi label="Thành viên" value={p.members} color="#0F2957" />
+          <Kpi label="Doanh nghiệp" value={p.companies} color="#7A4FD6" />
         </div>
 
         <div className="min-h-[80px] sm:h-[80px] sm:overflow-hidden" role="tabpanel">
           {tab === 'trend' &&
             (market ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5">
-                <AreaChart data={market.newJobsDaily} color="#8DBBFF" title="Việc làm đăng mới" />
-                <AreaChart data={market.applicationsDaily} color="#FF9AA0" title="Lượt ứng tuyển" />
+                <AreaChart data={market.newJobsDaily} color="#2F6FDB" title="Việc làm đăng mới" />
+                <AreaChart data={market.applicationsDaily} color="#E0424E" title="Lượt ứng tuyển" />
               </div>
             ) : (
               <Empty />
             ))}
-          {tab === 'industry' && <Bars rows={industryRows} href={(l) => q('industries', l)} color="#8DBBFF" />}
-          {tab === 'location' && <Bars rows={locationRows} href={(l) => q('provinces', l)} color="#4FE0B0" />}
+          {tab === 'industry' && <Bars rows={industryRows} href={(l) => q('industries', l)} color="#2F6FDB" />}
+          {tab === 'location' && <Bars rows={locationRows} href={(l) => q('provinces', l)} color="#12A06B" />}
           {tab === 'type' && (market ? <Donut rows={market.employmentTypes} href={(l) => q('employmentType', l)} /> : <Empty />)}
           {tab === 'salary' && (market ? <Columns rows={market.salaryBands} /> : <Empty />)}
         </div>

@@ -15,6 +15,8 @@
 // `admin/dashboard` AddJobForm) tự quản lý state `form`/`step`, tự viết `onSubmit`, tự truyền chữ
 // hiển thị (`submitLabel`, `previewNote`...) — file này chỉ là phần GIAO DIỆN dùng chung.
 import JobQualityPanel from './JobQualityPanel';
+import JobForecastPanel from '@/components/JobForecastPanel';
+import { suggestJobContent } from '@/lib/job-writer';
 import { MultiSelectPopover } from '@/components/search/MultiSelectPopover';
 import { ChipsInput } from '@/components/profile/ui';
 import { RichTextEditor } from '@/components/RichTextEditor';
@@ -251,10 +253,10 @@ export function JobWizardSteps({
                   {EXPERIENCE_LEVELS.map((o) => <option key={o}>{o}</option>)}
                 </select>
               </Field>
-              <Field label="Việc làm khẩn cấp">
+              <Field label="Việc làm URGENT">
                 <div className="flex items-center h-[42px]">
                   <Chip active={form.isUrgent} onClick={() => setForm({ ...form, isUrgent: !form.isUrgent })}>
-                    {form.isUrgent ? '🔥 Khẩn cấp' : 'Đánh dấu khẩn cấp'}
+                    {form.isUrgent ? '🔥 URGENT' : 'Đánh dấu URGENT'}
                   </Chip>
                 </div>
               </Field>
@@ -346,7 +348,26 @@ export function JobWizardSteps({
 
         {step === 1 && (
           <>
-            <h2 className="font-bold text-sm">Mô tả & yêu cầu công việc</h2>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <h2 className="font-bold text-sm">Mô tả & yêu cầu công việc</h2>
+              <button
+                type="button"
+                className="rounded-full border border-primary text-primary text-[13px] font-bold px-3 py-1 hover:bg-primary-tint"
+                title="Điền sẵn bản nháp từ chức danh — chỉ điền vào ô còn trống, bạn nên chỉnh lại cho đúng thực tế"
+                onClick={() => {
+                  const d = suggestJobContent(form.title, form.experienceLevel);
+                  setForm((f) => ({
+                    ...f,
+                    description: f.description.replace(/<[^>]*>/g, '').trim() ? f.description : d.description,
+                    requirements: f.requirements.replace(/<[^>]*>/g, '').trim() ? f.requirements : d.requirements,
+                    benefits: f.benefits.replace(/<[^>]*>/g, '').trim() ? f.benefits : d.benefits,
+                    tags: f.tags && f.tags.length ? f.tags : d.tags,
+                  }));
+                }}
+              >
+                ✨ Gợi ý nội dung từ chức danh
+              </button>
+            </div>
             <Field label="Mô tả công việc">
               <RichTextEditor
                 value={form.description}
@@ -451,13 +472,14 @@ export function JobWizardSteps({
         {step === 3 && (
           <>
             <JobQualityPanel form={form} />
+            <JobForecastPanel industry={form.industries[0]} level={form.level} salaryMin={form.negotiable ? undefined : Number(form.salaryMin) || undefined} salaryMax={form.negotiable ? undefined : Number(form.salaryMax) || undefined} />
             <h2 className="font-bold text-sm">Xem trước tin tuyển dụng</h2>
             <div className="rounded-lg bg-surface-alt p-4">
               <div className="font-extrabold text-sm flex items-center gap-2 flex-wrap">
                 {form.title || '(Chưa nhập chức danh)'}
                 {form.isUrgent && (
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-critical-tint text-critical align-middle">
-                    KHẨN CẤP
+                    URGENT
                   </span>
                 )}
               </div>

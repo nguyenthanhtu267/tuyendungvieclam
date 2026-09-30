@@ -53,7 +53,7 @@ export const JOBS_MEGA_MENU: { columns: NavMenuGroup[][] } = {
       {
         title: 'Nổi Bật',
         items: [
-          { label: '🔥 Việc làm khẩn cấp', href: '/viec-lam?urgentOnly=1' },
+          { label: '🔥 Việc làm URGENT', href: '/viec-lam?urgentOnly=1' },
           { label: '💛 Doanh nghiệp yêu thích', href: '/viec-lam?featuredEmployerOnly=1' },
           { label: '🆕 Việc làm mới nhất', href: '/viec-lam?postedWithin=7d' },
           { label: 'Tất cả việc làm', href: '/viec-lam' },

@@ -10,6 +10,7 @@ export interface NlFilters {
   postedWithin?: string;
   employmentType?: string;
   urgentOnly?: boolean;
+  district?: string;
 }
 export interface NlResult {
   filters: NlFilters;
@@ -38,6 +39,29 @@ const INDUSTRY_ALIAS: [RegExp, string][] = [
   [/\b(nha hang|khach san)\b/, 'Nhà hàng / Khách sạn'],
 ];
 
+
+// Đợt 64 — quận/huyện hay gặp (khớp giá trị lưu trong tin) + tỉnh tương ứng.
+const HCM_D = ['Quận 1', 'Quận 3', 'Quận 4', 'Quận 5', 'Quận 6', 'Quận 7', 'Quận 8', 'Quận 10', 'Quận 11', 'Quận 12', 'Quận Bình Thạnh', 'Quận Bình Tân', 'Quận Gò Vấp', 'Quận Phú Nhuận', 'Quận Tân Bình', 'Quận Tân Phú', 'Thành phố Thủ Đức'];
+const HN_D = ['Quận Ba Đình', 'Quận Hoàn Kiếm', 'Quận Hai Bà Trưng', 'Quận Đống Đa', 'Quận Tây Hồ', 'Quận Cầu Giấy', 'Quận Thanh Xuân', 'Quận Hoàng Mai', 'Quận Long Biên', 'Quận Nam Từ Liêm', 'Quận Bắc Từ Liêm', 'Quận Hà Đông'];
+const DISTRICTS: { name: string; province: string; key: string }[] = [
+  ...HCM_D.map((name) => ({ name, province: 'Hồ Chí Minh', key: fold(name.replace(/^(Quận|Thành phố) /, '')) })),
+  ...HN_D.map((name) => ({ name, province: 'Hà Nội', key: fold(name.replace(/^(Quận|Thành phố) /, '')) })),
+];
+function pickDistrict(text: string): { d: { name: string; province: string } | null; text: string } {
+  // "quan 7", "q7", "q.7" → chỉ tính cho số (mặc định HCM); tên chữ khớp không cần chữ "quận".
+  const num = text.match(/(?:^|\s)(?:quan|q\.?)\s?(\d{1,2})(?=\s|$)/);
+  if (num) {
+    const hit = DISTRICTS.find((x) => x.key === num[1]);
+    if (hit) return { d: hit, text: text.replace(num[0], ' ') };
+  }
+  for (const x of DISTRICTS) {
+    if (!/[a-z]/.test(x.key) || x.key.length < 4) continue;
+    const re = new RegExp(`(^|\\s)(?:quan |huyen |tp |thanh pho )?${x.key}(?=\\s|$)`);
+    if (re.test(text)) return { d: x, text: text.replace(re, ' ') };
+  }
+  return { d: null, text };
+}
+
 function pickTier(min: number): number {
   const vals = SALARY_TIERS.map((t) => t.value).filter((v) => v > 0);
   let best = 0;
@@ -63,6 +87,14 @@ export function parseNaturalQuery(input: string): NlResult {
   }
   text = text.replace(/\bluong\b/g, ' ');
 
+  const dd = pickDistrict(text);
+  if (dd.d) {
+    filters.district = dd.d.name;
+    filters.provinces = [dd.d.province];
+    chips.push(dd.d.name.replace('Thành phố ', 'TP '), dd.d.province);
+    text = dd.text;
+  }
+
   // Tỉnh thành
   const provs: string[] = [];
   for (const [alias, name] of Object.entries(PROVINCE_ALIAS)) {
@@ -81,7 +113,7 @@ export function parseNaturalQuery(input: string): NlResult {
       text = text.replace(re, ' ');
     }
   }
-  if (provs.length) {
+  if (provs.length && !filters.district) {
     filters.provinces = provs;
     chips.push(provs.join(', '));
   }
@@ -125,6 +157,7 @@ export function nlToParams(f: NlFilters): URLSearchParams {
   if (f.provinces?.length) p.set('provinces', f.provinces.join(','));
   if (f.industries?.length) p.set('industries', f.industries.join(','));
   if (f.salaryTier) p.set('salaryTier', String(f.salaryTier));
+  if (f.district) p.set('district', f.district);
   if (f.postedWithin) p.set('postedWithin', f.postedWithin);
   if (f.employmentType) p.set('employmentType', f.employmentType);
   if (f.urgentOnly) p.set('urgentOnly', '1');

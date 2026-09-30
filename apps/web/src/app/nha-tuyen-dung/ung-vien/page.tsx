@@ -1,6 +1,7 @@
 'use client';
 
 import InterviewScheduler from '@/components/InterviewScheduler';
+import ApplicantBulkTools from '@/components/ApplicantBulkTools';
 import { Suspense, useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -15,6 +16,7 @@ import {
   type ApplicationStatus,
   type ApplicantFilters,
   type CandidateDetail,
+  smartApi,
 } from '@/lib/api';
 import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatNumber } from '@/lib/format';
 
@@ -141,6 +143,10 @@ function UngVienPageInner() {
 
   const [folders, setFolders] = useState<string[]>([]);
   const [applicants, setApplicants] = useState<EmployerApplication[]>([]);
+  // Đợt 63 — điểm phù hợp từng hồ sơ + sắp xếp theo độ phù hợp.
+  const [scores, setScores] = useState<Record<string, { score: number; reasons: string[]; gaps: string[] }>>({});
+  const [sortBest, setSortBest] = useState(true);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [loadingApplicants, setLoadingApplicants] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -199,6 +205,11 @@ function UngVienPageInner() {
     if (!token) return;
     employerApi.listFolders(token).then(setFolders).catch(() => {});
   }, [token]);
+
+  useEffect(() => {
+    if (!token || !jobId) return;
+    smartApi.applicantScores(token, jobId).then((r) => setScores(r.scores)).catch(() => setScores({}));
+  }, [token, jobId, applicants.length]);
 
   const loadApplicants = useCallback(async () => {
     if (!token || !jobId) return;
@@ -446,6 +457,19 @@ function UngVienPageInner() {
               </div>
             )}
 
+            {view === 'active' && token && (
+              <ApplicantBulkTools
+                token={token}
+                selected={applicants.filter((x) => picked.has(x.id))}
+                scores={scores}
+                onDone={() => {
+                  setPicked(new Set());
+                  loadApplicants();
+                }}
+                onClear={() => setPicked(new Set())}
+              />
+            )}
+
             <div className="rounded-xl bg-white border border-border overflow-hidden">
               {loadingApplicants ? (
                 <div className="text-center text-ink-faint py-10 text-sm">Đang tải…</div>
@@ -458,7 +482,25 @@ function UngVienPageInner() {
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="text-left text-ink-faint bg-surface-alt">
-                        <th className="py-2.5 px-4 font-semibold">Ứng viên</th>
+                        {view === 'active' && (
+                          <th className="py-2.5 pl-4 pr-0 w-8">
+                            <input
+                              id="pick-all"
+                              type="checkbox"
+                              aria-label="Chọn tất cả"
+                              checked={applicants.length > 0 && applicants.every((x) => picked.has(x.id))}
+                              onChange={(e) => setPicked(e.target.checked ? new Set(applicants.map((x) => x.id)) : new Set())}
+                            />
+                          </th>
+                        )}
+                        <th className="py-2.5 px-4 font-semibold">
+                          Ứng viên
+                          {view === 'active' && Object.keys(scores).length > 0 && (
+                            <button type="button" onClick={() => setSortBest((v) => !v)} className="ml-2 rounded-full border border-border px-2 py-0.5 text-[11px] font-bold text-primary">
+                              {sortBest ? '↓ Phù hợp nhất' : 'Mới nộp trước'}
+                            </button>
+                          )}
+                        </th>
                         <th className="py-2.5 px-3 font-semibold">Ngày nộp</th>
                         {view === 'active' && <th className="py-2.5 px-3 font-semibold">Đánh giá</th>}
                         {view === 'active' && <th className="py-2.5 px-3 font-semibold">Thư mục</th>}
@@ -470,8 +512,29 @@ function UngVienPageInner() {
                       </tr>
                     </thead>
                     <tbody>
-                      {applicants.map((app) => (
+                      {(view === 'active' && sortBest
+                        ? [...applicants].sort((a, b) => (scores[b.id]?.score ?? -1) - (scores[a.id]?.score ?? -1))
+                        : applicants
+                      ).map((app) => (
                         <tr key={app.id} className="border-t border-border align-top">
+                          {view === 'active' && (
+                            <td className="py-3 pl-4 pr-0">
+                              <input
+                                id={`pick-${app.id}`}
+                                type="checkbox"
+                                aria-label="Chọn hồ sơ"
+                                checked={picked.has(app.id)}
+                                onChange={(e) =>
+                                  setPicked((prev) => {
+                                    const n = new Set(prev);
+                                    if (e.target.checked) n.add(app.id);
+                                    else n.delete(app.id);
+                                    return n;
+                                  })
+                                }
+                              />
+                            </td>
+                          )}
                           <td className="py-3 px-4">
                             {app.cv.candidateProfile ? (
                               <>
@@ -502,6 +565,20 @@ function UngVienPageInner() {
                                   )}
                                 </div>
                               </>
+                            )}
+                            {view === 'active' && scores[app.id] && (
+                              <div className="mt-1 max-w-xs" title={[...scores[app.id].reasons, ...scores[app.id].gaps.map((g) => `⚠ ${g}`)].join('\n')}>
+                                <span
+                                  className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-extrabold ${
+                                    scores[app.id].score >= 80 ? 'bg-success text-white' : scores[app.id].score >= 65 ? 'bg-primary text-white' : 'bg-surface-alt border border-border-strong text-ink'
+                                  }`}
+                                >
+                                  Phù hợp {scores[app.id].score}%
+                                </span>
+                                <div className="text-[11.5px] text-ink-muted mt-0.5">
+                                  {scores[app.id].reasons[0] ?? scores[app.id].gaps[0]}
+                                </div>
+                              </div>
                             )}
                             {app.coverLetter && (
                               <div className="text-ink-faint mt-1 italic max-w-xs">&quot;{app.coverLetter}&quot;</div>

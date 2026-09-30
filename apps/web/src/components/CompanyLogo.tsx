@@ -14,6 +14,7 @@ export function CompanyLogo({
   className = '',
   variant = 'tint',
   hideIfEmpty = false,
+  reserveSpace = false,
 }: {
   name: string;
   logoUrl?: string | null;
@@ -24,9 +25,12 @@ export function CompanyLogo({
   variant?: 'tint' | 'light';
   // Đợt 56 — công ty chưa có logo thật (hoặc ảnh lỗi) → không vẽ ô chữ viết tắt, ẩn hẳn ô logo.
   hideIfEmpty?: boolean;
+  // Đợt 60 — chưa có logo thì vẫn chừa 1 khoảng trống đúng kích thước (không vẽ chữ viết tắt) để các thẻ thẳng hàng.
+  reserveSpace?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   const showImage = !!logoUrl && !failed;
+  if (reserveSpace && !showImage) return <div className="shrink-0" style={{ width: size, height: size }} aria-hidden="true" />;
   if (hideIfEmpty && !showImage) return null;
   const bgClass = variant === 'light' ? 'bg-white/15 text-white' : 'bg-white text-primary border border-border shadow-sm';
 

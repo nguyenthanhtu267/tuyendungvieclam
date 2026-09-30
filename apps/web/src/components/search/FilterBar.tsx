@@ -159,8 +159,8 @@ export function FilterBar({
           value={value.urgentOnly ? 'urgent' : ''}
           onChange={(e) => onChange({ urgentOnly: e.target.value === 'urgent' || undefined })}
         >
-          <option value="">Chọn việc làm khẩn cấp</option>
-          <option value="urgent">Việc làm khẩn cấp</option>
+          <option value="">Chọn việc làm URGENT</option>
+          <option value="urgent">Việc làm URGENT</option>
         </select>
       </div>
 

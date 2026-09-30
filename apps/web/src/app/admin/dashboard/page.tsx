@@ -32,6 +32,7 @@ import { CandidatesPanel } from '@/components/admin/CandidatesPanel';
 import { AnalyticsPanel } from '@/components/admin/AnalyticsPanel';
 import { StoragePanel } from '@/components/admin/StoragePanel';
 import { BackgroundPanel } from '@/components/admin/BackgroundPanel';
+import { QualityPanel } from '@/components/admin/QualityPanel';
 import { PromoBadgePanel } from '@/components/admin/PromoBadgePanel';
 import { AdsPanel } from '@/components/admin/AdsPanel';
 
@@ -63,6 +64,8 @@ const NAV_ITEMS = [
   { id: 'ads', label: '📢 Banner quảng cáo' },
   // Đợt 29 (30/09/2026) — nền vector toàn website (15 mẫu, cố định hoặc tự đổi mỗi 2 giờ).
   { id: 'background', label: '🎨 Nền giao diện' },
+  // Đợt 63 — tin trùng / đáng ngờ / chất lượng thấp.
+  { id: 'quality', label: '🧹 Chất lượng dữ liệu' },
   { id: 'audit-log', label: '📜 Nhật ký thao tác' },
   { id: 'settings', label: '🔒 Đổi mật khẩu' },
 ];
@@ -596,6 +599,8 @@ export default function AdminDashboardPage() {
           <SourcedTabs token={token} />
         ) : tab === 'ads' ? (
           <AdsPanel token={token} />
+        ) : tab === 'quality' ? (
+          <QualityPanel token={token} />
         ) : tab === 'background' ? (
           <BackgroundPanel token={token} />
         ) : tab === 'promo' ? (

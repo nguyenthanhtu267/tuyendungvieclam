@@ -12,7 +12,7 @@ const LABELS: Record<string, string> = {
   postedWithin: 'thời gian đăng',
   employmentType: 'hình thức làm việc',
   experienceLevel: 'kinh nghiệm',
-  urgentOnly: 'chỉ việc khẩn cấp',
+  urgentOnly: 'chỉ việc URGENT',
   featuredEmployerOnly: 'doanh nghiệp yêu thích',
   district: 'quận/huyện',
   provinces: 'địa điểm',

@@ -9,6 +9,7 @@ import { candidatesApi, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { formatDate, formatSalaryTag, isNewJob } from '@/lib/format';
 import { CompanyLogo } from '@/components/CompanyLogo';
+import { scamWarnings } from '@/lib/scam';
 import { SourcedBadge, isCompanyUnverified } from '@/components/SourcedBadge';
 import { matchTone, useMatches } from '@/lib/match';
 import { useCompare } from '@/lib/compare';
@@ -72,9 +73,9 @@ export function JobCard({
     router.push(`/viec-lam/${job.id}?apply=1`);
   }
 
-  // Đợt 12aa (24/09/2026) — badge "URGENT" (tin khẩn cấp) thiết kế lại theo mẫu careerviet.vn: thẻ
+  // Đợt 12aa (24/09/2026) — badge "URGENT" (tin ưu tiên) thiết kế lại theo mẫu careerviet.vn: thẻ
   // nền hồng nhạt + viền hồng, badge có icon tia sét ⚡ và chữ tiếng Anh "URGENT" giống mẫu (thay
-  // cho pill "KHẨN CẤP" nhỏ trước đây), để nổi bật hơn giữa danh sách tin thường.
+  // cho pill "ƯU TIÊN" nhỏ trước đây), để nổi bật hơn giữa danh sách tin thường.
   // Đợt 14 (25/09/2026) — mục 13 danh sách lỗi: 2 thay đổi theo yêu cầu người dùng (không có ảnh
   // mẫu cụ thể, tự thiết kế theo mô tả bằng lời):
   //  1. Badge "URGENT" chuyển vào CÙNG dòng tiêu đề, ngay sau "(MỚI)" — trước đây là 1 khối riêng
@@ -120,7 +121,7 @@ export function JobCard({
       {/* Đợt 13 (24/09/2026) — mục 4 danh sách lỗi: logo công ty trên thẻ việc làm quá nhỏ so với
           các trang khác (chi tiết tin, trang công ty đều dùng size lớn hơn). Tăng 44→60px + cỡ chữ
           initials theo tỷ lệ để không bị vỡ layout khi công ty chưa có logoUrl. */}
-      <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={80} className="text-base" hideIfEmpty />
+      <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={80} className="text-base" reserveSpace />
       <div className="flex-1 min-w-0 pr-6">
         <div className="font-bold text-[13.5px] text-ink">
           {job.title}
@@ -132,6 +133,14 @@ export function JobCard({
               data-testid="match-badge"
             >
               ✨ Phù hợp {match.score}%
+            </span>
+          )}
+          {scamWarnings(job).length > 0 && (
+            <span
+              className="inline-flex items-center ml-1.5 align-middle text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-warning-tint text-[#7A4A00] border border-warning"
+              title={scamWarnings(job).join('\n')}
+            >
+              ⚠ Cẩn trọng
             </span>
           )}
           {job.isUrgent && (

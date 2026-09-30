@@ -20,7 +20,7 @@ import { FilterSuggestions } from '@/components/search/FilterSuggestions';
 import { readRecentJobs } from '@/lib/recent-jobs';
 
 // Đợt 10 — trang tìm việc làm nâng cao đầy đủ (claude/06-spec-tim-kiem-nang-cao.md): thanh lọc
-// FilterBar (tỉnh/thành + ngành nghề multi-select, 5 dropdown đơn, khẩn cấp, doanh nghiệp yêu thích),
+// FilterBar (tỉnh/thành + ngành nghề multi-select, 5 dropdown đơn, ưu tiên, doanh nghiệp yêu thích),
 // hàng chip quận/huyện khi chỉ chọn đúng 1 tỉnh/thành, danh sách JobCard kiểu careerviet.vn.
 
 function arr(v: string | null): string[] | undefined {

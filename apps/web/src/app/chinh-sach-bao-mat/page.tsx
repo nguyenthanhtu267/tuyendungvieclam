@@ -36,7 +36,7 @@ export default function ChinhSachBaoMatPage() {
         </Section>
 
         <Section title="3. Ai có thể xem dữ liệu của bạn">
-          Hồ sơ ứng viên ở chế độ "Công khai" hoặc "Khẩn cấp" hiển thị cho nhà tuyển dụng tìm kiếm;
+          Hồ sơ ứng viên ở chế độ "Công khai" hoặc "URGENT" hiển thị cho nhà tuyển dụng tìm kiếm;
           chế độ "Khoá" ẩn hoàn toàn khỏi tìm kiếm. Ứng viên có thể chặn từng công ty cụ thể xem hồ
           sơ của mình. Thông tin liên hệ (số điện thoại, email) chỉ hiển thị cho nhà tuyển dụng đã
           thực hiện "mở khoá hồ sơ" theo gói dịch vụ, trừ khi bạn chọn ẩn hẳn trong phần cài đặt.

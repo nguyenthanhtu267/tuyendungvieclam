@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import EmployerHeader from '@/components/EmployerHeader';
 import { useAuth } from '@/lib/auth-context';
-import { employerApi, type Company, type EmployerDashboard } from '@/lib/api';
+import { smartApi, type JobHealthItem, employerApi, type Company, type EmployerDashboard } from '@/lib/api';
 import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatNumber } from '@/lib/format';
 import { AdSlot } from '@/components/ads/AdSlot';
 
@@ -30,6 +30,12 @@ export default function EmployerDashboardPage() {
   const [company, setCompany] = useState<Company | null>(null);
   const [dashboard, setDashboard] = useState<EmployerDashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  const [health, setHealth] = useState<JobHealthItem[]>([]);
+
+  useEffect(() => {
+    if (!token || !me || !me.role.startsWith('employer')) return;
+    smartApi.jobHealth(token).then((r) => setHealth(r.items)).catch(() => setHealth([]));
+  }, [token, me]);
 
   useEffect(() => {
     if (me === null) router.replace('/dang-nhap');
@@ -90,6 +96,28 @@ export default function EmployerDashboardPage() {
               <StatTile value={dashboard?.totalApplications ?? 0} label="Tổng hồ sơ nhận được" />
               <StatTile value={dashboard?.newApplicationsToday ?? 0} label="Hồ sơ mới hôm nay" />
             </div>
+
+            {health.length > 0 && (
+              <div className="rounded-xl bg-white border border-border p-5">
+                <h2 className="font-bold text-sm mb-1">Tin cần cải thiện</h2>
+                <div className="text-[12px] text-ink-muted mb-3">Hệ thống so lượt xem, hồ sơ nhận được và nội dung tin trong 14 ngày gần nhất.</div>
+                <div className="flex flex-col divide-y divide-border">
+                  {health.map((h) => (
+                    <div key={h.jobId} className="py-2.5 flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-[13.5px]">{h.title}</div>
+                        <div className={`text-[13px] font-semibold ${h.severity === 'warn' ? 'text-critical' : 'text-warning'}`}>{h.problem}</div>
+                        <div className="text-[12.5px] text-ink-muted">{h.advice} {h.fix}</div>
+                      </div>
+                      <div className="flex gap-2 shrink-0 text-[12.5px] font-bold">
+                        <Link href={`/nha-tuyen-dung/dang-tin?edit=${h.jobId}`} className="text-primary">Sửa tin</Link>
+                        <Link href={`/nha-tuyen-dung/tin-dang/${h.jobId}/goi-y`} className="text-primary">Mời ứng viên</Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="grid md:grid-cols-2 gap-4 items-start">
               <div className="rounded-xl bg-white border border-border p-5">

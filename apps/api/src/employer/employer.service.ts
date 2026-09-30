@@ -497,6 +497,7 @@ export class EmployerService {
     userId: string,
     applicationId: string,
     status: ApplicationStatus,
+    customMessage?: string,
   ) {
     const application = await this.getOwnedApplication(userId, applicationId);
     const statusChanged = application.status !== status;
@@ -523,7 +524,7 @@ export class EmployerService {
         await this.notificationsService.create(
           candidateUserId,
           type,
-          `${message} "${application.jobPosting.title}".`,
+          `${message} "${application.jobPosting.title}".${customMessage?.trim() ? ` Lời nhắn từ nhà tuyển dụng: ${customMessage.trim()}` : ''}`,
         );
       }
     }
