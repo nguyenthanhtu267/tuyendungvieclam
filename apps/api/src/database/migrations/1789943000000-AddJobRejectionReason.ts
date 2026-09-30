@@ -7,12 +7,20 @@ export class AddJobRejectionReason1789943000000 implements MigrationInterface {
   name = 'AddJobRejectionReason1789943000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "job_postings" ADD "rejection_reasons" text`);
-    await queryRunner.query(`ALTER TABLE "job_postings" ADD "rejection_note" text`);
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" ADD "rejection_reasons" text`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" ADD "rejection_note" text`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "job_postings" DROP COLUMN "rejection_note"`);
-    await queryRunner.query(`ALTER TABLE "job_postings" DROP COLUMN "rejection_reasons"`);
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" DROP COLUMN "rejection_note"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" DROP COLUMN "rejection_reasons"`,
+    );
   }
 }

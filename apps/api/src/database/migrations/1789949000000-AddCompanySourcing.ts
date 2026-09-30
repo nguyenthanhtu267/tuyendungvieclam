@@ -14,14 +14,22 @@ export class AddCompanySourcing1789949000000 implements MigrationInterface {
   name = 'AddCompanySourcing1789949000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "companies" ADD "is_admin_sourced" boolean NOT NULL DEFAULT false`);
-    await queryRunner.query(`ALTER TABLE "companies" ADD "source_label" character varying`);
-    await queryRunner.query(`ALTER TABLE "companies" ADD "claimed_at" TIMESTAMP`);
+    await queryRunner.query(
+      `ALTER TABLE "companies" ADD "is_admin_sourced" boolean NOT NULL DEFAULT false`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "companies" ADD "source_label" character varying`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "companies" ADD "claimed_at" TIMESTAMP`,
+    );
     await queryRunner.query(
       `CREATE INDEX "IDX_companies_is_admin_sourced" ON "companies" ("is_admin_sourced")`,
     );
 
-    await queryRunner.query(`ALTER TABLE "job_postings" ADD "source_url" character varying`);
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" ADD "source_url" character varying`,
+    );
 
     await queryRunner.query(
       `CREATE TYPE "company_claim_requests_status_enum" AS ENUM('pending', 'approved', 'rejected')`,
@@ -55,10 +63,16 @@ export class AddCompanySourcing1789949000000 implements MigrationInterface {
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP TABLE "company_claim_requests"`);
     await queryRunner.query(`DROP TYPE "company_claim_requests_status_enum"`);
-    await queryRunner.query(`ALTER TABLE "job_postings" DROP COLUMN "source_url"`);
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" DROP COLUMN "source_url"`,
+    );
     await queryRunner.query(`DROP INDEX "IDX_companies_is_admin_sourced"`);
     await queryRunner.query(`ALTER TABLE "companies" DROP COLUMN "claimed_at"`);
-    await queryRunner.query(`ALTER TABLE "companies" DROP COLUMN "source_label"`);
-    await queryRunner.query(`ALTER TABLE "companies" DROP COLUMN "is_admin_sourced"`);
+    await queryRunner.query(
+      `ALTER TABLE "companies" DROP COLUMN "source_label"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "companies" DROP COLUMN "is_admin_sourced"`,
+    );
   }
 }

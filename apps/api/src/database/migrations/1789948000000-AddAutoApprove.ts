@@ -19,13 +19,21 @@ export class AddAutoApprove1789948000000 implements MigrationInterface {
     await queryRunner.query(
       `CREATE TABLE "admin_settings" ("id" character varying NOT NULL, "auto_approve_enabled" boolean NOT NULL DEFAULT false, "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_admin_settings_id" PRIMARY KEY ("id"))`,
     );
-    await queryRunner.query(`ALTER TABLE "job_postings" ADD "auto_approved" boolean NOT NULL DEFAULT false`);
-    await queryRunner.query(`ALTER TABLE "job_postings" ADD "admin_reviewed" boolean NOT NULL DEFAULT false`);
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" ADD "auto_approved" boolean NOT NULL DEFAULT false`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" ADD "admin_reviewed" boolean NOT NULL DEFAULT false`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "job_postings" DROP COLUMN "admin_reviewed"`);
-    await queryRunner.query(`ALTER TABLE "job_postings" DROP COLUMN "auto_approved"`);
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" DROP COLUMN "admin_reviewed"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" DROP COLUMN "auto_approved"`,
+    );
     await queryRunner.query(`DROP TABLE "admin_settings"`);
   }
 }

@@ -6,14 +6,26 @@ export class AddJobContactInfo1789944000000 implements MigrationInterface {
   name = 'AddJobContactInfo1789944000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "job_postings" ADD "contact_name" character varying`);
-    await queryRunner.query(`ALTER TABLE "job_postings" ADD "contact_email" character varying`);
-    await queryRunner.query(`ALTER TABLE "job_postings" ADD "contact_phone" character varying`);
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" ADD "contact_name" character varying`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" ADD "contact_email" character varying`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" ADD "contact_phone" character varying`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "job_postings" DROP COLUMN "contact_phone"`);
-    await queryRunner.query(`ALTER TABLE "job_postings" DROP COLUMN "contact_email"`);
-    await queryRunner.query(`ALTER TABLE "job_postings" DROP COLUMN "contact_name"`);
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" DROP COLUMN "contact_phone"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" DROP COLUMN "contact_email"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" DROP COLUMN "contact_name"`,
+    );
   }
 }

@@ -41,8 +41,12 @@ export class AddApplicationStatusHistory1789940720800 implements MigrationInterf
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "application_status_histories" DROP CONSTRAINT "FK_ash_application_id"`);
-    await queryRunner.query(`DROP INDEX "public"."IDX_ash_application_id_created_at"`);
+    await queryRunner.query(
+      `ALTER TABLE "application_status_histories" DROP CONSTRAINT "FK_ash_application_id"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_ash_application_id_created_at"`,
+    );
     await queryRunner.query(`DROP INDEX "public"."IDX_ash_application_id"`);
     await queryRunner.query(`DROP TABLE "application_status_histories"`);
   }

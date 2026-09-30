@@ -1,9 +1,19 @@
-// Đợt 29 — mã 15 mẫu nền giao diện (5 nhóm × 3). PHẢI khớp apps/web/src/lib/bg-themes.ts.
-export const BG_THEME_IDS = [
-  'neural-1', 'neural-2', 'neural-3',
-  'circuit-1', 'circuit-2', 'circuit-3',
-  'data-1', 'data-2', 'data-3',
-  'iso-1', 'iso-2', 'iso-3',
-  'aurora-1', 'aurora-2', 'aurora-3',
+// Đợt 30b — mã mẫu nền giao diện: 11 nhóm × 4 bảng màu = 44 mẫu. PHẢI khớp apps/web/src/lib/bg-themes.ts.
+export const BG_GROUP_IDS = [
+  'neural',
+  'circuit',
+  'data',
+  'iso',
+  'aurora',
+  'hex',
+  'topo',
+  'tri',
+  'wave',
+  'bubble',
+  'grid',
 ] as const;
-export type BgThemeId = (typeof BG_THEME_IDS)[number];
+export const BG_PALETTES_PER_GROUP = 4;
+export const BG_THEME_IDS: string[] = BG_GROUP_IDS.flatMap((g) =>
+  Array.from({ length: BG_PALETTES_PER_GROUP }, (_, i) => `${g}-${i + 1}`),
+);
+export const BG_IMAGE_THEME_PREFIX = 'img-';

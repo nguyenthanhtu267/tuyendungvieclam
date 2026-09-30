@@ -27,7 +27,6 @@ import { ClaimCompanyDto } from './dto/claim-company.dto';
 import { ResolveClaimRequestDto } from './dto/resolve-claim-request.dto';
 import { ExtractJobUrlDto } from './dto/extract-job-url.dto';
 import { UpdatePromoBadgeDto } from './dto/promo-badge.dto';
-import { UpdateBackgroundDto } from './dto/background.dto';
 
 // Đợt 23 — endpoint CÔNG KHAI (không cần đăng nhập) cho header đọc nhãn quảng bá.
 @Controller('public/settings')
@@ -37,12 +36,6 @@ export class PublicSettingsController {
   @Get('promo-badge')
   async promoBadge() {
     return { badge: await this.adminService.getPublicPromoBadge() };
-  }
-
-  // Đợt 29 — nền giao diện toàn website (công khai).
-  @Get('background')
-  background() {
-    return this.adminService.getBackground();
   }
 }
 
@@ -73,16 +66,6 @@ export class AdminController {
   }
 
   // Đợt 23 (29/09/2026) — nhãn quảng bá nhấp nháy cạnh logo (Admin bật/tắt, sửa chữ + link).
-  @Get('settings/background')
-  getBackground() {
-    return this.adminService.getBackground();
-  }
-
-  @Patch('settings/background')
-  setBackground(@CurrentUser() admin: { userId: string; email: string }, @Body() dto: UpdateBackgroundDto) {
-    return this.adminService.setBackground(admin, dto);
-  }
-
   @Get('settings/promo-badge')
   getPromoBadge() {
     return this.adminService.getPromoBadge();
@@ -99,7 +82,9 @@ export class AdminController {
   // Đợt 12q (21/09/2026) — Batch 5 mục #3: chuỗi thời gian cho biểu đồ dashboard, mặc định 14 ngày.
   @Get('stats/timeseries')
   getStatsTimeSeries(@Query('days') days?: string) {
-    return this.adminService.getStatsTimeSeries(days ? Number(days) : undefined);
+    return this.adminService.getStatsTimeSeries(
+      days ? Number(days) : undefined,
+    );
   }
 
   // Đợt 12q (21/09/2026) — Batch 5 mục #4: nhật ký thao tác admin, phân trang.
@@ -119,14 +104,24 @@ export class AdminController {
   }
 
   @Patch('jobs/:id/approve')
-  approveJob(@CurrentUser() admin: { userId: string; email: string }, @Param('id') id: string) {
-    return this.adminService.setJobStatus(admin, id, JobApprovalStatus.APPROVED);
+  approveJob(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+  ) {
+    return this.adminService.setJobStatus(
+      admin,
+      id,
+      JobApprovalStatus.APPROVED,
+    );
   }
 
   // Đợt 15 (25/09/2026) — nút "Tin đã kiểm tra": chỉ dùng cho tin đã được TỰ ĐỘNG duyệt (còn hiện
   // trong tab "Duyệt tin" chờ Admin xem lại lần 2) — bấm xong thì dòng tin biến mất khỏi danh sách.
   @Patch('jobs/:id/mark-reviewed')
-  markJobReviewed(@CurrentUser() admin: { userId: string; email: string }, @Param('id') id: string) {
+  markJobReviewed(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+  ) {
     return this.adminService.markJobReviewed(admin, id);
   }
 
@@ -145,13 +140,27 @@ export class AdminController {
   // route matching không xung đột: 'jobs/bulk-approve' 2 đoạn (đúng bằng số đoạn của 'jobs/:id') nên
   // PHẢI khai báo trước 'jobs/:id' (đợt 12x, PATCH) — nếu không Nest sẽ hiểu "bulk-approve" là :id).
   @Patch('jobs/bulk-approve')
-  bulkApproveJobs(@CurrentUser() admin: { userId: string; email: string }, @Body() dto: BulkIdsDto) {
-    return this.adminService.bulkSetJobStatus(admin, dto.ids, JobApprovalStatus.APPROVED);
+  bulkApproveJobs(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Body() dto: BulkIdsDto,
+  ) {
+    return this.adminService.bulkSetJobStatus(
+      admin,
+      dto.ids,
+      JobApprovalStatus.APPROVED,
+    );
   }
 
   @Patch('jobs/bulk-reject')
-  bulkRejectJobs(@CurrentUser() admin: { userId: string; email: string }, @Body() dto: BulkIdsDto) {
-    return this.adminService.bulkSetJobStatus(admin, dto.ids, JobApprovalStatus.REJECTED);
+  bulkRejectJobs(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Body() dto: BulkIdsDto,
+  ) {
+    return this.adminService.bulkSetJobStatus(
+      admin,
+      dto.ids,
+      JobApprovalStatus.REJECTED,
+    );
   }
 
   // Đợt 12x (21/09/2026) — "Sửa tin trước khi duyệt" (theo yêu cầu người dùng, chọn phương án "Sửa
@@ -168,7 +177,10 @@ export class AdminController {
   // Đợt 17k (25/09/2026) — "xoá tin đăng" (theo yêu cầu người dùng). Khai báo sau PATCH 'jobs/:id'
   // (method khác nên không xung đột route matching) cho gần các route sửa/xoá tin khác trong file này.
   @Delete('jobs/:id')
-  deleteJob(@CurrentUser() admin: { userId: string; email: string }, @Param('id') id: string) {
+  deleteJob(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+  ) {
     return this.adminService.deleteJob(admin, id);
   }
 
@@ -190,8 +202,12 @@ export class AdminController {
   }
 
   @Get('companies/sourced')
-  listSourcedCompanies(@Query('q') q?: string, @Query('claimed') claimed?: string) {
-    const claimedFilter = claimed === 'true' ? true : claimed === 'false' ? false : undefined;
+  listSourcedCompanies(
+    @Query('q') q?: string,
+    @Query('claimed') claimed?: string,
+  ) {
+    const claimedFilter =
+      claimed === 'true' ? true : claimed === 'false' ? false : undefined;
     return this.adminService.listSourcedCompanies(q, claimedFilter);
   }
 
@@ -254,7 +270,10 @@ export class AdminController {
   }
 
   @Patch('companies/:id/toggle-featured')
-  toggleFeaturedEmployer(@CurrentUser() admin: { userId: string; email: string }, @Param('id') id: string) {
+  toggleFeaturedEmployer(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+  ) {
     return this.adminService.toggleFeaturedEmployer(admin, id);
   }
 
@@ -269,23 +288,51 @@ export class AdminController {
   }
 
   @Patch('companies/:id/approve')
-  approveCompany(@CurrentUser() admin: { userId: string; email: string }, @Param('id') id: string) {
-    return this.adminService.setCompanyStatus(admin, id, CompanyApprovalStatus.APPROVED);
+  approveCompany(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+  ) {
+    return this.adminService.setCompanyStatus(
+      admin,
+      id,
+      CompanyApprovalStatus.APPROVED,
+    );
   }
 
   @Patch('companies/:id/reject')
-  rejectCompany(@CurrentUser() admin: { userId: string; email: string }, @Param('id') id: string) {
-    return this.adminService.setCompanyStatus(admin, id, CompanyApprovalStatus.REJECTED);
+  rejectCompany(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+  ) {
+    return this.adminService.setCompanyStatus(
+      admin,
+      id,
+      CompanyApprovalStatus.REJECTED,
+    );
   }
 
   @Patch('companies/bulk-approve')
-  bulkApproveCompanies(@CurrentUser() admin: { userId: string; email: string }, @Body() dto: BulkIdsDto) {
-    return this.adminService.bulkSetCompanyStatus(admin, dto.ids, CompanyApprovalStatus.APPROVED);
+  bulkApproveCompanies(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Body() dto: BulkIdsDto,
+  ) {
+    return this.adminService.bulkSetCompanyStatus(
+      admin,
+      dto.ids,
+      CompanyApprovalStatus.APPROVED,
+    );
   }
 
   @Patch('companies/bulk-reject')
-  bulkRejectCompanies(@CurrentUser() admin: { userId: string; email: string }, @Body() dto: BulkIdsDto) {
-    return this.adminService.bulkSetCompanyStatus(admin, dto.ids, CompanyApprovalStatus.REJECTED);
+  bulkRejectCompanies(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Body() dto: BulkIdsDto,
+  ) {
+    return this.adminService.bulkSetCompanyStatus(
+      admin,
+      dto.ids,
+      CompanyApprovalStatus.REJECTED,
+    );
   }
 
   @Get('users')
@@ -294,7 +341,10 @@ export class AdminController {
   }
 
   @Patch('users/:id/reset-password')
-  resetUserPassword(@CurrentUser() admin: { userId: string; email: string }, @Param('id') id: string) {
+  resetUserPassword(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+  ) {
     return this.adminService.resetUserPassword(admin, id);
   }
 
@@ -304,7 +354,10 @@ export class AdminController {
   }
 
   @Patch('orders/:id/confirm-payment')
-  confirmOrderPayment(@CurrentUser() admin: { userId: string; email: string }, @Param('id') id: string) {
+  confirmOrderPayment(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+  ) {
     return this.adminService.confirmOrderPayment(admin, id);
   }
 }

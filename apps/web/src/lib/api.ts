@@ -1,4 +1,4 @@
-import type { BgSetting } from './bg-themes';
+import type { BgImage, BgSetting } from './bg-themes';
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export class ApiError extends Error {
@@ -1066,6 +1066,9 @@ export interface PromoBadgeSetting {
 }
 
 // Đợt 23 — cấu hình công khai (không cần đăng nhập) cho header.
+/** Đường dẫn tuyệt đối tới tài nguyên do API phục vụ (VD ảnh nền). */
+export const apiAsset = (path: string) => `${API_URL}${path}`;
+
 export const publicSettingsApi = {
   getPromoBadge: () =>
     request<{ badge: { text: string; url: string } | null }>('/public/settings/promo-badge'),
@@ -1075,8 +1078,22 @@ export const publicSettingsApi = {
 
 export const adminApi = {
   getBackground: (token: string) => request<BgSetting>('/admin/settings/background', { headers: authHeaders(token) }),
-  setBackground: (token: string, body: BgSetting) =>
+  setBackground: (token: string, body: Omit<BgSetting, 'images'>) =>
     request<BgSetting>('/admin/settings/background', { method: 'PATCH', headers: { ...authHeaders(token), 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  // Đợt 30b — ảnh nền tải lên (trình duyệt đã thu nhỏ + đổi sang WEBP/JPEG trước khi gửi).
+  uploadBgImage: (token: string, blob: Blob, meta: { name: string; overlay: number; width: number; height: number }) => {
+    const form = new FormData();
+    form.append('file', blob, `nen.${blob.type === 'image/webp' ? 'webp' : blob.type === 'image/png' ? 'png' : 'jpg'}`);
+    form.append('name', meta.name);
+    form.append('overlay', String(meta.overlay));
+    form.append('width', String(meta.width));
+    form.append('height', String(meta.height));
+    return requestForm<BgImage>('/admin/settings/background/images', token, form);
+  },
+  updateBgImage: (token: string, id: string, body: { overlay?: number; name?: string }) =>
+    request<BgImage>(`/admin/settings/background/images/${id}`, { method: 'PUT', headers: { ...authHeaders(token), 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  deleteBgImage: (token: string, id: string) =>
+    request<BgSetting>(`/admin/settings/background/images/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
   dashboard: (token: string) => request<AdminDashboard>('/admin/dashboard', { headers: authHeaders(token) }),
   listPendingJobs: (token: string) =>
     request<JobPosting[]>('/admin/jobs/pending', { headers: authHeaders(token) }),

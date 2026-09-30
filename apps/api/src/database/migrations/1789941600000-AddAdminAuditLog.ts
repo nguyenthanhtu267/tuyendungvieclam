@@ -21,11 +21,15 @@ export class AddAdminAuditLog1789941600000 implements MigrationInterface {
         CONSTRAINT "PK_admin_audit_logs_id" PRIMARY KEY ("id")
       )
     `);
-    await queryRunner.query(`CREATE INDEX "IDX_admin_audit_logs_created_at" ON "admin_audit_logs" ("created_at")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_admin_audit_logs_created_at" ON "admin_audit_logs" ("created_at")`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX "public"."IDX_admin_audit_logs_created_at"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_admin_audit_logs_created_at"`,
+    );
     await queryRunner.query(`DROP TABLE "admin_audit_logs"`);
   }
 }

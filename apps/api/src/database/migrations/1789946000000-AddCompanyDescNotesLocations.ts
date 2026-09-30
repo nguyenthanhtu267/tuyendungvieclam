@@ -23,7 +23,9 @@ export class AddCompanyDescNotesLocations1789946000000 implements MigrationInter
         CONSTRAINT "PK_candidate_notes_id" PRIMARY KEY ("id")
       )
     `);
-    await queryRunner.query(`CREATE INDEX "IDX_candidate_notes_company_id" ON "candidate_notes" ("company_id")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_candidate_notes_company_id" ON "candidate_notes" ("company_id")`,
+    );
 
     await queryRunner.query(`
       CREATE TABLE "work_locations" (
@@ -37,14 +39,22 @@ export class AddCompanyDescNotesLocations1789946000000 implements MigrationInter
         CONSTRAINT "PK_work_locations_id" PRIMARY KEY ("id")
       )
     `);
-    await queryRunner.query(`CREATE INDEX "IDX_work_locations_company_id" ON "work_locations" ("company_id")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_work_locations_company_id" ON "work_locations" ("company_id")`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX "public"."IDX_work_locations_company_id"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_work_locations_company_id"`,
+    );
     await queryRunner.query(`DROP TABLE "work_locations"`);
-    await queryRunner.query(`DROP INDEX "public"."IDX_candidate_notes_company_id"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_candidate_notes_company_id"`,
+    );
     await queryRunner.query(`DROP TABLE "candidate_notes"`);
-    await queryRunner.query(`ALTER TABLE "companies" DROP COLUMN "description"`);
+    await queryRunner.query(
+      `ALTER TABLE "companies" DROP COLUMN "description"`,
+    );
   }
 }

@@ -1,21 +1,44 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, LessThanOrEqual, Repository } from 'typeorm';
 import * as argon2 from 'argon2';
 import * as crypto from 'crypto';
-import { Company, CompanyApprovalStatus } from '../database/entities/company.entity';
-import { CompanyUser, CompanyUserType } from '../database/entities/company-user.entity';
-import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
+import {
+  Company,
+  CompanyApprovalStatus,
+} from '../database/entities/company.entity';
+import {
+  CompanyUser,
+  CompanyUserType,
+} from '../database/entities/company-user.entity';
+import {
+  JobPosting,
+  JobApprovalStatus,
+} from '../database/entities/job-posting.entity';
 import { Application } from '../database/entities/application.entity';
 import { User, UserRole } from '../database/entities/user.entity';
 import { CandidateProfile } from '../database/entities/candidate-profile.entity';
-import { Order, OrderStatus, PaymentMethod } from '../database/entities/order.entity';
+import {
+  Order,
+  OrderStatus,
+  PaymentMethod,
+} from '../database/entities/order.entity';
 import { Payment, PaymentStatus } from '../database/entities/payment.entity';
 import { Invoice, InvoiceStatus } from '../database/entities/invoice.entity';
 import { SearchHistory } from '../database/entities/search-history.entity';
 import { AdminAuditLog } from '../database/entities/admin-audit-log.entity';
 import { AdminSetting } from '../database/entities/admin-setting.entity';
-import { CompanyClaimRequest, CompanyClaimRequestStatus } from '../database/entities/company-claim-request.entity';
+import {
+  CompanyClaimRequest,
+  CompanyClaimRequestStatus,
+} from '../database/entities/company-claim-request.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UpdateJobDto } from '../employer/dto/update-job.dto';
 import { CreateJobDto } from '../employer/dto/create-job.dto';
@@ -23,9 +46,15 @@ import { RejectJobDto } from './dto/reject-job.dto';
 import { CreateDraftCompanyDto } from './dto/create-draft-company.dto';
 import { ClaimCompanyDto } from './dto/claim-company.dto';
 import { ResolveClaimRequestDto } from './dto/resolve-claim-request.dto';
-import { JOB_EDITABLE_FIELDS, JOB_RICH_TEXT_FIELDS } from '../common/job-editable-fields';
+import {
+  JOB_EDITABLE_FIELDS,
+  JOB_RICH_TEXT_FIELDS,
+} from '../common/job-editable-fields';
 import { sanitizeRichText } from '../common/sanitize-html.util';
-import { extractJobFromUrl, type ExtractJobUrlResult } from '../common/job-url-extractor.util';
+import {
+  extractJobFromUrl,
+  type ExtractJobUrlResult,
+} from '../common/job-url-extractor.util';
 
 // Đợt 12q (21/09/2026) — thông tin admin đang đăng nhập, lấy từ CurrentUser() (payload JWT), dùng để
 // ghi nhật ký thao tác (mục #4 Batch 5). Chỉ cần userId + email, không cần load lại từ CSDL.
@@ -37,26 +66,40 @@ export type AdminActor = { userId: string; email: string };
 const AUTO_APPROVE_SWEEP_INTERVAL_MS = 60 * 1000;
 const AUTO_APPROVE_DELAY_MS = 15 * 60 * 1000;
 const AUTO_APPROVE_SETTING_ID = 'singleton';
-const AUTO_APPROVE_ACTOR: AdminActor = { userId: 'system', email: 'system-auto-approve' };
+const AUTO_APPROVE_ACTOR: AdminActor = {
+  userId: 'system',
+  email: 'system-auto-approve',
+};
 
 @Injectable()
 export class AdminService implements OnModuleInit, OnModuleDestroy {
   private autoApproveTimer?: ReturnType<typeof setInterval>;
 
   constructor(
-    @InjectRepository(Company) private readonly companyRepo: Repository<Company>,
-    @InjectRepository(CompanyUser) private readonly companyUserRepo: Repository<CompanyUser>,
-    @InjectRepository(JobPosting) private readonly jobRepo: Repository<JobPosting>,
-    @InjectRepository(Application) private readonly applicationRepo: Repository<Application>,
+    @InjectRepository(Company)
+    private readonly companyRepo: Repository<Company>,
+    @InjectRepository(CompanyUser)
+    private readonly companyUserRepo: Repository<CompanyUser>,
+    @InjectRepository(JobPosting)
+    private readonly jobRepo: Repository<JobPosting>,
+    @InjectRepository(Application)
+    private readonly applicationRepo: Repository<Application>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
-    @InjectRepository(CandidateProfile) private readonly candidateProfileRepo: Repository<CandidateProfile>,
+    @InjectRepository(CandidateProfile)
+    private readonly candidateProfileRepo: Repository<CandidateProfile>,
     @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
-    @InjectRepository(Payment) private readonly paymentRepo: Repository<Payment>,
-    @InjectRepository(Invoice) private readonly invoiceRepo: Repository<Invoice>,
-    @InjectRepository(SearchHistory) private readonly searchHistoryRepo: Repository<SearchHistory>,
-    @InjectRepository(AdminAuditLog) private readonly auditRepo: Repository<AdminAuditLog>,
-    @InjectRepository(AdminSetting) private readonly adminSettingRepo: Repository<AdminSetting>,
-    @InjectRepository(CompanyClaimRequest) private readonly claimRequestRepo: Repository<CompanyClaimRequest>,
+    @InjectRepository(Payment)
+    private readonly paymentRepo: Repository<Payment>,
+    @InjectRepository(Invoice)
+    private readonly invoiceRepo: Repository<Invoice>,
+    @InjectRepository(SearchHistory)
+    private readonly searchHistoryRepo: Repository<SearchHistory>,
+    @InjectRepository(AdminAuditLog)
+    private readonly auditRepo: Repository<AdminAuditLog>,
+    @InjectRepository(AdminSetting)
+    private readonly adminSettingRepo: Repository<AdminSetting>,
+    @InjectRepository(CompanyClaimRequest)
+    private readonly claimRequestRepo: Repository<CompanyClaimRequest>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -98,9 +141,19 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
   // Đợt 12m (21/09/2026) — báo cho TẤT CẢ tài khoản (Chính + Phụ) gắn với 1 công ty, vì bất kỳ ai
   // trong số đó có thể là người cần biết tin/hồ sơ công ty vừa đổi trạng thái duyệt.
-  private async notifyCompanyUsers(companyId: string, type: string, content: string) {
-    const companyUsers = await this.companyUserRepo.find({ where: { companyId } });
-    await this.notificationsService.createMany(companyUsers.map((cu) => cu.userId), type, content);
+  private async notifyCompanyUsers(
+    companyId: string,
+    type: string,
+    content: string,
+  ) {
+    const companyUsers = await this.companyUserRepo.find({
+      where: { companyId },
+    });
+    await this.notificationsService.createMany(
+      companyUsers.map((cu) => cu.userId),
+      type,
+      content,
+    );
   }
 
   // Job alert (đợt 12m) — khi 1 tin được duyệt, đối chiếu với các "Tìm kiếm đã lưu" của ứng viên
@@ -108,25 +161,38 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   // có lọc ngành thì phải trùng ngành; có lọc tỉnh/thành thì phải trùng ít nhất 1 tỉnh; nếu tìm kiếm
   // không lọc gì (chỉ có từ khoá) thì so khớp từ khoá với chức danh tin.
   private async notifyJobAlertMatches(job: JobPosting) {
-    const rows = await this.searchHistoryRepo.find({ where: { ownerType: 'candidate_profile' } });
+    const rows = await this.searchHistoryRepo.find({
+      where: { ownerType: 'candidate_profile' },
+    });
     if (rows.length === 0) return;
 
     const jobProvinces = job.provinces?.length
       ? job.provinces
       : job.location
-        ? job.location.split('|').map((s) => s.trim()).filter(Boolean)
+        ? job.location
+            .split('|')
+            .map((s) => s.trim())
+            .filter(Boolean)
         : [];
 
     const matchingProfileIds = new Set<string>();
     for (const row of rows) {
       const criteria = (row.criteria ?? {}) as Record<string, unknown>;
-      const industries = Array.isArray(criteria.industries) ? (criteria.industries as string[]) : [];
-      const provinces = Array.isArray(criteria.provinces) ? (criteria.provinces as string[]) : [];
-      const q = typeof criteria.q === 'string' ? criteria.q.trim().toLowerCase() : '';
+      const industries = Array.isArray(criteria.industries)
+        ? (criteria.industries as string[])
+        : [];
+      const provinces = Array.isArray(criteria.provinces)
+        ? (criteria.provinces as string[])
+        : [];
+      const q =
+        typeof criteria.q === 'string' ? criteria.q.trim().toLowerCase() : '';
 
       let matched = true;
-      if (industries.length > 0) matched = matched && !!job.industry && industries.includes(job.industry);
-      if (provinces.length > 0) matched = matched && jobProvinces.some((p) => provinces.includes(p));
+      if (industries.length > 0)
+        matched =
+          matched && !!job.industry && industries.includes(job.industry);
+      if (provinces.length > 0)
+        matched = matched && jobProvinces.some((p) => provinces.includes(p));
       if (industries.length === 0 && provinces.length === 0) {
         matched = q.length > 0 && job.title.toLowerCase().includes(q);
       }
@@ -135,7 +201,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     if (matchingProfileIds.size === 0) return;
 
     const profiles = await this.candidateProfileRepo.find({
-      where: { id: In(Array.from(matchingProfileIds)), allowJobNotifications: true },
+      where: {
+        id: In(Array.from(matchingProfileIds)),
+        allowJobNotifications: true,
+      },
     });
     if (profiles.length === 0) return;
     await this.notificationsService.createMany(
@@ -154,20 +223,37 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   private pendingReviewWhere() {
     return [
       { approvalStatus: JobApprovalStatus.PENDING },
-      { approvalStatus: JobApprovalStatus.APPROVED, autoApproved: true, adminReviewed: false },
+      {
+        approvalStatus: JobApprovalStatus.APPROVED,
+        autoApproved: true,
+        adminReviewed: false,
+      },
     ];
   }
 
   async getDashboard() {
-    const [employerCount, candidateCount, companyCount, jobCount, pendingJobs, pendingCompanies] =
-      await Promise.all([
-        this.userRepo.count({ where: [{ role: UserRole.EMPLOYER_MAIN }, { role: UserRole.EMPLOYER_SUB }] }),
-        this.candidateProfileRepo.count(),
-        this.companyRepo.count(),
-        this.jobRepo.count(),
-        this.jobRepo.count({ where: this.pendingReviewWhere() }),
-        this.companyRepo.count({ where: { approvalStatus: CompanyApprovalStatus.PENDING } }),
-      ]);
+    const [
+      employerCount,
+      candidateCount,
+      companyCount,
+      jobCount,
+      pendingJobs,
+      pendingCompanies,
+    ] = await Promise.all([
+      this.userRepo.count({
+        where: [
+          { role: UserRole.EMPLOYER_MAIN },
+          { role: UserRole.EMPLOYER_SUB },
+        ],
+      }),
+      this.candidateProfileRepo.count(),
+      this.companyRepo.count(),
+      this.jobRepo.count(),
+      this.jobRepo.count({ where: this.pendingReviewWhere() }),
+      this.companyRepo.count({
+        where: { approvalStatus: CompanyApprovalStatus.PENDING },
+      }),
+    ]);
 
     // Đợt 13 (24/09/2026) — updatedAt thay vì createdAt, xem ghi chú ở listPendingJobs() bên dưới.
     const recentJobsPending = await this.jobRepo.find({
@@ -208,17 +294,27 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   // Đợt 15 (25/09/2026) — công tắc chung "Tự động duyệt tin", lưu 1 dòng CSDL duy nhất (xem
   // admin-setting.entity.ts). Tạo dòng mặc định (TẮT) nếu chưa từng có — lần đầu Admin mở trang.
   async getAutoApproveSetting(): Promise<{ enabled: boolean }> {
-    let setting = await this.adminSettingRepo.findOne({ where: { id: AUTO_APPROVE_SETTING_ID } });
+    let setting = await this.adminSettingRepo.findOne({
+      where: { id: AUTO_APPROVE_SETTING_ID },
+    });
     if (!setting) {
       setting = await this.adminSettingRepo.save(
-        this.adminSettingRepo.create({ id: AUTO_APPROVE_SETTING_ID, autoApproveEnabled: false }),
+        this.adminSettingRepo.create({
+          id: AUTO_APPROVE_SETTING_ID,
+          autoApproveEnabled: false,
+        }),
       );
     }
     return { enabled: setting.autoApproveEnabled };
   }
 
-  async setAutoApproveSetting(admin: AdminActor, enabled: boolean): Promise<{ enabled: boolean }> {
-    let setting = await this.adminSettingRepo.findOne({ where: { id: AUTO_APPROVE_SETTING_ID } });
+  async setAutoApproveSetting(
+    admin: AdminActor,
+    enabled: boolean,
+  ): Promise<{ enabled: boolean }> {
+    let setting = await this.adminSettingRepo.findOne({
+      where: { id: AUTO_APPROVE_SETTING_ID },
+    });
     if (!setting) {
       setting = this.adminSettingRepo.create({ id: AUTO_APPROVE_SETTING_ID });
     }
@@ -236,8 +332,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
   // Đợt 23 (29/09/2026) — nhãn quảng bá cạnh logo. `getPromoBadge()` (Admin xem đủ cấu hình) và
   // `getPublicPromoBadge()` (trang công khai: chỉ trả khi BẬT + có link, còn lại null).
-  async getPromoBadge(): Promise<{ enabled: boolean; text: string; url: string | null }> {
-    let setting = await this.adminSettingRepo.findOne({ where: { id: AUTO_APPROVE_SETTING_ID } });
+  async getPromoBadge(): Promise<{
+    enabled: boolean;
+    text: string;
+    url: string | null;
+  }> {
+    let setting = await this.adminSettingRepo.findOne({
+      where: { id: AUTO_APPROVE_SETTING_ID },
+    });
     if (!setting) {
       setting = await this.adminSettingRepo.save(
         this.adminSettingRepo.create({ id: AUTO_APPROVE_SETTING_ID }),
@@ -250,43 +352,6 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  // Đợt 29 (30/09/2026) — nền giao diện toàn website (cố định / tự động đổi mỗi N giờ). GET dùng chung cho Admin và công khai.
-  async getBackground(): Promise<{ mode: 'fixed' | 'auto'; theme: string; autoThemes: string[]; hours: number }> {
-    let setting = await this.adminSettingRepo.findOne({ where: { id: AUTO_APPROVE_SETTING_ID } });
-    if (!setting) {
-      setting = await this.adminSettingRepo.save(this.adminSettingRepo.create({ id: AUTO_APPROVE_SETTING_ID }));
-    }
-    return {
-      mode: setting.bgMode === 'fixed' ? 'fixed' : 'auto',
-      theme: setting.bgTheme || 'neural-1',
-      autoThemes: Array.isArray(setting.bgAutoThemes) ? setting.bgAutoThemes : [],
-      hours: setting.bgAutoHours || 2,
-    };
-  }
-
-  async setBackground(
-    admin: AdminActor,
-    dto: { mode: 'fixed' | 'auto'; theme: string; autoThemes: string[]; hours: number },
-  ) {
-    let setting = await this.adminSettingRepo.findOne({ where: { id: AUTO_APPROVE_SETTING_ID } });
-    if (!setting) setting = this.adminSettingRepo.create({ id: AUTO_APPROVE_SETTING_ID });
-    setting.bgMode = dto.mode;
-    setting.bgTheme = dto.theme;
-    setting.bgAutoThemes = Array.from(new Set(dto.autoThemes));
-    setting.bgAutoHours = dto.hours;
-    await this.adminSettingRepo.save(setting);
-    await this.logAction(
-      admin,
-      'settings.background',
-      'admin_setting',
-      AUTO_APPROVE_SETTING_ID,
-      dto.mode === 'fixed'
-        ? `Nền giao diện: cố định "${dto.theme}"`
-        : `Nền giao diện: tự động đổi mỗi ${dto.hours} giờ (${setting.bgAutoThemes.length || 15} mẫu)`,
-    );
-    return this.getBackground();
-  }
-
   async getPublicPromoBadge(): Promise<{ text: string; url: string } | null> {
     const b = await this.getPromoBadge();
     return b.enabled && b.url ? { text: b.text, url: b.url } : null;
@@ -296,11 +361,16 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     admin: AdminActor,
     dto: { enabled: boolean; text: string; url?: string | null },
   ): Promise<{ enabled: boolean; text: string; url: string | null }> {
-    let setting = await this.adminSettingRepo.findOne({ where: { id: AUTO_APPROVE_SETTING_ID } });
-    if (!setting) setting = this.adminSettingRepo.create({ id: AUTO_APPROVE_SETTING_ID });
+    let setting = await this.adminSettingRepo.findOne({
+      where: { id: AUTO_APPROVE_SETTING_ID },
+    });
+    if (!setting)
+      setting = this.adminSettingRepo.create({ id: AUTO_APPROVE_SETTING_ID });
     const url = (dto.url ?? '').trim() || null;
     if (dto.enabled && !url) {
-      throw new BadRequestException('Cần nhập link trước khi bật nhãn quảng bá.');
+      throw new BadRequestException(
+        'Cần nhập link trước khi bật nhãn quảng bá.',
+      );
     }
     setting.promoBadgeEnabled = dto.enabled;
     setting.promoBadgeText = dto.text.trim();
@@ -328,7 +398,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
     const cutoff = new Date(Date.now() - AUTO_APPROVE_DELAY_MS);
     const dueJobs = await this.jobRepo.find({
-      where: { approvalStatus: JobApprovalStatus.PENDING, updatedAt: LessThanOrEqual(cutoff) },
+      where: {
+        approvalStatus: JobApprovalStatus.PENDING,
+        updatedAt: LessThanOrEqual(cutoff),
+      },
     });
     if (dueJobs.length === 0) return 0;
 
@@ -345,7 +418,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         `Tin "${job.title}" đã được TỰ ĐỘNG duyệt sau 15 phút và hiển thị công khai trong tìm kiếm việc làm.`,
       );
       await this.notifyJobAlertMatches(saved);
-      await this.logAction(AUTO_APPROVE_ACTOR, 'job.auto_approve', 'job', job.id, job.title);
+      await this.logAction(
+        AUTO_APPROVE_ACTOR,
+        'job.auto_approve',
+        'job',
+        job.id,
+        job.title,
+      );
     }
     return dueJobs.length;
   }
@@ -367,7 +446,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   // bấm Duyệt/Từ chối, thay vì chỉ đọc vài dòng rút gọn trong bảng. Route công khai GET /jobs/:id
   // chỉ trả về tin đã duyệt (approvalStatus = APPROVED) nên không dùng lại được cho mục đích này.
   async getJobForReview(id: string) {
-    const job = await this.jobRepo.findOne({ where: { id }, relations: { company: true } });
+    const job = await this.jobRepo.findOne({
+      where: { id },
+      relations: { company: true },
+    });
     if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng');
     return job;
   }
@@ -440,7 +522,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       'job_rejected',
       `Tin "${job.title}" đã bị từ chối. Lý do: ${reasonText}.${dto.note ? ` Ghi chú thêm: ${dto.note}.` : ''} Vui lòng sửa lại nội dung rồi gửi duyệt lại.`,
     );
-    await this.logAction(admin, 'job.reject', 'job', job.id, `${job.title} — Lý do: ${reasonText}`);
+    await this.logAction(
+      admin,
+      'job.reject',
+      'job',
+      job.id,
+      `${job.title} — Lý do: ${reasonText}`,
+    );
     return saved;
   }
 
@@ -486,7 +574,9 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     }
     await this.logAction(
       admin,
-      status === JobApprovalStatus.APPROVED ? 'job.bulk_approve' : 'job.bulk_reject',
+      status === JobApprovalStatus.APPROVED
+        ? 'job.bulk_approve'
+        : 'job.bulk_reject',
       'job',
       undefined,
       `${succeeded}/${ids.length} tin${failed.length ? ` (lỗi: ${failed.length})` : ''}`,
@@ -513,14 +603,18 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
     await this.notifyCompanyUsers(
       company.id,
-      status === CompanyApprovalStatus.APPROVED ? 'company_approved' : 'company_rejected',
+      status === CompanyApprovalStatus.APPROVED
+        ? 'company_approved'
+        : 'company_rejected',
       status === CompanyApprovalStatus.APPROVED
         ? `Hồ sơ công ty "${company.name}" đã được duyệt.`
         : `Hồ sơ công ty "${company.name}" bị từ chối. Vui lòng cập nhật giấy tờ pháp lý và gửi lại.`,
     );
     await this.logAction(
       admin,
-      status === CompanyApprovalStatus.APPROVED ? 'company.approve' : 'company.reject',
+      status === CompanyApprovalStatus.APPROVED
+        ? 'company.approve'
+        : 'company.reject',
       'company',
       company.id,
       company.name,
@@ -545,7 +639,9 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     }
     await this.logAction(
       admin,
-      status === CompanyApprovalStatus.APPROVED ? 'company.bulk_approve' : 'company.bulk_reject',
+      status === CompanyApprovalStatus.APPROVED
+        ? 'company.bulk_approve'
+        : 'company.bulk_reject',
       'company',
       undefined,
       `${succeeded}/${ids.length} công ty${failed.length ? ` (lỗi: ${failed.length})` : ''}`,
@@ -557,7 +653,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   // isFeaturedEmployer chỉ có thể bật thẳng trong CSDL (không có UI). Tìm công ty theo tên để chọn,
   // rồi bật/tắt — không giới hạn theo approvalStatus vì Admin có thể cần xem lại cả công ty đã duyệt.
   async searchCompanies(q?: string) {
-    const qb = this.companyRepo.createQueryBuilder('company').orderBy('company.isFeaturedEmployer', 'DESC').addOrderBy('company.name', 'ASC');
+    const qb = this.companyRepo
+      .createQueryBuilder('company')
+      .orderBy('company.isFeaturedEmployer', 'DESC')
+      .addOrderBy('company.name', 'ASC');
     if (q?.trim()) {
       qb.where('company.name ILIKE :q', { q: `%${q.trim()}%` });
     }
@@ -607,8 +706,15 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   // nên đổi lại mật khẩu ngay sau khi đăng nhập bằng mật khẩu tạm (xem AuthService.changePassword).
   async findUserByEmail(email: string) {
     const user = await this.userRepo.findOne({ where: { email } });
-    if (!user) throw new NotFoundException('Không tìm thấy tài khoản với email này');
-    return { id: user.id, email: user.email, fullName: user.fullName, role: user.role, status: user.status };
+    if (!user)
+      throw new NotFoundException('Không tìm thấy tài khoản với email này');
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+      status: user.status,
+    };
   }
 
   async resetUserPassword(admin: AdminActor, id: string) {
@@ -617,7 +723,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const tempPassword = crypto.randomBytes(6).toString('base64url'); // 8 ký tự, đủ ngẫu nhiên cho mật khẩu tạm
     user.passwordHash = await argon2.hash(tempPassword);
     await this.userRepo.save(user);
-    await this.logAction(admin, 'user.reset_password', 'user', user.id, user.email);
+    await this.logAction(
+      admin,
+      'user.reset_password',
+      'user',
+      user.id,
+      user.email,
+    );
     return { email: user.email, tempPassword };
   }
 
@@ -646,7 +758,9 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const now = new Date();
     order.status = OrderStatus.ACTIVE;
     order.activatedAt = now;
-    order.expiresAt = new Date(now.getTime() + order.servicePackage.durationDays * 24 * 60 * 60 * 1000);
+    order.expiresAt = new Date(
+      now.getTime() + order.servicePackage.durationDays * 24 * 60 * 60 * 1000,
+    );
     order.remaining = order.servicePackage.quantity;
     await this.orderRepo.save(order);
 
@@ -689,7 +803,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       skip: (page - 1) * pageSize,
       take: pageSize,
     });
-    return { items, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
+    return {
+      items,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    };
   }
 
   // ===== Batch 5 mục #3 — Biểu đồ dashboard theo thời gian =====
@@ -711,7 +831,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     ) => {
       const qb = repo
         .createQueryBuilder('t')
-        .select(`to_char(date_trunc('day', t.${dateColumn}), 'YYYY-MM-DD')`, 'day')
+        .select(
+          `to_char(date_trunc('day', t.${dateColumn}), 'YYYY-MM-DD')`,
+          'day',
+        )
         .addSelect('COUNT(*)', 'count')
         .where(`t.${dateColumn} >= :since`, { since })
         .groupBy('day');
@@ -722,14 +845,29 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       return map;
     };
 
-    const [jobsByDay, companiesByDay, candidatesByDay, applicationsByDay] = await Promise.all([
-      countByDay(this.jobRepo as unknown as Repository<{ id: string }>, 'createdAt'),
-      countByDay(this.companyRepo as unknown as Repository<{ id: string }>, 'createdAt'),
-      countByDay(this.userRepo as unknown as Repository<{ id: string }>, 'createdAt', 't.role = :role', {
-        role: UserRole.CANDIDATE,
-      }),
-      countByDay(this.applicationRepo as unknown as Repository<{ id: string }>, 'appliedAt'),
-    ]);
+    const [jobsByDay, companiesByDay, candidatesByDay, applicationsByDay] =
+      await Promise.all([
+        countByDay(
+          this.jobRepo as unknown as Repository<{ id: string }>,
+          'createdAt',
+        ),
+        countByDay(
+          this.companyRepo as unknown as Repository<{ id: string }>,
+          'createdAt',
+        ),
+        countByDay(
+          this.userRepo as unknown as Repository<{ id: string }>,
+          'createdAt',
+          't.role = :role',
+          {
+            role: UserRole.CANDIDATE,
+          },
+        ),
+        countByDay(
+          this.applicationRepo as unknown as Repository<{ id: string }>,
+          'appliedAt',
+        ),
+      ]);
 
     const series: {
       date: string;
@@ -764,10 +902,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   private async generateUniqueDraftTaxCode(): Promise<string> {
     for (let i = 0; i < 20; i++) {
       const code = `DRAFT-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-      const existing = await this.companyRepo.findOne({ where: { taxCode: code } });
+      const existing = await this.companyRepo.findOne({
+        where: { taxCode: code },
+      });
       if (!existing) return code;
     }
-    throw new ConflictException('Không sinh được mã số thuế tạm — vui lòng thử lại');
+    throw new ConflictException(
+      'Không sinh được mã số thuế tạm — vui lòng thử lại',
+    );
   }
 
   private async generateUniquePlaceholderEmail(): Promise<string> {
@@ -813,10 +955,20 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     );
 
     await this.companyUserRepo.save(
-      this.companyUserRepo.create({ companyId: company.id, userId: user.id, type: CompanyUserType.MAIN }),
+      this.companyUserRepo.create({
+        companyId: company.id,
+        userId: user.id,
+        type: CompanyUserType.MAIN,
+      }),
     );
 
-    await this.logAction(admin, 'company.create_draft', 'company', company.id, `${company.name} (nguồn: ${dto.sourceLabel ?? 'không ghi rõ'})`);
+    await this.logAction(
+      admin,
+      'company.create_draft',
+      'company',
+      company.id,
+      `${company.name} (nguồn: ${dto.sourceLabel ?? 'không ghi rõ'})`,
+    );
 
     return {
       company,
@@ -843,7 +995,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const jobCounts = await Promise.all(
       companies.map((c) => this.jobRepo.count({ where: { companyId: c.id } })),
     );
-    return companies.map((company, i) => ({ ...company, jobCount: jobCounts[i] }));
+    return companies.map((company, i) => ({
+      ...company,
+      jobCount: jobCounts[i],
+    }));
   }
 
   // Chi tiết 1 công ty nguồn ngoài + toàn bộ tin (mọi trạng thái) — màn quản lý tin của Admin cho
@@ -854,9 +1009,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   async getSourcedCompanyDetail(id: string) {
     const company = await this.companyRepo.findOne({ where: { id } });
     if (!company) throw new NotFoundException('Không tìm thấy công ty');
-    const jobs = await this.jobRepo.find({ where: { companyId: id }, order: { createdAt: 'DESC' } });
+    const jobs = await this.jobRepo.find({
+      where: { companyId: id },
+      order: { createdAt: 'DESC' },
+    });
     const applicationCounts = await Promise.all(
-      jobs.map((j) => this.applicationRepo.count({ where: { jobPostingId: j.id } })),
+      jobs.map((j) =>
+        this.applicationRepo.count({ where: { jobPostingId: j.id } }),
+      ),
     );
     return {
       company,
@@ -874,7 +1034,9 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   async deleteJob(admin: AdminActor, id: string) {
     const job = await this.jobRepo.findOne({ where: { id } });
     if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng');
-    const applicationCount = await this.applicationRepo.count({ where: { jobPostingId: id } });
+    const applicationCount = await this.applicationRepo.count({
+      where: { jobPostingId: id },
+    });
     await this.jobRepo.remove(job);
     await this.logAction(
       admin,
@@ -890,8 +1052,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   // công ty của chính tài khoản NTD đang đăng nhập). Đăng thẳng APPROVED (không qua hàng đợi "Duyệt
   // tin") vì đây CHÍNH LÀ Admin tự biên soạn/kiểm tra nội dung rồi — tương tự adminUpdateJob() không
   // cần vòng duyệt thêm lần 2 cho nội dung Admin tự tay xử lý.
-  async createJobForCompany(admin: AdminActor, companyId: string, dto: CreateJobDto) {
-    const company = await this.companyRepo.findOne({ where: { id: companyId } });
+  async createJobForCompany(
+    admin: AdminActor,
+    companyId: string,
+    dto: CreateJobDto,
+  ) {
+    const company = await this.companyRepo.findOne({
+      where: { id: companyId },
+    });
     if (!company) throw new NotFoundException('Không tìm thấy công ty');
     const job = this.jobRepo.create({
       companyId,
@@ -925,7 +1093,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       adminReviewed: true,
     });
     const saved = await this.jobRepo.save(job);
-    await this.logAction(admin, 'job.create_for_company', 'job', saved.id, `${saved.title} (${company.name})`);
+    await this.logAction(
+      admin,
+      'job.create_for_company',
+      'job',
+      saved.id,
+      `${saved.title} (${company.name})`,
+    );
     return saved;
   }
 
@@ -940,25 +1114,53 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   // ty của bạn?" (approveClaimRequest() gọi lại hàm này). Đổi email đăng nhập + đặt lại mật khẩu tạm
   // (Admin tự báo cho công ty qua kênh ngoài hệ thống, giống hệt resetUserPassword()) — KHÔNG tạo tài
   // khoản mới để giữ nguyên toàn bộ tin/ứng viên đã có sẵn dưới công ty này.
-  async claimCompany(admin: AdminActor, companyId: string, dto: ClaimCompanyDto) {
-    const company = await this.companyRepo.findOne({ where: { id: companyId } });
+  async claimCompany(
+    admin: AdminActor,
+    companyId: string,
+    dto: ClaimCompanyDto,
+  ) {
+    const company = await this.companyRepo.findOne({
+      where: { id: companyId },
+    });
     if (!company) throw new NotFoundException('Không tìm thấy công ty');
     if (!company.isAdminSourced) {
-      throw new BadRequestException('Công ty này không phải công ty nguồn ngoài — không áp dụng chuyển giao');
+      throw new BadRequestException(
+        'Công ty này không phải công ty nguồn ngoài — không áp dụng chuyển giao',
+      );
     }
 
-    const mainLink = await this.companyUserRepo.findOne({ where: { companyId, type: CompanyUserType.MAIN } });
-    if (!mainLink) throw new NotFoundException('Không tìm thấy tài khoản chính của công ty này');
-    const user = await this.userRepo.findOne({ where: { id: mainLink.userId } });
-    if (!user) throw new NotFoundException('Không tìm thấy tài khoản chính của công ty này');
+    const mainLink = await this.companyUserRepo.findOne({
+      where: { companyId, type: CompanyUserType.MAIN },
+    });
+    if (!mainLink)
+      throw new NotFoundException(
+        'Không tìm thấy tài khoản chính của công ty này',
+      );
+    const user = await this.userRepo.findOne({
+      where: { id: mainLink.userId },
+    });
+    if (!user)
+      throw new NotFoundException(
+        'Không tìm thấy tài khoản chính của công ty này',
+      );
 
     if (dto.email !== user.email) {
-      const existing = await this.userRepo.findOne({ where: { email: dto.email } });
-      if (existing) throw new ConflictException('Email này đã được đăng ký cho tài khoản khác');
+      const existing = await this.userRepo.findOne({
+        where: { email: dto.email },
+      });
+      if (existing)
+        throw new ConflictException(
+          'Email này đã được đăng ký cho tài khoản khác',
+        );
     }
     if (dto.taxCode && dto.taxCode !== company.taxCode) {
-      const existingTax = await this.companyRepo.findOne({ where: { taxCode: dto.taxCode } });
-      if (existingTax) throw new ConflictException('Mã số thuế này đã được đăng ký cho công ty khác');
+      const existingTax = await this.companyRepo.findOne({
+        where: { taxCode: dto.taxCode },
+      });
+      if (existingTax)
+        throw new ConflictException(
+          'Mã số thuế này đã được đăng ký cho công ty khác',
+        );
       company.taxCode = dto.taxCode;
     }
 
@@ -972,7 +1174,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     company.claimedAt = new Date();
     await this.companyRepo.save(company);
 
-    await this.logAction(admin, 'company.claim', 'company', company.id, `${company.name} → ${dto.email}`);
+    await this.logAction(
+      admin,
+      'company.claim',
+      'company',
+      company.id,
+      `${company.name} → ${dto.email}`,
+    );
 
     return { company, account: { email: dto.email, tempPassword } };
   }
@@ -987,7 +1195,11 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async approveClaimRequest(admin: AdminActor, id: string, dto: ResolveClaimRequestDto) {
+  async approveClaimRequest(
+    admin: AdminActor,
+    id: string,
+    dto: ResolveClaimRequestDto,
+  ) {
     const request = await this.claimRequestRepo.findOne({ where: { id } });
     if (!request) throw new NotFoundException('Không tìm thấy yêu cầu');
     if (request.status !== CompanyClaimRequestStatus.PENDING) {
@@ -1005,12 +1217,22 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     request.adminNote = dto.adminNote;
     request.resolvedAt = new Date();
     await this.claimRequestRepo.save(request);
-    await this.logAction(admin, 'claim_request.approve', 'company_claim_request', request.id, request.requesterEmail);
+    await this.logAction(
+      admin,
+      'claim_request.approve',
+      'company_claim_request',
+      request.id,
+      request.requesterEmail,
+    );
 
     return { request, account: result.account };
   }
 
-  async rejectClaimRequest(admin: AdminActor, id: string, dto: ResolveClaimRequestDto) {
+  async rejectClaimRequest(
+    admin: AdminActor,
+    id: string,
+    dto: ResolveClaimRequestDto,
+  ) {
     const request = await this.claimRequestRepo.findOne({ where: { id } });
     if (!request) throw new NotFoundException('Không tìm thấy yêu cầu');
     if (request.status !== CompanyClaimRequestStatus.PENDING) {
@@ -1020,7 +1242,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     request.adminNote = dto.adminNote;
     request.resolvedAt = new Date();
     const saved = await this.claimRequestRepo.save(request);
-    await this.logAction(admin, 'claim_request.reject', 'company_claim_request', request.id, request.requesterEmail);
+    await this.logAction(
+      admin,
+      'claim_request.reject',
+      'company_claim_request',
+      request.id,
+      request.requesterEmail,
+    );
     return saved;
   }
 }

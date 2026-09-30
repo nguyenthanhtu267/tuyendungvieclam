@@ -8,10 +8,14 @@ export class AddJobViewCount1789941200000 implements MigrationInterface {
   name = 'AddJobViewCount1789941200000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "job_postings" ADD "view_count" integer NOT NULL DEFAULT 0`);
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" ADD "view_count" integer NOT NULL DEFAULT 0`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "job_postings" DROP COLUMN "view_count"`);
+    await queryRunner.query(
+      `ALTER TABLE "job_postings" DROP COLUMN "view_count"`,
+    );
   }
 }

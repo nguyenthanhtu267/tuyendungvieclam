@@ -50,7 +50,7 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
   const theme = mounted ? currentBgTheme(setting, now || Date.now()) : BG_THEMES[0];
   const [shown, setShown] = useState<BgTheme>(theme);
   useEffect(() => {
-    if (theme.id === shown.id) return;
+    if (theme.id === shown.id && theme.image?.url === shown.image?.url) return;
     setPrev(shown);
     setShown(theme);
     const t = setTimeout(() => setPrev(null), 1600);
@@ -59,13 +59,14 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider value={shown}>
-      <div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
+      {/* Chế độ "none" (Admin tắt nền): không vẽ lớp nền, trang dùng nền trơn; khung số liệu vẫn dùng mẫu mặc định. */}
+      <div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true" hidden={setting.mode === 'none'}>
         {prev && (
           <div className="absolute inset-0">
             <ArtScene theme={prev} mode="page" />
           </div>
         )}
-        <div key={shown.id} className="absolute inset-0 bg-fade-in">
+        <div key={shown.image ? `${shown.id}-${shown.image.url}` : shown.id} className="absolute inset-0 bg-fade-in">
           <ArtScene theme={shown} mode="page" />
         </div>
       </div>

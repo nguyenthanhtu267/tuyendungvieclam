@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { apiAsset } from '@/lib/api';
 import type { BgTheme } from '@/lib/bg-themes';
 
 // Đợt 29 — vẽ 1 mẫu nền vector (SVG thuần, sinh theo mã ngẫu nhiên cố định `seed` nên mỗi mẫu luôn giống nhau).
@@ -200,11 +201,188 @@ function Aurora({ t, ink, o, glow }: Ctx) {
   );
 }
 
-const SCENES = { neural: Neural, circuit: Circuit, data: Data, iso: Iso, aurora: Aurora } as const;
+function Hex({ t, ink, o, glow }: Ctx) {
+  const r = rng(t.seed);
+  const R = 34;
+  const cells: JSX.Element[] = [];
+  const hexPts = (cx: number, cy: number, rad: number) =>
+    Array.from({ length: 6 }, (_, i) => {
+      const a = (Math.PI / 3) * i + Math.PI / 6;
+      return `${(cx + rad * Math.cos(a)).toFixed(1)},${(cy + rad * Math.sin(a)).toFixed(1)}`;
+    }).join(' ');
+  const dx = R * Math.sqrt(3);
+  for (let row = -1; row < 12; row++) {
+    for (let col = -1; col < 12; col++) {
+      const cx = col * dx + (row % 2 ? dx / 2 : 0);
+      const cy = row * R * 1.5;
+      const v = r();
+      // dồn đậm dần về góc phải-dưới để chừa vùng thoáng phía trên-trái
+      const weight = Math.min(1, (cx / W + cy / H) / 1.3);
+      if (v > 0.16 + weight * 0.5) {
+        cells.push(<polygon key={`${row}-${col}`} points={hexPts(cx, cy, R - 2)} fill="none" stroke={ink} strokeOpacity={(0.1 + weight * 0.3) * o} strokeWidth="1.2" />);
+      } else if (v > 0.06) {
+        cells.push(<polygon key={`${row}-${col}`} points={hexPts(cx, cy, R - 4)} fill={ink} fillOpacity={(0.1 + weight * 0.2) * o + 0.03} stroke={ink} strokeOpacity={0.4 * o} />);
+      } else {
+        cells.push(<polygon key={`${row}-${col}`} points={hexPts(cx, cy, R - 4)} fill={glow} fillOpacity={0.55} className="dg-blink" style={{ animationDelay: `${(row + col + 20) % 7 * 0.4}s` }} />);
+      }
+    }
+  }
+  return <>{cells}</>;
+}
+
+function Topo({ t, ink, o, glow }: Ctx) {
+  const r = rng(t.seed);
+  const centers = [
+    { x: 250 + r() * 100, y: 240 + r() * 80, n: 11, s: 34 },
+    { x: 620 + r() * 60, y: 140 + r() * 60, n: 8, s: 30 },
+  ];
+  const ring = (cx: number, cy: number, rad: number, ph: number) => {
+    const pts: string[] = [];
+    for (let a = 0; a <= 360; a += 8) {
+      const rr = rad * (1 + 0.14 * Math.sin((a * Math.PI) / 180 * 3 + ph) + 0.07 * Math.sin((a * Math.PI) / 180 * 5 + ph * 2.1));
+      pts.push(`${(cx + rr * Math.cos((a * Math.PI) / 180) * 1.35).toFixed(1)} ${(cy + rr * Math.sin((a * Math.PI) / 180)).toFixed(1)}`);
+    }
+    return `M${pts.join(' L')}Z`;
+  };
+  return (
+    <>
+      {centers.map((c, ci) => {
+        const ph = r() * 6;
+        return (
+          <g key={ci} fill="none">
+            {Array.from({ length: c.n }, (_, i) => (
+              <path key={i} d={ring(c.x, c.y, 18 + i * c.s, ph + i * 0.18)} stroke={i % 5 === 4 ? glow : ink} strokeOpacity={i % 5 === 4 ? 0.85 : (0.55 - i * 0.03) * o} strokeWidth={i % 5 === 4 ? 2 : 1.3} />
+            ))}
+            <circle cx={c.x} cy={c.y} r="6" fill={glow} stroke="none" className="dg-pulse" />
+          </g>
+        );
+      })}
+    </>
+  );
+}
+
+function Tri({ t, ink, o, glow }: Ctx) {
+  const r = rng(t.seed);
+  const cols = 11;
+  const rows = 7;
+  const cw = W / (cols - 1);
+  const rh = H / (rows - 1);
+  const P2 = Array.from({ length: rows }, (_, y) =>
+    Array.from({ length: cols }, (_, x) => [x * cw + (x > 0 && x < cols - 1 ? (r() - 0.5) * cw * 0.7 : 0), y * rh + (y > 0 && y < rows - 1 ? (r() - 0.5) * rh * 0.7 : 0)] as const),
+  );
+  const tris: JSX.Element[] = [];
+  for (let y = 0; y < rows - 1; y++)
+    for (let x = 0; x < cols - 1; x++) {
+      const a = P2[y][x], b = P2[y][x + 1], c = P2[y + 1][x], d = P2[y + 1][x + 1];
+      [[a, b, c], [b, d, c]].forEach((tri, k) => {
+        const v = r();
+        const fill = v > 0.93 ? glow : v > 0.55 ? t.c : ink;
+        tris.push(
+          <polygon
+            key={`${x}-${y}-${k}`}
+            points={tri.map((q) => q.join(',')).join(' ')}
+            fill={fill}
+            fillOpacity={v > 0.93 ? 0.7 : (0.05 + v * 0.28) * o + 0.02}
+            stroke={ink}
+            strokeOpacity={0.22 * o}
+            strokeWidth="1"
+            className={v > 0.93 ? 'dg-blink' : undefined}
+          />,
+        );
+      });
+    }
+  return <>{tris}</>;
+}
+
+function Wave({ t, ink, o, glow }: Ctx) {
+  const r = rng(t.seed);
+  const lines = Array.from({ length: 12 }, (_, i) => {
+    const base = 90 + i * 32;
+    const amp = 22 + r() * 30;
+    const f = 0.005 + r() * 0.004;
+    const ph = r() * 6;
+    const pts: string[] = [];
+    for (let x = -10; x <= W + 10; x += 16) pts.push(`${x} ${(base + amp * Math.sin(x * f + ph) + amp * 0.5 * Math.sin(x * f * 2.1 + ph * 1.3)).toFixed(1)}`);
+    return `M${pts.join(' L')}`;
+  });
+  return (
+    <>
+      <g fill="none" strokeLinecap="round">
+        {lines.map((d, i) => (
+          <path key={i} d={d} stroke={i % 4 === 2 ? glow : ink} strokeOpacity={i % 4 === 2 ? 0.75 : (0.2 + (i % 3) * 0.1) * o + 0.04} strokeWidth={i % 4 === 2 ? 2.4 : 1.4} />
+        ))}
+      </g>
+      <g fill="none" stroke={glow} strokeWidth="3" strokeLinecap="round" strokeDasharray="14 190" className="dg-flow">
+        {lines.filter((_, i) => i % 3 === 0).map((d, i) => (
+          <path key={i} d={d} />
+        ))}
+      </g>
+    </>
+  );
+}
+
+function Bubble({ t, ink, o, glow }: Ctx) {
+  const r = rng(t.seed);
+  const items = Array.from({ length: 26 }, () => ({ x: r() * W, y: r() * H, rad: 8 + r() * r() * 70, v: r() }));
+  return (
+    <>
+      {items.map((b, i) => (
+        <g key={i} className={b.v > 0.8 ? 'dg-float' : undefined} style={{ animationDelay: `${(i % 6) * 0.7}s` }}>
+          <circle cx={b.x} cy={b.y} r={b.rad} fill={b.v > 0.88 ? glow : b.v > 0.45 ? ink : 'none'} fillOpacity={b.v > 0.88 ? 0.4 : 0.1 * o + 0.03} stroke={ink} strokeOpacity={0.45 * o + 0.05} strokeWidth="1.3" />
+          {b.rad > 28 && <circle cx={b.x} cy={b.y} r={b.rad * 0.55} fill="none" stroke={ink} strokeOpacity={0.3 * o} strokeDasharray="3 6" />}
+          {b.rad > 14 && <circle cx={b.x - b.rad * 0.3} cy={b.y - b.rad * 0.3} r={b.rad * 0.12} fill="#fff" fillOpacity={0.5} />}
+        </g>
+      ))}
+    </>
+  );
+}
+
+function Grid({ t, ink, o, glow }: Ctx) {
+  const r = rng(t.seed);
+  const hz = 290;
+  const vx = 400;
+  const stars = Array.from({ length: 40 }, () => [r() * W, r() * (hz - 30), 0.6 + r() * 1.5] as const);
+  const vertical = Array.from({ length: 21 }, (_, i) => (i - 10) * 90);
+  const horiz = Array.from({ length: 9 }, (_, i) => hz + Math.pow(i + 1, 2.05) * 3.4);
+  return (
+    <>
+      <g fill={glow}>
+        {stars.map((s, i) => (
+          <circle key={i} cx={s[0]} cy={s[1]} r={s[2]} fillOpacity={0.6} className="dg-blink" style={{ animationDelay: `${(i % 8) * 0.35}s` }} />
+        ))}
+      </g>
+      <circle cx={vx} cy={hz - 8} r="92" fill={glow} fillOpacity={0.28} className="dg-pulse" />
+      <circle cx={vx} cy={hz - 8} r="62" fill={glow} fillOpacity={0.5} />
+      <rect x="0" y={hz} width={W} height={H - hz} fill={t.a} fillOpacity={0.5 * o + 0.15} />
+      <g stroke={ink} strokeOpacity={0.5 * o + 0.06} strokeWidth="1.3">
+        <line x1="0" y1={hz} x2={W} y2={hz} strokeOpacity={0.9} stroke={glow} />
+        {vertical.map((dx, i) => (
+          <line key={i} x1={vx + dx * 0.12} y1={hz} x2={vx + dx * 3.2} y2={H} />
+        ))}
+        {horiz.map((y, i) => (
+          <line key={i} x1="0" y1={y} x2={W} y2={y} />
+        ))}
+      </g>
+    </>
+  );
+}
+
+const SCENES = { neural: Neural, circuit: Circuit, data: Data, iso: Iso, aurora: Aurora, hex: Hex, topo: Topo, tri: Tri, wave: Wave, bubble: Bubble, grid: Grid } as const;
 
 export function ArtScene({ theme, mode = 'panel', className = '' }: { theme: BgTheme; mode?: 'panel' | 'page'; className?: string }) {
   const id = `art${useId().replace(/:/g, '')}`;
   const page = mode === 'page';
+  // Nền là ảnh Admin tải lên: ảnh phủ kín (cắt giữa, không méo) + lớp phủ: sáng nhạt cho toàn trang (chữ dễ đọc), tối cho khung số liệu.
+  if (theme.image) {
+    const ov = Math.min(90, Math.max(0, theme.image.overlay)) / 100;
+    return (
+      <div aria-hidden="true" className={`absolute inset-0 w-full h-full pointer-events-none overflow-hidden ${className}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={apiAsset(theme.image.url)} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" decoding="async" />
+        <div className="absolute inset-0" style={{ background: page ? `rgba(246,248,252,${ov})` : 'linear-gradient(135deg, rgba(8,22,56,.62), rgba(8,22,56,.78))' }} />
+      </div>
+    );
+  }
   const Scene = SCENES[theme.group];
   const ctx: Ctx = {
     t: theme,

@@ -9,7 +9,9 @@ export class AddCompanyLogoAndFollow1789945000000 implements MigrationInterface 
   name = 'AddCompanyLogoAndFollow1789945000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "companies" ADD "logo_url" character varying`);
+    await queryRunner.query(
+      `ALTER TABLE "companies" ADD "logo_url" character varying`,
+    );
 
     await queryRunner.query(`
       CREATE TABLE "company_follows" (
@@ -21,11 +23,15 @@ export class AddCompanyLogoAndFollow1789945000000 implements MigrationInterface 
         CONSTRAINT "PK_company_follows_id" PRIMARY KEY ("id")
       )
     `);
-    await queryRunner.query(`CREATE INDEX "IDX_company_follows_company_id" ON "company_follows" ("company_id")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_company_follows_company_id" ON "company_follows" ("company_id")`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX "public"."IDX_company_follows_company_id"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_company_follows_company_id"`,
+    );
     await queryRunner.query(`DROP TABLE "company_follows"`);
     await queryRunner.query(`ALTER TABLE "companies" DROP COLUMN "logo_url"`);
   }

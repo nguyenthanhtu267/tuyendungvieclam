@@ -10,6 +10,9 @@ import { usePathname } from 'next/navigation';
 //  · Dải nhỏ (sau khi nộp đơn, menu điện thoại) là khung tương tác riêng → không bị điều tiết.
 // Đo lúc tất cả banner đang hiện rồi quyết định trong cùng 1 nhịp (không nhấp nháy); ẩn bằng class .ad-suppressed.
 const MIN_GAP = 720;
+// Ngân sách mỗi trang: máy tính ≤ 3 banner (1 khung dọc cột phải + ≤ 2 dải ngang); điện thoại ≤ 2 dải ngang. Chỉ 2 loại kích thước: dải ngang và khung dọc.
+const BUDGET_DESKTOP = 3;
+const BUDGET_MOBILE = 2;
 const PRIORITY = ['jobs-inline', 'job-mid', 'home-top', 'home-mid', 'candidate-top', 'employer-top', 'employer-search', 'jobs-bottom', 'job-bottom', 'company-bottom', 'home-bottom', 'footer-top'];
 const rank = (s: string) => {
   const i = PRIORITY.indexOf(s);
@@ -31,13 +34,16 @@ function govern() {
     const r = e.getBoundingClientRect();
     return { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY };
   };
+  const desktop = window.matchMedia('(min-width: 1024px)').matches;
+  const sideKept = all.filter((e) => e.dataset.adGov === 'tall' && !e.classList.contains('ad-suppressed') && e.offsetParent !== null).length;
+  const allowWide = Math.max(0, (desktop ? BUDGET_DESKTOP : BUDGET_MOBILE) - (desktop ? sideKept : 0));
   const kept: { top: number; bottom: number }[] = [];
   wides
     .map((e) => ({ e, r: rank(e.dataset.adSlot || ''), b: box(e) }))
     .sort((a, b) => a.r - b.r)
     .forEach(({ e, b }) => {
       const near = kept.some((k) => Math.max(b.top - k.bottom, k.top - b.bottom) < MIN_GAP);
-      if (near) e.classList.add('ad-suppressed');
+      if (near || kept.length >= allowWide) e.classList.add('ad-suppressed');
       else kept.push(b);
     });
 }

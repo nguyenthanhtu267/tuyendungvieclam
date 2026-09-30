@@ -69,6 +69,8 @@ import { AdminToolsModule } from './admin-tools/admin-tools.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { StorageModule } from './storage/storage.module';
 import { AdsModule } from './ads/ads.module';
+import { BackgroundModule } from './background/background.module';
+import { BgImage } from './database/entities/bg-image.entity';
 
 const entities = [
   User,
@@ -119,6 +121,7 @@ const entities = [
   // Đợt 24 — banner quảng cáo.
   AdCampaign,
   AdCampaignStat,
+  BgImage,
 ];
 
 @Module({
@@ -139,7 +142,10 @@ const entities = [
         // CSDL hosting thật (Supabase, Render, v.v.) yêu cầu kết nối SSL — bật qua biến môi trường
         // DATABASE_SSL=true khi triển khai (đợt 7, 18/09/2026). rejectUnauthorized:false vì các dịch
         // vụ này dùng chứng chỉ do họ tự quản lý, không nằm trong danh sách CA gốc mặc định của Node.
-        ssl: configService.get<string>('DATABASE_SSL') === 'true' ? { rejectUnauthorized: false } : false,
+        ssl:
+          configService.get<string>('DATABASE_SSL') === 'true'
+            ? { rejectUnauthorized: false }
+            : false,
       }),
     }),
     // Bảo mật (đợt 12a, 20/09/2026): giới hạn số request mặc định 100 lần/60s theo IP cho toàn bộ
@@ -164,6 +170,7 @@ const entities = [
     AnalyticsModule,
     StorageModule,
     AdsModule,
+    BackgroundModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

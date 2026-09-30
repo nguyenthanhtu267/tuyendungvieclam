@@ -44,6 +44,7 @@ import {
   StoredFile,
   AdCampaign,
   AdCampaignStat,
+  BgImage,
 } from './entities';
 
 // Đợt 12a (20/09/2026) — DataSource riêng cho TypeORM CLI (migration:generate/run/revert), tách
@@ -100,9 +101,11 @@ export const AppDataSource = new DataSource({
     StoredFile,
     AdCampaign,
     AdCampaignStat,
+    BgImage,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,
   logging: false,
-  ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
+  ssl:
+    process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
 });

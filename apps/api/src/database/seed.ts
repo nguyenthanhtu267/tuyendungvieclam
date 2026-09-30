@@ -67,7 +67,12 @@ const SEED: SeedCompany[] = [
           'Tìm kiếm và phát triển khách hàng doanh nghiệp trong lĩnh vực phần mềm quản trị; xây dựng đề xuất giải pháp phù hợp nhu cầu khách hàng; phối hợp đội kỹ thuật để triển khai hợp đồng; đạt chỉ tiêu doanh số hàng quý.',
         requirements:
           'Tốt nghiệp Cao đẳng/Đại học, ưu tiên khối ngành Kinh tế\nTối thiểu 1 năm kinh nghiệm bán hàng B2B\nKỹ năng giao tiếp và đàm phán tốt',
-        benefits: ['Bảo hiểm sức khỏe', 'Thưởng KPI', 'Laptop', 'Du lịch hằng năm'],
+        benefits: [
+          'Bảo hiểm sức khỏe',
+          'Thưởng KPI',
+          'Laptop',
+          'Du lịch hằng năm',
+        ],
         deadline: '2026-10-30',
       },
       {
@@ -122,7 +127,8 @@ const SEED: SeedCompany[] = [
         level: 'Nhân viên',
         description:
           'Tư vấn và phát triển khách hàng doanh nghiệp sử dụng nền tảng thanh toán số; duy trì quan hệ khách hàng hiện hữu.',
-        requirements: 'Kinh nghiệm bán hàng B2B trong lĩnh vực tài chính/công nghệ là lợi thế',
+        requirements:
+          'Kinh nghiệm bán hàng B2B trong lĩnh vực tài chính/công nghệ là lợi thế',
         benefits: ['Bảo hiểm sức khỏe', 'Thưởng KPI'],
         deadline: '2026-11-20',
       },
@@ -140,8 +146,10 @@ const SEED: SeedCompany[] = [
         location: 'Đà Nẵng',
         employmentType: 'Toàn thời gian',
         level: 'Nhân viên',
-        description: 'Chăm sóc và theo dõi tình trạng bệnh nhân theo chỉ định của bác sĩ; hỗ trợ các thủ thuật y khoa.',
-        requirements: 'Tốt nghiệp Cao đẳng/Đại học Điều dưỡng\nCó chứng chỉ hành nghề',
+        description:
+          'Chăm sóc và theo dõi tình trạng bệnh nhân theo chỉ định của bác sĩ; hỗ trợ các thủ thuật y khoa.',
+        requirements:
+          'Tốt nghiệp Cao đẳng/Đại học Điều dưỡng\nCó chứng chỉ hành nghề',
         benefits: ['Bảo hiểm sức khỏe', 'Phụ cấp ca đêm', 'Đào tạo chuyên môn'],
         deadline: '2026-10-20',
       },
@@ -161,8 +169,10 @@ const SEED: SeedCompany[] = [
         salaryMax: 22,
         employmentType: 'Toàn thời gian',
         level: 'Nhân viên',
-        description: 'Bảo trì, sửa chữa hệ thống máy móc sản xuất; lập kế hoạch bảo trì định kỳ.',
-        requirements: 'Tốt nghiệp Cao đẳng/Đại học Cơ khí\nCó kinh nghiệm bảo trì máy công nghiệp',
+        description:
+          'Bảo trì, sửa chữa hệ thống máy móc sản xuất; lập kế hoạch bảo trì định kỳ.',
+        requirements:
+          'Tốt nghiệp Cao đẳng/Đại học Cơ khí\nCó kinh nghiệm bảo trì máy công nghiệp',
         benefits: ['Xe đưa đón', 'Phụ cấp ca'],
         deadline: '2026-10-12',
       },
@@ -180,7 +190,8 @@ const SEED: SeedCompany[] = [
         location: 'Đồng Nai',
         employmentType: 'Toàn thời gian',
         level: 'Giám sát / Trưởng nhóm',
-        description: 'Quản lý vận hành kho hàng, điều phối đội ngũ nhân viên kho, đảm bảo tiến độ xuất nhập hàng.',
+        description:
+          'Quản lý vận hành kho hàng, điều phối đội ngũ nhân viên kho, đảm bảo tiến độ xuất nhập hàng.',
         requirements: 'Tối thiểu 2 năm kinh nghiệm vận hành kho/logistics',
         benefits: ['Bảo hiểm sức khỏe', 'Nghỉ phép năm'],
         deadline: '2026-11-05',
@@ -201,7 +212,8 @@ const SEED: SeedCompany[] = [
         salaryMax: 12,
         employmentType: 'Toàn thời gian',
         level: 'Nhân viên',
-        description: 'Tiếp nhận và xử lý phản hồi, khiếu nại của khách hàng; hỗ trợ đặt bàn và chăm sóc khách VIP.',
+        description:
+          'Tiếp nhận và xử lý phản hồi, khiếu nại của khách hàng; hỗ trợ đặt bàn và chăm sóc khách VIP.',
         requirements: 'Giao tiếp tốt, ưu tiên có kinh nghiệm ngành F&B',
         benefits: ['Thưởng lễ Tết', 'Đồng phục', 'Ăn ca'],
         deadline: '2026-10-20',
@@ -219,7 +231,9 @@ async function run() {
   let createdJobs = 0;
 
   for (const seedCompany of SEED) {
-    let company = await companyRepo.findOne({ where: { taxCode: seedCompany.taxCode } });
+    let company = await companyRepo.findOne({
+      where: { taxCode: seedCompany.taxCode },
+    });
     if (!company) {
       company = await companyRepo.save(
         companyRepo.create({
@@ -235,7 +249,9 @@ async function run() {
     }
 
     for (const job of seedCompany.jobs) {
-      const exists = await jobRepo.findOne({ where: { companyId: company.id, title: job.title } });
+      const exists = await jobRepo.findOne({
+        where: { companyId: company.id, title: job.title },
+      });
       if (exists) continue;
       await jobRepo.save(
         jobRepo.create({
@@ -270,7 +286,10 @@ async function run() {
     const job = allJobs[i];
     let changed = false;
     if (!job.provinces && job.location) {
-      job.provinces = job.location.split(/[,|]/).map((s) => s.trim()).filter(Boolean);
+      job.provinces = job.location
+        .split(/[,|]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
       changed = true;
     }
     if (!job.district && job.location?.includes('Hồ Chí Minh')) {
@@ -278,7 +297,10 @@ async function run() {
       changed = true;
     }
     if (!job.experienceLevel) {
-      job.experienceLevel = job.level === 'Nhân viên' ? 'Từ 1 đến 4 năm' : 'Không yêu cầu kinh nghiệm';
+      job.experienceLevel =
+        job.level === 'Nhân viên'
+          ? 'Từ 1 đến 4 năm'
+          : 'Không yêu cầu kinh nghiệm';
       changed = true;
     }
     if (i < 2 && !job.isUrgent) {
@@ -291,7 +313,11 @@ async function run() {
     }
   }
 
-  const featuredNames = ['Công ty TNHH Giải pháp Số Việt', 'Tập đoàn Bán lẻ Hoa Mai', 'FinTech Ánh Dương'];
+  const featuredNames = [
+    'Công ty TNHH Giải pháp Số Việt',
+    'Tập đoàn Bán lẻ Hoa Mai',
+    'FinTech Ánh Dương',
+  ];
   for (const name of featuredNames) {
     await companyRepo.update({ name }, { isFeaturedEmployer: true });
   }
@@ -305,7 +331,11 @@ async function run() {
   if (!admin) {
     const passwordHash = await argon2.hash('Admin@123');
     admin = await userRepo.save(
-      userRepo.create({ email: adminEmail, passwordHash, role: UserRole.ADMIN }),
+      userRepo.create({
+        email: adminEmail,
+        passwordHash,
+        role: UserRole.ADMIN,
+      }),
     );
     createdAdmin = true;
   }
@@ -319,9 +349,27 @@ async function run() {
     durationDays: number;
     price: number;
   }> = [
-    { name: 'Không giới hạn 1 tháng', type: 'job_posting', quantity: 9999, durationDays: 30, price: 2_990_000 },
-    { name: 'Combo Tăng trưởng', type: 'combo', quantity: 20, durationDays: 60, price: 6_490_000 },
-    { name: 'RD 50 điểm · 30 ngày', type: 'cv_search', quantity: 50, durationDays: 30, price: 1_590_000 },
+    {
+      name: 'Không giới hạn 1 tháng',
+      type: 'job_posting',
+      quantity: 9999,
+      durationDays: 30,
+      price: 2_990_000,
+    },
+    {
+      name: 'Combo Tăng trưởng',
+      type: 'combo',
+      quantity: 20,
+      durationDays: 60,
+      price: 6_490_000,
+    },
+    {
+      name: 'RD 50 điểm · 30 ngày',
+      type: 'cv_search',
+      quantity: 50,
+      durationDays: 30,
+      price: 1_590_000,
+    },
   ];
   let createdPackages = 0;
   for (const pkg of SEED_PACKAGES) {
@@ -331,8 +379,12 @@ async function run() {
     createdPackages++;
   }
 
-  console.log(`Đã tạo ${createdCompanies} công ty mới, ${createdJobs} tin tuyển dụng mới, ${createdPackages} gói dịch vụ mới.`);
-  console.log(`Đã bù dữ liệu đợt 10 (tỉnh/thành, khẩn cấp...) cho ${backfilledJobs} tin, đánh dấu ${featuredNames.length} doanh nghiệp yêu thích.`);
+  console.log(
+    `Đã tạo ${createdCompanies} công ty mới, ${createdJobs} tin tuyển dụng mới, ${createdPackages} gói dịch vụ mới.`,
+  );
+  console.log(
+    `Đã bù dữ liệu đợt 10 (tỉnh/thành, khẩn cấp...) cho ${backfilledJobs} tin, đánh dấu ${featuredNames.length} doanh nghiệp yêu thích.`,
+  );
   console.log(
     createdAdmin
       ? `Đã tạo tài khoản Admin mẫu: ${adminEmail} / Admin@123 (đổi mật khẩu trước khi triển khai thật).`
