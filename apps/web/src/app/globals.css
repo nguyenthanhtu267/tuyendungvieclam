@@ -120,8 +120,8 @@
    280px, dải ngang toàn trang hay menu điện thoại đều tự đổi bố cục + cỡ chữ cho vừa. */
 .pm-wrap { position: relative; container-type: inline-size; }
 .pm {
-  position: relative; display: flex; flex-direction: column; justify-content: center; gap: 12px;
-  min-height: 118px; padding: 26px 18px 16px; border-radius: 14px; overflow: hidden; text-decoration: none;
+  position: relative; display: flex; flex-direction: column; justify-content: center; gap: 10px;
+  min-height: 100px; padding: 20px 16px 12px; border-radius: 14px; overflow: hidden; text-decoration: none;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08); transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 .pm:hover { box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16); transform: translateY(-1px); }
@@ -152,10 +152,10 @@
 .pm-close:hover { opacity: 1; }
 /* Dải ngang: khung đủ rộng → chữ trái, nút phải. */
 @container (min-width: 540px) {
-  .pm-wide .pm { flex-direction: row; align-items: center; justify-content: space-between; gap: 24px; min-height: 104px; padding: 22px 28px 18px; }
-  .pm-wide .pm-title { font-size: clamp(18px, 3cqi, 26px); }
+  .pm-wide .pm { flex-direction: row; align-items: center; justify-content: space-between; gap: 20px; min-height: 76px; padding: 14px 24px 12px; }
+  .pm-wide .pm-title { font-size: clamp(18px, 3cqi, 22px); }
   .pm-wide .pm-sub { font-size: clamp(13px, 1.7cqi, 15px); }
-  .pm-wide .pm-cta { align-self: center; font-size: 14px; padding: 11px 20px; }
+  .pm-wide .pm-cta { align-self: center; font-size: 14px; padding: 8px 18px; }
 }
 /* Khung dọc cột phải. */
 .pm-tall .pm { min-height: 270px; justify-content: space-between; padding: 30px 20px 20px; }

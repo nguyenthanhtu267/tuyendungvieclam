@@ -75,12 +75,12 @@ const dm = (day: string) => `${day.slice(8, 10)}/${day.slice(5, 7)}`;
 
 function Sparkline({ values, color }: { values: number[]; color: string }) {
   const max = Math.max(...values, 1);
-  if (values.every((v) => v === 0)) return <div className="h-6" />;
+  if (values.every((v) => v === 0)) return <div className="h-4" />;
   const W = 80;
-  const H = 24;
+  const H = 16;
   const pts = values.map((v, i) => `${(i / (values.length - 1)) * W},${H - 2 - (v / max) * (H - 5)}`);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-6" preserveAspectRatio="none" aria-hidden="true">
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-4" preserveAspectRatio="none" aria-hidden="true">
       <polyline points={pts.join(' ')} fill="none" stroke={color} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );
@@ -109,7 +109,7 @@ function Kpi({ label, value, color, series, change }: { label: string; value: nu
 function AreaChart({ data, color, title }: { data: { day: string; n: number }[]; color: string; title: string }) {
   const [ref, w] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
-  const H = 70;
+  const H = 30;
   const padL = 4;
   const padR = 4;
   const padT = 8;
@@ -234,7 +234,7 @@ function Donut({ rows, href }: { rows: { label: string; count: number }[]; href:
   let acc = 0;
   return (
     <div className="flex items-center gap-4">
-      <svg viewBox="0 0 120 120" className="w-[120px] h-[120px] shrink-0 -rotate-90" role="img" aria-label="Cơ cấu việc làm theo hình thức">
+      <svg viewBox="0 0 120 120" className="w-[92px] h-[92px] shrink-0 -rotate-90" role="img" aria-label="Cơ cấu việc làm theo hình thức">
         <circle cx="60" cy="60" r={R} fill="none" stroke="#E8EDF7" strokeWidth="16" />
         {rows.map((r, i) => {
           const len = (r.count / total) * C;
@@ -286,13 +286,13 @@ function Columns({ rows }: { rows: { label: string; count: number }[] }) {
   const short = (l: string) => l.replace(' triệu', '').replace('Dưới ', '<').replace('Trên ', '>');
   return (
     <div>
-      <div className="flex items-end gap-2 h-[120px]">
+      <div className="flex items-end gap-2 h-[92px]">
         {rows.map((r, i) => (
           <div key={r.label} className="flex-1 flex flex-col items-center justify-end h-full min-w-0" title={`${r.label}: ${r.count} tin`}>
             <span className="font-mono text-[12.5px] font-bold tabular-nums text-ink mb-0.5">{formatNumber(r.count)}</span>
             <div
               className="w-full rounded-t-md transition-[height] duration-700 ease-out"
-              style={{ height: on ? `${Math.max(3, (r.count / max) * 88)}px` : '0px', background: PALETTE[i % PALETTE.length] }}
+              style={{ height: on ? `${Math.max(3, (r.count / max) * 66)}px` : '0px', background: PALETTE[i % PALETTE.length] }}
             />
           </div>
         ))}
@@ -364,7 +364,7 @@ export function MarketPanel(p: MarketPanelProps) {
 
   return (
     <div
-      className="rounded-2xl min-h-[220px] relative overflow-hidden p-3 sm:p-4 flex"
+      className="rounded-2xl min-h-[180px] relative overflow-hidden p-3 sm:p-4 flex"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
@@ -412,7 +412,7 @@ export function MarketPanel(p: MarketPanelProps) {
           <Kpi label="Doanh nghiệp" value={p.companies} color="#7A4FD6" />
         </div>
 
-        <div className="min-h-[188px]" role="tabpanel">
+        <div className="min-h-[112px]" role="tabpanel">
           {tab === 'trend' &&
             (market ? (
               <div className="flex flex-col gap-2.5">

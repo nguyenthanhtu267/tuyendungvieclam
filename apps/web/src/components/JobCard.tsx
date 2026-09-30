@@ -114,10 +114,10 @@ export function JobCard({
           $ {formatSalaryTag(job.salaryMin, job.salaryMax)}
         </div>
 
-        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-[11.5px] text-ink-faint">
-          {locationText && <span>📍 {locationText}</span>}
-          {job.deadline && <span>Hạn nộp: {formatDate(job.deadline)}</span>}
-          <span>Cập nhật: {formatDate(job.updatedAt ?? job.createdAt)}</span>
+        <div className="flex flex-nowrap items-center gap-x-3 mt-1.5 text-[11.5px] text-ink-faint whitespace-nowrap overflow-hidden">
+          {locationText && <span className="truncate min-w-0 shrink">📍 {locationText}</span>}
+          {job.deadline && <span className="shrink-0">Hạn nộp: {formatDate(job.deadline)}</span>}
+          <span className="shrink-0">Cập nhật: {formatDate(job.updatedAt ?? job.createdAt)}</span>
         </div>
 
         {/* Đợt 15 (25/09/2026) — mục 17 danh sách lỗi: bỏ hẳn khối chip "Phúc lợi" khỏi thẻ tin (theo
