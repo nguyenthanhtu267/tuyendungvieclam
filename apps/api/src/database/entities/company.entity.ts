@@ -44,6 +44,14 @@ export class Company {
   @Column({ name: 'logo_url', nullable: true })
   logoUrl?: string;
 
+  // Đợt 67 — logo do hệ thống tự dò từ website công ty (apple-touch-icon / icon / og:image), chỉ dùng
+  // khi NTD chưa dán logoUrl. logoCheckedAt = lần dò gần nhất (kể cả khi không tìm ra) để không dò lại liên tục.
+  @Column({ name: 'auto_logo_url', nullable: true })
+  autoLogoUrl?: string;
+
+  @Column({ name: 'logo_checked_at', type: 'timestamp', nullable: true })
+  logoCheckedAt?: Date;
+
   // Đợt 12ac (24/09/2026) — "Giới thiệu công ty" cho tab Tổng quan công ty (trang chi tiết tin), có
   // mở rộng/thu gọn ở FE khi dài — theo mẫu careerviet.vn.
   @Column({ type: 'text', nullable: true })

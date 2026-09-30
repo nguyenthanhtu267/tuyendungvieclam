@@ -48,7 +48,7 @@ export default function OnlineBanner() {
   if (count == null) return null;
 
   return (
-    <div className="bg-success/10 border-b border-success/20">
+    <div className="bg-[#E9F7F2] border-b border-success/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-1.5 flex items-center justify-center gap-2 text-[12px] font-semibold text-success">
         <span className="relative flex h-2 w-2" aria-hidden>
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />

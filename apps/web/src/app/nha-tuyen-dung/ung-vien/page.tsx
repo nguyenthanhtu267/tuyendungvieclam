@@ -400,7 +400,7 @@ function UngVienPageInner() {
                   <button
                     onClick={() => setShowAdvanced((v) => !v)}
                     className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${
-                      hasActiveFilters ? 'border-primary text-primary bg-primary/5' : 'border-border text-ink-faint'
+                      hasActiveFilters ? 'border-primary text-primary bg-[#F3F6FB]' : 'border-border text-ink-faint'
                     }`}
                   >
                     Bộ lọc nâng cao {hasActiveFilters ? '●' : ''}

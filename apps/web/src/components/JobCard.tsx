@@ -88,7 +88,7 @@ export function JobCard({
       href={`/viec-lam/${job.id}`}
       className={`relative flex flex-wrap sm:flex-nowrap items-center gap-3 rounded-xl border p-4 transition-all ${
         job.isUrgent
-          ? 'border-critical/30 bg-critical-tint/50 hover:border-critical hover:shadow-sm'
+          ? 'border-critical/30 bg-[#FDF0F1] hover:border-critical hover:shadow-sm'
           : 'border-border bg-white hover:border-primary hover:shadow-sm'
       }`}
     >

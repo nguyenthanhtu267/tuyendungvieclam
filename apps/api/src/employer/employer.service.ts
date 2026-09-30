@@ -637,7 +637,14 @@ export class EmployerService {
     if (!company) throw new NotFoundException('Không tìm thấy công ty');
     if (dto.size !== undefined) company.size = dto.size;
     if (dto.industry !== undefined) company.industry = dto.industry;
-    if (dto.website !== undefined) company.website = dto.website;
+    if (dto.website !== undefined) {
+      if ((dto.website ?? '') !== (company.website ?? '')) {
+        // Đợt 67 — đổi website thì dò lại logo tự động.
+        company.autoLogoUrl = undefined;
+        company.logoCheckedAt = undefined;
+      }
+      company.website = dto.website;
+    }
     if (dto.logoUrl !== undefined)
       company.logoUrl = dto.logoUrl.trim() || undefined;
     // Đợt 12ac (24/09/2026) — "Giới thiệu công ty" cho tab Tổng quan công ty (trang chi tiết tin).

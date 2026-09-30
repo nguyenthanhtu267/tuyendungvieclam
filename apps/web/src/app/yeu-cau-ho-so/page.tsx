@@ -76,7 +76,7 @@ export default function YeuCauHoSoPage() {
                 <label
                   key={v}
                   className={`flex gap-3 items-start rounded-lg border p-3 cursor-pointer ${
-                    form.requestType === v ? 'border-primary bg-primary/5' : 'border-border'
+                    form.requestType === v ? 'border-primary bg-[#F3F6FB]' : 'border-border'
                   }`}
                 >
                   <input

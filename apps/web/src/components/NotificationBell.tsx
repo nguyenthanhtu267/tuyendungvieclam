@@ -128,7 +128,7 @@ export function NotificationBell({ token, variant = 'light' }: { token: string; 
                   key={n.id}
                   onClick={() => handleItemClick(n)}
                   className={`w-full text-left px-4 py-2.5 border-b border-border/60 last:border-0 hover:bg-surface-alt transition-colors ${
-                    !n.isRead ? 'bg-primary-tint/40' : ''
+                    !n.isRead ? 'bg-[#F3F6FB]' : ''
                   }`}
                 >
                   <div className="flex items-start gap-2">

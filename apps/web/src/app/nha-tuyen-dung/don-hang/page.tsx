@@ -153,7 +153,7 @@ export default function DonHangPage() {
                     </ul>
                     <div
                       className={`text-center text-xs font-bold rounded-lg py-2 ${
-                        selectedId === pkg.id ? 'bg-accent text-white' : 'bg-primary/10 text-primary'
+                        selectedId === pkg.id ? 'bg-accent text-white' : 'bg-[#E9EEF7] text-primary'
                       }`}
                     >
                       {selectedId === pkg.id ? 'Đã chọn' : 'Chọn gói'}

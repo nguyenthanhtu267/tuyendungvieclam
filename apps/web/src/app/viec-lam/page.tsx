@@ -14,6 +14,8 @@ import { useAuth } from '@/lib/auth-context';
 import { formatNumber } from '@/lib/format';
 import { AdSlot } from '@/components/ads/AdSlot';
 import { AdStack } from '@/components/ads/AdStack';
+import { ToggleChip } from '@/components/ToggleChip';
+import { PostedWithinMenu } from '@/components/PostedWithinMenu';
 import { RecentJobs } from '@/components/RecentJobs';
 import { FilterSuggestions } from '@/components/search/FilterSuggestions';
 import { readRecentJobs } from '@/lib/recent-jobs';
@@ -241,28 +243,22 @@ function JobSearchPage() {
                 </h1>
                 {/* Đợt 58 — "Tin vừa xem" ngay sau tiêu đề, xổ danh sách "Tiêu đề - Công ty". */}
                 <RecentJobs />
-                {/* Đợt 66 — cùng dòng: lọc nhanh theo thời gian đăng + "Chỉ hiện tin mới". */}
-                <div className="flex items-center gap-1.5 flex-wrap text-[13px]" role="group" aria-label="Thu hẹp nhanh theo ngày đăng">
-                  <span className="font-semibold text-ink-muted">💡 Thu hẹp nhanh: chỉ tin đăng</span>
-                  {[['3d', '3 ngày'], ['7d', '7 ngày'], ['15d', '15 ngày'], ['30d', '30 ngày']].map(([v, l]) => {
-                    const on = filters.postedWithin === v;
-                    return (
-                      <button
-                        key={v}
-                        type="button"
-                        aria-pressed={on}
-                        onClick={() => updateParams({ postedWithin: on ? undefined : v })}
-                        className={`rounded-full border px-2.5 py-0.5 whitespace-nowrap font-semibold ${on ? 'bg-primary text-white border-primary' : 'border-primary text-primary hover:bg-primary-tint'}`}
-                      >
-                        {l}
-                      </button>
-                    );
-                  })}
-                </div>
-                <label className="flex items-center gap-2 text-[13px] font-semibold" htmlFor="only-new">
-                  <input id="only-new" type="checkbox" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} />
-                  🆕 Chỉ hiện tin mới với tôi{onlyNew && hiddenCount > 0 ? ` (đã ẩn ${hiddenCount})` : ''}
-                </label>
+                {/* Đợt 69 — "Chỉ tin đăng" xổ danh sách 3/7/15/30 ngày, cùng dòng với "Tin vừa xem". */}
+                <PostedWithinMenu value={filters.postedWithin} onChange={(v) => updateParams({ postedWithin: v })} />
+                {/* Đợt 70 — 2 bộ lọc dạng nút bật/tắt gọn, cùng 1 dòng; chữ đầy đủ nằm ở tooltip. */}
+                {me?.role === 'candidate' && (result?.items.length ?? 0) > 1 && (
+                  <ToggleChip checked={sortMatch} onChange={setSortMatch} title="Ưu tiên tin phù hợp với hồ sơ của tôi nhất">
+                    ✨ <span className="xl:hidden">Phù hợp nhất</span><span className="hidden xl:inline">Ưu tiên phù hợp hồ sơ</span>
+                  </ToggleChip>
+                )}
+                <ToggleChip
+                  checked={onlyNew}
+                  onChange={setOnlyNew}
+                  title="Chỉ hiện tin mới với tôi (ẩn tin đã xem hoặc đã nộp)"
+                  badge={onlyNew && hiddenCount > 0 ? `(ẩn ${hiddenCount})` : undefined}
+                >
+                  🆕 <span className="xl:hidden">Tin mới</span><span className="hidden xl:inline">Chỉ tin mới với tôi</span>
+                </ToggleChip>
               </div>
             </div>
 
@@ -275,12 +271,6 @@ function JobSearchPage() {
             />
 
             <div className="flex items-center gap-x-5 gap-y-1 flex-wrap text-sm font-semibold">
-              {me?.role === 'candidate' && (result?.items.length ?? 0) > 1 && (
-                <label className="flex items-center gap-2" htmlFor="sort-match">
-                  <input id="sort-match" type="checkbox" checked={sortMatch} onChange={(e) => setSortMatch(e.target.checked)} />
-                  ✨ Ưu tiên tin phù hợp với hồ sơ của tôi nhất
-                </label>
-              )}
               {!me && (
                 <a href="/dang-nhap" className="text-primary hover:underline font-semibold">
                   ✨ Đăng nhập để xem % phù hợp với hồ sơ của bạn

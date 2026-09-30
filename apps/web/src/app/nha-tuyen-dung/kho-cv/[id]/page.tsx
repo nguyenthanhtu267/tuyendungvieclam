@@ -213,7 +213,7 @@ export default function KhoCvDetailPage() {
               return (
                 <div
                   key={e.id}
-                  className={`rounded-lg border p-3 text-[12.5px] ${active ? 'border-primary bg-primary/5' : 'border-border'}`}
+                  className={`rounded-lg border p-3 text-[12.5px] ${active ? 'border-primary bg-[#F3F6FB]' : 'border-border'}`}
                 >
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <button onClick={() => setSelectedEntryId(e.id)} className="text-left flex-1 min-w-[180px]">

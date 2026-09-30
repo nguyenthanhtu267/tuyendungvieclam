@@ -42,7 +42,7 @@ export default function CvAutofill({ token, onDone }: { token: string; onDone?: 
   }
   const p = res?.parsed;
   return (
-    <div className="rounded-xl border border-dashed border-primary bg-primary-tint/40 p-4">
+    <div className="rounded-xl border border-dashed border-primary bg-[#F3F6FB] p-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <div className="font-extrabold text-[14px]">✨ Tự điền hồ sơ từ CV</div>

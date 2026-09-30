@@ -10,7 +10,7 @@ export function JobSummaryBox({ job }: { job: JobLike }) {
   const [open, setOpen] = useState(false);
   if (s.lines.length === 0) return null;
   return (
-    <section className="rounded-xl bg-primary-tint/60 border border-border px-4 py-3 mb-4 text-[13.5px] text-ink">
+    <section className="rounded-xl bg-[#F0F3FA] border border-border px-4 py-3 mb-4 text-[13.5px] text-ink">
       <div className="font-extrabold text-[14px] mb-1.5">Tóm tắt nhanh</div>
       <ul className="flex flex-col gap-1">
         {s.lines.map((l) => (

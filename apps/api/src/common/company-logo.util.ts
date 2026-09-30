@@ -16,8 +16,14 @@
 export function resolveCompanyLogoUrl(company: {
   logoUrl?: string | null;
   website?: string | null;
+  autoLogoUrl?: string | null;
+  logoCheckedAt?: Date | null;
 }): string | undefined {
   if (company.logoUrl && company.logoUrl.trim()) return company.logoUrl.trim();
+  // Đợt 67 — logo đã dò được từ website được ưu tiên hơn favicon Google; đã dò mà không ra thì để FE
+  // vẽ icon mặc định (tránh hiện biểu tượng quả địa cầu chung của Google cho website không có favicon).
+  if (company.autoLogoUrl) return company.autoLogoUrl;
+  if (company.logoCheckedAt) return undefined;
   const domain = extractDomain(company.website);
   if (!domain) return undefined;
   return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;

@@ -68,7 +68,7 @@ export default function CompanyOverview({
 
   return (
     <div className="flex flex-col gap-6 text-ink min-w-0">
-      <section className="rounded-lg bg-primary-tint/70 border border-border p-4 sm:p-5">
+      <section className="rounded-lg bg-[#EEF2F9] border border-border p-4 sm:p-5">
         <div className="flex items-center gap-2 flex-wrap mb-3">
           <h2 className="font-extrabold text-[18px] uppercase tracking-tight min-w-0 max-w-full">
             <FitText lines={2} min={0.7}>{company.name}</FitText>
@@ -76,9 +76,9 @@ export default function CompanyOverview({
           {isCompanyUnverified(company) && <SourcedBadge />}
         </div>
         <div className="flex gap-4 items-start flex-col sm:flex-row">
-          {company.logoUrl && (
+          {(
             <div className="shrink-0 w-[128px] h-[108px] rounded-md bg-white border border-border flex items-center justify-center">
-              <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={104} className="text-xl" hideIfEmpty />
+              <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={104} className="text-xl" />
             </div>
           )}
           <div className="flex-1 min-w-0 w-full">

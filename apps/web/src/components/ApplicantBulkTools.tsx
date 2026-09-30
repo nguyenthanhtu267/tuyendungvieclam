@@ -110,7 +110,7 @@ export default function ApplicantBulkTools({
   ];
 
   return (
-    <div className="rounded-xl border border-primary bg-primary-tint/40 p-3 flex flex-col gap-2">
+    <div className="rounded-xl border border-primary bg-[#F3F6FB] p-3 flex flex-col gap-2">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="font-extrabold text-[13.5px]">Đã chọn {selected.length} hồ sơ</span>
         <button type="button" className="tvl-btn-ghost !w-auto px-3 text-[13px]" onClick={() => setMode(mode === 'interview' ? null : 'interview')}>Mời phỏng vấn hàng loạt</button>

@@ -487,7 +487,7 @@ function CandidateCard({
   const [inviteJobId, setInviteJobId] = useState('');
 
   return (
-    <div className={`rounded-xl border p-4 flex flex-col gap-2.5 ${item.hidden ? 'border-border bg-surface-alt/60' : 'border-border bg-white'}`}>
+    <div className={`rounded-xl border p-4 flex flex-col gap-2.5 ${item.hidden ? 'border-border bg-surface-alt' : 'border-border bg-white'}`}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -524,7 +524,7 @@ function CandidateCard({
             title="Ghi chú riêng"
             onClick={() => setNoteOpen((v) => !v)}
             className={`h-8 w-8 rounded-lg border text-sm flex items-center justify-center ${
-              item.note ? 'border-primary/40 bg-primary/5' : 'border-border bg-white'
+              item.note ? 'border-primary/40 bg-[#F3F6FB]' : 'border-border bg-white'
             } hover:bg-surface-alt`}
           >
             🏷️
