@@ -11,6 +11,7 @@ import { PINNED_PROVINCES } from '@/lib/catalogs';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { formatNumber } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
+import { MarketPanel } from '@/components/market/MarketPanel';
 import { memberCountDisplay, profilesUpdatedTodayDisplay, applicationsTodayDisplay } from '@/lib/vanity-stats';
 import { AdSlot } from '@/components/ads/AdSlot';
 
@@ -51,7 +52,7 @@ export default function Home() {
   // useMemo, chỉ tính lại khi danh sách `jobs` thay đổi (tức là mỗi lần tải/làm mới trang), không
   // đổi lại giữa các lần re-render khác của component.
   const recentJobsMinutesAgo = useMemo(
-    () => (jobs ?? []).slice(0, 2).map(() => Math.floor(Math.random() * 15) + 1),
+    () => (jobs ?? []).slice(0, 4).map(() => Math.floor(Math.random() * 15) + 1),
     [jobs],
   );
 
@@ -164,71 +165,18 @@ export default function Home() {
               trực tuyến luôn và không hiển thị dòng này nữa vì hiển thị tốt hơn" (tránh lặp số liệu
               2 nơi trên cùng 1 trang). Bố cục 2 hàng (3 số quan trọng nhất hàng trên, 2 số còn lại
               hàng dưới) thay vì 1 hàng 5 cột để không bị chật trong khối hero nhỏ cạnh ô tìm kiếm. */}
-          <div className="rounded-2xl bg-primary min-h-[220px] flex items-center justify-center p-5 sm:p-6 relative overflow-hidden">
-            <div className="w-full rounded-xl bg-white/95 p-4 sm:p-5 shadow-lg">
-              <div className="flex items-center gap-1.5 mb-3">
-                <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                <span className="text-[11px] font-bold text-ink-muted uppercase tracking-wide">
-                  Hoạt động trực tuyến
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-2 mb-2">
-                <div>
-                  <div className="font-mono font-extrabold text-base text-primary tabular-nums">
-                    {facets ? formatNumber(facets.total) : '—'}
-                  </div>
-                  <div className="text-[10px] text-ink-faint leading-tight">Việc làm đang tuyển</div>
-                </div>
-                <div>
-                  <div className="font-mono font-extrabold text-base text-critical tabular-nums">
-                    {displayApplicationsToday !== null ? formatNumber(displayApplicationsToday) : '—'}
-                  </div>
-                  <div className="text-[10px] text-ink-faint leading-tight">Ứng tuyển hôm nay</div>
-                </div>
-                <div>
-                  <div className="font-mono font-extrabold text-base text-success tabular-nums">
-                    {displayProfilesUpdatedToday !== null ? formatNumber(displayProfilesUpdatedToday) : '—'}
-                  </div>
-                  <div className="text-[10px] text-ink-faint leading-tight">Hồ sơ cập nhật</div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <div>
-                  <div className="font-mono font-extrabold text-base text-ink tabular-nums">
-                    {displayMemberCount !== null ? formatNumber(displayMemberCount) : '—'}
-                  </div>
-                  <div className="text-[10px] text-ink-faint leading-tight">Thành viên</div>
-                </div>
-                <div>
-                  <div className="font-mono font-extrabold text-base text-ink tabular-nums">
-                    {stats ? formatNumber(stats.companyCount) : '—'}
-                  </div>
-                  <div className="text-[10px] text-ink-faint leading-tight">Doanh nghiệp sử dụng</div>
-                </div>
-              </div>
-              <div className="border-t border-border pt-2.5">
-                <div className="text-[10px] font-bold text-ink-faint uppercase tracking-wide mb-1.5">
-                  Tin mới nhất
-                </div>
-                {jobs === null && <div className="text-[11px] text-ink-faint">Đang tải...</div>}
-                {jobs !== null && jobs.length === 0 && (
-                  <div className="text-[11px] text-ink-faint">Chưa có tin tuyển dụng nào.</div>
-                )}
-                {jobs && jobs.length > 0 && (
-                  <div className="flex flex-col gap-1.5">
-                    {jobs.slice(0, 2).map((j, idx) => (
-                      <div key={j.id} className="flex items-center justify-between gap-2 text-[11px]">
-                        <span className="truncate font-semibold text-ink">{j.title}</span>
-                        <span className="shrink-0 text-ink-faint">
-                          {recentJobsMinutesAgo[idx] ?? 1} phút trước
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          {/* Đợt 27 — "Bảng thị trường việc làm" (nền vector chuyển đổi số + số liệu + biểu đồ), thay khối mini dashboard cũ. */}
+          <MarketPanel
+            openJobs={facets ? facets.total : null}
+            applicationsToday={displayApplicationsToday}
+            profilesToday={displayProfilesUpdatedToday}
+            members={displayMemberCount}
+            companies={stats ? stats.companyCount : null}
+            industries={facets?.industries ?? []}
+            locations={facets?.locations ?? []}
+            jobs={jobs}
+            minutesAgo={recentJobsMinutesAgo}
+          />
         </div>
 
         {/* Đợt 24 — banner quảng cáo (vùng home-top). */}

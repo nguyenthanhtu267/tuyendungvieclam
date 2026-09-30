@@ -204,3 +204,20 @@ body { font-weight: 500; color: #0A0E14; -webkit-font-smoothing: antialiased; te
 h1, h2, h3, h4 { color: #0A0E14; }
 input, select, textarea, button { font-family: inherit; }
 ::placeholder { color: #3D4654 !important; opacity: 1 !important; }
+
+/* Đợt 27 — chuyển động nhẹ cho nền vector chuyển đổi số (DigitalBg). Tự tắt khi bật "giảm chuyển động". */
+@keyframes dg-flow { to { stroke-dashoffset: -320; } }
+@keyframes dg-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes dg-pulse { 0%, 100% { opacity: 0.85; } 50% { opacity: 0.45; } }
+@keyframes dg-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.dg-flow path { animation: dg-flow 5s linear infinite; }
+.dg-blink { animation: dg-blink 2.6s ease-in-out infinite; }
+.dg-pulse { animation: dg-pulse 6s ease-in-out infinite; }
+.dg-float { animation: dg-float 7s ease-in-out infinite; }
+.dg-delay { animation-delay: 1.8s; }
+@media (prefers-reduced-motion: reduce) {
+  .dg-flow path, .dg-blink, .dg-pulse, .dg-float { animation: none; }
+}
+@keyframes market-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.market-ticker { animation: market-in 0.45s ease-out; }
+@media (prefers-reduced-motion: reduce) { .market-ticker { animation: none; } }

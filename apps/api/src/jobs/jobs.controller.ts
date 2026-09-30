@@ -38,6 +38,12 @@ export class JobsController {
     return this.jobsService.getHomepageStats();
   }
 
+  // Đợt 27 — số liệu thị trường (theo ngày/nhóm) cho bảng ở trang chủ, công khai.
+  @Get('stats/market')
+  marketStats() {
+    return this.jobsService.getMarketStats();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.jobsService.findOne(id);

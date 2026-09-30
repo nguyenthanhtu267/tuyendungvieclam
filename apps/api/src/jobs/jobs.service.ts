@@ -461,4 +461,57 @@ export class JobsService {
       applicationsToday,
     };
   }
+
+  // Đợt 27 (30/09/2026) — "Bảng thị trường việc làm" ở trang chủ. Số liệu THẬT (đếm từ CSDL), công khai, cache
+  // 5 phút trong bộ nhớ để nhiều người xem cùng lúc không làm nặng CSDL. Chỉ gồm tổng hợp (theo ngày / theo nhóm),
+  // không lộ thông tin của từng tin hay từng người. Ngày tính theo giờ Việt Nam (UTC+7).
+  private marketCache?: { at: number; data: unknown };
+
+  async getMarketStats() {
+    if (this.marketCache && Date.now() - this.marketCache.at < 5 * 60 * 1000) return this.marketCache.data;
+    const DAYS = 14;
+    const [jobsDaily, appsDaily, types, salaries] = await Promise.all([
+      this.jobRepo.query(
+        `SELECT to_char((created_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date, 'YYYY-MM-DD') AS day, COUNT(*)::int AS n
+           FROM job_postings
+          WHERE approval_status = 'approved' AND created_at >= NOW() - INTERVAL '${DAYS + 1} days'
+          GROUP BY 1`,
+      ),
+      this.applicationRepo.query(
+        `SELECT to_char((applied_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date, 'YYYY-MM-DD') AS day, COUNT(*)::int AS n
+           FROM applications WHERE applied_at >= NOW() - INTERVAL '${DAYS + 1} days' GROUP BY 1`,
+      ),
+      this.jobRepo.query(
+        `SELECT employment_type AS label, COUNT(*)::int AS n FROM job_postings
+          WHERE approval_status = 'approved' AND is_paused = false AND employment_type IS NOT NULL AND employment_type <> ''
+          GROUP BY 1 ORDER BY 2 DESC LIMIT 6`,
+      ),
+      this.jobRepo.query(
+        `SELECT CASE WHEN m < 7 THEN 0 WHEN m < 10 THEN 1 WHEN m < 15 THEN 2 WHEN m < 25 THEN 3 WHEN m < 40 THEN 4 ELSE 5 END AS b,
+                COUNT(*)::int AS n
+           FROM (SELECT (COALESCE(salary_min, salary_max) + COALESCE(salary_max, salary_min)) / 2.0 AS m FROM job_postings
+                  WHERE approval_status = 'approved' AND is_paused = false AND COALESCE(salary_min, salary_max) > 0) t
+          GROUP BY 1`,
+      ),
+    ]);
+    // Dải ngày liên tục (giờ VN), ngày không có dữ liệu = 0.
+    const vnNow = new Date(Date.now() + 7 * 3600 * 1000);
+    const days: string[] = [];
+    for (let i = DAYS - 1; i >= 0; i--) days.push(new Date(vnNow.getTime() - i * 86400000).toISOString().slice(0, 10));
+    const toSeries = (rows: { day: string; n: number }[]) => {
+      const m = new Map(rows.map((r) => [r.day, r.n]));
+      return days.map((d) => ({ day: d, n: m.get(d) ?? 0 }));
+    };
+    const LABELS = ['Dưới 7 triệu', '7–10 triệu', '10–15 triệu', '15–25 triệu', '25–40 triệu', 'Trên 40 triệu'];
+    const sal = new Map<number, number>((salaries as { b: number; n: number }[]).map((r) => [Number(r.b), r.n]));
+    const data = {
+      updatedAt: new Date().toISOString(),
+      newJobsDaily: toSeries(jobsDaily),
+      applicationsDaily: toSeries(appsDaily),
+      employmentTypes: (types as { label: string; n: number }[]).map((r) => ({ label: r.label, count: r.n })),
+      salaryBands: LABELS.map((label, i) => ({ label, count: sal.get(i) ?? 0 })),
+    };
+    this.marketCache = { at: Date.now(), data };
+    return data;
+  }
 }

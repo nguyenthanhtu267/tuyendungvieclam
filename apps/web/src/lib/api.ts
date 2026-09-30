@@ -256,7 +256,17 @@ export const jobsApi = {
     request<CompatibilityResult>(`/jobs/${id}/compatibility`, { headers: authHeaders(token) }),
   // Đợt 13 (24/09/2026) — "Thống kê trang chủ" thật (thay 3/4 số ảo hard-code trước đó), công khai.
   homepageStats: () => request<HomepageStats>('/jobs/stats/homepage'),
+  // Đợt 27 — số liệu thị trường thật (14 ngày, hình thức, mức lương) cho bảng ở trang chủ.
+  marketStats: () => request<MarketStats>('/jobs/stats/market'),
 };
+
+export interface MarketStats {
+  updatedAt: string;
+  newJobsDaily: { day: string; n: number }[];
+  applicationsDaily: { day: string; n: number }[];
+  employmentTypes: { label: string; count: number }[];
+  salaryBands: { label: string; count: number }[];
+}
 
 export interface HomepageStats {
   memberCount: number;
