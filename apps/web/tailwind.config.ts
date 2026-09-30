@@ -4,10 +4,10 @@ import type { Config } from 'tailwindcss';
 // màu sắc/typography giữa mockup và code thật.
 
 // Đợt 26 (30/09/2026) — "hiển thị rõ ràng nhất, thu hẹp khoảng hở tối đa": thang khoảng cách (padding/margin/gap/space)
-// thu còn 75% so với mặc định Tailwind (KHÔNG đụng chiều rộng/cao nên icon, ảnh giữ nguyên), chữ to hơn, màu chữ gần đen.
+// thu còn 60% (Đợt 29, trước đó 75%) so với mặc định Tailwind (KHÔNG đụng chiều rộng/cao nên icon, ảnh giữ nguyên), chữ to hơn, màu chữ gần đen.
 const STEPS = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 72, 80, 96];
 const compact: Record<string, string> = { px: '1px' };
-for (const n of STEPS) compact[String(n)] = n === 0 ? '0px' : `${+(n * 0.25 * 0.75).toFixed(4)}rem`;
+for (const n of STEPS) compact[String(n)] = n === 0 ? '0px' : `${+(n * 0.25 * 0.6).toFixed(4)}rem`;
 const compactMargin = { auto: 'auto', ...compact };
 const config: Config = {
   darkMode: 'class',

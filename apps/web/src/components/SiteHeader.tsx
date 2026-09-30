@@ -1,5 +1,6 @@
 'use client';
 
+import { FontScale } from '@/components/FontScale';
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -145,6 +146,8 @@ export default function SiteHeader() {
           >
             🌐 {lang === 'vi' ? 'VI' : 'EN'}
           </button>
+
+          <FontScale />
 
           {me && token && <NotificationBell token={token} />}
 

@@ -197,7 +197,7 @@ export default function TimHoSoPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <main className="min-h-screen bg-bg">
+    <main className="min-h-screen">
       <EmployerHeader />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6 flex flex-col gap-3">
         {/* Đợt 24 — banner đầu trang Tìm hồ sơ của NTD. */}

@@ -61,7 +61,7 @@ export default function EmployerDashboardPage() {
   if (!me || !me.role.startsWith('employer')) return null;
 
   return (
-    <main className="min-h-screen bg-bg">
+    <main className="min-h-screen">
       <EmployerHeader />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6 flex flex-col gap-3">
         <div className="rounded-2xl p-6 bg-gradient-to-br from-primary to-primary-dark text-white flex flex-wrap justify-between items-center gap-4">

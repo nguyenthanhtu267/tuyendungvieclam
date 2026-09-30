@@ -102,7 +102,7 @@ export default function DonHangPage() {
   if (!me || !me.role.startsWith('employer')) return null;
 
   return (
-    <main className="min-h-screen bg-bg">
+    <main className="min-h-screen">
       <EmployerHeader />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col gap-4">
         <div className="flex gap-1 border-b border-border">

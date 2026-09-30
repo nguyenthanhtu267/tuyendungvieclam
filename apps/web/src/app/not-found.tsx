@@ -3,7 +3,7 @@ import Link from 'next/link';
 // Đợt 12a (20/09/2026) — trang 404 riêng theo thương hiệu, thay cho trang mặc định của Next.js.
 export default function NotFound() {
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 text-center bg-bg">
+    <main className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 text-center">
       <div className="text-6xl font-extrabold text-primary">404</div>
       <h1 className="font-bold text-lg text-ink">Không tìm thấy trang này</h1>
       <p className="text-sm text-ink-faint max-w-sm">

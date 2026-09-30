@@ -1,5 +1,6 @@
 'use client';
 
+import { PopularKeywords } from '@/components/PopularKeywords';
 import { AdStack } from '@/components/ads/AdStack';
 import { Fragment, Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -337,6 +338,8 @@ function JobSearchPage() {
                 )}
               </div>
             )}
+            {/* Đợt 29 — theo mẫu CareerViet: từ khoá được tìm nhiều nhất. */}
+            <PopularKeywords />
             {/* Đợt 24 — banner cột phải (chỉ máy tính). */}
             <AdStack>
               <AdSlot slot="jobs-sidebar" />

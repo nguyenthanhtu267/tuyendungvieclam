@@ -514,4 +514,42 @@ export class JobsService {
     this.marketCache = { at: Date.now(), data };
     return data;
   }
+
+  // Đợt 29 (30/09/2026) — "Việc làm được tìm kiếm nhiều nhất" (theo mẫu CareerViet): từ khoá người dùng thật đã tìm
+  // trong 30 ngày qua (nhật ký analytics_events, đã loại bot lúc thu thập), chỉ lấy từ khoá có kết quả và do ≥ 2 người
+  // khác nhau tìm (không lộ tìm kiếm lẻ của 1 người), bỏ chuỗi giống email/số điện thoại. Thiếu thì bổ sung bằng tên các
+  // ngành nhiều việc nhất. Cache 10 phút.
+  private kwCache?: { at: number; data: string[] };
+
+  async getPopularKeywords(): Promise<string[]> {
+    if (this.kwCache && Date.now() - this.kwCache.at < 10 * 60 * 1000) return this.kwCache.data;
+    let rows: { q: string }[] = [];
+    try {
+      rows = await this.jobRepo.query(
+        `SELECT lower(btrim(meta->>'q')) AS q, count(*) AS n
+           FROM analytics_events
+          WHERE type = 'search' AND created_at >= NOW() - INTERVAL '30 days'
+            AND coalesce(btrim(meta->>'q'), '') <> '' AND length(btrim(meta->>'q')) BETWEEN 2 AND 40
+            AND coalesce(meta->>'total', '1') <> '0'
+            AND btrim(meta->>'q') !~ '@' AND btrim(meta->>'q') !~ '[0-9]{6,}'
+          GROUP BY 1 HAVING count(DISTINCT visitor_id) >= 2
+          ORDER BY n DESC LIMIT 12`,
+      );
+    } catch {
+      rows = [];
+    }
+    const out: string[] = rows.map((r) => r.q);
+    if (out.length < 8) {
+      const inds: { industry: string }[] = await this.jobRepo.query(
+        `SELECT industry FROM job_postings WHERE approval_status = 'approved' AND is_paused = false AND industry IS NOT NULL AND industry <> ''
+          GROUP BY industry ORDER BY COUNT(*) DESC LIMIT 12`,
+      );
+      for (const i of inds) {
+        if (out.length >= 12) break;
+        if (!out.some((x) => x.toLowerCase() === i.industry.toLowerCase())) out.push(i.industry);
+      }
+    }
+    this.kwCache = { at: Date.now(), data: out };
+    return out;
+  }
 }

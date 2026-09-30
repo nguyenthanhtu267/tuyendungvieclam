@@ -74,6 +74,20 @@ export class AdminSetting {
   @Column({ name: 'ad_disabled_slots', type: 'jsonb', default: () => `'[]'` })
   adDisabledSlots: string[];
 
+  // Đợt 29 (30/09/2026) — nền giao diện toàn website: 'fixed' (1 mẫu) hoặc 'auto' (tự đổi mỗi bg_auto_hours giờ).
+  @Column({ name: 'bg_mode', type: 'varchar', default: 'auto' })
+  bgMode: 'fixed' | 'auto';
+
+  @Column({ name: 'bg_theme', type: 'varchar', default: 'neural-1' })
+  bgTheme: string;
+
+  // [] = xoay vòng cả 15 mẫu.
+  @Column({ name: 'bg_auto_themes', type: 'jsonb', default: () => `'[]'` })
+  bgAutoThemes: string[];
+
+  @Column({ name: 'bg_auto_hours', type: 'int', default: 2 })
+  bgAutoHours: number;
+
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }

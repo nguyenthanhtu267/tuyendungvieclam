@@ -1,5 +1,6 @@
 'use client';
 
+import { PopularKeywords } from '@/components/PopularKeywords';
 import { AdStack } from '@/components/ads/AdStack';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
@@ -667,6 +668,7 @@ function JobDetailInner() {
                 <CompatibilityChecklist checklist={compatibility.checklist} missingSkills={compatibility.missingSkills} />
               </div>
             )}
+            <PopularKeywords />
             {/* Đợt 24 — banner cột phải (chỉ máy tính). */}
             <AdStack>
               <AdSlot slot="job-sidebar" />

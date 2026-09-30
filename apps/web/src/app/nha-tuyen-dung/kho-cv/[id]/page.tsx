@@ -120,7 +120,7 @@ export default function KhoCvDetailPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-bg">
+      <main className="min-h-screen">
         <EmployerHeader />
         <div className="max-w-4xl mx-auto px-4 py-16 text-center text-ink-faint text-sm">Đang tải...</div>
       </main>
@@ -129,7 +129,7 @@ export default function KhoCvDetailPage() {
 
   if (!detail) {
     return (
-      <main className="min-h-screen bg-bg">
+      <main className="min-h-screen">
         <EmployerHeader />
         <div className="max-w-4xl mx-auto px-4 py-16 text-center">
           <p className="text-critical text-sm font-semibold">{error ?? 'Không tìm thấy hồ sơ'}</p>
@@ -145,7 +145,7 @@ export default function KhoCvDetailPage() {
   const s = entry?.snapshot;
 
   return (
-    <main className="min-h-screen bg-bg">
+    <main className="min-h-screen">
       <EmployerHeader />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-4">
         <Link href="/nha-tuyen-dung/kho-cv" className="text-xs font-semibold text-primary hover:underline w-fit">

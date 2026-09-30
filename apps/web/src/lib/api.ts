@@ -1,3 +1,4 @@
+import type { BgSetting } from './bg-themes';
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export class ApiError extends Error {
@@ -258,6 +259,8 @@ export const jobsApi = {
   homepageStats: () => request<HomepageStats>('/jobs/stats/homepage'),
   // Đợt 27 — số liệu thị trường thật (14 ngày, hình thức, mức lương) cho bảng ở trang chủ.
   marketStats: () => request<MarketStats>('/jobs/stats/market'),
+  // Đợt 29 — từ khoá được tìm nhiều nhất (khối cột phải trang tìm việc).
+  popularKeywords: () => request<{ keywords: string[] }>('/jobs/stats/popular-keywords'),
 };
 
 export interface MarketStats {
@@ -1066,9 +1069,14 @@ export interface PromoBadgeSetting {
 export const publicSettingsApi = {
   getPromoBadge: () =>
     request<{ badge: { text: string; url: string } | null }>('/public/settings/promo-badge'),
+  // Đợt 29 — cấu hình nền giao diện toàn website.
+  background: () => request<BgSetting>('/public/settings/background'),
 };
 
 export const adminApi = {
+  getBackground: (token: string) => request<BgSetting>('/admin/settings/background', { headers: authHeaders(token) }),
+  setBackground: (token: string, body: BgSetting) =>
+    request<BgSetting>('/admin/settings/background', { method: 'PATCH', headers: { ...authHeaders(token), 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   dashboard: (token: string) => request<AdminDashboard>('/admin/dashboard', { headers: authHeaders(token) }),
   listPendingJobs: (token: string) =>
     request<JobPosting[]>('/admin/jobs/pending', { headers: authHeaders(token) }),

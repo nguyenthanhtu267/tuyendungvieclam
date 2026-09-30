@@ -6,7 +6,7 @@ import { jobsApi, type JobPosting, type MarketStats } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
 import { useAuth } from '@/lib/auth-context';
 import { audienceOf } from '@/lib/ads';
-import { DigitalBg, type DigitalTone } from './DigitalBg';
+import { DigitalBg } from './DigitalBg';
 
 // Đợt 27 (30/09/2026) — "Bảng thị trường việc làm" thay cho khối "Hoạt động trực tuyến" thô sơ ở hero trang chủ.
 // - 5 thẻ số liệu (số chạy lên, đường mini 7–14 ngày) — 3 thẻ dùng số hiển thị trang chủ như cũ (vanity-stats).
@@ -321,7 +321,6 @@ export interface MarketPanelProps {
   locations: { location: string; count: number }[];
   jobs: JobPosting[] | null;
   minutesAgo: number[];
-  tone?: DigitalTone;
 }
 
 export function MarketPanel(p: MarketPanelProps) {
@@ -371,7 +370,7 @@ export function MarketPanel(p: MarketPanelProps) {
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
     >
-      <DigitalBg tone={p.tone ?? 'blue'} />
+      <DigitalBg />
       <div className="relative w-full flex flex-col gap-2.5">
         <div className="flex items-center justify-between gap-2 flex-wrap pt-1 px-1">
           <div className="flex items-center gap-2">

@@ -9,6 +9,7 @@ import '@fontsource/ibm-plex-mono/600.css';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
 import { LanguageProvider } from '@/lib/i18n';
+import { BackgroundProvider } from '@/components/bg/BackgroundProvider';
 import Footer from '@/components/Footer';
 import ImpersonationBanner from '@/components/ImpersonationBanner';
 import AnalyticsTracker from '@/components/AnalyticsTracker';
@@ -27,14 +28,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi">
+    <html lang="vi" suppressHydrationWarning>
+      <head>
+        {/* Đợt 29 — áp lại cỡ chữ người dùng đã chọn (FontScale) ngay khi mở trang, tránh nhấp nháy. */}
+        <script dangerouslySetInnerHTML={{ __html: "try{var l=Number(localStorage.getItem('tvl_font_level'));if(l>0&&l<=8)document.documentElement.style.fontSize=(100+l*5)+'%'}catch(e){}" }} />
+      </head>
       <body className="font-sans antialiased bg-bg text-ink flex flex-col min-h-screen">
         <AuthProvider>
           <LanguageProvider>
+            <BackgroundProvider>
             <ImpersonationBanner />
             <AnalyticsTracker />
             <div className="flex-1 flex flex-col">{children}</div>
             <Footer />
+            </BackgroundProvider>
           </LanguageProvider>
         </AuthProvider>
       </body>

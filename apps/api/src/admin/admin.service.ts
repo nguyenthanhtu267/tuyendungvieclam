@@ -250,6 +250,43 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  // Đợt 29 (30/09/2026) — nền giao diện toàn website (cố định / tự động đổi mỗi N giờ). GET dùng chung cho Admin và công khai.
+  async getBackground(): Promise<{ mode: 'fixed' | 'auto'; theme: string; autoThemes: string[]; hours: number }> {
+    let setting = await this.adminSettingRepo.findOne({ where: { id: AUTO_APPROVE_SETTING_ID } });
+    if (!setting) {
+      setting = await this.adminSettingRepo.save(this.adminSettingRepo.create({ id: AUTO_APPROVE_SETTING_ID }));
+    }
+    return {
+      mode: setting.bgMode === 'fixed' ? 'fixed' : 'auto',
+      theme: setting.bgTheme || 'neural-1',
+      autoThemes: Array.isArray(setting.bgAutoThemes) ? setting.bgAutoThemes : [],
+      hours: setting.bgAutoHours || 2,
+    };
+  }
+
+  async setBackground(
+    admin: AdminActor,
+    dto: { mode: 'fixed' | 'auto'; theme: string; autoThemes: string[]; hours: number },
+  ) {
+    let setting = await this.adminSettingRepo.findOne({ where: { id: AUTO_APPROVE_SETTING_ID } });
+    if (!setting) setting = this.adminSettingRepo.create({ id: AUTO_APPROVE_SETTING_ID });
+    setting.bgMode = dto.mode;
+    setting.bgTheme = dto.theme;
+    setting.bgAutoThemes = Array.from(new Set(dto.autoThemes));
+    setting.bgAutoHours = dto.hours;
+    await this.adminSettingRepo.save(setting);
+    await this.logAction(
+      admin,
+      'settings.background',
+      'admin_setting',
+      AUTO_APPROVE_SETTING_ID,
+      dto.mode === 'fixed'
+        ? `Nền giao diện: cố định "${dto.theme}"`
+        : `Nền giao diện: tự động đổi mỗi ${dto.hours} giờ (${setting.bgAutoThemes.length || 15} mẫu)`,
+    );
+    return this.getBackground();
+  }
+
   async getPublicPromoBadge(): Promise<{ text: string; url: string } | null> {
     const b = await this.getPromoBadge();
     return b.enabled && b.url ? { text: b.text, url: b.url } : null;

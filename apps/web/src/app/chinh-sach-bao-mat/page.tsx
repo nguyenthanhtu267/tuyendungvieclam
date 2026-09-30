@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 // máy chủ), không dùng cookie quảng cáo/theo dõi bên thứ ba, không gửi email/SMS marketing.
 export default function ChinhSachBaoMatPage() {
   return (
-    <main className="min-h-screen bg-bg">
+    <main className="min-h-screen">
       <SiteHeader />
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-10 py-10 flex flex-col gap-5 text-sm text-ink-muted">
         <div>

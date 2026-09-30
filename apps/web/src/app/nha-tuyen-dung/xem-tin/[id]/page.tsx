@@ -90,7 +90,7 @@ export default function XemTinNtdPage() {
   const locationText = job.provinces?.length ? job.provinces.join(' | ') : job.location;
 
   return (
-    <main className="min-h-screen bg-bg">
+    <main className="min-h-screen">
       <EmployerHeader />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
         <div className="rounded-xl bg-info-tint border border-info/30 px-4 py-3 mb-4 flex items-center justify-between gap-3 flex-wrap">

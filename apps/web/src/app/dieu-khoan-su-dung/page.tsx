@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 // dùng tự nhập hoặc dán link Google Drive.
 export default function DieuKhoanSuDungPage() {
   return (
-    <main className="min-h-screen bg-bg">
+    <main className="min-h-screen">
       <SiteHeader />
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-10 py-10 flex flex-col gap-5 text-sm text-ink-muted">
         <div>

@@ -93,7 +93,7 @@ function DangTinInner() {
 
   if (loadingEdit) {
     return (
-      <main className="min-h-screen bg-bg">
+      <main className="min-h-screen">
         <EmployerHeader />
         <div className="max-w-2xl mx-auto px-4 py-24 text-center text-ink-faint text-sm">Đang tải tin để sửa...</div>
       </main>
@@ -154,7 +154,7 @@ function DangTinInner() {
 
   if (success) {
     return (
-      <main className="min-h-screen bg-bg">
+      <main className="min-h-screen">
         <EmployerHeader />
         <div className="max-w-lg mx-auto px-4 py-24 text-center flex flex-col items-center gap-4">
           <div className="w-14 h-14 rounded-full bg-success-tint text-success flex items-center justify-center text-2xl">✓</div>
@@ -193,7 +193,7 @@ function DangTinInner() {
   }
 
   return (
-    <main className="min-h-screen bg-bg">
+    <main className="min-h-screen">
       <EmployerHeader />
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
         <JobWizardSteps

@@ -44,6 +44,12 @@ export class JobsController {
     return this.jobsService.getMarketStats();
   }
 
+  // Đợt 29 — từ khoá được tìm nhiều nhất (công khai).
+  @Get('stats/popular-keywords')
+  async popularKeywords() {
+    return { keywords: await this.jobsService.getPopularKeywords() };
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.jobsService.findOne(id);

@@ -27,6 +27,7 @@ import { ClaimCompanyDto } from './dto/claim-company.dto';
 import { ResolveClaimRequestDto } from './dto/resolve-claim-request.dto';
 import { ExtractJobUrlDto } from './dto/extract-job-url.dto';
 import { UpdatePromoBadgeDto } from './dto/promo-badge.dto';
+import { UpdateBackgroundDto } from './dto/background.dto';
 
 // Đợt 23 — endpoint CÔNG KHAI (không cần đăng nhập) cho header đọc nhãn quảng bá.
 @Controller('public/settings')
@@ -36,6 +37,12 @@ export class PublicSettingsController {
   @Get('promo-badge')
   async promoBadge() {
     return { badge: await this.adminService.getPublicPromoBadge() };
+  }
+
+  // Đợt 29 — nền giao diện toàn website (công khai).
+  @Get('background')
+  background() {
+    return this.adminService.getBackground();
   }
 }
 
@@ -66,6 +73,16 @@ export class AdminController {
   }
 
   // Đợt 23 (29/09/2026) — nhãn quảng bá nhấp nháy cạnh logo (Admin bật/tắt, sửa chữ + link).
+  @Get('settings/background')
+  getBackground() {
+    return this.adminService.getBackground();
+  }
+
+  @Patch('settings/background')
+  setBackground(@CurrentUser() admin: { userId: string; email: string }, @Body() dto: UpdateBackgroundDto) {
+    return this.adminService.setBackground(admin, dto);
+  }
+
   @Get('settings/promo-badge')
   getPromoBadge() {
     return this.adminService.getPromoBadge();
