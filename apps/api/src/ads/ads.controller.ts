@@ -33,7 +33,9 @@ import { AdSettingsDto, SaveAdDto } from './dto/save-ad.dto';
 type Actor = { userId: string; email: string };
 
 // Đợt 24 (29/09/2026) — banner quảng cáo, phần CÔNG KHAI (không cần đăng nhập).
-@Controller('public/ads')
+// Đường dẫn chính /public/promos (tên trung tính để trình chặn quảng cáo không chặn nhầm); giữ /public/ads
+// cho bản web cũ đang chạy trong lúc Vercel/Render cập nhật lệch nhau.
+@Controller(['public/promos', 'public/ads'])
 export class PublicAdsController {
   constructor(private readonly ads: AdsService) {}
 

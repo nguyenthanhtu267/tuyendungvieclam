@@ -571,7 +571,7 @@ export function AdEditor({
           </div>
 
           {/* ------------------------------------------------ cột xem trước */}
-          <div className="bg-surface-alt border-t lg:border-t-0 lg:border-l border-border p-5 flex flex-col gap-4 min-w-0">
+          <div className="bg-surface-alt border-t lg:border-t-0 lg:border-l border-border p-5 flex flex-col gap-4 min-w-0 lg:sticky lg:top-0 lg:self-start">
             <div className="text-[11px] font-bold text-primary uppercase tracking-wide">Xem trước trực tiếp</div>
             <div className="flex flex-col gap-1.5">
               <div className="text-[11px] text-ink-muted">Dải ngang (trang chủ, danh sách, chi tiết tin)</div>

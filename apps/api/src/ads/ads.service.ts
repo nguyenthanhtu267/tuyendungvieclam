@@ -102,7 +102,7 @@ export class AdsService {
   }
 
   static imageUrl(c: AdCampaign) {
-    return `/public/ads/${c.id}/image?v=${new Date(c.updatedAt).getTime()}`;
+    return `/public/promos/${c.id}/image?v=${new Date(c.updatedAt).getTime()}`;
   }
 
   async list(days = 30) {

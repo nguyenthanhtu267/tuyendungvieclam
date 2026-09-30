@@ -45,7 +45,7 @@ export function loadAdFeed(): Promise<AdFeed | null> {
   const hit = peekAdFeed();
   if (hit !== undefined) return Promise.resolve(hit);
   if (!inflight) {
-    inflight = fetch(`${API}/public/ads`)
+    inflight = fetch(`${API}/public/promos`)
       .then((r) => (r.ok ? (r.json() as Promise<AdFeed>) : null))
       .catch(() => null)
       .then((v) => {
@@ -152,7 +152,7 @@ function flush() {
   timer = null;
   if (!queue.length) return;
   const body = JSON.stringify({ e: queue.splice(0, 50) });
-  const url = `${API}/public/ads/events`;
+  const url = `${API}/public/promos/events`;
   try {
     const blob = new Blob([body], { type: 'text/plain;charset=UTF-8' });
     if (navigator.sendBeacon && navigator.sendBeacon(url, blob)) return;
