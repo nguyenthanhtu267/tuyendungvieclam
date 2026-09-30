@@ -83,6 +83,20 @@ export class SearchCandidatesDto {
   @IsBoolean()
   hiddenOnly?: boolean;
 
+  // Đợt 73 — lọc theo hoạt động: "mới truy cập" (ứng viên đồng ý hiển thị hoạt động) và "mới cập nhật hồ sơ".
+  @IsOptional()
+  @IsIn(['1d', '3d', '7d', '30d'])
+  seenWithin?: string;
+
+  @IsOptional()
+  @IsIn(['3d', '7d', '30d'])
+  updatedWithin?: string;
+
+  // 'relevance' (mặc định: URGENT → độ hoàn thiện → mới cập nhật), 'seen' (truy cập gần nhất), 'updated' (cập nhật gần nhất).
+  @IsOptional()
+  @IsIn(['relevance', 'seen', 'updated'])
+  sort?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()

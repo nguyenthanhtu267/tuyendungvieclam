@@ -92,9 +92,9 @@ export default function Home() {
       <SiteHeader />
       <OnlineBanner />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6">
-        <div className="grid md:grid-cols-2 gap-3 items-stretch">
-          <div className="rounded-2xl border border-border bg-white px-6 py-4 flex flex-col gap-3 justify-center">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-1.5 pb-3">
+        <div className="grid md:grid-cols-2 gap-2 items-stretch">
+          <div className="rounded-2xl border border-border bg-white px-6 py-3 flex flex-col gap-2 justify-center">
             <div className="text-xs font-bold text-primary uppercase tracking-wide">
               {facets ? `${formatNumber(facets.total)} ${t('home.eyebrowJobsToday')}` : t('home.eyebrowLoading')}
             </div>
@@ -195,13 +195,13 @@ export default function Home() {
         </div>
 
         {/* Đợt 24 — banner quảng cáo (vùng home-top). */}
-        <AdSlot slot="home-top" className="mt-3" />
+        <AdSlot slot="home-top" className="mt-1.5" />
 
         <ContinueBlock />
 
         <RecommendedJobs />
 
-        <div className="flex items-center justify-between mt-5 mb-2.5">
+        <div className="flex items-center justify-between mt-2 mb-1.5">
           <h2 className="font-extrabold text-lg">{t('home.latestJobs')}</h2>
           <a href="/viec-lam" className="text-primary text-xs font-bold">
             {t('home.seeMore')}
@@ -217,7 +217,7 @@ export default function Home() {
 
         {facets && facets.industries.length > 0 && (
           <>
-            <div className="flex items-center justify-between mt-5 mb-2.5">
+            <div className="flex items-center justify-between mt-2 mb-1.5">
               <h2 className="font-extrabold text-lg">{t('home.topIndustries')}</h2>
               {facets.industries.length > HOME_SECTION_PREVIEW_COUNT && (
                 <button
@@ -247,11 +247,11 @@ export default function Home() {
         )}
 
         {/* Đợt 24 — banner giữa trang chủ (chỉ máy tính; điện thoại đã có home-top). */}
-        <AdSlot slot="home-mid" className="mt-5 hidden lg:block" />
+        <AdSlot slot="home-mid" className="mt-2 hidden lg:block" />
 
         {featured && featured.length > 0 && (
           <>
-            <div className="flex items-center justify-between mt-5 mb-2.5">
+            <div className="flex items-center justify-between mt-2 mb-1.5">
               <h2 className="font-extrabold text-lg">💛 Doanh nghiệp yêu thích</h2>
               <a href="/viec-lam?featuredEmployerOnly=1" className="text-primary text-xs font-bold">
                 Xem tất cả →
@@ -279,7 +279,7 @@ export default function Home() {
         )}
 
         {/* Đợt 28 — banner cuối trang chủ. */}
-        <AdSlot slot="home-bottom" className="mt-5" />
+        <AdSlot slot="home-bottom" className="mt-2" />
 
       </div>
     </main>

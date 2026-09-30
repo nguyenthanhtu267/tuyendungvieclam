@@ -63,6 +63,10 @@ export class User {
   @OneToMany(() => Notification, (notification) => notification.user)
   notifications?: Notification[];
 
+  // Đợt 73 — lần hoạt động gần nhất (ghi tối đa 10 phút/lần khi đã đăng nhập) để NTD thấy "mới truy cập".
+  @Column({ name: 'last_active_at', type: 'timestamp', nullable: true })
+  lastActiveAt?: Date;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

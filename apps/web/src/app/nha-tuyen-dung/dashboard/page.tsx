@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { smartApi, type JobHealthItem, employerApi, type Company, type EmployerDashboard } from '@/lib/api';
 import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatNumber } from '@/lib/format';
 import { AdSlot } from '@/components/ads/AdSlot';
+import EmployerSmartCards from '@/components/EmployerSmartCards';
 
 const JOB_STATUS_LABEL: Record<string, string> = {
   draft: 'Nháp',
@@ -96,6 +97,8 @@ export default function EmployerDashboardPage() {
               <StatTile value={dashboard?.totalApplications ?? 0} label="Tổng hồ sơ nhận được" />
               <StatTile value={dashboard?.newApplicationsToday ?? 0} label="Hồ sơ mới hôm nay" />
             </div>
+
+            <EmployerSmartCards />
 
             {health.length > 0 && (
               <div className="rounded-xl bg-white border border-border p-5">

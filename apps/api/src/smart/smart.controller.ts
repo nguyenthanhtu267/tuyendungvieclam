@@ -6,11 +6,91 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { UserRole } from '../database/entities/user.entity';
 import { SmartService } from './smart.service';
 import { Smart2Service } from './smart2.service';
+import { Smart3Service } from './smart3.service';
+import { Smart4Service } from './smart4.service';
 
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SmartController {
-  constructor(private readonly smart: SmartService, private readonly smart2: Smart2Service) {}
+  constructor(private readonly smart: SmartService, private readonly smart2: Smart2Service, private readonly smart3: Smart3Service, private readonly smart4: Smart4Service) {}
+
+  @Get('employer/pending-applications')
+  @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB)
+  pending(@CurrentUser() user: { userId: string }, @Query('days') days?: string) {
+    return this.smart4.pendingApplications(user.userId, Number(days) || 3);
+  }
+
+  @Get('employer/job-performance')
+  @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB)
+  performance(@CurrentUser() user: { userId: string }) {
+    return this.smart4.jobPerformance(user.userId);
+  }
+
+  @Post('employer/jobs/:id/extend')
+  @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB)
+  extend(@CurrentUser() user: { userId: string }, @Param('id') id: string, @Body() body: { days?: number }) {
+    return this.smart4.extendJob(user.userId, id, Number(body?.days) || 15);
+  }
+
+  @Get('employer/jobs/:id/title-test')
+  @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB)
+  titleTest(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.smart4.getTitleTest(user.userId, id);
+  }
+
+  @Post('employer/jobs/:id/title-test')
+  @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB)
+  startTitleTest(@CurrentUser() user: { userId: string }, @Param('id') id: string, @Body() body: { titleB?: string }) {
+    return this.smart4.startTitleTest(user.userId, id, String(body?.titleB ?? ''));
+  }
+
+  @Post('employer/jobs/:id/title-test/finish')
+  @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB)
+  finishTitleTest(@CurrentUser() user: { userId: string }, @Param('id') id: string, @Body() body: { apply?: boolean }) {
+    return this.smart4.finishTitleTest(user.userId, id, !!body?.apply);
+  }
+
+  @Post('employer/jobs/:id/bulk-invite')
+  @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB)
+  bulkInvite(@CurrentUser() user: { userId: string }, @Param('id') id: string, @Body() body: { profileIds?: string[] }) {
+    return this.smart4.bulkInvite(user.userId, id, body?.profileIds ?? []);
+  }
+
+  @Get('admin/companies/:id/verify-check')
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  verifyCheck(@Param('id') id: string) {
+    return this.smart4.companyVerifyCheck(id);
+  }
+
+  @Get('jobs/:id/cv-tailor')
+  @Roles(UserRole.CANDIDATE)
+  cvTailor(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.smart3.cvTailor(user.userId, id);
+  }
+
+  @Get('jobs/:id/apply-check')
+  @Roles(UserRole.CANDIDATE)
+  applyCheck(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.smart3.applyCheck(user.userId, id);
+  }
+
+  @Get('me/profile-freshness')
+  @Roles(UserRole.CANDIDATE)
+  freshness(@CurrentUser() user: { userId: string }) {
+    return this.smart3.profileFreshness(user.userId);
+  }
+
+  @Get('me/salary-position')
+  @Roles(UserRole.CANDIDATE)
+  salaryPosition(@CurrentUser() user: { userId: string }) {
+    return this.smart3.salaryPosition(user.userId);
+  }
+
+  @Get('me/job-goal')
+  @Roles(UserRole.CANDIDATE)
+  jobGoal(@CurrentUser() user: { userId: string }) {
+    return this.smart3.jobGoal(user.userId);
+  }
 
   @Get('jobs/:id/insights')
   @Roles(UserRole.CANDIDATE)
@@ -132,7 +212,18 @@ export class SmartPublicController {
 // Đợt 65 — công khai: xem hồ sơ tóm tắt qua link chia sẻ (không có thông tin liên hệ).
 @Controller('public')
 export class SmartSharePublicController {
-  constructor(private readonly smart2: Smart2Service) {}
+  constructor(private readonly smart2: Smart2Service, private readonly smart4: Smart4Service) {}
+
+  // Đợt 75 — A/B tiêu đề: danh sách tin đang thử nghiệm + ghi nhận lượt hiển thị/bấm (ẩn danh, chỉ đếm).
+  @Get('title-tests')
+  titleTests(@Query('ids') ids?: string) {
+    return this.smart4.publicTests((ids ?? '').split(','));
+  }
+
+  @Post('title-tests/event')
+  titleEvent(@Body() body: { testId?: string; variant?: string; type?: string }) {
+    return this.smart4.recordTestEvent(String(body?.testId ?? ''), String(body?.variant ?? ''), String(body?.type ?? ''));
+  }
 
   @Get('profile-share/:token')
   shared(@Param('token') token: string) {

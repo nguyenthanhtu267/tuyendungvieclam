@@ -2,6 +2,7 @@
 import { nearestProvince, saveHome } from '@/lib/geo';
 
 import { MultiSelectPopover } from './MultiSelectPopover';
+import { usePins } from '@/lib/pins';
 import {
   EMPLOYMENT_TYPES,
   EXPERIENCE_LEVELS,
@@ -54,6 +55,8 @@ export function FilterBar({
     !!value.featuredEmployerOnly;
 
   const showSearchField = onSearchChange !== undefined;
+  const provincePins = usePins('provinces');
+  const industryPins = usePins('industries');
 
   return (
     <div className="rounded-xl border border-border bg-white p-3.5 flex flex-col gap-3">
@@ -80,6 +83,7 @@ export function FilterBar({
             selected={value.provinces ?? []}
             onChange={(v) => onChange({ provinces: v })}
             emptyText="Chọn địa điểm"
+            pins={provincePins}
             topAction={{
               label: 'Dùng vị trí của tôi',
               onClick: () =>
@@ -108,6 +112,7 @@ export function FilterBar({
             selected={value.industries ?? []}
             onChange={(v) => onChange({ industries: v })}
             emptyText="Vui lòng chọn ngành nghề"
+            pins={industryPins}
           />
         </div>
         {showSearchField && (

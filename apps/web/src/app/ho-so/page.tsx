@@ -5,6 +5,7 @@ import CvAutofill from '@/components/CvAutofill';
 import ShareProfileCard from '@/components/ShareProfileCard';
 import BulkApplyModal from '@/components/BulkApplyModal';
 import ApplicationTracker from '@/components/ApplicationTracker';
+import ProfileSmartCards from '@/components/ProfileSmartCards';
 import ApplicationStepper from '@/components/ApplicationStepper';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -201,6 +202,8 @@ export default function MyCenterPage() {
             />
 
             <CvAutofill token={token} onDone={() => window.location.reload()} />
+
+            <ProfileSmartCards token={token} onRefresh={() => document.getElementById('refresh-profile-btn')?.click()} />
 
             <ShareProfileCard token={token} />
 
@@ -733,7 +736,7 @@ function OverviewCard({
             <button onClick={() => setEditing(true)} className="tvl-btn-primary !w-auto px-5">
               Cập nhật hồ sơ
             </button>
-            <button onClick={handleRefresh} disabled={refreshing} className="tvl-btn-ghost !w-auto px-5 text-center disabled:opacity-60">
+            <button id="refresh-profile-btn" onClick={handleRefresh} disabled={refreshing} className="tvl-btn-ghost !w-auto px-5 text-center disabled:opacity-60">
               {refreshing ? 'Đang làm mới…' : '🔄 Làm mới hồ sơ'}
             </button>
             <Link href="/ho-so/truc-tuyen" className="tvl-btn-ghost !w-auto px-5 text-center">
@@ -978,6 +981,11 @@ function SettingsSection({
     onChanged({ ...updated, cvs: profile.cvs });
   }
 
+  async function toggleActivity() {
+    const updated = await candidatesApi.updateProfile(token, { showActivityStatus: !(profile.showActivityStatus ?? true) });
+    onChanged({ ...updated, cvs: profile.cvs });
+  }
+
   async function toggleNotifications() {
     const updated = await candidatesApi.updateProfile(token, {
       allowJobNotifications: !profile.allowJobNotifications,
@@ -1037,6 +1045,12 @@ function SettingsSection({
           desc="Theo ngành nghề & vị trí đã lưu trong hồ sơ"
           on={profile.allowJobNotifications}
           onToggle={toggleNotifications}
+        />
+        <ToggleCard
+          title="Cho nhà tuyển dụng thấy tôi mới truy cập"
+          desc="Hiện nhãn “Truy cập hôm nay / 3 ngày qua” (không hiện giờ chính xác). Tắt thì chỉ còn nhãn “Mới cập nhật hồ sơ”."
+          on={profile.showActivityStatus ?? true}
+          onToggle={toggleActivity}
         />
       </div>
 

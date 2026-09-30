@@ -16,6 +16,7 @@ const CHANCE = {
 export default function JobInsightsPanel({ jobId }: { jobId: string }) {
   const { me, token } = useAuth();
   const [data, setData] = useState<JobInsights | null>(null);
+  const [open, setOpen] = useState(false);
   const [certs, setCerts] = useState<{ name: string; jobs: number; percent: number }[]>([]);
   useEffect(() => {
     if (!token || me?.role !== 'candidate') return;
@@ -26,8 +27,15 @@ export default function JobInsightsPanel({ jobId }: { jobId: string }) {
   const c = CHANCE[data.chance.level];
   return (
     <div className="rounded-xl border border-border bg-white p-4 flex flex-col gap-3">
-      <div className="text-[13px] font-extrabold text-primary uppercase tracking-wide">Trợ lý ứng tuyển</div>
-
+      {/* Mặc định thu gọn (giống "Chuẩn bị phỏng vấn"); dòng tiêu đề vẫn cho thấy % cơ hội. */}
+      <button type="button" onClick={() => setOpen((v) => !v)} className="w-full flex items-center justify-between gap-2 text-left" aria-expanded={open}>
+        <span className="text-[13px] font-extrabold text-primary uppercase tracking-wide">
+          Trợ lý ứng tuyển
+          {!open && <span className={`ml-2 normal-case tabular-nums ${c.cls}`}>{data.chance.percent}% · {c.label}</span>}
+        </span>
+        <span className="text-primary font-bold">{open ? '−' : '+'}</span>
+      </button>
+      {open && <>
       <div>
         <div className="flex items-baseline gap-2">
           <span className={`text-2xl font-extrabold tabular-nums ${c.cls}`}>{data.chance.percent}%</span>
@@ -105,6 +113,7 @@ export default function JobInsightsPanel({ jobId }: { jobId: string }) {
           )}
         </div>
       )}
+      </>}
     </div>
   );
 }

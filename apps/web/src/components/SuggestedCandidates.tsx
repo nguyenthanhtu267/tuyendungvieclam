@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { cvSearchApi } from '@/lib/api';
+import { cvSearchApi, smartApi5 } from '@/lib/api';
 
 type Item = Awaited<ReturnType<typeof cvSearchApi.suggest>>['items'][number];
 
@@ -17,6 +17,24 @@ export default function SuggestedCandidates({ jobId }: { jobId: string }) {
     if (!token) return;
     cvSearchApi.suggest(token, jobId).then((r) => setItems(r.items)).catch(() => setItems([]));
   }, [token, jobId]);
+
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [bulk, setBulk] = useState<string>('');
+  function toggle(id: string) {
+    setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+  async function bulkInvite() {
+    if (!token || picked.size === 0) return;
+    setBulk('Đang gửi…');
+    try {
+      const r = await smartApi5.bulkInvite(token, jobId, Array.from(picked));
+      setInvited((s) => { const n = { ...s }; picked.forEach((id) => { n[id] = 'done'; }); return n; });
+      setPicked(new Set());
+      setBulk(`Đã gửi ${r.sent} lời mời kèm lời nhắn riêng cho từng người.`);
+    } catch {
+      setBulk('Không gửi được, thử lại');
+    }
+  }
 
   async function invite(id: string) {
     if (!token) return;
@@ -39,8 +57,14 @@ export default function SuggestedCandidates({ jobId }: { jobId: string }) {
     );
   return (
     <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-3 text-[14px]">
+        <button type="button" onClick={() => setPicked(new Set(items.filter((c) => invited[c.id] !== 'done').map((c) => c.id)))} className="font-bold text-primary underline">Chọn tất cả</button>
+        <button type="button" onClick={bulkInvite} disabled={picked.size === 0} className="tvl-btn-primary !w-auto px-3 py-1.5 disabled:opacity-50">Mời {picked.size || ''} người đã chọn</button>
+        <span className="text-ink-muted">{bulk || 'Mỗi người nhận lời nhắn riêng có tên và lý do phù hợp.'}</span>
+      </div>
       {items.map((c) => (
         <div key={c.id} className="rounded-xl border border-border bg-white p-3 flex gap-3 items-start">
+          <input type="checkbox" aria-label={`Chọn ${c.fullName}`} checked={picked.has(c.id)} disabled={invited[c.id] === 'done'} onChange={() => toggle(c.id)} className="mt-1 w-5 h-5 shrink-0" />
           <div className="shrink-0 w-14 h-14 rounded-full bg-primary-tint text-primary font-extrabold text-lg flex items-center justify-center">
             {c.match.score}%
           </div>

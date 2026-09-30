@@ -133,6 +133,16 @@ export class CvSearchService {
         salaryMax: dto.salaryMax,
       });
     }
+    const DAYS: Record<string, number> = { '1d': 1, '3d': 3, '7d': 7, '30d': 30 };
+    if (dto.seenWithin && DAYS[dto.seenWithin]) {
+      qb.andWhere(
+        `profile.show_activity_status = true AND EXISTS (SELECT 1 FROM users ua WHERE ua.id = profile.user_id AND ua.last_active_at >= :seenSince)`,
+        { seenSince: new Date(Date.now() - DAYS[dto.seenWithin] * 86400000) },
+      );
+    }
+    if (dto.updatedWithin && DAYS[dto.updatedWithin]) {
+      qb.andWhere('profile.updated_at >= :updSince', { updSince: new Date(Date.now() - DAYS[dto.updatedWithin] * 86400000) });
+    }
     if (dto.urgentOnly) qb.andWhere('profile.visibility = :urgent', { urgent: ProfileVisibility.URGENT });
     return qb;
   }
@@ -179,7 +189,15 @@ export class CvSearchService {
       .clone()
       .select('profile.id', 'id')
       .addSelect(`CASE WHEN profile.visibility = '${ProfileVisibility.URGENT}' THEN 0 ELSE 1 END`, 'urgent_rank')
-      .orderBy('urgent_rank', 'ASC')
+      .addSelect(
+        `(SELECT CASE WHEN profile.show_activity_status THEN ua.last_active_at END FROM users ua WHERE ua.id = profile.user_id)`,
+        'seen_at',
+      )
+      .orderBy(
+        dto.sort === 'seen' ? 'seen_at' : dto.sort === 'updated' ? 'profile.updated_at' : 'urgent_rank',
+        dto.sort === 'relevance' || !dto.sort ? 'ASC' : 'DESC',
+        dto.sort === 'seen' ? 'NULLS LAST' : undefined,
+      )
       .addOrderBy('profile.completion_percent', 'DESC')
       .addOrderBy('profile.updated_at', 'DESC')
       .offset((page - 1) * pageSize)
@@ -201,8 +219,32 @@ export class CvSearchService {
     const unlockedSet = await this.getUnlockedIdSet(company.id, ids);
     const notesMap = await this.getNotesMap(company.id, ids);
 
-    const items = ordered.map((p) => this.toSummary(p, unlockedSet.has(p.id), notesMap.get(p.id)));
+    const seenMap = await this.getLastSeenMap(ordered);
+    const items = ordered.map((p) => ({ ...this.toSummary(p, unlockedSet.has(p.id), notesMap.get(p.id)), ...this.activityOf(p, seenMap.get(p.userId)) }));
     return { items, total, page, pageSize };
+  }
+
+  // Đợt 73 — lần truy cập gần nhất (chỉ của ứng viên cho phép hiển thị hoạt động).
+  private async getLastSeenMap(profiles: CandidateProfile[]): Promise<Map<string, Date>> {
+    const ids = profiles.filter((p) => p.showActivityStatus !== false).map((p) => p.userId);
+    if (ids.length === 0) return new Map();
+    const rows = await this.profileRepo.query(
+      `SELECT id, last_active_at FROM users WHERE id = ANY($1::uuid[]) AND last_active_at IS NOT NULL`,
+      [ids],
+    );
+    return new Map((rows as { id: string; last_active_at: Date }[]).map((r) => [r.id, new Date(r.last_active_at)]));
+  }
+
+  // Nhãn hoạt động dạng thô (không lộ giờ chính xác). hot = vừa truy cập ≤3 ngày VÀ vừa cập nhật hồ sơ ≤14 ngày.
+  private activityOf(p: CandidateProfile, seen?: Date) {
+    const DAY = 86400000;
+    const now = Date.now();
+    const seenDays = seen ? (now - seen.getTime()) / DAY : null;
+    const updDays = p.updatedAt ? (now - new Date(p.updatedAt).getTime()) / DAY : null;
+    const seenLabel = seenDays == null ? null : seenDays <= 1 ? 'Truy cập hôm nay' : seenDays <= 3 ? 'Truy cập 3 ngày qua' : seenDays <= 7 ? 'Truy cập tuần này' : seenDays <= 30 ? 'Truy cập tháng này' : null;
+    const updatedLabel = updDays == null ? null : updDays <= 3 ? 'Mới cập nhật hồ sơ' : updDays <= 7 ? 'Cập nhật hồ sơ tuần này' : updDays <= 30 ? 'Cập nhật hồ sơ tháng này' : null;
+    const hot = seenDays != null && seenDays <= 3 && updDays != null && updDays <= 14;
+    return { seenLabel, updatedLabel, updatedAt: p.updatedAt, recentlySeen: seenDays != null && seenDays <= 3, recentlyUpdated: updDays != null && updDays <= 7, activeSeeker: hot };
   }
 
   private async getUnlockedIdSet(companyId: string, profileIds: string[]): Promise<Set<string>> {
@@ -430,7 +472,7 @@ export class CvSearchService {
 
   // Đợt 12ac (24/09/2026) — "Mời ứng tuyển": NTD gửi lời mời cho ứng viên vào 1 tin đang tuyển của
   // ĐÚNG công ty đang thao tác (chặn mời hộ tin công ty khác), tái dùng NotificationsService.
-  async inviteToApply(userId: string, profileId: string, jobPostingId: string) {
+  async inviteToApply(userId: string, profileId: string, jobPostingId: string, extra?: string) {
     const company = await this.getCompany(userId);
     await this.assertVisibleToCompany(company, profileId);
 
@@ -443,7 +485,7 @@ export class CvSearchService {
     await this.notificationsService.create(
       profile.userId,
       'job_invite',
-      `${company.name} mời bạn ứng tuyển vị trí "${job.title}".`,
+      `${company.name} mời bạn ứng tuyển vị trí "${job.title}".${extra ? ` ${extra}` : ''}`,
     );
     return { success: true };
   }

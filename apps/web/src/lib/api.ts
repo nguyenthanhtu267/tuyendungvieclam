@@ -256,6 +256,7 @@ export const jobsApi = {
     const qs = buildJobQuery(params);
     return request<JobListResponse>(`/jobs${qs ? `?${qs}` : ''}`);
   },
+  suggest: (q: string) => request<{ suggestion: string | null; synonyms: string[] }>(`/jobs/suggest?q=${encodeURIComponent(q)}`),
   get: (id: string) => request<{ job: JobPosting; related: JobPosting[] }>(`/jobs/${id}`),
   // Đợt 38 — độ phù hợp việc ↔ hồ sơ (ứng viên đăng nhập).
   match: (token: string, ids: string[]) =>
@@ -371,6 +372,7 @@ export interface CandidateProfile {
   visibility: ProfileVisibility;
   completionPercent: number;
   allowJobNotifications: boolean;
+  showActivityStatus?: boolean;
   cvs?: CV[];
   // Đợt 12p (21/09/2026) — GET /me/profile thật ra trả về toàn bộ CandidateProfile (entity backend
   // có sẵn các trường này từ đợt 8), chỉ là type FE trước đây khai báo thiếu. Bổ sung để trang
@@ -1412,6 +1414,10 @@ export interface CandidateSearchParams {
   unlockedOnly?: boolean;
   // Đợt 12ac (24/09/2026) — xem lại đúng các hồ sơ NTD đã tự ẩn (để có thể bỏ ẩn).
   hiddenOnly?: boolean;
+  // Đợt 73 — hoạt động ứng viên: mới truy cập / mới cập nhật hồ sơ / sắp xếp.
+  seenWithin?: '1d' | '3d' | '7d' | '30d';
+  updatedWithin?: '3d' | '7d' | '30d';
+  sort?: 'relevance' | 'seen' | 'updated';
   page?: number;
   pageSize?: number;
 }
@@ -1448,6 +1454,12 @@ export interface CandidateSearchItem {
   hidden: boolean;
   // Đợt 18c (26/09/2026) — hồ sơ "Nguồn tổng hợp" do đội ngũ web tổng hợp (ứng viên chưa tự quản lý).
   isAdminSourced?: boolean;
+  // Đợt 73 — nhãn hoạt động (dạng thô). seenLabel chỉ có khi ứng viên cho phép hiển thị hoạt động.
+  seenLabel?: string | null;
+  updatedLabel?: string | null;
+  recentlySeen?: boolean;
+  recentlyUpdated?: boolean;
+  activeSeeker?: boolean;
 }
 
 export interface CandidateSearchResult {
@@ -1556,6 +1568,9 @@ function buildSearchQuery(params: CandidateSearchParams): string {
   if (params.urgentOnly) qs.set('urgentOnly', 'true');
   if (params.unlockedOnly) qs.set('unlockedOnly', 'true');
   if (params.hiddenOnly) qs.set('hiddenOnly', 'true');
+  if (params.seenWithin) qs.set('seenWithin', params.seenWithin);
+  if (params.updatedWithin) qs.set('updatedWithin', params.updatedWithin);
+  if (params.sort && params.sort !== 'relevance') qs.set('sort', params.sort);
   qs.set('page', String(params.page ?? 1));
   qs.set('pageSize', String(params.pageSize ?? 10));
   return qs.toString();
@@ -2717,4 +2732,35 @@ export const smartApi3 = {
   resolveReports: (token: string, jobId: string) => request<{ ok: boolean }>(`/admin/quality/reports/${jobId}/resolve`, { method: 'POST', headers: authHeaders(token) }),
   weekly: (token: string) => request<WeeklyReport>('/admin/quality/weekly', { headers: authHeaders(token) }),
   adTargeting: (token: string) => request<AdTargeting>('/admin/quality/ad-targeting', { headers: authHeaders(token) }),
+};
+
+// Đợt 75 — tính năng thông minh mới (ứng viên / nhà tuyển dụng / admin).
+export interface CvTailor { hasProfile: boolean; score?: number; keywords?: string[]; matched?: string[]; inText?: string[]; missing?: string[]; tips?: string[] }
+export interface SalaryPosition { hasProfile: boolean; expected?: number | null; scope?: string; sample?: number; p25?: number; median?: number; p75?: number; percent?: number; advice?: string }
+export interface JobGoalData { hasProfile: boolean; thisWeek?: number; weeks?: number[]; streak?: number }
+export const smartApi4 = {
+  cvTailor: (token: string, jobId: string) => request<CvTailor>(`/jobs/${jobId}/cv-tailor`, { headers: authHeaders(token) }),
+  applyCheck: (token: string, jobId: string) => request<{ similar: { jobId: string; title: string; appliedAt: string; status: string }[] }>(`/jobs/${jobId}/apply-check`, { headers: authHeaders(token) }),
+  freshness: (token: string) => request<{ hasProfile: boolean; days?: number; stale?: boolean }>('/me/profile-freshness', { headers: authHeaders(token) }),
+  salaryPosition: (token: string) => request<SalaryPosition>('/me/salary-position', { headers: authHeaders(token) }),
+  jobGoal: (token: string) => request<JobGoalData>('/me/job-goal', { headers: authHeaders(token) }),
+};
+
+export interface PendingApps { days: number; total: number; items: { id: string; name: string; jobId: string; jobTitle: string; waitDays: number }[] }
+export interface JobPerf { id: string; title: string; views: number; applications: number; rate: number; daysLeft: number | null; advice: string; level: 'good' | 'warn' | 'bad' }
+export interface TitleTestData { test: null | { id: string; status: string; winner: string | null; a: { title: string; views: number; clicks: number; ctr: number }; b: { title: string; views: number; clicks: number; ctr: number }; enough: boolean; leader: 'a' | 'b' | null } }
+export interface VerifyCheck { score: number; level: 'high' | 'medium' | 'low'; checks: { key: string; ok: boolean | null; label: string }[]; duplicates: { id: string; name: string; why: string }[] }
+const jsonPost = (token: string, body: unknown) => ({ method: 'POST', headers: authHeaders(token), body: JSON.stringify(body) });
+export const smartApi5 = {
+  pending: (token: string, days = 3) => request<PendingApps>(`/employer/pending-applications?days=${days}`, { headers: authHeaders(token) }),
+  performance: (token: string) => request<{ items: JobPerf[] }>('/employer/job-performance', { headers: authHeaders(token) }),
+  extend: (token: string, jobId: string, days: number) => request<{ deadline: string }>(`/employer/jobs/${jobId}/extend`, jsonPost(token, { days })),
+  titleTest: (token: string, jobId: string) => request<TitleTestData>(`/employer/jobs/${jobId}/title-test`, { headers: authHeaders(token) }),
+  startTitleTest: (token: string, jobId: string, titleB: string) => request<TitleTestData>(`/employer/jobs/${jobId}/title-test`, jsonPost(token, { titleB })),
+  finishTitleTest: (token: string, jobId: string, apply: boolean) => request<TitleTestData>(`/employer/jobs/${jobId}/title-test/finish`, jsonPost(token, { apply })),
+  bulkInvite: (token: string, jobId: string, profileIds: string[]) => request<{ sent: number; skipped: number }>(`/employer/jobs/${jobId}/bulk-invite`, jsonPost(token, { profileIds })),
+  verifyCheck: (token: string, companyId: string) => request<VerifyCheck>(`/admin/companies/${companyId}/verify-check`, { headers: authHeaders(token) }),
+  publicTests: (ids: string[]) => request<{ items: { testId: string; jobId: string; a: string; b: string }[] }>(`/public/title-tests?ids=${ids.join(',')}`),
+  testEvent: (testId: string, variant: 'a' | 'b', type: 'view' | 'click') =>
+    request<{ ok: boolean }>('/public/title-tests/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testId, variant, type }) }),
 };

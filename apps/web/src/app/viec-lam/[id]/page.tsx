@@ -17,6 +17,8 @@ import { CompatibilityChecklist } from '@/components/CompatibilityChecklist';
 import JobInsightsPanel from '@/components/JobInsightsPanel';
 import InterviewPrepPanel from '@/components/InterviewPrepPanel';
 import SalaryNudge from '@/components/SalaryNudge';
+import ApplyCheckNote from '@/components/ApplyCheckNote';
+import CvTailorPanel from '@/components/CvTailorPanel';
 import TranslateHint from '@/components/TranslateHint';
 import ReportJobButton from '@/components/ReportJobButton';
 import CompanyResponseBadge from '@/components/CompanyResponseBadge';
@@ -305,6 +307,7 @@ function JobDetailInner() {
         {applyOpen && (
           <div className="mt-3 rounded-xl border border-border bg-white p-5">
             {me?.role === 'candidate' && <SalaryNudge jobId={params.id} />}
+            {me?.role === 'candidate' && <ApplyCheckNote jobId={params.id} />}
             {!me ? (
               // Đợt 22 — khách chưa đăng nhập vẫn ứng tuyển được (họ tên/SĐT/email + file hoặc link CV).
               <GuestApplyForm jobId={params.id} jobTitle={job.title} onCancel={() => setApplyOpen(false)} />
@@ -717,6 +720,7 @@ function JobDetailInner() {
               </div>
             )}
             {me?.role === 'candidate' && compatibility && <JobInsightsPanel jobId={job.id} />}
+            {me?.role === 'candidate' && compatibility && <CvTailorPanel jobId={job.id} />}
             {me?.role === 'candidate' && <InterviewPrepPanel job={job as never} />}
             {/* Đợt 33 — banner cột phải nằm TRÊN khối "Việc làm được tìm kiếm nhiều nhất"; khối từ khoá dính theo khi cuộn. */}
             <AdStack sticky={false}>

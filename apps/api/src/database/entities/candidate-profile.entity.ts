@@ -87,6 +87,10 @@ export class CandidateProfile {
   @Column({ name: 'completion_percent', type: 'int', default: 0 })
   completionPercent: number;
 
+  // Đợt 73 — cho phép NTD thấy nhãn "mới truy cập" (chỉ dạng thô: hôm nay/3 ngày/7 ngày, không giờ chính xác).
+  @Column({ name: 'show_activity_status', default: true })
+  showActivityStatus: boolean;
+
   @Column({ name: 'allow_job_notifications', default: true })
   allowJobNotifications: boolean;
 

@@ -246,6 +246,28 @@ export default function TimHoSoPage() {
                   onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
                 />
               </div>
+              <div className="rounded-lg bg-surface-alt border border-border p-2.5 flex flex-col gap-2">
+                <div className="text-xs font-extrabold text-ink">Hoạt động của ứng viên</div>
+                <label className="text-[12px] font-semibold text-ink-muted" htmlFor="f-seen">
+                  Truy cập gần đây
+                  <select id="f-seen" className="tvl-input mt-1 text-[12.5px]" value={filters.seenWithin ?? ''} onChange={(e) => setFilters((f) => ({ ...f, seenWithin: (e.target.value || undefined) as CandidateSearchParams['seenWithin'] }))}>
+                    <option value="">Tất cả</option>
+                    <option value="1d">Hôm nay</option>
+                    <option value="3d">Trong 3 ngày</option>
+                    <option value="7d">Trong 7 ngày</option>
+                    <option value="30d">Trong 30 ngày</option>
+                  </select>
+                </label>
+                <label className="text-[12px] font-semibold text-ink-muted" htmlFor="f-upd">
+                  Cập nhật hồ sơ
+                  <select id="f-upd" className="tvl-input mt-1 text-[12.5px]" value={filters.updatedWithin ?? ''} onChange={(e) => setFilters((f) => ({ ...f, updatedWithin: (e.target.value || undefined) as CandidateSearchParams['updatedWithin'] }))}>
+                    <option value="">Tất cả</option>
+                    <option value="3d">Trong 3 ngày</option>
+                    <option value="7d">Trong 7 ngày</option>
+                    <option value="30d">Trong 30 ngày</option>
+                  </select>
+                </label>
+              </div>
               <div>
                 <label className="text-xs font-bold text-ink">Ngành nghề</label>
                 <div className="mt-1.5">
@@ -374,8 +396,37 @@ export default function TimHoSoPage() {
             </aside>
 
             <div className="flex flex-col gap-3">
-              <div className="text-xs text-ink-faint">
-                {loading ? 'Đang tải…' : `Tìm thấy ${formatNumber(total)} hồ sơ phù hợp`}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="text-xs text-ink-faint mr-1">
+                  {loading ? 'Đang tải…' : `Tìm thấy ${formatNumber(total)} hồ sơ phù hợp`}
+                </div>
+                {/* Đợt 73 — lọc nhanh theo 2 trạng thái hoạt động + sắp xếp. */}
+                <button
+                  type="button"
+                  aria-pressed={filters.seenWithin === '3d'}
+                  onClick={() => setFilters((f) => ({ ...f, seenWithin: f.seenWithin === '3d' ? undefined : '3d' }))}
+                  className={`h-8 px-3 rounded-lg border text-[13px] font-semibold ${filters.seenWithin === '3d' ? 'bg-primary text-white border-primary' : 'bg-white border-border-strong hover:border-primary'}`}
+                >
+                  🟢 Mới truy cập
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={filters.updatedWithin === '7d'}
+                  onClick={() => setFilters((f) => ({ ...f, updatedWithin: f.updatedWithin === '7d' ? undefined : '7d' }))}
+                  className={`h-8 px-3 rounded-lg border text-[13px] font-semibold ${filters.updatedWithin === '7d' ? 'bg-primary text-white border-primary' : 'bg-white border-border-strong hover:border-primary'}`}
+                >
+                  🔄 Mới cập nhật hồ sơ
+                </button>
+                <select
+                  aria-label="Sắp xếp hồ sơ"
+                  className="tvl-input !w-auto !h-8 !py-0 text-[13px] font-semibold"
+                  value={filters.sort ?? 'relevance'}
+                  onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value as CandidateSearchParams['sort'] }))}
+                >
+                  <option value="relevance">Sắp xếp: Nổi bật</option>
+                  <option value="seen">Truy cập gần nhất</option>
+                  <option value="updated">Cập nhật gần nhất</option>
+                </select>
               </div>
               {!loading && items.length === 0 && (
                 <div className="rounded-xl border border-border bg-white text-center text-ink-faint text-sm py-16">
@@ -511,6 +562,25 @@ function CandidateCard({
               </span>
             )}
           </div>
+          {(item.activeSeeker || item.seenLabel || item.updatedLabel) && (
+            <div className="flex items-center gap-1.5 flex-wrap mt-1">
+              {item.activeSeeker && (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-warning-tint text-[#7A4A00]" title="Vừa truy cập và vừa cập nhật hồ sơ: nhiều khả năng đang tìm việc, liên hệ sớm sẽ có phản hồi tốt hơn">
+                  🔥 Đang tích cực tìm việc
+                </span>
+              )}
+              {item.seenLabel && (
+                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${item.recentlySeen ? 'bg-success-tint text-[#0B5D2A]' : 'bg-surface-alt text-ink-muted'}`}>
+                  🟢 {item.seenLabel}
+                </span>
+              )}
+              {item.updatedLabel && (
+                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${item.recentlyUpdated ? 'bg-info-tint text-[#1E4FB0]' : 'bg-surface-alt text-ink-muted'}`}>
+                  🔄 {item.updatedLabel}
+                </span>
+              )}
+            </div>
+          )}
           <div className="text-primary font-semibold text-[13px] mt-0.5">{item.profileTitle}</div>
           <div className="text-ink-faint text-[11.5px] mt-1">
             {[item.desiredPosition, item.desiredLevel, formatSalary(item.desiredSalaryMin, item.desiredSalaryMax), item.province]

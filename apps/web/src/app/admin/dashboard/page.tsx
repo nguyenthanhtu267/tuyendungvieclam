@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import CompanyVerifyBox from '@/components/admin/CompanyVerifyBox';
+import { useEffect, useState, useRef, useCallback, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -87,6 +88,7 @@ export default function AdminDashboardPage() {
   }, []);
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [pendingJobs, setPendingJobs] = useState<JobPosting[]>([]);
+  const [verifyId, setVerifyId] = useState<string | null>(null);
   const [pendingCompanies, setPendingCompanies] = useState<Company[]>([]);
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -558,7 +560,8 @@ export default function AdminDashboardPage() {
                     </thead>
                     <tbody>
                       {pendingCompanies.map((c) => (
-                        <tr key={c.id} className="border-t border-border">
+                        <Fragment key={c.id}>
+                        <tr className="border-t border-border">
                           <td className="py-3 px-3">
                             <input
                               type="checkbox"
@@ -570,6 +573,13 @@ export default function AdminDashboardPage() {
                           <td className="py-3 px-3 tabular-nums">{c.taxCode}</td>
                           <td className="py-3 px-3 text-ink-faint">{c.industry ?? '—'}</td>
                           <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => setVerifyId(verifyId === c.id ? null : c.id)}
+                              className="text-[11px] font-bold rounded-md border border-primary text-primary px-2.5 py-1.5 mr-1.5"
+                            >
+                              🔍 Kiểm tra nhanh
+                            </button>
                             <button
                               disabled={busyId === c.id}
                               onClick={() => handleCompanyDecision(c.id, 'approve')}
@@ -586,6 +596,10 @@ export default function AdminDashboardPage() {
                             </button>
                           </td>
                         </tr>
+                        {verifyId === c.id && (
+                          <tr className="bg-surface-alt"><td colSpan={5} className="px-4 py-3"><CompanyVerifyBox token={token} companyId={c.id} /></td></tr>
+                        )}
+                        </Fragment>
                       ))}
                     </tbody>
                   </table>

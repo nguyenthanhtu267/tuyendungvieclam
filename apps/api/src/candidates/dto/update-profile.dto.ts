@@ -42,6 +42,10 @@ export class UpdateProfileDto {
   @IsBoolean()
   allowJobNotifications?: boolean;
 
+  @IsOptional()
+  @IsBoolean()
+  showActivityStatus?: boolean;
+
   // Đợt 8
   @IsOptional()
   @IsString()

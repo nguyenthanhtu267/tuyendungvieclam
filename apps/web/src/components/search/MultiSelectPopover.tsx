@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { PinsApi } from '@/lib/pins';
 
 // Đợt 10 — popover lọc nhiều lựa chọn dùng chung cho "Tỉnh, Thành Phố" và "Ngành nghề"
 // (claude/06-spec-tim-kiem-nang-cao.md mục 1): không có nút "Áp dụng", chọn là lọc ngay; ô tìm +
@@ -19,6 +20,7 @@ export function MultiSelectPopover({
   onChange,
   emptyText,
   topAction,
+  pins,
 }: {
   label: string;
   placeholder: string;
@@ -27,9 +29,12 @@ export function MultiSelectPopover({
   onChange: (next: string[]) => void;
   emptyText: string;
   // Đợt 66 — mục đặt trên cùng danh sách (VD "Dùng vị trí của tôi").
+  // Đợt 74 — ghim tối đa N mục hay chọn (chỉ khi đã đăng nhập).
+  pins?: PinsApi;
   topAction?: { label: string; onClick: () => Promise<string | void> | string | void };
 }) {
   const [actionMsg, setActionMsg] = useState('');
+  const [pinMsg, setPinMsg] = useState('');
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const rootRef = useRef<HTMLDivElement>(null);
@@ -53,11 +58,16 @@ export function MultiSelectPopover({
 
   const filteredGroups = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return groups;
-    return groups
+    const pinnedList = (pins?.list ?? []).filter((p) => groups.some((g) => g.options.includes(p)));
+    // Mục đã ghim đưa lên nhóm đầu, bỏ khỏi các nhóm còn lại để không trùng.
+    const base = pinnedList.length
+      ? [{ label: '📌 Đã ghim', options: pinnedList }, ...groups.map((g) => ({ ...g, options: g.options.filter((o) => !pinnedList.includes(o)) })).filter((g) => g.options.length > 0)]
+      : groups;
+    if (!q) return base;
+    return base
       .map((g) => ({ ...g, options: g.options.filter((o) => o.toLowerCase().includes(q)) }))
       .filter((g) => g.options.length > 0);
-  }, [groups, query]);
+  }, [groups, query, pins?.list]);
 
   function toggle(value: string) {
     if (selected.includes(value)) onChange(selected.filter((v) => v !== value));
@@ -130,6 +140,8 @@ export function MultiSelectPopover({
               </button>
             )}
             {actionMsg && <div className="text-[11.5px] text-critical">{actionMsg}</div>}
+            {pinMsg && <div className="text-[11.5px] text-critical">{pinMsg}</div>}
+            {pins && !pinMsg && <div className="text-[11px] text-ink-faint">Bấm 📌 cạnh mục hay tìm để ghim lên đầu (tối đa {pins.max}).</div>}
             <div className="flex items-center justify-between text-[11px]">
               <span className="text-ink-faint">
                 {selected.length === 0 ? emptyText : `${selected.length} ${label.toLowerCase()} đã chọn`}
@@ -156,20 +168,31 @@ export function MultiSelectPopover({
                 {g.options.map((opt) => {
                   const checked = selected.includes(opt);
                   return (
-                    <label
-                      key={opt}
-                      className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-surface-alt"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggle(opt)}
-                        className="h-3.5 w-3.5 accent-primary shrink-0"
-                      />
-                      <span className={`text-[12.5px] leading-snug ${checked ? 'font-bold text-primary' : 'text-ink-muted'}`}>
-                        {opt}
-                      </span>
-                    </label>
+                    <div key={opt} className="flex items-center hover:bg-surface-alt">
+                      <label className="flex-1 min-w-0 flex items-center gap-2.5 pl-3 py-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggle(opt)}
+                          className="h-3.5 w-3.5 accent-primary shrink-0"
+                        />
+                        <span className={`text-[12.5px] leading-snug ${checked ? 'font-bold text-primary' : 'text-ink-muted'}`}>
+                          {opt}
+                        </span>
+                      </label>
+                      {pins && (
+                        <button
+                          type="button"
+                          onClick={() => setPinMsg(pins.toggle(opt) || '')}
+                          aria-pressed={pins.list.includes(opt)}
+                          aria-label={pins.list.includes(opt) ? `Bỏ ghim ${opt}` : `Ghim ${opt}`}
+                          title={pins.list.includes(opt) ? 'Bỏ ghim' : `Ghim lên đầu (tối đa ${pins.max})`}
+                          className={`shrink-0 px-2.5 py-2 text-[14px] leading-none ${pins.list.includes(opt) ? 'opacity-100' : 'opacity-35 hover:opacity-100'}`}
+                        >
+                          📌
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>

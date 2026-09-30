@@ -88,20 +88,33 @@ export function FilterSuggestions({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig, total, loading, facets]);
 
+  const [openMenu, setOpenMenu] = useState(false);
   if (sugs.length === 0) return null;
+  // Đợt 76 — dạng nút xổ gọn nằm cùng hàng tiêu đề kết quả (không chiếm dòng riêng, không tràn nội dung).
   return (
-    <div className="flex items-center gap-2 flex-wrap text-[13px]">
-      <span className="font-semibold text-ink-muted">💡 Mở rộng kết quả:</span>
-      {sugs.map((s) => (
-        <button
-          key={s.key}
-          type="button"
-          onClick={() => onApply(s.patch)}
-          className="rounded-full border border-primary text-primary font-semibold px-3 py-1 hover:bg-primary-tint"
-        >
-          {s.text}
-        </button>
-      ))}
+    <div className="relative" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOpenMenu(false); }}>
+      <button
+        type="button"
+        onClick={() => setOpenMenu((v) => !v)}
+        aria-expanded={openMenu}
+        className="inline-flex items-center gap-1.5 rounded-full border border-primary bg-white text-primary font-bold px-3 py-1.5 text-[14px] whitespace-nowrap hover:bg-primary-tint"
+      >
+        💡 Mở rộng kết quả <span className="tabular-nums">({sugs.length})</span> <span className="text-[10px]">▾</span>
+      </button>
+      {openMenu && (
+        <div className="absolute left-0 top-full mt-1 z-30 w-[min(92vw,380px)] rounded-xl border border-border bg-white shadow-lg p-1.5 flex flex-col">
+          {sugs.map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => { setOpenMenu(false); onApply(s.patch); }}
+              className="text-left rounded-lg px-3 py-2 text-[14px] font-semibold text-ink hover:bg-primary-tint"
+            >
+              {s.text}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

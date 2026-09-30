@@ -34,7 +34,7 @@ export default function SiteHeader() {
 
   return (
     <>
-      <div className="flex items-center gap-4 px-4 sm:px-6 lg:px-10 h-16 border-b border-border bg-surface sticky top-0 z-30">
+      <div className="flex items-center gap-4 px-4 sm:px-6 lg:px-10 h-12 border-b border-border bg-surface sticky top-0 z-30">
         {/* Đợt 23 (29/09/2026) — khung `relative` để đặt nhãn quảng bá nhấp nháy ngay góc trên chữ
             "MIỄN PHÍ" (nhãn là link riêng, KHÔNG lồng trong <Link> logo vì <a> không được lồng <a>). */}
         <div className="relative shrink-0">

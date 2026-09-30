@@ -39,7 +39,9 @@ export default function ChinhSachBaoMatPage() {
           Hồ sơ ứng viên ở chế độ "Công khai" hoặc "URGENT" hiển thị cho nhà tuyển dụng tìm kiếm;
           chế độ "Khoá" ẩn hoàn toàn khỏi tìm kiếm. Ứng viên có thể chặn từng công ty cụ thể xem hồ
           sơ của mình. Thông tin liên hệ (số điện thoại, email) chỉ hiển thị cho nhà tuyển dụng đã
-          thực hiện "mở khoá hồ sơ" theo gói dịch vụ, trừ khi bạn chọn ẩn hẳn trong phần cài đặt.
+          thực hiện "mở khoá hồ sơ" theo gói dịch vụ, trừ khi bạn chọn ẩn hẳn trong phần cài đặt. Nhà tuyển dụng còn thấy nhãn hoạt động dạng thô
+          (“Truy cập hôm nay / 3 ngày qua / tuần này”, “Mới cập nhật hồ sơ”), không có giờ chính xác; bạn
+          có thể tắt nhãn “Truy cập” trong Hồ sơ → Cài đặt.
         </Section>
 
         {/* Đợt 18 (26/09/2026) — minh bạch về Kho CV và hồ sơ "Nguồn tổng hợp". */}

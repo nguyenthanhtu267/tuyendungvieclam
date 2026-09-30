@@ -8,14 +8,13 @@ import SiteHeader from '@/components/SiteHeader';
 import { JobCard } from '@/components/JobCard';
 import { FilterBar } from '@/components/search/FilterBar';
 import { DistrictChips } from '@/components/search/DistrictChips';
-import { jobsApi, candidatesApi, applicationsApi, type JobFacets, type JobListParams, type JobListResponse, type DistrictFacet } from '@/lib/api';
+import { jobsApi, smartApi5, candidatesApi, applicationsApi, type JobFacets, type JobListParams, type JobListResponse, type DistrictFacet } from '@/lib/api';
 import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth-context';
 import { formatNumber } from '@/lib/format';
 import { AdSlot } from '@/components/ads/AdSlot';
 import { AdStack } from '@/components/ads/AdStack';
 import { ToggleChip } from '@/components/ToggleChip';
-import { PostedWithinMenu } from '@/components/PostedWithinMenu';
 import { RecentJobs } from '@/components/RecentJobs';
 import { FilterSuggestions } from '@/components/search/FilterSuggestions';
 import { readRecentJobs } from '@/lib/recent-jobs';
@@ -139,6 +138,41 @@ function JobSearchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
+  // Đợt 75 — A/B tiêu đề: tin đang thử nghiệm hiện ngẫu nhiên (ổn định theo khách) tiêu đề A hoặc B.
+  const [ab, setAb] = useState<Record<string, { testId: string; variant: 'a' | 'b'; title: string }>>({});
+  useEffect(() => {
+    const ids = (result?.items ?? []).map((j) => j.id);
+    if (!ids.length) { setAb({}); return; }
+    let off = false;
+    smartApi5.publicTests(ids).then((r) => {
+      if (off || !r.items.length) { if (!off) setAb({}); return; }
+      let vid = '';
+      try { vid = localStorage.getItem('tvl_vid') ?? ''; if (!vid) { vid = Math.random().toString(36).slice(2); localStorage.setItem('tvl_vid', vid); } } catch { vid = 'x'; }
+      const m: Record<string, { testId: string; variant: 'a' | 'b'; title: string }> = {};
+      for (const t of r.items) {
+        let h = 0;
+        for (const ch of vid + t.testId) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+        const variant = h % 2 === 0 ? 'a' : 'b';
+        m[t.jobId] = { testId: t.testId, variant, title: variant === 'a' ? t.a : t.b };
+        try {
+          const k = `tvl_abv_${t.testId}`;
+          if (!sessionStorage.getItem(k)) { sessionStorage.setItem(k, '1'); smartApi5.testEvent(t.testId, variant, 'view').catch(() => {}); }
+        } catch { /* bỏ qua */ }
+      }
+      setAb(m);
+    }).catch(() => {});
+    return () => { off = true; };
+  }, [result]);
+
+  const [didYouMean, setDidYouMean] = useState<string | null>(null);
+  useEffect(() => {
+    const q = filters.q?.trim();
+    if (loading || !q || !result || result.total > 0) { setDidYouMean(null); return; }
+    let off = false;
+    jobsApi.suggest(q).then((r) => { if (!off) setDidYouMean(r.suggestion); }).catch(() => {});
+    return () => { off = true; };
+  }, [filters.q, loading, result]);
+
   function updateParams(next: Partial<JobListParams>) {
     const params = new URLSearchParams(searchParams.toString());
     const patched: Record<string, unknown> = { ...filters, ...next };
@@ -243,14 +277,22 @@ function JobSearchPage() {
                 </h1>
                 {/* Đợt 58 — "Tin vừa xem" ngay sau tiêu đề, xổ danh sách "Tiêu đề - Công ty". */}
                 <RecentJobs />
-                {/* Đợt 69 — "Chỉ tin đăng" xổ danh sách 3/7/15/30 ngày, cùng dòng với "Tin vừa xem". */}
-                <PostedWithinMenu value={filters.postedWithin} onChange={(v) => updateParams({ postedWithin: v })} />
                 {/* Đợt 70 — 2 bộ lọc dạng nút bật/tắt gọn, cùng 1 dòng; chữ đầy đủ nằm ở tooltip. */}
-                {me?.role === 'candidate' && (result?.items.length ?? 0) > 1 && (
-                  <ToggleChip checked={sortMatch} onChange={setSortMatch} title="Ưu tiên tin phù hợp với hồ sơ của tôi nhất">
-                    ✨ <span className="xl:hidden">Phù hợp nhất</span><span className="hidden xl:inline">Ưu tiên phù hợp hồ sơ</span>
-                  </ToggleChip>
-                )}
+                {/* Luôn hiện để mọi người thấy chức năng: khách → bấm sẽ đến trang đăng nhập; tài khoản không phải ứng viên → mờ kèm lời giải thích. */}
+                <ToggleChip
+                  checked={me?.role === 'candidate' && sortMatch}
+                  disabled={!!me && me.role !== 'candidate'}
+                  onChange={(v) => (me ? setSortMatch(v) : router.push('/dang-nhap'))}
+                  title={
+                    !me
+                      ? 'Đăng nhập tài khoản ứng viên để ưu tiên tin phù hợp với hồ sơ của bạn nhất'
+                      : me.role !== 'candidate'
+                        ? 'Chỉ dành cho tài khoản ứng viên (cần hồ sơ để tính độ phù hợp)'
+                        : 'Ưu tiên tin phù hợp với hồ sơ của tôi nhất'
+                  }
+                >
+                  ✨ <span className="xl:hidden">Phù hợp nhất</span><span className="hidden xl:inline">Ưu tiên phù hợp hồ sơ</span>
+                </ToggleChip>
                 <ToggleChip
                   checked={onlyNew}
                   onChange={setOnlyNew}
@@ -259,16 +301,16 @@ function JobSearchPage() {
                 >
                   🆕 <span className="xl:hidden">Tin mới</span><span className="hidden xl:inline">Chỉ tin mới với tôi</span>
                 </ToggleChip>
+                {/* Đợt 76 — "Mở rộng kết quả" thu thành nút xổ, nằm cùng hàng tiêu đề. */}
+                <FilterSuggestions
+                  filters={filters}
+                  total={result?.total ?? 0}
+                  facets={facets}
+                  loading={loading}
+                  onApply={(patch) => updateParams(patch)}
+                />
               </div>
             </div>
-
-            <FilterSuggestions
-              filters={filters}
-              total={result?.total ?? 0}
-              facets={facets}
-              loading={loading}
-              onApply={(patch) => updateParams(patch)}
-            />
 
             <div className="flex items-center gap-x-5 gap-y-1 flex-wrap text-sm font-semibold">
               {!me && (
@@ -299,6 +341,15 @@ function JobSearchPage() {
             {!loading && result?.items.length === 0 && (
               <div className="rounded-xl border border-border bg-white p-8 text-center text-ink-muted text-sm">
                 Không tìm thấy tin tuyển dụng phù hợp. Thử từ khoá hoặc bộ lọc khác.
+                {didYouMean && (
+                  <div className="mt-3 text-base text-ink">
+                    Ý bạn là:{' '}
+                    <button type="button" className="font-semibold text-brand-700 underline" onClick={() => updateParams({ q: didYouMean })}>
+                      {didYouMean}
+                    </button>
+                    ?
+                  </div>
+                )}
               </div>
             )}
 
@@ -306,7 +357,9 @@ function JobSearchPage() {
               {/* Đợt 24 — banner xen giữa danh sách: sau tin thứ 5 (ít hơn 5 tin thì sau tin cuối). */}
               {visibleItems.map((job, i, arr) => (
                 <Fragment key={job.id}>
-                  <JobCard job={job} />
+                  <div onClickCapture={() => { const a = ab[job.id]; if (a) smartApi5.testEvent(a.testId, a.variant, 'click').catch(() => {}); }}>
+                    <JobCard job={ab[job.id] ? { ...job, title: ab[job.id].title } : job} />
+                  </div>
                   {i === Math.min(4, arr.length - 1) && <AdSlot slot="jobs-inline" />}
                 </Fragment>
               ))}

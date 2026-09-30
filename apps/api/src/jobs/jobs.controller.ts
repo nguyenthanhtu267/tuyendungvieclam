@@ -20,6 +20,12 @@ export class JobsController {
     return this.jobsService.findAll(query);
   }
 
+  // Đợt 75 — "Ý bạn là…" + từ đồng nghĩa (khai trước ':id').
+  @Get('suggest')
+  suggest(@Query('q') q: string) {
+    return this.jobsService.suggest(q);
+  }
+
   @Get('facets')
   facets(@Query() query: ListJobsDto) {
     return this.jobsService.facets(query);

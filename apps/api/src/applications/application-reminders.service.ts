@@ -42,10 +42,25 @@ export class ApplicationRemindersService implements OnModuleInit, OnModuleDestro
     if (this.startTimer) clearTimeout(this.startTimer);
   }
 
+  // Đợt 75 — hồ sơ ≥ 30 ngày chưa cập nhật: nhắc 1 lần / 45 ngày (có nhận việc mới bật, tối đa 200 người/lượt).
+  private async nudgeStaleProfiles() {
+    const rows = await this.appRepo.manager.query(
+      `SELECT p.user_id FROM candidate_profiles p
+         JOIN users u ON u.id = p.user_id
+        WHERE p.updated_at < now() - interval '30 days' AND u.status = 'active' AND p.is_admin_sourced = false
+          AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.user_id = p.user_id AND n.type = 'profile_stale' AND n.created_at > now() - interval '45 days')
+        LIMIT 200`,
+    ) as { user_id: string }[];
+    for (const r of rows) {
+      await this.notifications.create(r.user_id, 'profile_stale', 'Hồ sơ của bạn đã hơn 30 ngày chưa cập nhật. Bấm "Làm mới hồ sơ" để được nhà tuyển dụng thấy lại ở đầu danh sách.', '/ho-so');
+    }
+  }
+
   async run(): Promise<{ candidates: number; employers: number }> {
     if (this.running) return { candidates: 0, employers: 0 };
     this.running = true;
     try {
+      await this.nudgeStaleProfiles().catch(() => undefined);
       const cutoff = new Date(Date.now() - SILENT_DAYS * DAY);
       const stale = await this.appRepo.find({
         where: { status: ApplicationStatus.NEW, appliedAt: Between(new Date(Date.now() - 30 * DAY), cutoff), deletedAt: IsNull() },

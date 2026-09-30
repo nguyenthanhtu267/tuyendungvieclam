@@ -77,6 +77,7 @@ export class QuickFieldsDto {
   @IsIn(Object.values(ProfileVisibility))
   visibility?: ProfileVisibility;
   @IsOptional() @IsBoolean() allowJobNotifications?: boolean;
+  @IsOptional() @IsBoolean() showActivityStatus?: boolean;
 }
 
 export class ExperienceDto {

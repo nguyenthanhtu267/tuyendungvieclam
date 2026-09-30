@@ -16,6 +16,35 @@ const COLS: { id: string; label: string; hint: string; pick: (a: Application) =>
   { id: 'done', label: 'Kết quả', hint: 'Từ chối', pick: (a) => a.status === 'rejected' },
 ];
 
+function ymd(d: Date) {
+  return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+}
+// Đợt 75 — thêm lịch phỏng vấn vào Google Calendar / tải file .ics (Apple, Outlook).
+function CalendarButtons({ a }: { a: Application }) {
+  const start = new Date(a.interviewAt as string);
+  const end = new Date(start.getTime() + 60 * 60000);
+  const title = `Phỏng vấn: ${a.jobPosting.title} - ${a.jobPosting.company.name}`;
+  const loc = a.interviewPlace ?? '';
+  const details = a.interviewNote ?? '';
+  const g = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${ymd(start)}/${ymd(end)}&location=${encodeURIComponent(loc)}&details=${encodeURIComponent(details)}`;
+  function ics() {
+    const esc = (t: string) => t.replace(/([,;\\])/g, '\\$1').replace(/\n/g, '\\n');
+    const body = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Tuyen Dung Viec Lam//VI', 'BEGIN:VEVENT', `UID:${a.id}@tuyendungvieclam`, `DTSTAMP:${ymd(new Date())}`, `DTSTART:${ymd(start)}`, `DTEND:${ymd(end)}`, `SUMMARY:${esc(title)}`, `LOCATION:${esc(loc)}`, `DESCRIPTION:${esc(details)}`, 'BEGIN:VALARM', 'TRIGGER:-PT2H', 'ACTION:DISPLAY', 'DESCRIPTION:Sắp đến giờ phỏng vấn', 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+    const url = URL.createObjectURL(new Blob([body], { type: 'text/calendar;charset=utf-8' }));
+    const el = document.createElement('a');
+    el.href = url;
+    el.download = 'phong-van.ics';
+    el.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  return (
+    <div className="flex flex-wrap gap-1 text-[11.5px] font-bold">
+      <a href={g} target="_blank" rel="noopener noreferrer" className="rounded border border-primary text-primary px-1.5 py-0.5 hover:bg-primary-tint">📅 Google Lịch</a>
+      <button type="button" onClick={ics} className="rounded border border-border text-ink px-1.5 py-0.5 hover:border-primary">Tải .ics</button>
+    </div>
+  );
+}
+
 export default function ApplicationTracker({ applications }: { applications: Application[] }) {
   const { token } = useAuth();
   const [eta, setEta] = useState<AppEta | null>(null);
@@ -51,6 +80,7 @@ export default function ApplicationTracker({ applications }: { applications: App
               {c.items.map((a) => {
                 const days = Math.floor((Date.now() - new Date(a.appliedAt).getTime()) / DAY);
                 return (
+                  <div key={a.id} className="flex flex-col gap-1">
                   <Link key={a.id} href={`/viec-lam/${a.jobPostingId}`} className="rounded-md bg-white border border-border p-2 hover:border-primary block">
                     <div className="font-bold text-[12.5px] leading-tight line-clamp-2">{a.jobPosting.title}</div>
                     <div className="co-name text-[11.5px] truncate">{a.jobPosting.company.name}</div>
@@ -60,6 +90,8 @@ export default function ApplicationTracker({ applications }: { applications: App
                       {a.interviewAt ? ` · PV ${formatDate(a.interviewAt)}` : ''}
                     </div>
                   </Link>
+                    {a.interviewAt && new Date(a.interviewAt).getTime() > Date.now() && <CalendarButtons a={a} />}
+                  </div>
                 );
               })}
             </div>

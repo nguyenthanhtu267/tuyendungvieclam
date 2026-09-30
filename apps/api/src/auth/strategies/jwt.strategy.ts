@@ -7,6 +7,9 @@ import { UsersService } from '../../users/users.service';
 import { UserStatus } from '../../database/entities/user.entity';
 import { UserStatusCache } from '../user-status.cache';
 
+const lastTouch = new Map<string, number>();
+const TOUCH_EVERY_MS = 10 * 60 * 1000;
+
 export interface JwtPayload {
   sub: string;
   email: string;
@@ -41,6 +44,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
     if (entry.status === UserStatus.SUSPENDED) {
       throw new UnauthorizedException('Tài khoản đã bị khoá — vui lòng liên hệ quản trị viên');
+    }
+    // Đợt 73 — ghi "lần hoạt động gần nhất" của ứng viên (tối đa 10 phút/lần, bỏ qua khi Admin đăng nhập thay).
+    if (entry.role === 'candidate' && !payload.imp) {
+      const now = Date.now();
+      if (now - (lastTouch.get(payload.sub) ?? 0) > TOUCH_EVERY_MS) {
+        if (lastTouch.size > 20_000) lastTouch.clear();
+        lastTouch.set(payload.sub, now);
+        this.usersService.touchActive(payload.sub).catch(() => undefined);
+      }
     }
     return { userId: payload.sub, email: payload.email, role: entry.role, impersonatedBy: payload.imp };
   }

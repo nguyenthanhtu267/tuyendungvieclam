@@ -40,6 +40,7 @@ const LEVEL_ORDER: string[] = [
 ];
 
 import { scoreMatch, type MatchProfile, type MatchResult } from './job-match';
+import { buildVocab, expandQuery, suggestQuery, type Vocab } from './search-synonyms';
 
 function stripHtml(html?: string): string {
   return (html ?? '').replace(/<[^>]*>/g, ' ');
@@ -83,9 +84,12 @@ export class JobsService {
 
   private applyFilters(qb: SelectQueryBuilder<JobPosting>, query: ListJobsDto) {
     if (query.q) {
-      qb.andWhere('(job.title ILIKE :q OR company.name ILIKE :q)', {
-        q: `%${query.q}%`,
-      });
+      // Đợt 75 — mở rộng theo từ đồng nghĩa / có dấu ↔ không dấu (xem search-synonyms.ts).
+      const terms = expandQuery(query.q);
+      qb.andWhere(
+        `(${terms.map((_, i) => `job.title ILIKE :q${i} OR company.name ILIKE :q${i}`).join(' OR ')})`,
+        Object.fromEntries(terms.map((t, i) => [`q${i}`, `%${t}%`])),
+      );
     }
     // provinces (đợt 10) khớp bất kỳ; location (đợt 7, tương thích ngược) khớp chuỗi con.
     if (query.provinces?.length) {
@@ -149,6 +153,32 @@ export class JobsService {
       if (job.company) job.company.logoUrl = resolveCompanyLogoUrl(job.company);
     }
     return jobs;
+  }
+
+  // Đợt 75 — từ vựng chức danh (cache 10 phút) cho "Ý bạn là…".
+  private vocab?: { at: number; v: Vocab };
+  private async getVocab(): Promise<Vocab> {
+    if (this.vocab && Date.now() - this.vocab.at < 10 * 60 * 1000) return this.vocab.v;
+    const rows = await this.jobRepo
+      .createQueryBuilder('job')
+      .select('job.title', 'title')
+      .where('job.approvalStatus = :s', { s: JobApprovalStatus.APPROVED })
+      .andWhere('job.isPaused = false')
+      .orderBy('job.createdAt', 'DESC')
+      .limit(6000)
+      .getRawMany<{ title: string }>();
+    const v = buildVocab(rows.map((r) => r.title));
+    this.vocab = { at: Date.now(), v };
+    return v;
+  }
+
+  async suggest(q: string) {
+    const term = (q ?? '').trim().slice(0, 80);
+    if (!term) return { suggestion: null, synonyms: [] as string[] };
+    const vocab = await this.getVocab();
+    const suggestion = suggestQuery(term, vocab);
+    const synonyms = expandQuery(term).slice(1);
+    return { suggestion: suggestion && suggestion.toLowerCase() !== term.toLowerCase() ? suggestion : null, synonyms };
   }
 
   async findAll(query: ListJobsDto) {

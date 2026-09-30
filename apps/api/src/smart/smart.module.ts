@@ -11,11 +11,15 @@ import { resolveJwtSecret } from '../config/env-guard';
 import { JobReport } from '../database/entities/job-report.entity';
 import { CandidateExperience, CandidateEducation, CandidateCertificate } from '../database/entities/candidate-sections.entity';
 import { Smart2Service } from './smart2.service';
+import { Smart3Service } from './smart3.service';
+import { Smart4Service } from './smart4.service';
+import { CvSearchModule } from '../cv-search/cv-search.module';
 import { SmartController, SmartPublicController, SmartSharePublicController } from './smart.controller';
 import { SmartService } from './smart.service';
 
 @Module({
   imports: [
+    CvSearchModule,
     TypeOrmModule.forFeature([JobPosting, CandidateProfile, CandidateSkill, CandidateExperience, CandidateEducation, CandidateCertificate, Application, CompanyUser, JobReport]),
     // Khoá riêng cho link chia sẻ hồ sơ — khác khoá đăng nhập nên token chia sẻ không dùng để đăng nhập được.
     JwtModule.registerAsync({
@@ -25,6 +29,6 @@ import { SmartService } from './smart.service';
     }),
   ],
   controllers: [SmartController, SmartPublicController, SmartSharePublicController],
-  providers: [SmartService, Smart2Service],
+  providers: [SmartService, Smart2Service, Smart3Service, Smart4Service],
 })
 export class SmartModule {}

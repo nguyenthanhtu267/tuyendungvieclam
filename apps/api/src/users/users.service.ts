@@ -16,6 +16,11 @@ export class UsersService {
     return this.userRepo.findOne({ where: { email } });
   }
 
+  // Ghi thẳng bằng SQL để KHÔNG làm đổi updated_at của tài khoản.
+  async touchActive(id: string): Promise<void> {
+    await this.userRepo.query(`UPDATE users SET last_active_at = now() WHERE id = $1`, [id]);
+  }
+
   findById(id: string): Promise<User | null> {
     return this.userRepo.findOne({ where: { id } });
   }
