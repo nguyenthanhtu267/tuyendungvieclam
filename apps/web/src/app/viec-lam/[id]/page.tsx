@@ -7,6 +7,7 @@ import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import SiteHeader from '@/components/SiteHeader';
 import { JobCard } from '@/components/JobCard';
+import CompanyOverview from '@/components/CompanyOverview';
 import { RichTextView } from '@/components/RichTextView';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { SourcedBadge, isCompanyUnverified } from '@/components/SourcedBadge';
@@ -28,7 +29,6 @@ import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth-context';
 import {
   formatDate,
-  formatNumber,
   formatSalary,
   formatSalaryTag,
   jobAddressDisplay,
@@ -595,65 +595,30 @@ function JobDetailInner() {
                     </div>
                   )}
                 </>
+              ) : companyOverview ? (
+                /* Đợt 49 — "Tổng quan công ty" theo mẫu (components/CompanyOverview.tsx). */
+                <CompanyOverview
+                  company={{ ...job.company, ...companyOverview.company }}
+                  jobs={companyOverview.jobs}
+                  excludeJobId={job.id}
+                  canFollow={me?.role === 'candidate'}
+                  following={following}
+                  followBusy={followBusy}
+                  onToggleFollow={toggleFollow}
+                  maxJobs={6}
+                  showAllLink
+                />
               ) : (
-                <div className="flex flex-col gap-3 text-[12.8px] text-ink-muted">
-                  <div className="flex items-center gap-3">
-                    <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={48} className="text-sm" />
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Link href={`/cong-ty/${job.company.id}`} className="font-bold text-ink text-sm hover:text-primary hover:underline">
-                          <span className="co-name">{job.company.name}</span>
-                        </Link>
-                        {isCompanyUnverified(job.company) && <SourcedBadge />}
-                      </div>
-                      <div className="text-ink-faint text-xs">Mã số thuế: {job.company.taxCode}</div>
-                    </div>
-                  </div>
-                  {job.company.industry && <div>Lĩnh vực: {job.company.industry}</div>}
-                  {job.company.size && <div>Quy mô: {job.company.size}</div>}
-                  {job.company.website && <div>Website: {job.company.website}</div>}
-                  {/* Đợt 12ac (24/09/2026) — số lượt "Theo dõi công ty" (đồng bộ với nút "+ Theo dõi"
-                      ở khối bên phải), tải kèm mô tả + danh sách tin qua companiesApi.getProfile(). */}
-                  {companyOverview?.company.followersCount != null && (
-                    <div>{formatNumber(companyOverview.company.followersCount)} lượt theo dõi</div>
-                  )}
-                  {companyOverview?.company.description && (
-                    <CompanyDescription text={companyOverview.company.description} />
-                  )}
-                  {companyOverview === undefined && (
-                    <div className="text-ink-faint text-xs">Đang tải thông tin công ty…</div>
-                  )}
-                  {/* Đợt 12k (21/09/2026) — bấm tên công ty ở trên hoặc vào đây để xem tất cả tin
-                      đang tuyển khác của công ty này (trang /cong-ty/[id]). */}
-                  <Link
-                    href={`/cong-ty/${job.company.id}`}
-                    className="tvl-btn-ghost !w-auto px-4 self-start mt-1"
-                  >
-                    Xem tất cả tin đang tuyển của công ty này →
-                  </Link>
-
-                  {/* Đợt 12ac (24/09/2026) — danh sách tin đang tuyển khác NGAY trong tab (trước đó
-                      phải bấm sang trang /cong-ty/[id] mới xem được), giống mẫu careerviet.vn. */}
-                  {companyOverview && companyOverview.jobs.length > 1 && (
-                    <div className="flex flex-col gap-2 pt-3 border-t border-border">
-                      <div className="font-extrabold text-ink text-[14px]">Tin đang tuyển khác của công ty</div>
-                      {/* Đợt 47 — hiển thị bằng thẻ việc làm chuẩn (JobCard) giống giao diện chính. */}
-                      <div className="grid grid-cols-1 gap-3">
-                        {companyOverview.jobs
-                          .filter((j) => j.id !== job.id)
-                          .slice(0, 6)
-                          .map((j) => (
-                            <JobCard key={j.id} job={{ ...j, company: j.company ?? companyOverview.company }} />
-                          ))}
-                      </div>
-                    </div>
-                  )}
+                <div className="text-ink-faint text-[13px]">
+                  {companyOverview === undefined ? 'Đang tải thông tin công ty…' : 'Không tải được thông tin công ty.'}
                 </div>
               )}
             </div>
           </div>
 
-          <div className="flex flex-col gap-3.5 lg:self-stretch">
+          <div className="flex flex-col gap-3.5 lg:self-stretch min-w-0">
+            {/* Đợt 49 — tab "Tổng quan công ty" đã có khung công ty + nút FOLLOW → ẩn thẻ công ty cột phải để không trùng. */}
+            {tab !== 'company' && (
             <div className="rounded-xl border border-border bg-white p-4">
               <div className="flex items-center gap-2.5">
                 <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={40} className="text-xs" />
@@ -674,6 +639,7 @@ function JobDetailInner() {
                 </button>
               )}
             </div>
+            )}
 
             {/* Đợt 12ab (24/09/2026) — "Đánh giá mức độ tương thích" (radar chart), theo mẫu
                 careerviet.vn — chỉ hiện cho ứng viên đã đăng nhập và đã có hồ sơ. */}
@@ -733,25 +699,6 @@ function JobDetailInner() {
   );
 }
 
-// Đợt 12ac (24/09/2026) — "Giới thiệu công ty" mở rộng/thu gọn khi dài, theo mẫu careerviet.vn.
-const COMPANY_DESCRIPTION_COLLAPSED_LENGTH = 260;
-
-function CompanyDescription({ text }: { text: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const isLong = text.length > COMPANY_DESCRIPTION_COLLAPSED_LENGTH;
-  const shown = expanded || !isLong ? text : `${text.slice(0, COMPANY_DESCRIPTION_COLLAPSED_LENGTH).trim()}…`;
-  return (
-    <div>
-      <div className="font-bold text-ink text-xs mb-1">Giới thiệu công ty</div>
-      <p className="whitespace-pre-line leading-relaxed">{shown}</p>
-      {isLong && (
-        <button onClick={() => setExpanded((v) => !v)} className="text-primary font-semibold text-xs mt-1 hover:underline">
-          {expanded ? 'Thu gọn' : 'Xem thêm'}
-        </button>
-      )}
-    </div>
-  );
-}
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (

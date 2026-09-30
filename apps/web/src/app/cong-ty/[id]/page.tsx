@@ -5,13 +5,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import SiteHeader from '@/components/SiteHeader';
-import { JobCard } from '@/components/JobCard';
-import { CompanyLogo } from '@/components/CompanyLogo';
-import { SourcedBadge, isCompanyUnverified } from '@/components/SourcedBadge';
+import CompanyOverview from '@/components/CompanyOverview';
+import { isCompanyUnverified } from '@/components/SourcedBadge';
 import { companiesApi, candidatesApi, ApiError, type CompanyProfileResponse } from '@/lib/api';
 import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth-context';
-import { formatNumber } from '@/lib/format';
 import { AdSlot } from '@/components/ads/AdSlot';
 
 // Đợt 12k (21/09/2026) — trang công ty công khai: bấm tên công ty trong tin tuyển dụng sẽ tới đây,
@@ -84,7 +82,7 @@ export default function CongTyPage() {
     );
   }
 
-  const { company, jobs, totalJobs } = data;
+  const { company, jobs } = data;
 
   return (
     <main className="min-h-screen">
@@ -98,79 +96,24 @@ export default function CongTyPage() {
           <span className="co-name text-[12px]">{company.name}</span>
         </div>
 
-        <div className="rounded-2xl bg-primary p-6 flex items-center gap-4 flex-wrap justify-between">
-          <div className="flex items-center gap-4">
-            <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={64} variant="light" className="text-lg" />
-            <div>
-              <div className="text-white text-xl font-extrabold flex items-center gap-2 flex-wrap">
-                <span className="co-name-dark">{company.name}</span>
-                {isCompanyUnverified(company) && <SourcedBadge />}
-              </div>
-              <div className="text-white/95 text-[13px] mt-1">
-                {formatNumber(totalJobs)} tin đang tuyển{company.industry ? ` · ${company.industry}` : ''}
-                {' · '}
-                {formatNumber(company.followersCount ?? 0)} người theo dõi
-              </div>
-            </div>
-          </div>
-          {me?.role === 'candidate' && (
-            <button
-              onClick={toggleFollow}
-              disabled={followBusy}
-              className={`!w-auto px-5 py-2 rounded-lg text-sm font-bold shrink-0 disabled:opacity-60 ${
-                following ? 'bg-white/15 text-white' : 'bg-white text-primary'
-              }`}
-            >
-              {following ? '✓ Đang theo dõi' : '+ Theo dõi'}
-            </button>
-          )}
-        </div>
-
         {/* Đợt 17 (25/09/2026) — "Đây là công ty của bạn?": chỉ hiện khi công ty đang ở trạng thái
-            "chưa xác thực" (isAdminSourced && !claimedAt) — công ty tự đăng ký từ đầu hoặc đã claim
-            rồi thì không cần nút này. */}
+            "chưa xác thực" (isAdminSourced && !claimedAt). */}
         {isCompanyUnverified(company) && <ClaimCompanySection companyId={company.id} />}
 
-        <div className="grid lg:grid-cols-[1fr_280px] gap-5 mt-5 items-start">
-          <div>
-            <h2 className="font-extrabold text-lg mb-3">
-              {totalJobs > 0 ? `${formatNumber(totalJobs)} việc làm đang tuyển tại ${company.name}` : 'Chưa có tin đang tuyển'}
-            </h2>
-
-            {jobs.length === 0 && (
-              <div className="rounded-xl border border-border bg-white p-8 text-center text-ink-muted text-sm">
-                Công ty này hiện chưa có tin tuyển dụng nào đang hiển thị.
-              </div>
-            )}
-
-            <div className="flex flex-col gap-3">
-              {jobs.map((job) => (
-                <JobCard key={job.id} job={job} />
-              ))}
-            </div>
+        {/* Đợt 49 — bố cục theo mẫu "Tổng quan công ty" (components/CompanyOverview.tsx), dùng chung với tab ở trang tin. */}
+        <div className="grid lg:grid-cols-[1fr_300px] gap-5 mt-3 items-start">
+          <div className="rounded-xl border border-border bg-white p-4 sm:p-5 min-w-0">
+            <CompanyOverview
+              company={company}
+              jobs={jobs}
+              canFollow={me?.role === 'candidate'}
+              following={following}
+              followBusy={followBusy}
+              onToggleFollow={toggleFollow}
+              maxJobs={100}
+            />
           </div>
-
           <div className="flex flex-col gap-3.5 lg:self-stretch">
-            <div className="rounded-xl border border-border bg-white p-4">
-              <div className="text-[11px] font-bold text-primary uppercase tracking-wide mb-2.5">
-                Thông tin công ty
-              </div>
-              <div className="flex flex-col gap-2 text-[12.5px] text-ink-muted">
-                <div>Mã số thuế: {company.taxCode}</div>
-                {company.industry && <div>Lĩnh vực: {company.industry}</div>}
-                {company.size && <div>Quy mô: {company.size}</div>}
-                {company.website && <div>Website: {company.website}</div>}
-              </div>
-            </div>
-            {/* Đợt 12ac (24/09/2026) — "Giới thiệu công ty", mở rộng/thu gọn khi dài. */}
-            {company.description && (
-              <div className="rounded-xl border border-border bg-white p-4">
-                <div className="text-[11px] font-bold text-primary uppercase tracking-wide mb-2.5">
-                  Giới thiệu công ty
-                </div>
-                <CompanyDescription text={company.description} />
-              </div>
-            )}
             <AdStack>
               <AdSlot slot="company-sidebar" />
             </AdStack>
@@ -273,21 +216,3 @@ function ClaimCompanySection({ companyId }: { companyId: string }) {
   );
 }
 
-// Đợt 12ac (24/09/2026) — "Giới thiệu công ty" mở rộng/thu gọn khi dài, theo mẫu careerviet.vn.
-const COMPANY_DESCRIPTION_COLLAPSED_LENGTH = 260;
-
-function CompanyDescription({ text }: { text: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const isLong = text.length > COMPANY_DESCRIPTION_COLLAPSED_LENGTH;
-  const shown = expanded || !isLong ? text : `${text.slice(0, COMPANY_DESCRIPTION_COLLAPSED_LENGTH).trim()}…`;
-  return (
-    <div className="text-[12.5px] text-ink-muted">
-      <p className="whitespace-pre-line leading-relaxed">{shown}</p>
-      {isLong && (
-        <button onClick={() => setExpanded((v) => !v)} className="text-primary font-semibold text-xs mt-1 hover:underline">
-          {expanded ? 'Thu gọn' : 'Xem thêm'}
-        </button>
-      )}
-    </div>
-  );
-}

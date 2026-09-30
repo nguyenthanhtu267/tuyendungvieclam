@@ -75,6 +75,10 @@ export class Application {
   @DeleteDateColumn({ name: 'deleted_at' })
   deletedAt?: Date;
 
+  // Đợt 48 — NTD mở CV/hồ sơ lần đầu (bước "Đã xem").
+  @Column({ name: 'viewed_at', type: 'timestamptz', nullable: true })
+  viewedAt?: Date | null;
+
   // Đợt 46 — hẹn lịch phỏng vấn.
   @Column({ name: 'interview_slots', type: 'jsonb', nullable: true })
   interviewSlots?: string[] | null;

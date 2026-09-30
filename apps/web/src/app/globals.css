@@ -246,10 +246,9 @@ input, select, textarea, button { font-family: inherit; }
 .mp-dark .hover\:bg-primary-tint:hover { background: rgba(255, 255, 255, 0.18) !important; }
 .mp-dark .text-success { color: #5EEAB0 !important; }
 .mp-dark .text-critical { color: #FFA3A8 !important; }
-.mp-dark .mp-tile .text-ink-muted { color: #3D4654 !important; }
-.mp-dark .mp-tile .text-success { color: #1FA97D !important; }
-.mp-dark .mp-tile .text-critical { color: #E5484D !important; }
-.mp-dark .mp-tile { border-color: #D5DBE5 !important; }
+/* Đợt 49 — ô số liệu KHÔNG nền (trong suốt trên nền tối): chữ sáng cho nổi bật. */
+.mp-dark .mp-tile { background: transparent; }
+.mp-dark .mp-tile .text-ink-muted { color: #DCE6FA !important; }
 .mp-dark .market-ticker .bg-accent-tint { background: #FFE3DA !important; }
 .mp-dark .market-ticker .text-accent-dark { color: #B5320F !important; }
 

@@ -106,6 +106,13 @@ export interface Company {
   followersCount?: number;
   // Đợt 12ac (24/09/2026) — "Giới thiệu công ty" cho tab Tổng quan công ty (trang chi tiết tin).
   description?: string;
+  // Đợt 49 — "Tổng quan công ty" theo mẫu.
+  address?: string | null;
+  contactPerson?: string | null;
+  companyType?: string | null;
+  vision?: string | null;
+  mission?: string | null;
+  galleryUrls?: string[] | null;
   // Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp": true nếu Admin tạo hộ từ nguồn ngoài;
   // claimedAt có giá trị nghĩa là công ty thật đã "nhận lại" — FE hiện badge "Tin tổng hợp — chưa xác
   // thực" khi isAdminSourced && !claimedAt (xem CompanyBadge trong components/CompanyLogo.tsx).
@@ -436,6 +443,8 @@ export interface Application {
   coverLetter?: string;
   appliedAt: string;
   jobPosting: JobPosting;
+  // Đợt 48 — NTD đã mở CV/hồ sơ.
+  viewedAt?: string | null;
   // Đợt 46 — hẹn lịch phỏng vấn.
   interviewSlots?: string[] | null;
   interviewAt?: string | null;
@@ -766,6 +775,8 @@ export interface EmployerApplication {
   rating?: number;
   folder?: string;
   deletedAt?: string;
+  // Đợt 48 — NTD đã mở CV/hồ sơ.
+  viewedAt?: string | null;
   // Đợt 46 — hẹn lịch phỏng vấn.
   interviewSlots?: string[] | null;
   interviewAt?: string | null;
@@ -851,6 +862,13 @@ export interface UpdateCompanyPayload {
   logoUrl?: string;
   // Đợt 12ac (24/09/2026) — "Giới thiệu công ty" cho tab Tổng quan công ty.
   description?: string;
+  // Đợt 49
+  address?: string;
+  contactPerson?: string;
+  companyType?: string;
+  vision?: string;
+  mission?: string;
+  galleryUrls?: string[];
 }
 
 // Đợt 12ac (24/09/2026) — "Quản lý địa điểm làm việc" (chọn nhanh khi đăng tin).
@@ -1027,6 +1045,8 @@ export const employerApi = {
       headers: authHeaders(token),
       body: JSON.stringify({ rating }),
     }),
+  markApplicationViewed: (token: string, applicationId: string) =>
+    request<{ viewedAt: string }>(`/employer/applications/${applicationId}/viewed`, { method: 'POST', headers: authHeaders(token) }),
   proposeInterview: (token: string, applicationId: string, dto: { slots: string[]; place?: string; note?: string }) =>
     request<EmployerApplication>(`/employer/applications/${applicationId}/interview`, {
       method: 'PATCH',
@@ -2064,6 +2084,12 @@ export interface AdminPersonDetail {
     website: string | null;
     logoUrl: string | null;
     description: string | null;
+    address?: string | null;
+    contactPerson?: string | null;
+    companyType?: string | null;
+    vision?: string | null;
+    mission?: string | null;
+    galleryUrls?: string[];
     approvalStatus: string;
     companyUserType: string | null;
   } | null;
@@ -2111,7 +2137,7 @@ export const adminPeopleApi = {
   updateCompany: (
     token: string,
     companyId: string,
-    payload: { name?: string; taxCode?: string; industry?: string; size?: string; website?: string; logoUrl?: string; description?: string },
+    payload: { name?: string; taxCode?: string; industry?: string; size?: string; website?: string; logoUrl?: string; description?: string; address?: string; contactPerson?: string; companyType?: string; vision?: string; mission?: string; galleryUrls?: string[] },
   ) =>
     request<{ success: true }>(`/admin/people/companies/${companyId}`, {
       method: 'PATCH',

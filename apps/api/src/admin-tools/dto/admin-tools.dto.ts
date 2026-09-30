@@ -1,19 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import {
-  ArrayMaxSize,
-  IsArray,
-  IsBoolean,
-  IsEmail,
-  IsIn,
-  IsInt,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  IsUUID,
-  Max,
-  MaxLength,
-  Min,
-} from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 import { UserRole, UserStatus } from '../../database/entities/user.entity';
 import { ProfileVisibility } from '../../database/entities/candidate-profile.entity';
 
@@ -198,6 +184,39 @@ export class UpdateCompanyInfoDto {
   @IsString()
   @MaxLength(10000)
   description?: string;
+
+  // Đợt 49 — thông tin "Tổng quan công ty".
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  contactPerson?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  companyType?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3000)
+  vision?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3000)
+  mission?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(12, { message: 'Tối đa 12 ảnh' })
+  @IsString({ each: true })
+  @MaxLength(1000, { each: true })
+  galleryUrls?: string[];
 }
 
 export class UpdateCandidateBasicDto {

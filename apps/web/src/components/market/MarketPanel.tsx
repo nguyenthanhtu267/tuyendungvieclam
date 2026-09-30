@@ -90,8 +90,8 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
 function Kpi({ label, value, color, series, change }: { label: string; value: number | null; color: string; series?: number[]; change?: number | null }) {
   const shown = useCountUp(value);
   return (
-    <div className="mp-tile rounded-lg bg-white border border-border px-2.5 py-2 min-w-0">
-      <div className="font-mono font-extrabold text-[19px] leading-none tabular-nums" style={{ color }}>
+    <div className="mp-tile rounded-lg border border-white/20 px-2 py-1.5 min-w-0">
+      <div className="font-extrabold text-[19px] leading-none tabular-nums" style={{ color }}>
         {shown === null ? '—' : formatNumber(shown)}
       </div>
       <div className="text-[12px] font-semibold text-ink-muted leading-tight mt-1 truncate" title={label}>
@@ -128,7 +128,7 @@ function AreaChart({ data, color, title }: { data: { day: string; n: number }[];
     <div>
       <div className="flex items-baseline justify-between gap-2">
         <div className="text-[13.5px] font-extrabold text-ink whitespace-nowrap">
-          {title} <span className="font-mono tabular-nums" style={{ color }}>{formatNumber(total)}</span>
+          {title} <span className="tabular-nums" style={{ color }}>{formatNumber(total)}</span>
           <span className="text-[12px] font-semibold text-ink-muted"> /14 ngày</span>
         </div>
         {ch !== null && (
@@ -196,29 +196,30 @@ function Bars({ rows, href, color }: { rows: { label: string; count: number }[];
   }, []);
   const max = Math.max(...rows.map((r) => r.count), 1);
   if (rows.length === 0) return <Empty />;
+  // Đợt 49 — 2 cột × 3 dòng để vừa khung cố định 80px (chiều cao bảng không đổi khi chuyển tab).
   return (
-    <ul className="flex flex-col gap-1">
-      {rows.map((r) => {
+    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+      {rows.slice(0, 6).map((r) => {
         const inner = (
           <>
-            <span className="w-[38%] sm:w-[34%] truncate text-[13.5px] font-bold text-ink" title={r.label}>{r.label}</span>
-            <span className="flex-1 h-3.5 rounded-full bg-primary-tint overflow-hidden">
+            <span className="w-[42%] truncate text-[13px] font-bold text-ink" title={r.label}>{r.label}</span>
+            <span className="flex-1 h-3 rounded-full bg-primary-tint overflow-hidden">
               <span
                 className="block h-full rounded-full transition-[width] duration-700 ease-out"
                 style={{ width: on ? `${Math.max(4, (r.count / max) * 100)}%` : '0%', background: color }}
               />
             </span>
-            <span className="w-10 text-right font-mono text-[13px] font-bold tabular-nums text-ink">{formatNumber(r.count)}</span>
+            <span className="w-10 text-right text-[13px] font-bold tabular-nums text-ink">{formatNumber(r.count)}</span>
           </>
         );
         return (
           <li key={r.label}>
             {href ? (
-              <Link href={href(r.label)} className="flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-primary-tint transition-colors" title={`Xem việc làm: ${r.label}`}>
+              <Link href={href(r.label)} className="flex items-center gap-2 rounded-md px-1 h-[26px] hover:bg-primary-tint transition-colors" title={`Xem việc làm: ${r.label}`}>
                 {inner}
               </Link>
             ) : (
-              <div className="flex items-center gap-2 px-1 py-0.5">{inner}</div>
+              <div className="flex items-center gap-2 px-1 h-[26px]">{inner}</div>
             )}
           </li>
         );
@@ -235,7 +236,7 @@ function Donut({ rows, href }: { rows: { label: string; count: number }[]; href:
   let acc = 0;
   return (
     <div className="flex items-center gap-4">
-      <svg viewBox="0 0 120 120" className="w-[92px] h-[92px] shrink-0 -rotate-90" role="img" aria-label="Cơ cấu việc làm theo hình thức">
+      <svg viewBox="0 0 120 120" className="w-[78px] h-[78px] shrink-0 -rotate-90" role="img" aria-label="Cơ cấu việc làm theo hình thức">
         <circle cx="60" cy="60" r={R} fill="none" stroke="#fff" strokeOpacity="0.2" strokeWidth="16" />
         {rows.map((r, i) => {
           const len = (r.count / total) * C;
@@ -256,17 +257,17 @@ function Donut({ rows, href }: { rows: { label: string; count: number }[]; href:
           return seg;
         })}
         <g className="rotate-90" style={{ transformOrigin: '60px 60px' }}>
-          <text x="60" y="58" textAnchor="middle" className="font-mono" fontSize="17" fontWeight="800" fill="#fff">{formatNumber(total)}</text>
+          <text x="60" y="58" textAnchor="middle" fontSize="17" fontWeight="800" fill="#fff">{formatNumber(total)}</text>
           <text x="60" y="74" textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#DCE6FA">việc làm</text>
         </g>
       </svg>
-      <ul className="flex-1 min-w-0 flex flex-col gap-0.5">
-        {rows.map((r, i) => (
+      <ul className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-x-3">
+        {rows.slice(0, 6).map((r, i) => (
           <li key={r.label}>
-            <Link href={href(r.label)} className="flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-primary-tint transition-colors" title={`Xem việc làm: ${r.label}`}>
+            <Link href={href(r.label)} className="flex items-center gap-2 rounded-md px-1 h-[25px] hover:bg-primary-tint transition-colors" title={`Xem việc làm: ${r.label}`}>
               <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: PALETTE[i % PALETTE.length] }} />
               <span className="flex-1 truncate text-[13.5px] font-bold text-ink">{r.label}</span>
-              <span className="font-mono text-[13px] font-bold tabular-nums text-ink">{Math.round((r.count / total) * 100)}%</span>
+              <span className="text-[13px] font-bold tabular-nums text-ink">{Math.round((r.count / total) * 100)}%</span>
             </Link>
           </li>
         ))}
@@ -286,30 +287,29 @@ function Columns({ rows }: { rows: { label: string; count: number }[] }) {
   const max = Math.max(...rows.map((r) => r.count), 1);
   const short = (l: string) => l.replace(' triệu', '').replace('Dưới ', '<').replace('Trên ', '>');
   return (
-    <div>
-      <div className="flex items-end gap-2 h-[92px]">
+    <div title="Mức lương (triệu đồng/tháng) — các tin có ghi mức lương">
+      <div className="flex items-end gap-2 h-[52px]">
         {rows.map((r, i) => (
           <div key={r.label} className="flex-1 flex flex-col items-center justify-end h-full min-w-0" title={`${r.label}: ${r.count} tin`}>
-            <span className="font-mono text-[12.5px] font-bold tabular-nums text-ink mb-0.5">{formatNumber(r.count)}</span>
+            <span className="text-[12.5px] font-bold tabular-nums text-ink mb-0.5">{formatNumber(r.count)}</span>
             <div
               className="w-full rounded-t-md transition-[height] duration-700 ease-out"
-              style={{ height: on ? `${Math.max(3, (r.count / max) * 66)}px` : '0px', background: PALETTE[i % PALETTE.length] }}
+              style={{ height: on ? `${Math.max(3, (r.count / max) * 34)}px` : '0px', background: PALETTE[i % PALETTE.length] }}
             />
           </div>
         ))}
       </div>
       <div className="flex gap-2 mt-1 border-t border-border pt-1">
         {rows.map((r) => (
-          <span key={r.label} className="flex-1 text-center text-[12px] font-bold text-ink truncate">{short(r.label)}</span>
+          <span key={r.label} className="flex-1 text-center text-[12px] font-bold text-ink truncate">{short(r.label)} tr</span>
         ))}
       </div>
-      <div className="text-[11.5px] font-semibold text-ink-muted text-center mt-0.5">Mức lương (triệu đồng/tháng) — các tin có ghi mức lương</div>
     </div>
   );
 }
 
 function Empty() {
-  return <div className="py-10 text-center text-[13.5px] font-semibold text-ink-muted">Chưa đủ dữ liệu để vẽ biểu đồ này.</div>;
+  return <div className="py-6 text-center text-[13.5px] font-semibold text-ink-muted">Chưa đủ dữ liệu để vẽ biểu đồ này.</div>;
 }
 
 export interface MarketPanelProps {
@@ -365,7 +365,7 @@ export function MarketPanel(p: MarketPanelProps) {
 
   return (
     <div
-      className="rounded-2xl min-h-[180px] relative overflow-hidden p-3 sm:p-4 flex"
+      className="rounded-2xl min-h-[180px] relative overflow-hidden p-3 flex"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
@@ -406,14 +406,14 @@ export function MarketPanel(p: MarketPanelProps) {
         </div>
         <div className="mp-dark w-full rounded-xl bg-[#04122e]/60 ring-1 ring-white/25 p-3 sm:p-3.5 shadow-lg flex flex-col gap-2.5">
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-          <Kpi label="Việc làm" value={p.openJobs} color="#163B7A" series={jobsSeries} change={market ? delta(market.newJobsDaily) : null} />
-          <Kpi label="Ứng tuyển" value={p.applicationsToday} color="#E5484D" series={appsSeries} change={market ? delta(market.applicationsDaily) : null} />
-          <Kpi label="Hồ sơ mới" value={p.profilesToday} color="#1FA97D" />
-          <Kpi label="Thành viên" value={p.members} color="#0A0E14" />
-          <Kpi label="Doanh nghiệp" value={p.companies} color="#7A4FD6" />
+          <Kpi label="Việc làm" value={p.openJobs} color="#8DBBFF" series={jobsSeries} change={market ? delta(market.newJobsDaily) : null} />
+          <Kpi label="Ứng tuyển" value={p.applicationsToday} color="#FF9AA0" series={appsSeries} change={market ? delta(market.applicationsDaily) : null} />
+          <Kpi label="Hồ sơ mới" value={p.profilesToday} color="#5EEAB0" />
+          <Kpi label="Thành viên" value={p.members} color="#FFFFFF" />
+          <Kpi label="Doanh nghiệp" value={p.companies} color="#C4A8FF" />
         </div>
 
-        <div className="min-h-[112px]" role="tabpanel">
+        <div className="min-h-[80px] sm:h-[80px] sm:overflow-hidden" role="tabpanel">
           {tab === 'trend' &&
             (market ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5">

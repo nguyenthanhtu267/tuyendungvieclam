@@ -208,7 +208,7 @@ function PersonModal({
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [u, setU] = useState({ fullName: '', email: '', phone: '', status: '', role: '' });
-  const [c, setC] = useState({ name: '', taxCode: '', industry: '', size: '', website: '', logoUrl: '', description: '' });
+  const [c, setC] = useState({ name: '', taxCode: '', industry: '', size: '', website: '', logoUrl: '', description: '', address: '', contactPerson: '', companyType: '', vision: '', mission: '', gallery: '' });
   const [p, setP] = useState({
     fullName: '',
     profileTitle: '',
@@ -238,6 +238,12 @@ function PersonModal({
         website: x.company.website ?? '',
         logoUrl: x.company.logoUrl ?? '',
         description: x.company.description ?? '',
+        address: x.company.address ?? '',
+        contactPerson: x.company.contactPerson ?? '',
+        companyType: x.company.companyType ?? '',
+        vision: x.company.vision ?? '',
+        mission: x.company.mission ?? '',
+        gallery: (x.company.galleryUrls ?? []).join('\n'),
       });
     if (x.profile)
       setP({
@@ -425,6 +431,25 @@ function PersonModal({
                 <L label="Logo (URL)">
                   <input className="tvl-input text-sm" value={c.logoUrl} onChange={(e) => setC({ ...c, logoUrl: e.target.value })} />
                 </L>
+                {/* Đợt 49 — thông tin "Tổng quan công ty" */}
+                <L label="Địa chỉ">
+                  <input className="tvl-input text-sm" value={c.address} onChange={(e) => setC({ ...c, address: e.target.value })} />
+                </L>
+                <L label="Người liên hệ">
+                  <input className="tvl-input text-sm" value={c.contactPerson} onChange={(e) => setC({ ...c, contactPerson: e.target.value })} />
+                </L>
+                <L label="Loại hình hoạt động">
+                  <input className="tvl-input text-sm" value={c.companyType} onChange={(e) => setC({ ...c, companyType: e.target.value })} />
+                </L>
+                <L label="Hình ảnh (mỗi dòng 1 link)">
+                  <textarea className="tvl-input text-sm min-h-[60px]" value={c.gallery} onChange={(e) => setC({ ...c, gallery: e.target.value })} />
+                </L>
+                <L label="Tầm nhìn">
+                  <textarea className="tvl-input text-sm min-h-[60px]" value={c.vision} onChange={(e) => setC({ ...c, vision: e.target.value })} />
+                </L>
+                <L label="Sứ mệnh">
+                  <textarea className="tvl-input text-sm min-h-[60px]" value={c.mission} onChange={(e) => setC({ ...c, mission: e.target.value })} />
+                </L>
               </div>
               <L label="Giới thiệu công ty">
                 <textarea
@@ -438,7 +463,11 @@ function PersonModal({
                   disabled={!!busy}
                   onClick={() =>
                     run('company', async () => {
-                      await adminPeopleApi.updateCompany(token, d.company!.id, c);
+                      const { gallery, ...rest } = c;
+                      await adminPeopleApi.updateCompany(token, d.company!.id, {
+                        ...rest,
+                        galleryUrls: gallery.split(/\s*\n\s*/).map((u) => u.trim()).filter((u) => /^https?:\/\//i.test(u)),
+                      });
                       return 'Đã lưu thông tin công ty.';
                     })
                   }

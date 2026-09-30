@@ -1,3 +1,4 @@
+import { applyCompanyProfileFields } from '../common/company-profile-fields';
 import {
   BadRequestException,
   ConflictException,
@@ -447,6 +448,7 @@ export class EmployerService {
       applicationId,
       true,
     );
+    await this.markApplicationViewed(userId, applicationId).catch(() => undefined);
     const profileId = application.cv?.candidateProfileId;
     if (!profileId) {
       throw new NotFoundException(
@@ -478,6 +480,7 @@ export class EmployerService {
     const application = await this.getOwnedApplication(userId, applicationId);
     const statusChanged = application.status !== status;
     application.status = status;
+    if (!application.viewedAt && status !== ApplicationStatus.NEW) application.viewedAt = new Date(); // Đợt 48
     const saved = await this.applicationRepo.save(application);
 
     if (statusChanged) {
@@ -504,6 +507,24 @@ export class EmployerService {
       }
     }
     return saved;
+  }
+
+  // Đợt 48 — đánh dấu "Đã xem" khi NTD mở CV/hồ sơ lần đầu; báo ứng viên 1 lần.
+  async markApplicationViewed(userId: string, applicationId: string) {
+    const application = await this.getOwnedApplication(userId, applicationId, true);
+    if (application.viewedAt) return { viewedAt: application.viewedAt };
+    application.viewedAt = new Date();
+    await this.applicationRepo.update(application.id, { viewedAt: application.viewedAt });
+    const candidateUserId = application.cv?.candidateProfile?.userId;
+    if (candidateUserId) {
+      await this.notificationsService.create(
+        candidateUserId,
+        'application_viewed',
+        `Nhà tuyển dụng đã xem hồ sơ của bạn cho vị trí "${application.jobPosting.title}".`,
+        `/ho-so?app=${application.id}#applications`,
+      );
+    }
+    return { viewedAt: application.viewedAt };
   }
 
   // Đợt 46 — hẹn lịch phỏng vấn: lưu khung giờ, chuyển trạng thái "Mời phỏng vấn", báo ứng viên chọn giờ.
@@ -600,6 +621,7 @@ export class EmployerService {
     // Đợt 12ac (24/09/2026) — "Giới thiệu công ty" cho tab Tổng quan công ty (trang chi tiết tin).
     if (dto.description !== undefined)
       company.description = dto.description.trim() || undefined;
+    applyCompanyProfileFields(company, dto); // Đợt 49
     return this.companyRepo.save(company);
   }
 

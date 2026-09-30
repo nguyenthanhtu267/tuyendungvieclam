@@ -1,3 +1,4 @@
+import { applyCompanyProfileFields } from '../common/company-profile-fields';
 import {
   BadRequestException,
   ConflictException,
@@ -163,6 +164,12 @@ export class AdminPeopleService {
             industry: company.industry ?? null,
             size: company.size ?? null,
             website: company.website ?? null,
+            address: company.address ?? null,
+            contactPerson: company.contactPerson ?? null,
+            companyType: company.companyType ?? null,
+            vision: company.vision ?? null,
+            mission: company.mission ?? null,
+            galleryUrls: company.galleryUrls ?? [],
             logoUrl: company.logoUrl ?? null,
             description: company.description ?? null,
             approvalStatus: company.approvalStatus,
@@ -285,6 +292,7 @@ export class AdminPeopleService {
     if (dto.logoUrl !== undefined) company.logoUrl = dto.logoUrl.trim() || null;
     if (dto.description !== undefined)
       company.description = dto.description.trim() || null;
+    applyCompanyProfileFields(company, dto); // Đợt 49
     await this.companyRepo.save(company);
     await logAdminAction(
       this.auditRepo,

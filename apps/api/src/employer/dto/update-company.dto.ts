@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UpdateCompanyDto {
   @IsOptional()
@@ -23,4 +23,37 @@ export class UpdateCompanyDto {
   @IsString()
   @MaxLength(5000)
   description?: string;
+
+  // Đợt 49 — thông tin "Tổng quan công ty".
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  contactPerson?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  companyType?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3000)
+  vision?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3000)
+  mission?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(12, { message: 'Tối đa 12 ảnh' })
+  @IsString({ each: true })
+  @MaxLength(1000, { each: true })
+  galleryUrls?: string[];
 }

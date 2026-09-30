@@ -2,12 +2,13 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Notification } from '../database/entities/notification.entity';
+import { MailService } from './mail.service';
 
 // Đợt 12m (21/09/2026) — "chuông thông báo hoạt động thật": trước đây bảng `notifications` tồn tại
 // nhưng KHÔNG có service nào tạo bản ghi, chuông trên header chỉ hiện tĩnh "Chưa có thông báo nào".
 // NotificationsService là điểm gọi chung cho mọi module (admin/employer/cv-search/candidates...) khi
-// có sự kiện cần báo cho người dùng — chỉ hiển thị trong web (chuông), KHÔNG gửi email/SMS, đúng
-// quyết định phạm vi giai đoạn 1 (xem comment trong notification.entity.ts).
+// có sự kiện cần báo cho người dùng — hiển thị trong web (chuông); từ Đợt 48 gửi kèm EMAIL cho các loại
+// quan trọng khi đã cấu hình SMTP (xem mail.service.ts).
 export const NOTIFICATION_LIST_LIMIT = 30;
 
 @Injectable()
@@ -15,6 +16,7 @@ export class NotificationsService {
   constructor(
     @InjectRepository(Notification)
     private readonly notificationRepo: Repository<Notification>,
+    private readonly mail: MailService,
   ) {}
 
   async create(
@@ -23,7 +25,7 @@ export class NotificationsService {
     content: string,
     link?: string,
   ): Promise<Notification> {
-    return this.notificationRepo.save(
+    const saved = await this.notificationRepo.save(
       this.notificationRepo.create({
         userId,
         type,
@@ -31,6 +33,8 @@ export class NotificationsService {
         link: link ?? null,
       }),
     );
+    this.mail.notify([userId], type, content, link); // Đợt 48 — email (nếu đã cấu hình SMTP)
+    return saved;
   }
 
   // Nhiều người nhận cùng lúc (VD: tin công ty có nhiều tài khoản Chính/Phụ) — dùng khi duyệt
@@ -53,6 +57,7 @@ export class NotificationsService {
         }),
       ),
     );
+    this.mail.notify(uniqueIds, type, content, link); // Đợt 48 — email (nếu đã cấu hình SMTP)
   }
 
   async list(

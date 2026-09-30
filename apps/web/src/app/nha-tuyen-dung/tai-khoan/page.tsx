@@ -105,7 +105,15 @@ function CompanyInfoCard({
   const [website, setWebsite] = useState(company.website ?? '');
   const [logoUrl, setLogoUrl] = useState(company.logoUrl ?? '');
   const [description, setDescription] = useState(company.description ?? '');
+  // Đợt 49 — thông tin "Tổng quan công ty".
+  const [address, setAddress] = useState(company.address ?? '');
+  const [contactPerson, setContactPerson] = useState(company.contactPerson ?? '');
+  const [companyType, setCompanyType] = useState(company.companyType ?? '');
+  const [vision, setVision] = useState(company.vision ?? '');
+  const [mission, setMission] = useState(company.mission ?? '');
+  const [gallery, setGallery] = useState((company.galleryUrls ?? []).join('\n'));
   const [saving, setSaving] = useState(false);
+  const galleryList = gallery.split(/\s*\n\s*/).map((u) => u.trim()).filter((u) => /^https?:\/\//i.test(u));
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -117,6 +125,12 @@ function CompanyInfoCard({
         website: website.trim() || undefined,
         logoUrl: logoUrl.trim() || undefined,
         description: description.trim() || undefined,
+        address: address.trim(),
+        contactPerson: contactPerson.trim(),
+        companyType: companyType.trim(),
+        vision: vision.trim(),
+        mission: mission.trim(),
+        galleryUrls: galleryList,
       });
       onToast('Đã lưu thông tin công ty');
       await onSaved();
@@ -214,6 +228,48 @@ function CompanyInfoCard({
         />
         <div className="text-[10.5px] text-ink-faint mt-1.5">
           Hiển thị ở tab &quot;Tổng quan công ty&quot; trên trang chi tiết tin tuyển dụng.
+        </div>
+      </div>
+      {/* Đợt 49 — hiển thị ở "Tổng quan công ty" (trang tin + trang công ty). Để trống mục nào thì mục đó tự ẩn. */}
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="sm:col-span-2">
+          <label htmlFor="tk-address" className="text-xs font-semibold text-ink-faint mb-1 block">Địa chỉ công ty</label>
+          <input id="tk-address" className="tvl-input" placeholder="VD: Tầng 12, 45 Võ Thị Sáu, P. Tân Định, TP.HCM" value={address} onChange={(e) => setAddress(e.target.value)} />
+        </div>
+        <div>
+          <label htmlFor="tk-contact" className="text-xs font-semibold text-ink-faint mb-1 block">Người liên hệ</label>
+          <input id="tk-contact" className="tvl-input" placeholder="VD: Chị Vũ Thị Mây" value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} />
+        </div>
+        <div>
+          <label htmlFor="tk-type" className="text-xs font-semibold text-ink-faint mb-1 block">Loại hình hoạt động</label>
+          <input id="tk-type" className="tvl-input" list="tk-type-list" placeholder="VD: 100% vốn nước ngoài" value={companyType} onChange={(e) => setCompanyType(e.target.value)} />
+          <datalist id="tk-type-list">
+            {['Trách nhiệm hữu hạn', 'Cổ phần', '100% vốn nước ngoài', 'Liên doanh', 'Nhà nước', 'Doanh nghiệp tư nhân', 'Văn phòng đại diện'].map((v) => (
+              <option key={v} value={v} />
+            ))}
+          </datalist>
+        </div>
+        <div>
+          <label htmlFor="tk-vision" className="text-xs font-semibold text-ink-faint mb-1 block">Tầm nhìn</label>
+          <textarea id="tk-vision" className="tvl-input !h-auto" rows={3} value={vision} onChange={(e) => setVision(e.target.value)} />
+        </div>
+        <div>
+          <label htmlFor="tk-mission" className="text-xs font-semibold text-ink-faint mb-1 block">Sứ mệnh</label>
+          <textarea id="tk-mission" className="tvl-input !h-auto" rows={3} value={mission} onChange={(e) => setMission(e.target.value)} />
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="tk-gallery" className="text-xs font-semibold text-ink-faint mb-1 block">
+            Hình ảnh công ty — mỗi dòng 1 link ảnh (tối đa 12)
+          </label>
+          <textarea id="tk-gallery" className="tvl-input !h-auto font-mono text-[12px]" rows={3} placeholder={'https://.../van-phong.jpg\nhttps://.../team.jpg'} value={gallery} onChange={(e) => setGallery(e.target.value)} />
+          {galleryList.length > 0 && (
+            <div className="flex gap-2 mt-2 flex-wrap">
+              {galleryList.slice(0, 12).map((u) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={u} src={u} alt="" className="w-20 h-14 object-cover rounded border border-border bg-surface-alt" />
+              ))}
+            </div>
+          )}
         </div>
       </div>
       <div className="flex justify-end pt-2 border-t border-border">

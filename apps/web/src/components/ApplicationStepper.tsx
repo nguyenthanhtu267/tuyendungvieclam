@@ -2,18 +2,21 @@ import { formatDate } from '@/lib/format';
 
 const STEPS = [
   { key: 'new', label: 'Đã nộp' },
+  { key: 'viewed', label: 'Đã xem' },
   { key: 'reviewing', label: 'Đang xem xét' },
   { key: 'suitable', label: 'Phù hợp' },
   { key: 'interview', label: 'Phỏng vấn' },
 ];
 
 // Đợt 43 — thanh tiến trình trạng thái ứng tuyển + nhắc chờ lâu.
-export default function ApplicationStepper({ status, appliedAt }: { status: string; appliedAt: string }) {
+export default function ApplicationStepper({ status: rawStatus, appliedAt, viewedAt }: { status: string; appliedAt: string; viewedAt?: string | null }) {
+  // Đợt 48 — bước "Đã xem" khi NTD đã mở CV/hồ sơ nhưng chưa đổi trạng thái.
+  const status = rawStatus === 'new' && viewedAt ? 'viewed' : rawStatus;
   const idx = STEPS.findIndex((s) => s.key === status);
   const rejected = status === 'rejected';
   const waitDays = Math.floor((Date.now() - new Date(appliedAt).getTime()) / 86_400_000);
   return (
-    <div className="min-w-[210px]">
+    <div className="min-w-[270px]">
       <div className="flex items-center" aria-label="Tiến trình ứng tuyển">
         {STEPS.map((s, i) => {
           const done = !rejected && i <= idx;

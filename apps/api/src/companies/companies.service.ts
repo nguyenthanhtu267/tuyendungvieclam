@@ -65,6 +65,13 @@ export class CompaniesService {
         followersCount,
         // Đợt 12ac (24/09/2026) — "Giới thiệu công ty" cho tab Tổng quan công ty.
         description: company.description,
+        // Đợt 49 — "Tổng quan công ty" theo mẫu.
+        address: company.address,
+        contactPerson: company.contactPerson,
+        companyType: company.companyType,
+        vision: company.vision,
+        mission: company.mission,
+        galleryUrls: company.galleryUrls ?? [],
         // Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp": FE dùng 2 trường này để quyết định có
         // hiện badge "Tin tổng hợp — chưa xác thực" + nút "Đây là công ty của bạn?" hay không (điều
         // kiện: isAdminSourced && !claimedAt — xem ghi chú ở company.entity.ts).

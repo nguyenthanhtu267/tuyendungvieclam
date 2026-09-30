@@ -193,6 +193,11 @@ export class EmployerController {
     return this.employerService.updateApplicationStatus(user.userId, id, dto.status);
   }
 
+  @Post('employer/applications/:id/viewed')
+  markViewed(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.employerService.markApplicationViewed(user.userId, id);
+  }
+
   @Patch('employer/applications/:id/interview')
   proposeInterview(
     @CurrentUser() user: { userId: string },

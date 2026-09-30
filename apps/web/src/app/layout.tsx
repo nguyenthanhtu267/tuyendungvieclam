@@ -33,7 +33,7 @@ export default function RootLayout({
     <html lang="vi" suppressHydrationWarning>
       <head>
         {/* Đợt 29 — áp lại cỡ chữ người dùng đã chọn (FontScale) ngay khi mở trang, tránh nhấp nháy. */}
-        <script dangerouslySetInnerHTML={{ __html: "try{var l=Number(localStorage.getItem('tvl_font_level'));if(l>0&&l<=8)document.documentElement.style.fontSize=(100+l*5)+'%'}catch(e){}" }} />
+        <script dangerouslySetInnerHTML={{ __html: "try{var p=Number(localStorage.getItem('tvl_font_pct'));if(!(p>=80&&p<=200)){var l=Number(localStorage.getItem('tvl_font_level'));p=l>0&&l<=8?100+l*5:100}if(p!==100)document.documentElement.style.fontSize=p+'%'}catch(e){}" }} />
       </head>
       <body className="font-sans antialiased bg-bg text-ink flex flex-col min-h-screen">
         <AuthProvider>

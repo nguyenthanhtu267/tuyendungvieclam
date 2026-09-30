@@ -26,7 +26,7 @@ function initialsOf(email: string) {
 
 export default function SiteHeader() {
   const { me, token, logout } = useAuth();
-  const { lang, toggleLang, t } = useLanguage();
+  const { t } = useLanguage();
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -124,7 +124,7 @@ export default function SiteHeader() {
         <div className="hidden md:flex items-center gap-3">
           <NavDropdown
             trigger={<span className="text-white font-bold text-[14px]">{t('nav.forEmployer')}</span>}
-            triggerClassName="!border-b-0 !text-white bg-primary-dark hover:bg-primary rounded-lg px-3.5 py-2"
+            triggerClassName="!border-b-0 !text-white bg-primary-dark hover:bg-primary rounded-lg px-3.5 h-9 !py-0 inline-flex items-center"
             align="right"
             panelClassName="w-64 p-2"
           >
@@ -140,18 +140,7 @@ export default function SiteHeader() {
             ))}
           </NavDropdown>
 
-          {/* Đợt 13 (24/09/2026) — công tắc chuyển Tiếng Việt/Tiếng Anh (khung giao diện). Trước đó
-              chỉ là badge tĩnh "🌐 VI" với chú thích "sẽ hỗ trợ ở bản cập nhật sau" — nay đã hoạt
-              động thật, lưu lựa chọn ở localStorage, mặc định Tiếng Việt. */}
-          <button
-            type="button"
-            onClick={toggleLang}
-            className="text-[11px] font-bold text-ink-faint border border-border-strong rounded-md px-1.5 py-1 hover:border-primary hover:text-primary transition-colors"
-            title={lang === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
-          >
-            🌐 {lang === 'vi' ? 'VI' : 'EN'}
-          </button>
-
+          {/* Đợt 48 — gộp nút ngôn ngữ + cỡ chữ thành 1 nút tối giản (xem FontScale.tsx). */}
           <FontScale />
 
           {me && token && <NotificationBell token={token} />}
@@ -190,7 +179,7 @@ export default function SiteHeader() {
               </button>
             </NavDropdown>
           ) : (
-            <Link href="/dang-nhap" className="tvl-btn-primary !w-auto px-5 whitespace-nowrap">
+            <Link href="/dang-nhap" className="tvl-btn-primary !w-auto px-5 h-9 !py-0 inline-flex items-center whitespace-nowrap">
               {t('nav.login')}
             </Link>
           )}
@@ -330,6 +319,9 @@ export default function SiteHeader() {
                   {t('nav.login')}
                 </Link>
               )}
+              <div className="mt-3 flex items-center gap-2 text-[14px] font-semibold text-ink-muted">
+                Ngôn ngữ & cỡ chữ: <FontScale />
+              </div>
             </div>
             {/* Đợt 24 — banner nhỏ cuối menu điện thoại. */}
             <AdSlot slot="mobile-menu" className="px-4 pb-5 mt-auto" />

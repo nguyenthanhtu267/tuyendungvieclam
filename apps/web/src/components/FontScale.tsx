@@ -1,30 +1,40 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useLanguage } from '@/lib/i18n';
 
-// Đợt 29 (30/09/2026) — nút "Aa" trên header: thanh kéo tăng cỡ chữ TOÀN website, mỗi mức +5% (0 → 100%, tối đa mức 8 → 140%).
-// Lưu ở trình duyệt (localStorage); script nhỏ trong <head> (layout.tsx) áp lại ngay khi mở trang để không bị nhấp nháy.
-// Mọi cỡ chữ/khoảng cách của web dùng đơn vị rem nên co giãn theo đồng bộ.
-export const FONT_KEY = 'tvl_font_level';
-const MAX_LEVEL = 8;
+// Đợt 48 — gộp "Ngôn ngữ" + "Cỡ chữ" vào 1 nút tối giản trên header (thay cho 2 nút 🌐 VI và AA).
+// Cỡ chữ 80% → 200% (bước 10%), áp cho TOÀN website (mọi cỡ chữ/khoảng cách dùng rem).
+// Lưu ở trình duyệt; script nhỏ trong <head> (layout.tsx) áp lại ngay khi mở trang để không nhấp nháy.
+export const FONT_KEY = 'tvl_font_pct';
+const OLD_KEY = 'tvl_font_level'; // Đợt 29: mức 0–8 (100%–140%)
+export const FONT_MIN = 80;
+export const FONT_MAX = 200;
+const STEP = 10;
 
-export function applyFontLevel(level: number) {
-  document.documentElement.style.fontSize = `${100 + level * 5}%`;
+export function applyFontPct(pct: number) {
+  document.documentElement.style.fontSize = `${pct}%`;
 }
 
-export function FontScale() {
-  const [level, setLevel] = useState(0);
+function readPct(): number {
+  try {
+    const v = Number(localStorage.getItem(FONT_KEY));
+    if (v >= FONT_MIN && v <= FONT_MAX) return v;
+    const old = Number(localStorage.getItem(OLD_KEY));
+    if (old > 0 && old <= 8) return 100 + old * 5;
+  } catch {
+    /* bỏ qua */
+  }
+  return 100;
+}
+
+export function FontScale({ className = '' }: { className?: string }) {
+  const { lang, setLang } = useLanguage();
+  const [pct, setPct] = useState(100);
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    try {
-      const v = Number(localStorage.getItem(FONT_KEY));
-      if (Number.isInteger(v) && v >= 0 && v <= MAX_LEVEL) setLevel(v);
-    } catch {
-      /* bỏ qua */
-    }
-  }, []);
+  useEffect(() => setPct(readPct()), []);
 
   useEffect(() => {
     if (!open) return;
@@ -41,11 +51,12 @@ export function FontScale() {
   }, [open]);
 
   function change(v: number) {
-    const n = Math.max(0, Math.min(MAX_LEVEL, v));
-    setLevel(n);
-    applyFontLevel(n);
+    const n = Math.max(FONT_MIN, Math.min(FONT_MAX, Math.round(v / STEP) * STEP));
+    setPct(n);
+    applyFontPct(n);
     try {
       localStorage.setItem(FONT_KEY, String(n));
+      localStorage.removeItem(OLD_KEY);
     } catch {
       /* bỏ qua */
     }
@@ -57,39 +68,62 @@ export function FontScale() {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        aria-label="Chỉnh cỡ chữ"
-        title="Chỉnh cỡ chữ"
-        className="text-[13px] font-extrabold text-ink border border-border-strong rounded-md px-2 py-1 hover:border-primary hover:text-primary transition-colors"
+        aria-label="Ngôn ngữ và cỡ chữ"
+        title="Ngôn ngữ & cỡ chữ"
+        className={`h-9 inline-flex items-center gap-1 rounded-lg border border-border-strong bg-white px-2.5 text-[14px] font-bold text-ink hover:border-primary hover:text-primary transition-colors ${className}`}
       >
-        A<span className="text-[15px]">A</span>
+        <span aria-hidden>🌐</span>
+        {lang === 'vi' ? 'VI' : 'EN'}
+        <span aria-hidden className="text-[10px] text-ink-faint">▾</span>
       </button>
       {open && (
-        <div role="dialog" aria-label="Cỡ chữ" className="absolute right-0 top-full mt-1 z-50 w-64 rounded-xl border border-border bg-white shadow-xl p-3">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="font-extrabold text-sm text-ink">Cỡ chữ: {100 + level * 5}%</span>
-            <button type="button" onClick={() => change(0)} className="text-[13px] font-bold text-primary hover:underline">
-              Đặt lại
-            </button>
+        <div role="dialog" aria-label="Ngôn ngữ và cỡ chữ" className="absolute right-0 top-full mt-1 z-50 w-72 rounded-xl border border-border bg-white shadow-xl p-3 flex flex-col gap-3">
+          <div>
+            <div className="font-extrabold text-sm text-ink mb-1.5">Ngôn ngữ</div>
+            <div className="grid grid-cols-2 gap-1 p-1 bg-surface-alt rounded-lg text-[14px] font-semibold">
+              {(['vi', 'en'] as const).map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  onClick={() => setLang(l)}
+                  className={`py-1.5 rounded-md ${lang === l ? 'bg-white shadow text-ink' : 'text-ink-muted'}`}
+                >
+                  {l === 'vi' ? 'Tiếng Việt' : 'English'}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => change(level - 1)} disabled={level === 0} aria-label="Giảm cỡ chữ" className="w-8 h-8 rounded-md border border-border-strong font-extrabold text-sm disabled:opacity-40">
-              A−
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={MAX_LEVEL}
-              step={1}
-              value={level}
-              onChange={(e) => change(Number(e.target.value))}
-              aria-label="Kéo để đổi cỡ chữ"
-              className="flex-1 accent-[#163B7A]"
-            />
-            <button type="button" onClick={() => change(level + 1)} disabled={level === MAX_LEVEL} aria-label="Tăng cỡ chữ" className="w-8 h-8 rounded-md border border-border-strong font-extrabold text-base disabled:opacity-40">
-              A+
-            </button>
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="font-extrabold text-sm text-ink">Cỡ chữ: {pct}%</span>
+              <button type="button" onClick={() => change(100)} className="text-[13px] font-bold text-primary hover:underline">
+                Đặt lại 100%
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => change(pct - STEP)} disabled={pct <= FONT_MIN} aria-label="Giảm cỡ chữ" className="w-8 h-8 rounded-md border border-border-strong font-extrabold text-sm disabled:opacity-40">
+                A−
+              </button>
+              <input
+                id="font-scale-range"
+                type="range"
+                min={FONT_MIN}
+                max={FONT_MAX}
+                step={STEP}
+                value={pct}
+                onChange={(e) => change(Number(e.target.value))}
+                aria-label="Kéo để đổi cỡ chữ"
+                className="flex-1 accent-[#163B7A]"
+              />
+              <button type="button" onClick={() => change(pct + STEP)} disabled={pct >= FONT_MAX} aria-label="Tăng cỡ chữ" className="w-8 h-8 rounded-md border border-border-strong font-extrabold text-base disabled:opacity-40">
+                A+
+              </button>
+            </div>
+            <div className="flex justify-between text-[12px] text-ink-faint mt-0.5">
+              <span>80%</span>
+              <span>200%</span>
+            </div>
           </div>
-          <div className="text-[12.5px] font-semibold text-ink-muted mt-1.5">Mỗi mức tăng 5% — áp dụng cho toàn bộ website.</div>
         </div>
       )}
     </div>

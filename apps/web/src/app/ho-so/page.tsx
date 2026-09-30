@@ -271,7 +271,7 @@ export default function MyCenterPage() {
                               {formatDate(a.appliedAt)}
                             </td>
                             <td className="py-2 px-1">
-                              <ApplicationStepper status={a.status} appliedAt={a.appliedAt} />
+                              <ApplicationStepper status={a.status} appliedAt={a.appliedAt} viewedAt={a.viewedAt} />
                               {token && (
                                 <InterviewChooser
                                   token={token}

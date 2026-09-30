@@ -546,13 +546,20 @@ function UngVienPageInner() {
                               <a
                                 className="text-primary font-semibold"
                                 href={`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}${app.cv.fileUrl}`}
+                                onClick={() => token && employerApi.markApplicationViewed(token, app.id).catch(() => undefined)}
                                 target="_blank"
                                 rel="noreferrer"
                               >
                                 Xem CV
                               </a>
                             ) : app.cv.externalLinkUrl ? (
-                              <a className="text-primary font-semibold" href={app.cv.externalLinkUrl} target="_blank" rel="noreferrer">
+                              <a
+                                className="text-primary font-semibold"
+                                href={app.cv.externalLinkUrl}
+                                onClick={() => token && employerApi.markApplicationViewed(token, app.id).catch(() => undefined)}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
                                 Xem CV (Drive)
                               </a>
                             ) : app.cv.type === 'template' ? (

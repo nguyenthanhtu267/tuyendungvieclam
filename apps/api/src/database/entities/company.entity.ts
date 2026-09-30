@@ -49,6 +49,27 @@ export class Company {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
+  // Đợt 49 — thông tin hiển thị ở "Tổng quan công ty" (theo mẫu careerviet.vn).
+  @Column({ type: 'varchar', length: 300, nullable: true })
+  address?: string | null;
+
+  @Column({ name: 'contact_person', type: 'varchar', length: 120, nullable: true })
+  contactPerson?: string | null;
+
+  // VD: "100% vốn nước ngoài", "Cổ phần", "TNHH"
+  @Column({ name: 'company_type', type: 'varchar', length: 120, nullable: true })
+  companyType?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  vision?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  mission?: string | null;
+
+  // Link ảnh (tối đa 12) — cùng quy ước dán link như logo.
+  @Column({ name: 'gallery_urls', type: 'jsonb', nullable: true })
+  galleryUrls?: string[] | null;
+
   @Index()
   @Column({
     type: 'enum',
