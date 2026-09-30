@@ -1,5 +1,7 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
+import { AdSlot } from '@/components/ads/AdSlot';
 import Link from 'next/link';
 import { useLanguage } from '@/lib/i18n';
 
@@ -13,7 +15,12 @@ import { useLanguage } from '@/lib/i18n';
 export default function Footer() {
   const year = new Date().getFullYear();
   const { t } = useLanguage();
+  const pathname = usePathname();
+  const isAdmin = pathname?.startsWith('/admin');
   return (
+    <>
+    {/* Đợt 28 — banner ngay trên chân trang, có ở mọi trang (trừ Admin). */}
+    {!isAdmin && <AdSlot slot="footer-top" className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-3" />}
     <footer className="border-t border-border bg-white mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-ink-faint">
         <div>© {year} {t('footer.rights')} — tuyendungvieclam</div>
@@ -31,5 +38,6 @@ export default function Footer() {
         </div>
       </div>
     </footer>
+    </>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { AdStack } from '@/components/ads/AdStack';
 import { Fragment, Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import SiteHeader from '@/components/SiteHeader';
@@ -228,6 +229,9 @@ function JobSearchPage() {
               ))}
             </div>
 
+            {/* Đợt 28 — banner cuối danh sách kết quả. */}
+            <AdSlot slot="jobs-bottom" className="mt-3" />
+
             {result && result.totalPages > 1 && (
               <div className="flex items-center justify-center gap-2 mt-6">
                 {/* Đợt 13 (24/09/2026) — thêm nút "Đầu tiên"/"Cuối cùng" để nhảy nhanh 2 đầu danh
@@ -267,7 +271,7 @@ function JobSearchPage() {
             )}
           </div>
 
-          <div className="flex flex-col gap-3.5">
+          <div className="flex flex-col gap-3.5 lg:self-stretch">
             <div className="rounded-xl bg-primary p-[18px] flex flex-col gap-2">
               <div className="text-white font-extrabold text-sm">Lọc việc phù hợp nhanh hơn</div>
               <div className="text-white/95 text-xs">Tạo hồ sơ để nhận gợi ý việc làm mỗi ngày</div>
@@ -334,7 +338,10 @@ function JobSearchPage() {
               </div>
             )}
             {/* Đợt 24 — banner cột phải (chỉ máy tính). */}
-            <AdSlot slot="jobs-sidebar" className="hidden lg:block" />
+            <AdStack>
+              <AdSlot slot="jobs-sidebar" />
+              <AdSlot slot="jobs-sidebar-2" />
+            </AdStack>
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { AdStack } from '@/components/ads/AdStack';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -149,7 +150,7 @@ export default function CongTyPage() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3.5">
+          <div className="flex flex-col gap-3.5 lg:self-stretch">
             <div className="rounded-xl border border-border bg-white p-4">
               <div className="text-[11px] font-bold text-primary uppercase tracking-wide mb-2.5">
                 Thông tin công ty
@@ -170,6 +171,9 @@ export default function CongTyPage() {
                 <CompanyDescription text={company.description} />
               </div>
             )}
+            <AdStack>
+              <AdSlot slot="company-sidebar" />
+            </AdStack>
           </div>
         </div>
         {/* Đợt 24 — banner cuối trang công ty. */}

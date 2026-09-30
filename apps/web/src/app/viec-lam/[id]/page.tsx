@@ -1,5 +1,6 @@
 'use client';
 
+import { AdStack } from '@/components/ads/AdStack';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -447,6 +448,9 @@ function JobDetailInner() {
                     </div>
                   )}
 
+                  {/* Đợt 28 — banner giữa bài (mọi thiết bị, kể cả điện thoại). */}
+                  <AdSlot slot="job-mid" className="mt-4" />
+
                   {job.requirements && (
                     <div className="mt-4">
                       <h3 className="font-bold text-sm mb-2">Yêu cầu ứng viên</h3>
@@ -619,7 +623,7 @@ function JobDetailInner() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3.5">
+          <div className="flex flex-col gap-3.5 lg:self-stretch">
             <div className="rounded-xl border border-border bg-white p-4">
               <div className="flex items-center gap-2.5">
                 <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={40} className="text-xs" />
@@ -664,7 +668,11 @@ function JobDetailInner() {
               </div>
             )}
             {/* Đợt 24 — banner cột phải (chỉ máy tính). */}
-            <AdSlot slot="job-sidebar" className="hidden lg:block" />
+            <AdStack>
+              <AdSlot slot="job-sidebar" />
+              <AdSlot slot="job-sidebar-2" />
+              <AdSlot slot="job-sidebar-3" />
+            </AdStack>
           </div>
         </div>
 

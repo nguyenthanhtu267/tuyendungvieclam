@@ -28,6 +28,14 @@ export const AD_SLOT_DEFS: AdSlotDef[] = [
   { id: 'employer-top', page: 'NTD · Tổng quan', label: 'Dưới lời chào, trên số liệu', variant: 'wide', devices: 'all', audience: 'Nhà tuyển dụng', onlyFor: 'employer', size: 'Ngang toàn khung' },
   { id: 'employer-search', page: 'NTD · Tìm hồ sơ', label: 'Đầu trang tìm hồ sơ', variant: 'wide', devices: 'all', audience: 'Nhà tuyển dụng', onlyFor: 'employer', size: 'Ngang toàn khung' },
   { id: 'mobile-menu', page: 'Menu điện thoại', label: 'Cuối menu ☰ trên điện thoại', variant: 'compact', devices: 'mobile', audience: 'Mọi người', size: 'Dải nhỏ gọn' },
+  { id: 'job-sidebar-2', page: 'Chi tiết tin', label: 'Cột phải, banner thứ 2 (theo cuộn trang)', variant: 'tall', devices: 'desktop', audience: 'Mọi người', size: 'Dọc 280 × ~280px' },
+  { id: 'job-sidebar-3', page: 'Chi tiết tin', label: 'Cột phải, banner thứ 3 (theo cuộn trang)', variant: 'tall', devices: 'desktop', audience: 'Mọi người', size: 'Dọc 280 × ~280px' },
+  { id: 'job-mid', page: 'Chi tiết tin', label: 'Giữa bài, giữa "Mô tả" và "Yêu cầu ứng viên"', variant: 'wide', devices: 'all', audience: 'Mọi người', size: 'Ngang toàn khung' },
+  { id: 'jobs-sidebar-2', page: 'Tìm việc làm', label: 'Cột phải, banner thứ 2 (theo cuộn trang)', variant: 'tall', devices: 'desktop', audience: 'Mọi người', size: 'Dọc 280 × ~280px' },
+  { id: 'jobs-bottom', page: 'Tìm việc làm', label: 'Cuối danh sách kết quả', variant: 'wide', devices: 'all', audience: 'Mọi người', size: 'Ngang toàn khung' },
+  { id: 'company-sidebar', page: 'Trang công ty', label: 'Cột phải, dưới phần giới thiệu', variant: 'tall', devices: 'desktop', audience: 'Mọi người', size: 'Dọc 280 × ~280px' },
+  { id: 'home-bottom', page: 'Trang chủ', label: 'Cuối trang, trước chân trang', variant: 'wide', devices: 'all', audience: 'Mọi người', size: 'Ngang toàn khung' },
+  { id: 'footer-top', page: 'Mọi trang', label: 'Ngay trên chân trang (toàn website, trừ Admin)', variant: 'compact', devices: 'all', audience: 'Mọi người', size: 'Dải nhỏ gọn ngang toàn khung' },
 ];
 
 export const AD_SLOT_MAP: Record<string, AdSlotDef> = Object.fromEntries(AD_SLOT_DEFS.map((s) => [s.id, s]));

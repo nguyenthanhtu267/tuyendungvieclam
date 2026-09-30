@@ -259,6 +259,9 @@ export default function Home() {
           </>
         )}
 
+        {/* Đợt 28 — banner cuối trang chủ. */}
+        <AdSlot slot="home-bottom" className="mt-5" />
+
         <div className="mt-6 pt-3 border-t border-border text-[11.3px] text-ink-faint flex flex-wrap justify-between gap-2">
           <span>© 2026 Tuyển Dụng Việc Làm · tuyendungvieclam</span>
           <span>Về chúng tôi · Điều khoản · Bảo mật · Liên hệ</span>

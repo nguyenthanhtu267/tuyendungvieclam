@@ -13,6 +13,15 @@ export const AD_SLOTS = [
   'employer-top',
   'employer-search',
   'mobile-menu',
+  // Đợt 28 — thêm vùng để lấp khoảng trống (cột phải xếp chồng, giữa bài, cuối danh sách, chân trang mọi trang).
+  'job-sidebar-2',
+  'job-sidebar-3',
+  'job-mid',
+  'jobs-sidebar-2',
+  'jobs-bottom',
+  'company-sidebar',
+  'home-bottom',
+  'footer-top',
 ] as const;
 export type AdSlot = (typeof AD_SLOTS)[number];
 
