@@ -39,7 +39,7 @@ export default function TinhLuongPage() {
   return (
     <main className="min-h-screen">
       <SiteHeader />
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-4">
+      <div className="max-w-5xl mx-3 sm:mx-auto my-3 px-4 sm:px-6 py-5 flex flex-col gap-4 rounded-2xl border border-border bg-white">
         <div>
           <h1 className="font-extrabold text-2xl text-ink">Tính lương Gross ↔ Net 2026</h1>
           <p className="text-[15px] text-ink-muted mt-1">

@@ -192,7 +192,7 @@ export function JobWizardSteps({
         </div>
       )}
 
-      <div className="flex mb-6">
+      <div className="flex mb-3 rounded-xl bg-white border border-border px-2 py-2">
         {JOB_WIZARD_STEPS.map((label, i) => (
           <button
             key={label}
@@ -207,7 +207,7 @@ export function JobWizardSteps({
             >
               {i < step ? '✓' : i + 1}
             </div>
-            <div className={`text-[11px] font-semibold ${i === step ? 'text-ink' : 'text-ink-faint'}`}>{label}</div>
+            <div className={`text-[12px] font-semibold ${i === step ? 'text-ink' : 'text-ink-muted'}`}>{label}</div>
           </button>
         ))}
       </div>
@@ -527,7 +527,7 @@ export function JobWizardSteps({
         )}
 
         <div className="flex justify-between items-center gap-3 pt-4 border-t border-border mt-auto">
-          <button type="button" disabled={step === 0} onClick={() => setStep((s) => s - 1)} className="tvl-btn-ghost !w-auto px-4 disabled:opacity-40">
+          <button type="button" disabled={step === 0} onClick={() => setStep((s) => s - 1)} className="tvl-btn-ghost !w-auto px-4 disabled:text-ink-faint disabled:bg-white">
             ← Quay lại
           </button>
           {step < JOB_WIZARD_STEPS.length - 1 ? (

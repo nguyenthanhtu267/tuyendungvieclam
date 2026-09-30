@@ -13,7 +13,7 @@ export default function DieuKhoanSuDungPage() {
   return (
     <main className="min-h-screen">
       <SiteHeader />
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-10 py-10 flex flex-col gap-5 text-sm text-ink-muted">
+      <div className="max-w-3xl mx-3 sm:mx-auto my-4 px-5 sm:px-8 py-6 rounded-2xl border border-border bg-white flex flex-col gap-5 text-sm text-ink-muted">
         <div>
           <h1 className="font-extrabold text-2xl text-ink mb-1">Điều khoản sử dụng</h1>
           <p className="text-xs text-ink-faint">Cập nhật lần cuối: 20/09/2026</p>

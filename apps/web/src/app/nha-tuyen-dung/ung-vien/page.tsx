@@ -362,7 +362,7 @@ function UngVienPageInner() {
         ) : (
           <>
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <h1 className="font-extrabold text-base uppercase">{currentJob?.title}</h1>
+              <h1 className="font-extrabold text-base uppercase tvl-title">{currentJob?.title}</h1>
               <div className="flex items-center gap-2">
                 <select className="tvl-input !w-auto text-sm" value={jobId} onChange={(e) => setJobId(e.target.value)}>
                   {jobs.map((j) => (
@@ -371,7 +371,7 @@ function UngVienPageInner() {
                     </option>
                   ))}
                 </select>
-                <Link href="/nha-tuyen-dung/tin-dang" className="text-xs font-semibold text-primary whitespace-nowrap">
+                <Link href="/nha-tuyen-dung/tin-dang" className="text-xs font-semibold text-primary whitespace-nowrap tvl-title">
                   Quản lý tin
                 </Link>
               </div>
@@ -382,7 +382,7 @@ function UngVienPageInner() {
             )}
 
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex gap-1 border-b border-border overflow-x-auto flex-1">
+              <div className="flex gap-1 border-b border-border bg-white rounded-t-xl px-2 overflow-x-auto flex-1">
                 {(view === 'active' ? STATUS_TABS : []).map((tab) => (
                   <button
                     key={tab.value}
@@ -400,7 +400,7 @@ function UngVienPageInner() {
                   <button
                     onClick={() => setShowAdvanced((v) => !v)}
                     className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${
-                      hasActiveFilters ? 'border-primary text-primary bg-[#F3F6FB]' : 'border-border text-ink-faint'
+                      hasActiveFilters ? 'border-primary text-primary bg-[#F3F6FB]' : 'border-border text-ink-faint bg-white'
                     }`}
                   >
                     Bộ lọc nâng cao {hasActiveFilters ? '●' : ''}
@@ -409,7 +409,7 @@ function UngVienPageInner() {
                 <button
                   onClick={() => setView(view === 'active' ? 'trash' : 'active')}
                   className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${
-                    view === 'trash' ? 'border-critical text-critical bg-critical-tint' : 'border-border text-ink-faint'
+                    view === 'trash' ? 'border-critical text-critical bg-critical-tint' : 'border-border text-ink-faint bg-white'
                   }`}
                 >
                   🗑 Thùng rác

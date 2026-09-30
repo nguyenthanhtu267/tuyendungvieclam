@@ -194,7 +194,7 @@ export default function KhoCvDetailPage() {
                 {detail.province && <span>📍 {detail.province}</span>}
               </div>
             </div>
-            <button onClick={toggleTrash} disabled={busy} className="tvl-btn-ghost !w-auto px-4 text-xs shrink-0 disabled:opacity-50">
+            <button onClick={toggleTrash} disabled={busy} className="tvl-btn-ghost !w-auto px-4 text-xs shrink-0 disabled:text-ink-faint disabled:bg-white">
               {busy ? 'Đang xử lý…' : detail.inTrash ? 'Khôi phục về kho' : 'Đưa vào thùng rác'}
             </button>
           </div>

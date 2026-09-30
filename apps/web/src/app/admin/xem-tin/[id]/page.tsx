@@ -287,7 +287,7 @@ export default function AdminJobReviewPage() {
                   <button
                     disabled={busy}
                     onClick={() => setShowRejectModal(true)}
-                    className="tvl-btn-ghost !w-auto px-5 disabled:opacity-50"
+                    className="tvl-btn-ghost !w-auto px-5 disabled:text-ink-faint disabled:bg-white"
                   >
                     Từ chối
                   </button>
@@ -338,7 +338,7 @@ export default function AdminJobReviewPage() {
                   setShowRejectModal(false);
                   setRejectError('');
                 }}
-                className="tvl-btn-ghost !w-auto px-4 disabled:opacity-50"
+                className="tvl-btn-ghost !w-auto px-4 disabled:text-ink-faint disabled:bg-white"
               >
                 Huỷ
               </button>

@@ -270,7 +270,7 @@ function JobSearchPage() {
           <div>
             <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
               <div className="flex items-center gap-x-3 gap-y-1 flex-wrap min-w-0 flex-1">
-                <h1 className="font-extrabold text-lg">
+                <h1 className="font-extrabold text-lg tvl-title">
                   {/* Đợt 13 (24/09/2026) — thiếu formatNumber() khiến số hàng nghìn hiện dính liền
                       (VD "1106" thay vì "1.106") — xem Quy tắc chung mục A. */}
                   {loading ? 'Đang tìm...' : `${formatNumber(result?.total ?? 0)} ${heading}`}
@@ -312,7 +312,7 @@ function JobSearchPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-x-5 gap-y-1 flex-wrap text-sm font-semibold">
+            <div className="flex items-center gap-x-5 gap-y-1 flex-wrap text-sm font-semibold empty:hidden [&:has(a)]:rounded-lg [&:has(a)]:bg-white [&:has(a)]:px-3 [&:has(a)]:py-1.5 [&:has(a)]:mb-1">
               {!me && (
                 <a href="/dang-nhap" className="text-primary hover:underline font-semibold">
                   ✨ Đăng nhập để xem % phù hợp với hồ sơ của bạn
@@ -325,7 +325,7 @@ function JobSearchPage() {
                   type="button"
                   onClick={me ? handleSaveSearch : () => router.push('/dang-nhap')}
                   disabled={saveSearchState === 'saving' || saveSearchState === 'saved'}
-                  className="tvl-btn-ghost !w-auto px-3.5 py-1.5 text-xs disabled:opacity-70"
+                  className="tvl-btn-ghost !w-auto px-3.5 py-1.5 text-xs disabled:text-ink-faint disabled:bg-white"
                 >
                   {saveSearchState === 'saved'
                     ? '✓ Đã lưu tìm kiếm'
@@ -375,31 +375,31 @@ function JobSearchPage() {
                 <button
                   disabled={page <= 1}
                   onClick={() => goToPage(1)}
-                  className="tvl-btn-ghost !w-auto px-4 py-1.5 text-xs disabled:opacity-40"
+                  className="tvl-btn-ghost !w-auto px-4 py-1.5 text-xs disabled:text-ink-faint disabled:bg-white"
                 >
                   Đầu tiên
                 </button>
                 <button
                   disabled={page <= 1}
                   onClick={() => goToPage(page - 1)}
-                  className="tvl-btn-ghost !w-auto px-4 py-1.5 text-xs disabled:opacity-40"
+                  className="tvl-btn-ghost !w-auto px-4 py-1.5 text-xs disabled:text-ink-faint disabled:bg-white"
                 >
                   ← Trước
                 </button>
-                <span className="text-xs text-ink-muted px-2">
+                <span className="text-xs text-ink-muted px-2 py-1 rounded-lg bg-white">
                   Trang {result.page} / {result.totalPages}
                 </span>
                 <button
                   disabled={page >= result.totalPages}
                   onClick={() => goToPage(page + 1)}
-                  className="tvl-btn-ghost !w-auto px-4 py-1.5 text-xs disabled:opacity-40"
+                  className="tvl-btn-ghost !w-auto px-4 py-1.5 text-xs disabled:text-ink-faint disabled:bg-white"
                 >
                   Sau →
                 </button>
                 <button
                   disabled={page >= result.totalPages}
                   onClick={() => goToPage(result.totalPages)}
-                  className="tvl-btn-ghost !w-auto px-4 py-1.5 text-xs disabled:opacity-40"
+                  className="tvl-btn-ghost !w-auto px-4 py-1.5 text-xs disabled:text-ink-faint disabled:bg-white"
                 >
                   Cuối cùng
                 </button>

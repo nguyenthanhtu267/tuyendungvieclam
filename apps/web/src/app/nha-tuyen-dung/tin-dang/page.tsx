@@ -93,7 +93,7 @@ export default function TinDangPage() {
       <EmployerHeader />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col gap-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <h1 className="font-extrabold text-base uppercase">Quản lý tin đăng</h1>
+          <h1 className="font-extrabold text-base uppercase tvl-title">Quản lý tin đăng</h1>
           <Link href="/nha-tuyen-dung/dang-tin" className="tvl-btn-primary !w-auto px-5">
             + Đăng tin mới
           </Link>
@@ -103,7 +103,7 @@ export default function TinDangPage() {
           <div className="rounded-lg bg-critical-tint text-critical text-xs font-semibold px-3.5 py-2.5">{errorMsg}</div>
         )}
 
-        <div className="flex gap-1 border-b border-border overflow-x-auto">
+        <div className="flex gap-1 border-b border-border bg-white rounded-t-xl px-2 overflow-x-auto">
           {TABS.map((t) => (
             <button
               key={t.value}

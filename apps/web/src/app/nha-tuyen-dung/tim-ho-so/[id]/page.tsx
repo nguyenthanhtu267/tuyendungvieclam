@@ -124,7 +124,7 @@ export default function CandidateDetailPage() {
     <main className="min-h-screen">
       <EmployerHeader />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-4">
-        <Link href="/nha-tuyen-dung/tim-ho-so" className="text-xs font-semibold text-primary hover:underline w-fit">
+        <Link href="/nha-tuyen-dung/tim-ho-so" className="text-xs font-semibold text-primary hover:underline w-fit rounded-lg bg-white px-3 py-1.5">
           ← Quay lại tìm kiếm
         </Link>
 

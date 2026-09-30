@@ -86,7 +86,7 @@ export default function DangKyNtdPage() {
       </div>
 
       <div className="flex items-center justify-center p-6 sm:p-10">
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-sm rounded-2xl border border-border bg-white p-6 sm:p-8 shadow-sm">
           <h2 className="text-lg font-extrabold mb-1">Đăng ký tài khoản Nhà tuyển dụng</h2>
           <p className="text-xs text-ink-faint mb-6">
             Bạn là ứng viên tìm việc?{' '}

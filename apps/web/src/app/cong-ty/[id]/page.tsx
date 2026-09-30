@@ -89,7 +89,7 @@ export default function CongTyPage() {
     <main className="min-h-screen">
       <SiteHeader />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6">
-        <div className="text-[11.5px] text-ink-faint mb-3">
+        <div className="text-[11.5px] text-ink-muted mb-3 inline-block rounded-lg bg-white px-3 py-1.5">
           <Link href="/viec-lam" className="hover:text-primary">
             Tìm việc làm
           </Link>

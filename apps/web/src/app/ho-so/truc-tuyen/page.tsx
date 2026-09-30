@@ -151,7 +151,7 @@ export default function OnlineProfilePage() {
     return (
       <>
         <SiteHeader />
-        <main className="mx-auto max-w-3xl px-4 py-16 text-center text-ink-muted">Đang tải hồ sơ…</main>
+        <main className="mx-auto max-w-xs my-16 px-4 py-3 text-center text-ink-muted rounded-xl border border-border bg-white block">Đang tải hồ sơ…</main>
       </>
     );
   }

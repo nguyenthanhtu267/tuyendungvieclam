@@ -157,7 +157,7 @@ export default function MyCenterPage() {
     return (
       <main className="min-h-screen">
         <SiteHeader />
-        <div className="max-w-7xl mx-auto px-4 py-16 text-center text-ink-faint text-sm">Đang tải...</div>
+        <div className="max-w-xs mx-auto my-16 px-4 py-3 text-center text-ink-muted text-sm rounded-xl border border-border bg-white">Đang tải...</div>
       </main>
     );
   }
@@ -736,7 +736,7 @@ function OverviewCard({
             <button onClick={() => setEditing(true)} className="tvl-btn-primary !w-auto px-5">
               Cập nhật hồ sơ
             </button>
-            <button id="refresh-profile-btn" onClick={handleRefresh} disabled={refreshing} className="tvl-btn-ghost !w-auto px-5 text-center disabled:opacity-60">
+            <button id="refresh-profile-btn" onClick={handleRefresh} disabled={refreshing} className="tvl-btn-ghost !w-auto px-5 text-center disabled:text-ink-faint disabled:bg-white">
               {refreshing ? 'Đang làm mới…' : '🔄 Làm mới hồ sơ'}
             </button>
             <Link href="/ho-so/truc-tuyen" className="tvl-btn-ghost !w-auto px-5 text-center">

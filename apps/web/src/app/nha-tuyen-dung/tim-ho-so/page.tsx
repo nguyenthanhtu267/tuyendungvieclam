@@ -203,7 +203,7 @@ export default function TimHoSoPage() {
         {/* Đợt 24 — banner đầu trang Tìm hồ sơ của NTD. */}
         <AdSlot slot="employer-search" />
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex gap-1 border-b border-border flex-1">
+          <div className="flex gap-1 border-b border-border bg-white rounded-t-xl px-2 flex-1">
             <button
               onClick={() => setTab('search')}
               className={`px-3.5 py-2.5 text-xs font-bold whitespace-nowrap border-b-2 -mb-px ${
@@ -397,7 +397,7 @@ export default function TimHoSoPage() {
 
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="text-xs text-ink-faint mr-1">
+                <div className="text-xs text-ink-muted mr-1 rounded-lg bg-white px-2 py-1">
                   {loading ? 'Đang tải…' : `Tìm thấy ${formatNumber(total)} hồ sơ phù hợp`}
                 </div>
                 {/* Đợt 73 — lọc nhanh theo 2 trạng thái hoạt động + sắp xếp. */}
@@ -454,31 +454,31 @@ export default function TimHoSoPage() {
                   <button
                     disabled={page <= 1}
                     onClick={() => setPage(1)}
-                    className="tvl-btn-ghost !w-auto px-3 py-1.5 text-xs disabled:opacity-40"
+                    className="tvl-btn-ghost !w-auto px-3 py-1.5 text-xs disabled:text-ink-faint disabled:bg-white"
                   >
                     Đầu tiên
                   </button>
                   <button
                     disabled={page <= 1}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    className="tvl-btn-ghost !w-auto px-3 py-1.5 text-xs disabled:opacity-40"
+                    className="tvl-btn-ghost !w-auto px-3 py-1.5 text-xs disabled:text-ink-faint disabled:bg-white"
                   >
                     ← Trước
                   </button>
-                  <span className="text-xs text-ink-faint">
+                  <span className="text-xs text-ink-muted rounded-lg bg-white px-2 py-1">
                     Trang {page}/{totalPages}
                   </span>
                   <button
                     disabled={page >= totalPages}
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    className="tvl-btn-ghost !w-auto px-3 py-1.5 text-xs disabled:opacity-40"
+                    className="tvl-btn-ghost !w-auto px-3 py-1.5 text-xs disabled:text-ink-faint disabled:bg-white"
                   >
                     Sau →
                   </button>
                   <button
                     disabled={page >= totalPages}
                     onClick={() => setPage(totalPages)}
-                    className="tvl-btn-ghost !w-auto px-3 py-1.5 text-xs disabled:opacity-40"
+                    className="tvl-btn-ghost !w-auto px-3 py-1.5 text-xs disabled:text-ink-faint disabled:bg-white"
                   >
                     Cuối cùng
                   </button>

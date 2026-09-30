@@ -44,7 +44,7 @@ export default function YeuCauHoSoPage() {
   return (
     <main className="min-h-screen">
       <SiteHeader />
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-5">
+      <div className="max-w-2xl mx-3 sm:mx-auto my-4 px-5 sm:px-8 py-6 rounded-2xl border border-border bg-white flex flex-col gap-5">
         <div>
           <h1 className="font-extrabold text-2xl text-ink">Gỡ hoặc nhận lại hồ sơ “Nguồn tổng hợp”</h1>
           <p className="text-sm text-ink-muted mt-2 leading-relaxed">

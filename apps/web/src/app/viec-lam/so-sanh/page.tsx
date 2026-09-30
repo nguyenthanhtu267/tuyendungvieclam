@@ -62,7 +62,7 @@ function ComparePage() {
   return (
     <main className="min-h-screen">
       <SiteHeader />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-6xl mx-3 sm:mx-auto my-3 px-4 sm:px-6 py-5 rounded-2xl border border-border bg-white">
         <h1 className="font-extrabold text-2xl text-ink mb-3">So sánh việc làm</h1>
         {jobs === null ? (
           <div className="text-ink-muted">Đang tải…</div>

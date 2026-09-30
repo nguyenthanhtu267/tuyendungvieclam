@@ -86,7 +86,7 @@ export default function CvBuilderPage() {
     return (
       <main className="min-h-screen">
         <SiteHeader />
-        <div className="max-w-4xl mx-auto px-4 py-16 text-center text-ink-faint text-sm">Đang tải...</div>
+        <div className="max-w-xs mx-auto my-16 px-4 py-3 text-center text-ink-muted text-sm rounded-xl border border-border bg-white">Đang tải...</div>
       </main>
     );
   }

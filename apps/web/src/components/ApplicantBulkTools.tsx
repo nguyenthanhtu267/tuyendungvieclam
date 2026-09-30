@@ -115,7 +115,7 @@ export default function ApplicantBulkTools({
         <span className="font-extrabold text-[13.5px]">Đã chọn {selected.length} hồ sơ</span>
         <button type="button" className="tvl-btn-ghost !w-auto px-3 text-[13px]" onClick={() => setMode(mode === 'interview' ? null : 'interview')}>Mời phỏng vấn hàng loạt</button>
         <button type="button" className="tvl-btn-ghost !w-auto px-3 text-[13px]" onClick={() => setMode(mode === 'reply' ? null : 'reply')}>Gửi phản hồi theo mẫu</button>
-        <button type="button" disabled={selected.length < 2 || selected.length > 3} title="Chọn 2–3 hồ sơ để so sánh" className="tvl-btn-ghost !w-auto px-3 text-[13px] disabled:opacity-50" onClick={() => setMode(mode === 'compare' ? null : 'compare')}>So sánh {selected.length >= 2 && selected.length <= 3 ? '' : '(chọn 2–3)'}</button>
+        <button type="button" disabled={selected.length < 2 || selected.length > 3} title="Chọn 2–3 hồ sơ để so sánh" className="tvl-btn-ghost !w-auto px-3 text-[13px] disabled:text-ink-faint disabled:bg-white" onClick={() => setMode(mode === 'compare' ? null : 'compare')}>So sánh {selected.length >= 2 && selected.length <= 3 ? '' : '(chọn 2–3)'}</button>
         <button type="button" className="ml-auto text-[13px] font-bold text-ink-muted" onClick={onClear}>Bỏ chọn</button>
       </div>
       {msg && <div className="text-[13px] font-semibold">{msg}</div>}

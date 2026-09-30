@@ -239,7 +239,7 @@ function JobDetailInner() {
     return (
       <main className="min-h-screen">
         <SiteHeader />
-        <div className="max-w-7xl mx-auto px-4 py-16 text-center">
+        <div className="max-w-xl mx-auto px-4 py-10 text-center rounded-2xl border border-border bg-white my-6">
           <div className="text-ink-muted text-sm mb-3">Không tìm thấy tin tuyển dụng này.</div>
           <Link href="/viec-lam" className="text-primary font-semibold text-sm">
             ← Quay lại tìm việc làm
@@ -253,7 +253,7 @@ function JobDetailInner() {
     <main className="min-h-screen">
       <SiteHeader />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6">
-        <div className="text-[11.5px] text-ink-faint mb-3">
+        <div className="text-[11.5px] text-ink-muted mb-3 inline-block rounded-lg bg-white px-3 py-1.5">
           <Link href="/viec-lam" className="hover:text-primary">
             Tìm việc làm
           </Link>
@@ -446,7 +446,7 @@ function JobDetailInner() {
                       }
                       submitApply(letter);
                     }}
-                    className="tvl-btn-ghost !w-auto px-4 disabled:opacity-50"
+                    className="tvl-btn-ghost !w-auto px-4 disabled:text-ink-faint disabled:bg-white"
                     title="Nộp ngay bằng CV đã chọn và thư gợi ý tự soạn"
                   >
                     ⚡ Nộp nhanh
@@ -462,7 +462,7 @@ function JobDetailInner() {
 
         <div className="grid lg:grid-cols-[1fr_280px] gap-5 mt-5 items-start">
           <div>
-            <div className="flex gap-1 border-b border-border">
+            <div className="flex gap-1 border-b border-border bg-white rounded-t-xl px-2">
               {(
                 [
                   ['details', 'Chi tiết'],
@@ -690,7 +690,7 @@ function JobDetailInner() {
               </div>
               <CompanyResponseBadge companyId={job.company.id} />
               {me?.role === 'candidate' && (
-                <button onClick={toggleFollow} disabled={followBusy} className="tvl-btn-ghost mt-3 disabled:opacity-60">
+                <button onClick={toggleFollow} disabled={followBusy} className="tvl-btn-ghost mt-3 disabled:text-ink-faint disabled:bg-white">
                   {following ? '✓ Đang theo dõi' : '+ Theo dõi'}
                 </button>
               )}
@@ -740,7 +740,7 @@ function JobDetailInner() {
             cuối trang, dạng lưới đầy đủ như JobCard ở trang tìm việc, theo mẫu tham khảo. */}
         {related.length > 0 && (
           <div className="mt-8">
-            <h2 className="font-extrabold text-base uppercase tracking-wide mb-3">Các công việc tương tự</h2>
+            <h2 className="font-extrabold text-base uppercase tracking-wide mb-3 tvl-title">Các công việc tương tự</h2>
             {/* Đợt 21 — thêm "grid-cols-1" tường minh: thiếu khai báo cột ở mobile khiến track "auto"
                 không bị giới hạn theo container, đẩy thẻ việc làm (flex-wrap bên trong) tràn ngang
                 trang trên điện thoại (phát hiện qua kiểm thử tự động ui21.js, không liên quan Đợt 21). */}

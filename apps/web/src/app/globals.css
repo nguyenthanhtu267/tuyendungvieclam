@@ -26,6 +26,11 @@
   .tvl-btn-accent {
     @apply w-full rounded-lg bg-accent text-white font-bold text-sm py-2.5 hover:bg-accent-dark transition-colors disabled:opacity-60;
   }
+  /* Tiêu đề nằm trực tiếp trên hình nền: luôn có nền trắng đục để không lẫn với hình. */
+  .tvl-title {
+    @apply inline-block rounded-lg bg-white px-3 py-1;
+  }
+
   .tvl-btn-ghost {
     @apply w-full rounded-lg border border-border-strong bg-white text-ink font-semibold text-sm py-2.5 hover:bg-surface-alt transition-colors disabled:bg-white disabled:text-ink-muted disabled:cursor-not-allowed;
   }

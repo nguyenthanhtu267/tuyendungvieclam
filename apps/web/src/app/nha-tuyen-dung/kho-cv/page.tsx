@@ -128,8 +128,8 @@ export default function KhoCvPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col gap-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex-1 min-w-[240px]">
-          <h1 className="font-extrabold text-base uppercase">Kho CV</h1>
-          <p className="text-[12px] text-ink-faint mt-1 max-w-3xl">
+          <h1 className="font-extrabold text-base uppercase tvl-title">Kho CV</h1>
+          <p className="text-[12px] text-ink-muted mt-1 max-w-3xl rounded-lg bg-white px-3 py-1.5">
             Mọi CV ứng viên đã nộp cho công ty bạn được tự động lưu lại đầy đủ (hồ sơ, quá trình làm việc, học vấn,
             kỹ năng, file CV…) ngay khi nộp — lưu vĩnh viễn, vẫn còn kể cả khi ứng viên xoá tài khoản. Cùng 1 người
             ứng tuyển nhiều vị trí được gộp chung 1 thẻ.
@@ -179,7 +179,7 @@ export default function KhoCvPage() {
           </Modal>
         )}
 
-        <div className="flex gap-1 border-b border-border">
+        <div className="flex gap-1 border-b border-border bg-white rounded-t-xl px-2">
           {(
             [
               { key: 'active', label: 'Trong kho', count: data?.activeCount },
@@ -242,7 +242,7 @@ export default function KhoCvPage() {
         {error && <div className="rounded-lg bg-critical-tint text-critical text-xs font-semibold px-3.5 py-2.5">{error}</div>}
 
         <div className="flex items-center justify-between text-xs text-ink-faint">
-          <span>
+          <span className="rounded-lg bg-white px-2 py-1 text-ink-muted">
             {data ? `${formatNumber(data.total)} ứng viên` : ''}
             {hasFilters && data ? ' phù hợp bộ lọc' : ''}
           </span>
@@ -327,7 +327,7 @@ export default function KhoCvPage() {
                     <button
                       onClick={() => handleTrash(c.id)}
                       disabled={busyId === c.id}
-                      className="tvl-btn-ghost !w-auto px-4 text-xs disabled:opacity-50"
+                      className="tvl-btn-ghost !w-auto px-4 text-xs disabled:text-ink-faint disabled:bg-white"
                     >
                       {busyId === c.id ? 'Đang xoá…' : 'Đưa vào thùng rác'}
                     </button>
@@ -335,7 +335,7 @@ export default function KhoCvPage() {
                     <button
                       onClick={() => handleRestore(c.id)}
                       disabled={busyId === c.id}
-                      className="tvl-btn-ghost !w-auto px-4 text-xs disabled:opacity-50"
+                      className="tvl-btn-ghost !w-auto px-4 text-xs disabled:text-ink-faint disabled:bg-white"
                     >
                       {busyId === c.id ? 'Đang khôi phục…' : 'Khôi phục'}
                     </button>
@@ -350,7 +350,7 @@ export default function KhoCvPage() {
           <div className="flex items-center justify-center gap-1.5 text-xs">
             <PageButton label="« Đầu tiên" disabled={page === 1} onClick={() => setPage(1)} />
             <PageButton label="‹ Trước" disabled={page === 1} onClick={() => setPage(page - 1)} />
-            <span className="px-3 text-ink-muted tabular-nums">
+            <span className="px-3 py-1 rounded-lg bg-white text-ink-muted tabular-nums">
               Trang {formatNumber(page)} / {formatNumber(totalPages)}
             </span>
             <PageButton label="Sau ›" disabled={page >= totalPages} onClick={() => setPage(page + 1)} />

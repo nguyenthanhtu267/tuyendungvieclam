@@ -202,8 +202,8 @@ export default function Home() {
         <RecommendedJobs />
 
         <div className="flex items-center justify-between mt-2 mb-1.5">
-          <h2 className="font-extrabold text-lg">{t('home.latestJobs')}</h2>
-          <a href="/viec-lam" className="text-primary text-xs font-bold">
+          <h2 className="font-extrabold text-lg tvl-title">{t('home.latestJobs')}</h2>
+          <a href="/viec-lam" className="text-primary text-xs font-bold tvl-title">
             {t('home.seeMore')}
           </a>
         </div>
@@ -218,12 +218,12 @@ export default function Home() {
         {facets && facets.industries.length > 0 && (
           <>
             <div className="flex items-center justify-between mt-2 mb-1.5">
-              <h2 className="font-extrabold text-lg">{t('home.topIndustries')}</h2>
+              <h2 className="font-extrabold text-lg tvl-title">{t('home.topIndustries')}</h2>
               {facets.industries.length > HOME_SECTION_PREVIEW_COUNT && (
                 <button
                   type="button"
                   onClick={() => setShowAllIndustries((v) => !v)}
-                  className="text-primary text-xs font-bold"
+                  className="text-primary text-xs font-bold tvl-title"
                 >
                   {showAllIndustries ? t('home.collapse') : t('home.showAll')}
                 </button>
@@ -252,8 +252,8 @@ export default function Home() {
         {featured && featured.length > 0 && (
           <>
             <div className="flex items-center justify-between mt-2 mb-1.5">
-              <h2 className="font-extrabold text-lg">💛 Doanh nghiệp yêu thích</h2>
-              <a href="/viec-lam?featuredEmployerOnly=1" className="text-primary text-xs font-bold">
+              <h2 className="font-extrabold text-lg tvl-title">💛 Doanh nghiệp yêu thích</h2>
+              <a href="/viec-lam?featuredEmployerOnly=1" className="text-primary text-xs font-bold tvl-title">
                 Xem tất cả →
               </a>
             </div>
