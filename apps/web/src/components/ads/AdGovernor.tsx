@@ -13,7 +13,7 @@ const MIN_GAP = 720;
 // Ngân sách mỗi trang: máy tính ≤ 3 banner (1 khung dọc cột phải + ≤ 2 dải ngang); điện thoại ≤ 2 dải ngang. Chỉ 2 loại kích thước: dải ngang và khung dọc.
 const BUDGET_DESKTOP = 3;
 const BUDGET_MOBILE = 2;
-const PRIORITY = ['jobs-inline', 'job-mid', 'home-top', 'home-mid', 'candidate-top', 'employer-top', 'employer-search', 'jobs-bottom', 'job-bottom', 'company-bottom', 'home-bottom', 'footer-top'];
+const PRIORITY = ['jobs-inline', 'job-mid', 'home-top', 'home-mid', 'candidate-top', 'employer-top', 'employer-search', 'employer-manage', 'candidate-bottom', 'tools-bottom', 'jobs-bottom', 'job-bottom', 'company-bottom', 'home-bottom', 'footer-top'];
 const rank = (s: string) => {
   const i = PRIORITY.indexOf(s);
   return i < 0 ? 99 : i;

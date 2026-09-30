@@ -24,11 +24,11 @@ export function CompanyLogo({
 }) {
   const [failed, setFailed] = useState(false);
   const showImage = !!logoUrl && !failed;
-  const bgClass = variant === 'light' ? 'bg-white/15 text-white' : 'bg-primary-tint text-primary';
+  const bgClass = variant === 'light' ? 'bg-white/15 text-white' : 'bg-white text-primary border border-border shadow-sm';
 
   return (
     <div
-      className={`shrink-0 rounded-lg ${bgClass} flex items-center justify-center font-bold overflow-hidden ${className}`}
+      className={`shrink-0 rounded-xl ${bgClass} flex items-center justify-center font-bold overflow-hidden ${className}`}
       style={{ width: size, height: size, fontSize: Math.max(10, size * 0.32) }}
     >
       {showImage ? (
@@ -37,7 +37,7 @@ export function CompanyLogo({
         <img
           src={logoUrl}
           alt={name}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain p-1"
           onError={() => setFailed(true)}
         />
       ) : (

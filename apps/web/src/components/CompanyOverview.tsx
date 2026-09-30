@@ -7,6 +7,7 @@ import { CompanyLogo } from '@/components/CompanyLogo';
 import { SourcedBadge, isCompanyUnverified } from '@/components/SourcedBadge';
 import { JobCard } from '@/components/JobCard';
 import { formatNumber } from '@/lib/format';
+import { FitText } from '@/components/FitText';
 
 // Đợt 49 — "Tổng quan công ty" theo mẫu careerviet.vn: khung thông tin nền xanh nhạt (tên, logo, địa điểm,
 // thông tin có biểu tượng, nút FOLLOW) → Giới thiệu → Thông điệp (Tầm nhìn/Sứ mệnh) → Hình ảnh → Việc làm đang tuyển.
@@ -32,7 +33,30 @@ export default function CompanyOverview({
   maxJobs?: number;
   showAllLink?: boolean;
 }) {
-  const list = jobs.filter((j) => j.id !== excludeJobId);
+  // Đợt 51 — chỉ ưu tiên hiện các việc làm được quan tâm (xem/tìm) nhiều nhất; phần còn lại bấm "Xem thêm".
+  const [showAll, setShowAll] = useState(false);
+  // Đợt 54 — thanh tìm trong danh sách việc làm của công ty: chức danh + địa điểm (tỉnh) + sắp xếp.
+  const [kw, setKw] = useState('');
+  const [place, setPlace] = useState('');
+  const [sort, setSort] = useState<'hot' | 'new' | 'salary'>('hot');
+  const base = jobs.filter((j) => j.id !== excludeJobId);
+  const jobProvinces = (j: JobPosting) => (j.provinces && j.provinces.length ? j.provinces : j.location ? [j.location] : []);
+  const placeCounts = new Map<string, number>();
+  base.forEach((j) => jobProvinces(j).forEach((pv) => placeCounts.set(pv, (placeCounts.get(pv) ?? 0) + 1)));
+  const places = Array.from(placeCounts.entries()).sort((a, b) => b[1] - a[1]);
+  const norm = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase();
+  const filtering = kw.trim() !== '' || place !== '';
+  const list = base
+    .filter((j) => (!kw.trim() || norm(j.title).includes(norm(kw.trim()))) && (!place || jobProvinces(j).includes(place)))
+    .sort((a, b) =>
+      sort === 'new'
+        ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        : sort === 'salary'
+          ? (b.salaryMax ?? b.salaryMin ?? 0) - (a.salaryMax ?? a.salaryMin ?? 0)
+          : (b.viewCount ?? 0) - (a.viewCount ?? 0),
+    );
+  const TOP = 5;
+  const shown = showAll || filtering ? maxJobs : Math.min(TOP, maxJobs);
   const info: { icon: string; label: string; value: string }[] = [
     company.contactPerson ? { icon: '👤', label: 'Người liên hệ', value: company.contactPerson } : null,
     company.size ? { icon: '👥', label: 'Quy mô công ty', value: company.size } : null,
@@ -46,12 +70,14 @@ export default function CompanyOverview({
     <div className="flex flex-col gap-6 text-ink min-w-0">
       <section className="rounded-lg bg-primary-tint/70 border border-border p-4 sm:p-5">
         <div className="flex items-center gap-2 flex-wrap mb-3">
-          <h2 className="font-extrabold text-[18px] uppercase tracking-tight break-words min-w-0">{company.name}</h2>
+          <h2 className="font-extrabold text-[18px] uppercase tracking-tight min-w-0 max-w-full">
+            <FitText lines={2} min={0.7}>{company.name}</FitText>
+          </h2>
           {isCompanyUnverified(company) && <SourcedBadge />}
         </div>
         <div className="flex gap-4 items-start flex-col sm:flex-row">
           <div className="shrink-0 w-[128px] h-[108px] rounded-md bg-white border border-border flex items-center justify-center">
-            <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={84} className="text-lg" />
+            <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={104} className="text-xl" />
           </div>
           <div className="flex-1 min-w-0 w-full">
             {company.address && (
@@ -127,15 +153,72 @@ export default function CompanyOverview({
 
       {company.galleryUrls && company.galleryUrls.length > 0 && <Gallery urls={company.galleryUrls} name={company.name} />}
 
-      <Section title={`Việc làm đang tuyển${list.length ? ` (${list.length})` : ''}`}>
+      <Section
+        title={
+          filtering
+            ? `Vị trí đang tuyển dụng (${list.length}/${base.length} việc làm)`
+            : list.length > TOP && !showAll && sort === 'hot'
+              ? `Việc làm được quan tâm nhiều nhất (${TOP}/${list.length})`
+              : `Vị trí đang tuyển dụng${list.length ? ` (${list.length} việc làm)` : ''}`
+        }
+      >
+        {base.length > 1 && (
+          <div className="flex flex-col sm:flex-row gap-2.5 mb-3">
+            <label className="flex-1 min-w-0 relative" htmlFor="co-job-kw">
+              <span className="sr-only">Nhập chức danh</span>
+              <span aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint">🔍</span>
+              <input
+                id="co-job-kw"
+                className="tvl-input" style={{ paddingLeft: 36 }}
+                placeholder="Nhập chức danh"
+                value={kw}
+                onChange={(e) => setKw(e.target.value)}
+              />
+            </label>
+            {places.length > 1 && (
+              <select
+                id="co-job-place"
+                aria-label="Địa điểm làm việc"
+                className="tvl-input sm:w-[210px]"
+                value={place}
+                onChange={(e) => setPlace(e.target.value)}
+              >
+                <option value="">Tất cả địa điểm ({base.length})</option>
+                {places.map(([pv, n]) => (
+                  <option key={pv} value={pv}>
+                    {pv} ({n})
+                  </option>
+                ))}
+              </select>
+            )}
+            <select
+              id="co-job-sort"
+              aria-label="Sắp xếp"
+              className="tvl-input sm:w-[210px]"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as 'hot' | 'new' | 'salary')}
+            >
+              <option value="hot">Quan tâm nhiều nhất</option>
+              <option value="new">Mới cập nhật</option>
+              <option value="salary">Lương cao nhất</option>
+            </select>
+          </div>
+        )}
         {list.length === 0 ? (
-          <div className="text-[14px] text-ink-muted">Công ty hiện chưa có tin tuyển dụng khác đang hiển thị.</div>
+          <div className="text-[14px] text-ink-muted">
+            {filtering ? 'Không có vị trí nào khớp. Thử chức danh hoặc địa điểm khác.' : 'Công ty hiện chưa có tin tuyển dụng khác đang hiển thị.'}
+          </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {list.slice(0, maxJobs).map((j) => (
+            {list.slice(0, shown).map((j) => (
               <JobCard key={j.id} job={{ ...j, company: j.company ?? company }} />
             ))}
-            {list.length > maxJobs && (
+            {list.length > shown && !showAll && !filtering && list.length > TOP && (
+              <button onClick={() => setShowAll(true)} className="tvl-btn-ghost !w-auto px-4 self-start">
+                Xem tất cả {list.length} việc làm →
+              </button>
+            )}
+            {list.length > shown && showAll && (
               <Link href={`/cong-ty/${company.id}`} className="tvl-btn-ghost !w-auto px-4 self-start">
                 Xem tất cả {list.length} việc làm →
               </Link>

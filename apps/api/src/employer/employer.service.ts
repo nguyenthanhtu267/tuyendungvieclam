@@ -166,9 +166,30 @@ export class EmployerService {
       where: { companyId },
       order: { createdAt: 'DESC' },
     });
+    // Đợt 52 — số lượt xem 7 ngày gần nhất (và 7 ngày trước đó để so xu hướng) từ dữ liệu truy cập thật.
+    const weekly = new Map<string, { w: number; p: number }>();
+    if (jobs.length) {
+      try {
+        const rows: { id: string; w: string; p: string }[] = await this.jobRepo.manager.query(
+          `SELECT entity_id::text AS id,
+                  COUNT(*) FILTER (WHERE started_at >= now() - interval '7 days') AS w,
+                  COUNT(*) FILTER (WHERE started_at < now() - interval '7 days') AS p
+             FROM analytics_pageviews
+            WHERE entity_type = 'job' AND entity_id::text = ANY($1::text[])
+              AND started_at >= now() - interval '14 days'
+            GROUP BY entity_id`,
+          [jobs.map((j) => j.id)],
+        );
+        rows.forEach((r) => weekly.set(r.id, { w: Number(r.w), p: Number(r.p) }));
+      } catch {
+        /* bảng analytics chưa có / lỗi → bỏ qua, chỉ mất số liệu tuần */
+      }
+    }
     const withCounts = await Promise.all(
       jobs.map(async (job) => ({
         ...job,
+        viewsWeek: weekly.get(job.id)?.w ?? 0,
+        viewsPrevWeek: weekly.get(job.id)?.p ?? 0,
         applicationCount: await this.applicationRepo.count({
           where: { jobPostingId: job.id },
         }),

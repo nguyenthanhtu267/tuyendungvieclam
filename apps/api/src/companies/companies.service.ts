@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Company } from '../database/entities/company.entity';
 import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
 import { CompanyFollow } from '../database/entities/company-follow.entity';
@@ -24,6 +24,44 @@ export class CompaniesService {
     @InjectRepository(CompanyClaimRequest)
     private readonly claimRequestRepo: Repository<CompanyClaimRequest>,
   ) {}
+
+  // Đợt 52 — "Công ty cùng lĩnh vực": công ty khác đang có tin tuyển cùng ngành nghề với công ty này.
+  async getSimilar(id: string) {
+    const own = await this.jobRepo
+      .createQueryBuilder('job')
+      .select('job.industry', 'industry')
+      .addSelect('COUNT(*)', 'n')
+      .where('job.companyId = :id', { id })
+      .andWhere('job.approvalStatus = :st', { st: JobApprovalStatus.APPROVED })
+      .andWhere('job.industry IS NOT NULL')
+      .groupBy('job.industry')
+      .orderBy('n', 'DESC')
+      .limit(3)
+      .getRawMany<{ industry: string }>();
+    const industries = own.map((r) => r.industry).filter(Boolean);
+    if (industries.length === 0) return [];
+    const rows = await this.jobRepo
+      .createQueryBuilder('job')
+      .select('job.companyId', 'companyId')
+      .addSelect('COUNT(*)', 'jobCount')
+      .where('job.companyId != :id', { id })
+      .andWhere('job.approvalStatus = :st', { st: JobApprovalStatus.APPROVED })
+      .andWhere('job.isPaused = false')
+      .andWhere('job.industry IN (:...industries)', { industries })
+      .groupBy('job.companyId')
+      .orderBy('"jobCount"', 'DESC')
+      .limit(6)
+      .getRawMany<{ companyId: string; jobCount: string }>();
+    if (rows.length === 0) return [];
+    const companies = await this.companyRepo.findBy({ id: In(rows.map((r) => r.companyId)) });
+    return rows
+      .map((r) => {
+        const c = companies.find((x) => x.id === r.companyId);
+        if (!c) return null;
+        return { id: c.id, name: c.name, logoUrl: resolveCompanyLogoUrl(c), jobCount: Number(r.jobCount) };
+      })
+      .filter(Boolean);
+  }
 
   async getProfile(id: string) {
     const company = await this.companyRepo.findOne({ where: { id } });

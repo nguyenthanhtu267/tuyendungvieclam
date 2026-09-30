@@ -14,6 +14,7 @@ import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth-context';
 import { formatNumber } from '@/lib/format';
 import { AdSlot } from '@/components/ads/AdSlot';
+import { RecentJobs } from '@/components/RecentJobs';
 
 // Đợt 10 — trang tìm việc làm nâng cao đầy đủ (claude/06-spec-tim-kiem-nang-cao.md): thanh lọc
 // FilterBar (tỉnh/thành + ngành nghề multi-select, 5 dropdown đơn, khẩn cấp, doanh nghiệp yêu thích),
@@ -233,6 +234,8 @@ function JobSearchPage() {
                 </button>
               ) : null}
             </div>
+
+            <RecentJobs />
 
             <HomePlacePicker onNearMe={(provinces) => updateParams({ provinces, location: undefined, district: undefined })} />
 

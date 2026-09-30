@@ -6,6 +6,11 @@ import { CreateClaimRequestDto } from './dto/create-claim-request.dto';
 export class CompaniesController {
   constructor(private readonly companiesService: CompaniesService) {}
 
+  @Get(':id/similar')
+  getSimilar(@Param('id') id: string) {
+    return this.companiesService.getSimilar(id);
+  }
+
   @Get(':id')
   getProfile(@Param('id') id: string) {
     return this.companiesService.getProfile(id);

@@ -12,6 +12,7 @@ import {
   SALARY_TIERS,
 } from '@/lib/catalogs';
 import type { JobListParams } from '@/lib/api';
+import { VoiceSearchButton } from '@/components/VoiceSearchButton';
 
 // Đợt 10 — thanh lọc nâng cao đầy đủ cho /viec-lam (mục 1 + 2 của đặc tả). Áp dụng lọc ngay khi
 // thay đổi giá trị (không có nút "Tìm" riêng cho các ô dropdown/popover) — khớp hành vi careerviet.vn.
@@ -60,12 +61,15 @@ export function FilterBar({
         className="flex flex-col sm:flex-row gap-2.5"
       >
         {showSearchField && (
-          <input
-            className="tvl-input sm:flex-[1.4] min-w-0"
-            placeholder="Chức danh, kỹ năng, tên công ty"
-            value={searchValue}
-            onChange={(e) => onSearchChange?.(e.target.value)}
-          />
+          <div className="flex gap-2 sm:flex-[1.4] min-w-0">
+            <input
+              className="tvl-input min-w-0"
+              placeholder="Chức danh, kỹ năng, tên công ty"
+              value={searchValue}
+              onChange={(e) => onSearchChange?.(e.target.value)}
+            />
+            <VoiceSearchButton onText={(t) => onSearchChange?.(t)} />
+          </div>
         )}
         <div className="sm:flex-1 min-w-0">
           <MultiSelectPopover

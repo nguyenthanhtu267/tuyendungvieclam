@@ -15,7 +15,7 @@ export default function ChinhSachBaoMatPage() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-10 py-10 flex flex-col gap-5 text-sm text-ink-muted">
         <div>
           <h1 className="font-extrabold text-2xl text-ink mb-1">Chính sách bảo mật</h1>
-          <p className="text-xs text-ink-faint">Cập nhật lần cuối: 27/09/2026</p>
+          <p className="text-xs text-ink-faint">Cập nhật lần cuối: 30/09/2026</p>
         </div>
 
         <Section title="1. Dữ liệu chúng tôi thu thập">
@@ -62,16 +62,28 @@ export default function ChinhSachBaoMatPage() {
         </Section>
 
         {/* Đợt 19 (26/09/2026) — minh bạch về bộ ghi truy cập (thống kê nội bộ). */}
-        <Section title="5. Cookie & thống kê truy cập">
-          Chúng tôi dùng thông tin phiên đăng nhập cần thiết để bạn không phải đăng nhập lại mỗi lần truy cập. Để cải
-          thiện website, chúng tôi tự ghi nhận thống kê truy cập nội bộ: trang đã xem, thời gian xem, mức cuộn trang,
-          vị trí các cú bấm chuột/chạm, nút đã bấm (ứng tuyển, lưu tin...), từ khoá tìm kiếm, trang giới thiệu bạn tới
-          (VD Google, Facebook), loại thiết bị/trình duyệt và tỉnh/thành ước lượng. Trình duyệt của bạn được gắn một mã
-          ngẫu nhiên ẩn danh (lưu trong bộ nhớ trình duyệt); nếu bạn đang đăng nhập, thống kê được gắn với tài khoản.
-          Chúng tôi KHÔNG lưu địa chỉ IP, không ghi nội dung bạn gõ vào ô nhập liệu, không dùng dịch vụ quảng cáo/phân
-          tích của bên thứ ba và không bán hay chia sẻ dữ liệu này. Dữ liệu chi tiết tự động xoá sau 90 ngày; chỉ giữ
-          lại số tổng hợp theo ngày (không định danh). Bạn có thể xoá mã ẩn danh bất kỳ lúc nào bằng cách xoá dữ liệu
-          trang web trong trình duyệt.
+        <Section title="5. Cookie & thống kê truy cập" id="cookie">
+          <p>
+            <b className="text-ink">Cookie/bộ nhớ cần thiết</b> (không cần xin phép): phiên đăng nhập, ngôn ngữ, cỡ chữ, “Tin vừa xem”, lựa chọn
+            cookie của bạn. Các mục này nằm trên trình duyệt của bạn để web chạy đúng.
+          </p>
+          <p className="mt-2">
+            <b className="text-ink">Thống kê truy cập nội bộ</b> (chỉ khi bạn chọn “Đồng ý”): trang đã xem, thời gian xem, mức cuộn trang, vị trí cú
+            bấm chuột/chạm, nút đã bấm (ứng tuyển, lưu tin...), từ khoá tìm kiếm, trang giới thiệu bạn tới (VD Google, Facebook), loại
+            thiết bị/trình duyệt và tỉnh/thành ước lượng. Trình duyệt được gắn một mã ngẫu nhiên ẩn danh lưu lâu dài; nếu đang đăng nhập,
+            thống kê được gắn với tài khoản.
+          </p>
+          <p className="mt-2">
+            <b className="text-ink">Nếu bạn chưa chọn hoặc chọn “Chỉ cần thiết”</b>: web vẫn ghi số lượt xem tổng hợp nhưng ở chế độ ẩn danh — mã
+            trình duyệt chỉ nằm trong bộ nhớ của trang đang mở (không lưu vào máy bạn, mất khi tải lại/đóng trang) và không gắn với tài
+            khoản.
+          </p>
+          <p className="mt-2">
+            Chúng tôi KHÔNG lưu địa chỉ IP, không ghi nội dung bạn gõ vào ô nhập liệu, không dùng dịch vụ quảng cáo/phân tích của bên thứ ba
+            và không bán hay chia sẻ dữ liệu này. Dữ liệu chi tiết tự động xoá sau 90 ngày; chỉ giữ số tổng hợp theo ngày (không định
+            danh). Bạn có thể đổi lựa chọn bất kỳ lúc nào bằng nút “Cài đặt cookie” ở chân trang, hoặc xoá dữ liệu trang web trong trình
+            duyệt.
+          </p>
         </Section>
 
         <Section title="6. Quyền của bạn">
@@ -89,9 +101,9 @@ export default function ChinhSachBaoMatPage() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, id }: { title: string; children: React.ReactNode; id?: string }) {
   return (
-    <section className="flex flex-col gap-1.5">
+    <section id={id} className="flex flex-col gap-1.5 scroll-mt-20">
       <h2 className="font-bold text-ink text-[15px]">{title}</h2>
       <div className="leading-relaxed">{children}</div>
     </section>

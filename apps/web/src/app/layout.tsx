@@ -15,6 +15,7 @@ import { BackgroundProvider } from '@/components/bg/BackgroundProvider';
 import Footer from '@/components/Footer';
 import ImpersonationBanner from '@/components/ImpersonationBanner';
 import AnalyticsTracker from '@/components/AnalyticsTracker';
+import ConsentBanner from '@/components/ConsentBanner';
 
 // Font Inter (to, rõ, sắc nét — quyết định 18/09/2026) + IBM Plex Mono cho số liệu dạng bảng,
 // nạp qua @fontsource (đóng gói sẵn file font) vì fonts.googleapis.com bị chặn bởi chính sách
@@ -42,6 +43,7 @@ export default function RootLayout({
               <AdGovernor />
             <ImpersonationBanner />
             <AnalyticsTracker />
+            <ConsentBanner />
             <div className="flex-1 flex flex-col">{children}</div>
             <CompareTray />
             <Footer />

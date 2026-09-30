@@ -36,6 +36,9 @@ export const AD_SLOT_DEFS: AdSlotDef[] = [
   { id: 'company-sidebar', page: 'Trang công ty', label: 'Cột phải, dưới phần giới thiệu', variant: 'tall', devices: 'desktop', audience: 'Mọi người', size: 'Dọc 280 × ~280px' },
   { id: 'home-bottom', page: 'Trang chủ', label: 'Cuối trang, trước chân trang', variant: 'wide', devices: 'all', audience: 'Mọi người', size: 'Ngang toàn khung' },
   { id: 'footer-top', page: 'Mọi trang', label: 'Ngay trên chân trang (toàn website, trừ Admin)', variant: 'compact', devices: 'all', audience: 'Mọi người', size: 'Dải nhỏ gọn ngang toàn khung' },
+  { id: 'candidate-bottom', page: 'Hồ sơ ứng viên', label: 'Cuối trang My Center', variant: 'wide', devices: 'all', audience: 'Ứng viên', onlyFor: 'candidate', size: 'Ngang toàn khung' },
+  { id: 'tools-bottom', page: 'Tiện ích / So sánh việc làm', label: 'Cuối trang Tính lương và So sánh việc làm', variant: 'wide', devices: 'all', audience: 'Mọi người', size: 'Ngang toàn khung' },
+  { id: 'employer-manage', page: 'NTD · Quản lý tin', label: 'Cuối trang Quản lý tin đăng', variant: 'wide', devices: 'all', audience: 'Nhà tuyển dụng', onlyFor: 'employer', size: 'Ngang toàn khung' },
 ];
 
 export const AD_SLOT_MAP: Record<string, AdSlotDef> = Object.fromEntries(AD_SLOT_DEFS.map((s) => [s.id, s]));

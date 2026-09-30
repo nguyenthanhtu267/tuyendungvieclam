@@ -10,6 +10,7 @@ import { useMatches } from '@/lib/match';
 import { useCompare } from '@/lib/compare';
 import { toItems } from '@/lib/job-insights';
 import { distanceLabel, useHomePlace } from '@/lib/geo';
+import { AdSlot } from '@/components/ads/AdSlot';
 
 // Đợt 46 — So sánh 2–3 tin cạnh nhau.
 function ComparePage() {
@@ -100,6 +101,7 @@ function ComparePage() {
           </div>
         )}
       </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pb-6"><AdSlot slot="tools-bottom" className="mt-2" /></div>
     </main>
   );
 }

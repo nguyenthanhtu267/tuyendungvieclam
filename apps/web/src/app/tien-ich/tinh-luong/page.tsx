@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import SiteHeader from '@/components/SiteHeader';
 import { jobsApi, type SalaryStats } from '@/lib/api';
 import { grossToNet, netToGross, REGION_MIN_WAGE, PERSONAL_DEDUCTION, DEPENDENT_DEDUCTION } from '@/lib/salary-calc';
+import { AdSlot } from '@/components/ads/AdSlot';
 
 const vnd = (n: number) => Math.round(n).toLocaleString('vi-VN') + ' đ';
 const trieu = (n: number | null | undefined) => (n == null ? '—' : `${(Math.round(n * 10) / 10).toLocaleString('vi-VN')} triệu`);
@@ -175,6 +176,7 @@ export default function TinhLuongPage() {
           </section>
         </div>
       </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pb-6"><AdSlot slot="tools-bottom" className="mt-2" /></div>
     </main>
   );
 }

@@ -10,7 +10,7 @@ export const FONT_KEY = 'tvl_font_pct';
 const OLD_KEY = 'tvl_font_level'; // Đợt 29: mức 0–8 (100%–140%)
 export const FONT_MIN = 80;
 export const FONT_MAX = 200;
-const STEP = 10;
+const STEP = 5;
 
 export function applyFontPct(pct: number) {
   document.documentElement.style.fontSize = `${pct}%`;

@@ -16,6 +16,8 @@ import { useLanguage } from '@/lib/i18n';
 import { MarketPanel } from '@/components/market/MarketPanel';
 import { memberCountDisplay, profilesUpdatedTodayDisplay, applicationsTodayDisplay } from '@/lib/vanity-stats';
 import { AdSlot } from '@/components/ads/AdSlot';
+import { VoiceSearchButton } from '@/components/VoiceSearchButton';
+import { FitText } from '@/components/FitText';
 
 export default function Home() {
   const router = useRouter();
@@ -100,12 +102,21 @@ export default function Home() {
               {t('home.heading2')}
             </h1>
             <form onSubmit={handleSearch} className="flex flex-col gap-3">
-              <input
-                className="tvl-input"
-                placeholder={t('home.searchPlaceholder')}
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-              />
+              <div className="flex gap-2">
+                <input
+                  className="tvl-input"
+                  placeholder={t('home.searchPlaceholder')}
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                />
+                <VoiceSearchButton
+                  onText={(text) => {
+                    setKeyword(text);
+                    const params = nlToParams(parseNaturalQuery(text).filters);
+                    router.push(`/viec-lam${params.toString() ? `?${params}` : ''}`);
+                  }}
+                />
+              </div>
               <div className="flex gap-3 flex-wrap">
                 <button type="submit" className="tvl-btn-accent !w-auto px-6">
                   {t('home.searchButton')}
@@ -251,9 +262,9 @@ export default function Home() {
                   href={`/viec-lam?q=${encodeURIComponent(c.name)}`}
                   className="rounded-xl border border-border bg-white p-4 flex items-center gap-3 hover:border-primary hover:shadow-sm transition-all"
                 >
-                  <CompanyLogo name={c.name} logoUrl={c.logoUrl} size={40} className="text-xs" />
+                  <CompanyLogo name={c.name} logoUrl={c.logoUrl} size={52} className="text-xs" />
                   <div className="min-w-0">
-                    <div className="text-[12.5px] truncate"><span className="co-name">{c.name}</span></div>
+                    <div className="text-[12.5px]"><FitText lines={1} min={0.7} className="co-name">{c.name}</FitText></div>
                     <div className="text-ink-faint text-[11px]">{c.jobCount} việc làm đang tuyển</div>
                   </div>
                 </a>

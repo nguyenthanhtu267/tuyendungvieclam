@@ -31,6 +31,13 @@ export default function Footer() {
           <Link href="/chinh-sach-bao-mat" className="hover:text-primary font-semibold">
             {t('footer.privacy')}
           </Link>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event('tvl-open-consent'))}
+            className="hover:text-primary font-semibold"
+          >
+            Cài đặt cookie
+          </button>
           {/* Đợt 18c (26/09/2026) — người thật yêu cầu gỡ / nhận lại hồ sơ "Nguồn tổng hợp". */}
           <Link href="/yeu-cau-ho-so" className="hover:text-primary font-semibold">
             {t('footer.profileRequest')}

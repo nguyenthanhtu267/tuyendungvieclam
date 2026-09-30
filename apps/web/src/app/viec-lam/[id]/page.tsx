@@ -37,10 +37,12 @@ import {
   jobWorkScheduleDisplay,
 } from '@/lib/format';
 import { benefitsRichTextValue } from '@/lib/richtext';
-import { JobSummaryBox, useSalaryEstimate, fmtTrieu } from '@/components/JobInsights';
+import { useSalaryEstimate, fmtTrieu } from '@/components/JobInsights';
 import { draftCoverLetter } from '@/lib/job-insights';
 import { distanceLabel, useHomePlace } from '@/lib/geo';
 import { AdSlot } from '@/components/ads/AdSlot';
+import { pushRecentJob } from '@/lib/recent-jobs';
+import { FitText } from '@/components/FitText';
 
 type Tab = 'details' | 'company';
 
@@ -84,6 +86,7 @@ function JobDetailInner() {
       .get(params.id)
       .then((res) => {
         setJob(res.job);
+        pushRecentJob({ id: res.job.id, title: res.job.title, company: res.job.company?.name ?? '' });
         setRelated(res.related);
       })
       .catch((err) => {
@@ -194,7 +197,7 @@ function JobDetailInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job, searchParams]);
 
-  async function submitApply() {
+  async function submitApply(quickLetter?: string) {
     if (!token) return;
     if (!useOnlineProfile && !selectedCvId) return;
     setApplyState('submitting');
@@ -202,7 +205,7 @@ function JobDetailInner() {
     try {
       await applicationsApi.apply(token, params.id, {
         ...(useOnlineProfile ? { useOnlineProfile: true } : { cvId: selectedCvId }),
-        coverLetter: coverLetter || undefined,
+        coverLetter: (quickLetter ?? coverLetter) || undefined,
       });
       track('apply_submit', { entityType: 'job', entityId: params.id, meta: { useOnlineProfile } });
       setApplyState('done');
@@ -409,11 +412,29 @@ function JobDetailInner() {
                 {applyError && <div className="text-critical text-xs font-semibold">{applyError}</div>}
                 <div className="flex gap-2">
                   <button
-                    onClick={submitApply}
+                    onClick={() => submitApply()}
                     disabled={applyState === 'submitting' || (!useOnlineProfile && !selectedCvId)}
                     className="tvl-btn-accent !w-auto px-6"
                   >
                     {applyState === 'submitting' ? 'Đang gửi...' : 'Gửi hồ sơ ứng tuyển'}
+                  </button>
+                  {/* Đợt 52 — Nộp nhanh một chạm: dùng CV/hồ sơ đã chọn + thư gợi ý tự soạn (khi ô thư còn trống). */}
+                  <button
+                    type="button"
+                    disabled={applyState === 'submitting' || (!useOnlineProfile && !selectedCvId)}
+                    onClick={async () => {
+                      let letter = coverLetter;
+                      if (!letter.trim()) {
+                        const profile = token ? await candidatesApi.getProfile(token).catch(() => null) : null;
+                        letter = draftCoverLetter(job, profile as never, compatibility?.checklist);
+                        setCoverLetter(letter);
+                      }
+                      submitApply(letter);
+                    }}
+                    className="tvl-btn-ghost !w-auto px-4 disabled:opacity-50"
+                    title="Nộp ngay bằng CV đã chọn và thư gợi ý tự soạn"
+                  >
+                    ⚡ Nộp nhanh
                   </button>
                   <button onClick={() => setApplyOpen(false)} className="tvl-btn-ghost !w-auto px-4">
                     Huỷ
@@ -448,7 +469,7 @@ function JobDetailInner() {
             <div className="rounded-b-xl border border-t-0 border-border bg-white p-5">
               {tab === 'details' ? (
                 <>
-                  <JobSummaryBox job={job} />
+                  
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-[12.5px]">
                     <Detail
                       label="📍 Địa điểm"
@@ -620,18 +641,18 @@ function JobDetailInner() {
             {/* Đợt 49 — tab "Tổng quan công ty" đã có khung công ty + nút FOLLOW → ẩn thẻ công ty cột phải để không trùng. */}
             {tab !== 'company' && (
             <div className="rounded-xl border border-border bg-white p-4">
-              <div className="flex items-center gap-2.5">
-                <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={40} className="text-xs" />
-                <div>
-                  <Link href={`/cong-ty/${job.company.id}`} className="font-bold text-[13px] hover:text-primary hover:underline">
-                    <span className="co-name">{job.company.name}</span>
-                  </Link>
-                  {isCompanyUnverified(job.company) && (
-                    <div className="mt-1">
+              <div className="flex flex-col gap-2.5 min-w-0">
+                <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={96} className="text-lg" />
+                <Link href={`/cong-ty/${job.company.id}`} className="font-bold text-[13px] hover:text-primary hover:underline block min-w-0">
+                  <FitText lines={2} min={0.7} className="co-name">{job.company.name}</FitText>
+                </Link>
+                {isCompanyUnverified(job.company) && (
+                  <div>
+                    <FitText>
                       <SourcedBadge />
-                    </div>
-                  )}
-                </div>
+                    </FitText>
+                  </div>
+                )}
               </div>
               {me?.role === 'candidate' && (
                 <button onClick={toggleFollow} disabled={followBusy} className="tvl-btn-ghost mt-3 disabled:opacity-60">

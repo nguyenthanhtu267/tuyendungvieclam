@@ -100,8 +100,12 @@ export class ApplicationRemindersService implements OnModuleInit, OnModuleDestro
       }
       const interviews = await this.remindInterviews();
       const closing = await this.remindJobClosing();
-      if (candidates || employers || interviews || closing)
-        this.log.log(`Nhắc: ${candidates} ứng viên, ${employers} NTD, ${interviews} lịch phỏng vấn, ${closing} tin cần đóng/gia hạn`);
+      const savedClosing = await this.remindSavedJobsClosing().catch((e) => {
+        this.log.warn(`Nhắc tin đã lưu sắp hết hạn lỗi: ${e?.message ?? e}`);
+        return 0;
+      });
+      if (candidates || employers || interviews || closing || savedClosing)
+        this.log.log(`Nhắc: ${candidates} ứng viên, ${employers} NTD, ${interviews} lịch phỏng vấn, ${closing} tin cần đóng/gia hạn, ${savedClosing} nhắc tin đã lưu sắp hết hạn`);
       return { candidates, employers };
     } finally {
       this.running = false;
@@ -178,6 +182,40 @@ export class ApplicationRemindersService implements OnModuleInit, OnModuleDestro
           sent++;
         }
       }
+    }
+    return sent;
+  }
+
+  // Đợt 52 — nhắc ứng viên: tin ĐÃ LƯU sắp hết hạn nộp (còn ≤ 3 ngày) mà chưa ứng tuyển. Mỗi tin 1 lần/ứng viên.
+  private async remindSavedJobsClosing(): Promise<number> {
+    const ymd = (d: Date) => d.toISOString().slice(0, 10);
+    const rows: { userId: string; jobId: string; title: string; deadline: string; company: string | null }[] =
+      await this.appRepo.manager.query(
+        `SELECT p.user_id AS "userId", j.id AS "jobId", j.title, j.deadline::text AS deadline, c.name AS company
+           FROM saved_jobs sj
+           JOIN candidate_profiles p ON p.id = sj.candidate_profile_id
+           JOIN job_postings j ON j.id = sj.job_posting_id
+           LEFT JOIN companies c ON c.id = j.company_id
+          WHERE j.approval_status = $1 AND j.is_paused = false
+            AND j.deadline BETWEEN $2 AND $3
+            AND NOT EXISTS (
+              SELECT 1 FROM applications a JOIN cvs v ON v.id = a.cv_id
+               WHERE a.job_posting_id = j.id AND v.candidate_profile_id = p.id AND a.deleted_at IS NULL)
+          LIMIT 500`,
+        [JobApprovalStatus.APPROVED, ymd(new Date()), ymd(new Date(Date.now() + 3 * DAY))],
+      );
+    let sent = 0;
+    for (const r of rows) {
+      const link = `/viec-lam/${r.jobId}?n=saved-closing`;
+      if (await this.notifRepo.exists({ where: { userId: r.userId, type: 'saved_job_closing', link } })) continue;
+      const d = String(r.deadline).slice(0, 10).split('-').reverse().join('/');
+      await this.notifications.create(
+        r.userId,
+        'saved_job_closing',
+        `Tin bạn đã lưu "${r.title}"${r.company ? ` (${r.company})` : ''} hết hạn nộp ngày ${d}. Nộp hồ sơ ngay kẻo lỡ cơ hội.`,
+        link,
+      );
+      sent++;
     }
     return sent;
   }

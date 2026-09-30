@@ -346,7 +346,10 @@ export interface ClaimRequestPayload {
   note?: string;
 }
 
+export interface SimilarCompany { id: string; name: string; logoUrl?: string | null; jobCount: number }
+
 export const companiesApi = {
+  similar: (id: string) => request<SimilarCompany[]>(`/companies/${id}/similar`),
   getProfile: (id: string) => request<CompanyProfileResponse>(`/companies/${id}`),
   submitClaimRequest: (id: string, dto: ClaimRequestPayload) =>
     request<{ success: true; id: string }>(`/companies/${id}/claim-request`, {

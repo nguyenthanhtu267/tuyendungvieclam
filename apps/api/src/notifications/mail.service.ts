@@ -20,6 +20,7 @@ export const EMAIL_TYPES = new Set([
   'application_reminder',
   'application_stale',
   'job_closing',
+  'saved_job_closing',
   'job_approved',
   'job_rejected',
 ]);

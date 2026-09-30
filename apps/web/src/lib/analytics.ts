@@ -67,6 +67,25 @@ const CITY_VI: Record<string, string> = {
   'Vinh': 'Vinh',
 };
 
+// Đợt 55 — đồng ý cookie/thống kê. Chưa đồng ý (hoặc chọn "Chỉ cần thiết") → chế độ ẨN DANH: mã trình duyệt và phiên chỉ
+// nằm trong bộ nhớ của trang đang mở (không ghi vào máy người dùng), không gắn với tài khoản. Chọn "Chấp nhận" → mã
+// ẩn danh lưu lâu dài + thống kê gắn với tài khoản (như trước Đợt 55).
+export type ConsentLevel = 'all' | 'essential';
+const CONSENT_KEY = 'tvl_consent';
+export function getConsent(): ConsentLevel | null {
+  const v = lsGet(CONSENT_KEY);
+  return v === 'all' || v === 'essential' ? v : null;
+}
+let anonMode = true;
+const memStore = new Map<string, string>();
+function pGet(k: string): string | null {
+  return anonMode ? memStore.get(k) ?? null : lsGet(k);
+}
+function pSet(k: string, v: string) {
+  if (anonMode) memStore.set(k, v);
+  else lsSet(k, v);
+}
+
 class Tracker {
   private enabled = false;
   private ready = false; // đã biết danh tính (me) — trước đó chỉ gom, chưa gửi
@@ -92,14 +111,15 @@ class Tracker {
       return;
     }
     this.enabled = true;
+    anonMode = getConsent() !== 'all';
     this.webdriver = navigator.webdriver === true;
-    this.visitorId = lsGet('tvl_vid') ?? '';
-    this.visitorFirst = Number(lsGet('tvl_vid_t') ?? 0);
+    this.visitorId = pGet('tvl_vid') ?? '';
+    this.visitorFirst = Number(pGet('tvl_vid_t') ?? 0);
     if (!this.visitorId) {
       this.visitorId = uuid();
       this.visitorFirst = Date.now();
-      lsSet('tvl_vid', this.visitorId);
-      lsSet('tvl_vid_t', String(this.visitorFirst));
+      pSet('tvl_vid', this.visitorId);
+      pSet('tvl_vid_t', String(this.visitorFirst));
     }
     this.lastTick = Date.now();
     this.lastInteraction = Date.now();
@@ -159,15 +179,43 @@ class Tracker {
       return;
     }
     this.suspended = false;
-    this.token = me ? token : null;
+    this.lastIdentity = { me, token, impersonating };
+    this.token = me && !anonMode ? token : null;
     this.ready = true;
     this.flush();
   }
   private suspended = false;
+  private lastIdentity: { me: { role: string } | null | undefined; token: string | null; impersonating: boolean } | null = null;
+
+  // Người dùng chọn ở banner đồng ý. Có hiệu lực ngay, không cần tải lại trang.
+  applyConsent(level: ConsentLevel) {
+    lsSet(CONSENT_KEY, level);
+    if (!this.enabled) return;
+    if (level === 'all') {
+      anonMode = false;
+      const stored = lsGet('tvl_vid');
+      this.visitorId = stored || this.visitorId || uuid();
+      this.visitorFirst = Number(lsGet('tvl_vid_t') ?? 0) || this.visitorFirst || Date.now();
+      lsSet('tvl_vid', this.visitorId);
+      lsSet('tvl_vid_t', String(this.visitorFirst));
+      if (this.session) lsSet('tvl_sess', JSON.stringify(this.session));
+      if (this.lastIdentity) this.setIdentity(this.lastIdentity.me, this.lastIdentity.token, this.lastIdentity.impersonating);
+    } else {
+      anonMode = true;
+      try {
+        localStorage.removeItem('tvl_vid');
+        localStorage.removeItem('tvl_vid_t');
+        localStorage.removeItem('tvl_sess');
+      } catch {
+        /* bỏ qua */
+      }
+      this.token = null;
+    }
+  }
 
   private readStoredSessionId(): string | null {
     try {
-      const raw = lsGet('tvl_sess');
+      const raw = pGet('tvl_sess');
       if (!raw) return null;
       const s = JSON.parse(raw) as SessionInfo;
       return Date.now() - s.last > SESSION_IDLE_MS ? null : s.id;
@@ -180,7 +228,7 @@ class Tracker {
     const now = Date.now();
     if (!this.session) {
       try {
-        const raw = lsGet('tvl_sess');
+        const raw = pGet('tvl_sess');
         if (raw) this.session = JSON.parse(raw) as SessionInfo;
       } catch {
         this.session = null;
@@ -209,7 +257,7 @@ class Tracker {
       this.loadGeo(this.session);
     }
     this.session.last = now;
-    lsSet('tvl_sess', JSON.stringify(this.session));
+    pSet('tvl_sess', JSON.stringify(this.session));
     return this.session;
   }
 
@@ -221,7 +269,7 @@ class Tracker {
         if (!g || !this.session || this.session.id !== s.id) return;
         const city = g.city ? CITY_VI[g.city] ?? g.city : undefined;
         this.session.ses.geo = { country: g.country ?? undefined, city };
-        lsSet('tvl_sess', JSON.stringify(this.session));
+        pSet('tvl_sess', JSON.stringify(this.session));
       })
       .catch(() => {});
   }
@@ -241,7 +289,7 @@ class Tracker {
     const prev = this.pv?.p ?? (sessionBefore === s.id ? s.lp ?? null : null);
     this.pv = { id: uuid(), p: path, prev, ts: Date.now(), d: 0, sc: 0, dirty: true };
     s.lp = path;
-    lsSet('tvl_sess', JSON.stringify(s));
+    pSet('tvl_sess', JSON.stringify(s));
     this.lastInteraction = Date.now();
     this.lastTick = Date.now();
     setTimeout(() => this.updateScroll(), 400);
@@ -385,4 +433,8 @@ export function track(
   } catch {
     /* không bao giờ làm hỏng trang vì bộ ghi */
   }
+}
+
+export function setAnalyticsConsent(level: ConsentLevel) {
+  tracker.applyConsent(level);
 }

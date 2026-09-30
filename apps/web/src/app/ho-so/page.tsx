@@ -478,6 +478,7 @@ export default function MyCenterPage() {
       {historyApp && token && (
         <ApplicationHistoryModal application={historyApp} token={token} onClose={() => setHistoryApp(null)} />
       )}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pb-6"><AdSlot slot="candidate-bottom" className="mt-2" /></div>
     </main>
   );
 }

@@ -11,6 +11,7 @@ import { companiesApi, candidatesApi, ApiError, type CompanyProfileResponse } fr
 import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth-context';
 import { AdSlot } from '@/components/ads/AdSlot';
+import { SimilarCompanies } from '@/components/SimilarCompanies';
 
 // Đợt 12k (21/09/2026) — trang công ty công khai: bấm tên công ty trong tin tuyển dụng sẽ tới đây,
 // xem thông tin công ty + toàn bộ tin đang tuyển khác của công ty đó (theo mẫu careerviet.vn).
@@ -114,6 +115,7 @@ export default function CongTyPage() {
             />
           </div>
           <div className="flex flex-col gap-3.5 lg:self-stretch">
+            <SimilarCompanies companyId={company.id} />
             <AdStack>
               <AdSlot slot="company-sidebar" />
             </AdStack>

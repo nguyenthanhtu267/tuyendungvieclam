@@ -13,6 +13,7 @@ import { SourcedBadge, isCompanyUnverified } from '@/components/SourcedBadge';
 import { matchTone, useMatches } from '@/lib/match';
 import { useCompare } from '@/lib/compare';
 import { distanceLabel, useHomePlace } from '@/lib/geo';
+import { FitText } from '@/components/FitText';
 
 // Đợt 10 — thẻ việc làm theo mục 4 đặc tả: tiêu đề đậm + badge (MỚI) chữ đỏ trong ngoặc (không phải
 // pill), dòng lương đỏ, nhiều tỉnh ngăn bởi "|", hạn nộp/cập nhật, tag phúc lợi có icon, nút đỏ
@@ -119,7 +120,7 @@ export function JobCard({
       {/* Đợt 13 (24/09/2026) — mục 4 danh sách lỗi: logo công ty trên thẻ việc làm quá nhỏ so với
           các trang khác (chi tiết tin, trang công ty đều dùng size lớn hơn). Tăng 44→60px + cỡ chữ
           initials theo tỷ lệ để không bị vỡ layout khi công ty chưa có logoUrl. */}
-      <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={60} className="text-sm" />
+      <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={80} className="text-base" />
       <div className="flex-1 min-w-0 pr-6">
         <div className="font-bold text-[13.5px] text-ink">
           {job.title}
@@ -140,8 +141,10 @@ export function JobCard({
           )}
         </div>
         <div className="text-xs text-ink-muted mt-0.5 truncate flex items-center gap-1.5">
-          <span className="truncate co-name">{job.company.name}</span>
-          {isCompanyUnverified(job.company) && <SourcedBadge />}
+          <span className="min-w-0 flex-1 max-w-full">
+            <FitText lines={1} min={0.7} className="co-name">{job.company.name}</FitText>
+          </span>
+          {isCompanyUnverified(job.company) && <span className="shrink-0"><SourcedBadge /></span>}
         </div>
 
         <div className="text-critical font-bold text-[12.5px] mt-1.5">

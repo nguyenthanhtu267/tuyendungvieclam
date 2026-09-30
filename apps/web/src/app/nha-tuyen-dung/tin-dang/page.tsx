@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { employerApi, type EmployerJob, type EmployerJobStatus, type EmployerJobStatusCounts } from '@/lib/api';
 import { EMPLOYER_JOB_STATUS_CLASS, EMPLOYER_JOB_STATUS_LABEL, formatDate, formatNumber } from '@/lib/format';
 import { jobShareUrl, openFacebookShare } from '@/lib/social';
+import { AdSlot } from '@/components/ads/AdSlot';
 
 // Đợt 11b — Mục #4 ATS: trang quản lý tin đăng của NTD, 4 tab trạng thái (đang đăng/chờ đăng/
 // tạm ngưng/hết hạn) + số lượng từng trạng thái, thao tác tạm ngưng/đăng lại/nhân bản tin.
@@ -178,7 +179,19 @@ export default function TinDangPage() {
                             {EMPLOYER_JOB_STATUS_LABEL[status]}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-right tabular-nums text-ink-faint">{formatNumber(job.viewCount ?? 0)}</td>
+                        <td className="py-3 px-3 text-right tabular-nums text-ink-faint">
+                          {formatNumber(job.viewCount ?? 0)}
+                          {(() => {
+                            const j = job as typeof job & { viewsWeek?: number; viewsPrevWeek?: number };
+                            if (!j.viewsWeek) return null;
+                            const up = j.viewsWeek >= (j.viewsPrevWeek ?? 0);
+                            return (
+                              <div className={`text-[11.5px] font-semibold ${up ? 'text-success' : 'text-ink-muted'}`}>
+                                {up ? '▲' : '▼'} {formatNumber(j.viewsWeek)} tuần này
+                              </div>
+                            );
+                          })()}
+                        </td>
                         <td className="py-3 px-3 text-right tabular-nums">
                           <Link
                             href={`/nha-tuyen-dung/ung-vien?jobId=${job.id}`}
@@ -261,6 +274,7 @@ export default function TinDangPage() {
           )}
         </div>
       </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pb-6"><AdSlot slot="employer-manage" className="mt-2" /></div>
     </main>
   );
 }

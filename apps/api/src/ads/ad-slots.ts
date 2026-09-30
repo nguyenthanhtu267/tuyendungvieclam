@@ -22,6 +22,10 @@ export const AD_SLOTS = [
   'company-sidebar',
   'home-bottom',
   'footer-top',
+  // Đợt 52 — thêm vùng cho trang ứng viên / tiện ích / quản lý tin NTD (cuối trang, không chen giữa nội dung).
+  'candidate-bottom',
+  'tools-bottom',
+  'employer-manage',
 ] as const;
 export type AdSlot = (typeof AD_SLOTS)[number];
 
