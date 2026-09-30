@@ -67,7 +67,7 @@ export function AdSlot({ slot, className = '' }: { slot: string; className?: str
 
   if (!ad || !def) return null;
   return (
-    <div ref={ref} className={className}>
+    <div ref={ref} className={className} data-ad-slot={slot} data-ad-gov={def.variant === 'wide' || slot === 'footer-top' ? 'wide' : def.variant}>
       <AdBanner
         ad={ad}
         variant={def.variant}

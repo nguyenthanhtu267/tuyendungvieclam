@@ -9,6 +9,7 @@ import '@fontsource/ibm-plex-mono/600.css';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
 import { LanguageProvider } from '@/lib/i18n';
+import { AdGovernor } from '@/components/ads/AdGovernor';
 import { BackgroundProvider } from '@/components/bg/BackgroundProvider';
 import Footer from '@/components/Footer';
 import ImpersonationBanner from '@/components/ImpersonationBanner';
@@ -37,6 +38,7 @@ export default function RootLayout({
         <AuthProvider>
           <LanguageProvider>
             <BackgroundProvider>
+              <AdGovernor />
             <ImpersonationBanner />
             <AnalyticsTracker />
             <div className="flex-1 flex flex-col">{children}</div>

@@ -230,3 +230,6 @@ input, select, textarea, button { font-family: inherit; }
 @keyframes bg-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .bg-fade-in { animation: bg-fade-in 1.4s ease both; }
 @media (prefers-reduced-motion: reduce) { .bg-fade-in { animation: none; } }
+
+/* Đợt 31 — banner bị bộ điều tiết mật độ ẩn (xem AdGovernor). */
+.ad-suppressed { display: none !important; }
