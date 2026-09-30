@@ -72,6 +72,7 @@ import { StorageModule } from './storage/storage.module';
 import { AdsModule } from './ads/ads.module';
 import { BackgroundModule } from './background/background.module';
 import { BgImage } from './database/entities/bg-image.entity';
+import { JobReport } from './database/entities/job-report.entity';
 
 const entities = [
   User,
@@ -123,6 +124,7 @@ const entities = [
   AdCampaign,
   AdCampaignStat,
   BgImage,
+  JobReport,
 ];
 
 @Module({

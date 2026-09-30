@@ -139,7 +139,7 @@ export const LEVELS: string[] = [
 export const POSTED_WITHIN_OPTIONS: { label: string; value: string }[] = [
   { label: '3 ngày trước', value: '3d' },
   { label: '1 tuần trước', value: '7d' },
-  { label: '2 tuần trước', value: '14d' },
+  { label: '15 ngày trước', value: '15d' },
   { label: '1 tháng trước', value: '30d' },
 ];
 

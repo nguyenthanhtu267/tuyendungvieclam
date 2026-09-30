@@ -2,6 +2,7 @@
 
 import InterviewChooser from '@/components/InterviewChooser';
 import CvAutofill from '@/components/CvAutofill';
+import ShareProfileCard from '@/components/ShareProfileCard';
 import BulkApplyModal from '@/components/BulkApplyModal';
 import ApplicationTracker from '@/components/ApplicationTracker';
 import ApplicationStepper from '@/components/ApplicationStepper';
@@ -200,6 +201,8 @@ export default function MyCenterPage() {
             />
 
             <CvAutofill token={token} onDone={() => window.location.reload()} />
+
+            <ShareProfileCard token={token} />
 
             <CvSection
               profile={profile}

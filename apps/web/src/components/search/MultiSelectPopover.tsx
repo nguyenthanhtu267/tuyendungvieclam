@@ -18,6 +18,7 @@ export function MultiSelectPopover({
   selected,
   onChange,
   emptyText,
+  topAction,
 }: {
   label: string;
   placeholder: string;
@@ -25,7 +26,10 @@ export function MultiSelectPopover({
   selected: string[];
   onChange: (next: string[]) => void;
   emptyText: string;
+  // Đợt 66 — mục đặt trên cùng danh sách (VD "Dùng vị trí của tôi").
+  topAction?: { label: string; onClick: () => Promise<string | void> | string | void };
 }) {
+  const [actionMsg, setActionMsg] = useState('');
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const rootRef = useRef<HTMLDivElement>(null);
@@ -111,6 +115,21 @@ export function MultiSelectPopover({
                 className="tvl-input !pl-7 text-xs"
               />
             </div>
+            {topAction && (
+              <button
+                type="button"
+                onClick={async () => {
+                  setActionMsg('Đang lấy vị trí…');
+                  const m = await topAction.onClick();
+                  setActionMsg(m || '');
+                  if (!m) setOpen(false);
+                }}
+                className="text-left text-[12.5px] font-bold text-primary hover:bg-primary-tint rounded-lg px-2 py-1.5 border border-primary"
+              >
+                📍 {topAction.label}
+              </button>
+            )}
+            {actionMsg && <div className="text-[11.5px] text-critical">{actionMsg}</div>}
             <div className="flex items-center justify-between text-[11px]">
               <span className="text-ink-faint">
                 {selected.length === 0 ? emptyText : `${selected.length} ${label.toLowerCase()} đã chọn`}

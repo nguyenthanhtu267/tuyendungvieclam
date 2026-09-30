@@ -17,6 +17,8 @@ import {
   type ApplicantFilters,
   type CandidateDetail,
   smartApi,
+  smartApi3,
+  type ApplicantScoreInfo,
 } from '@/lib/api';
 import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatNumber } from '@/lib/format';
 
@@ -144,7 +146,24 @@ function UngVienPageInner() {
   const [folders, setFolders] = useState<string[]>([]);
   const [applicants, setApplicants] = useState<EmployerApplication[]>([]);
   // Đợt 63 — điểm phù hợp từng hồ sơ + sắp xếp theo độ phù hợp.
-  const [scores, setScores] = useState<Record<string, { score: number; reasons: string[]; gaps: string[] }>>({});
+  const [scores, setScores] = useState<Record<string, ApplicantScoreInfo>>({});
+  // Đợt 65 — NTD tự chỉnh trọng số tiêu chí (hệ số 0–3, mặc định 1) để xếp hạng lại tại chỗ.
+  const [mult, setMult] = useState<Record<string, number>>({});
+  const [showWeights, setShowWeights] = useState(false);
+  const [reinvite, setReinvite] = useState<{ profileId: string; name: string; title: string | null; score: number; reasons: string[]; oldJob: string; oldStatus: string }[]>([]);
+  const [invited, setInvited] = useState<Set<string>>(new Set());
+  const adjScore = (id: string): number | undefined => {
+    const sc = scores[id];
+    if (!sc) return undefined;
+    if (!sc.parts || Object.keys(mult).length === 0) return sc.score;
+    let num = 0, den = 0;
+    for (const p of sc.parts) {
+      const w = p.weight * (mult[p.key] ?? 1);
+      num += p.score * w;
+      den += w;
+    }
+    return den === 0 ? sc.score : Math.min(100, Math.round(num / den + (sc.bonus ?? 0)));
+  };
   const [sortBest, setSortBest] = useState(true);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [loadingJobs, setLoadingJobs] = useState(true);
@@ -210,6 +229,14 @@ function UngVienPageInner() {
     if (!token || !jobId) return;
     smartApi.applicantScores(token, jobId).then((r) => setScores(r.scores)).catch(() => setScores({}));
   }, [token, jobId, applicants.length]);
+
+  useEffect(() => {
+    if (!token || !jobId) {
+      setReinvite([]);
+      return;
+    }
+    smartApi3.reinvite(token, jobId).then((r) => setReinvite(r.items)).catch(() => setReinvite([]));
+  }, [token, jobId]);
 
   const loadApplicants = useCallback(async () => {
     if (!token || !jobId) return;
@@ -457,6 +484,56 @@ function UngVienPageInner() {
               </div>
             )}
 
+            {view === 'active' && showWeights && Object.values(scores).some((x) => x.parts) && (
+              <div className="rounded-xl border border-border bg-white p-3 mb-3">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="font-extrabold text-[13px]">Trọng số tiêu chí (kéo để xếp hạng lại)</div>
+                  <button type="button" onClick={() => setMult({})} className="text-[12px] font-bold text-primary">Về mặc định</button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1.5">
+                  {(Object.values(scores).find((x) => x.parts)?.parts ?? []).map((p) => (
+                    <label key={p.key} htmlFor={`w-${p.key}`} className="flex items-center gap-2 text-[12.5px]">
+                      <span className="w-24 shrink-0 font-semibold">{p.label}</span>
+                      <input id={`w-${p.key}`} type="range" min={0} max={3} step={0.5} value={mult[p.key] ?? 1} onChange={(e) => setMult({ ...mult, [p.key]: Number(e.target.value) })} className="flex-1" />
+                      <span className="w-8 text-right tabular-nums">×{mult[p.key] ?? 1}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {view === 'active' && reinvite.length > 0 && token && (
+              <div className="rounded-xl border border-border bg-white p-3 mb-3">
+                <div className="font-extrabold text-[13px] mb-0.5">Ứng viên cũ có thể phù hợp với tin này</div>
+                <div className="text-[12px] text-ink-muted mb-2">Từng nộp tin khác của bạn, chưa được nhận. Mời lại chỉ với một cú nhấp.</div>
+                <ul className="flex flex-col gap-1.5">
+                  {reinvite.map((r) => (
+                    <li key={r.profileId} className="flex items-center gap-2 flex-wrap text-[12.5px]">
+                      <span className="font-bold">{r.name}</span>
+                      <span className="text-ink-muted">{r.title || ''}</span>
+                      <span className="rounded px-1.5 py-0.5 text-[11px] font-extrabold bg-primary text-white">{r.score}%</span>
+                      <span className="text-ink-muted flex-1 min-w-[160px]">Đã nộp: {r.oldJob}{r.reasons[0] ? ` · ${r.reasons[0]}` : ''}</span>
+                      <button
+                        type="button"
+                        disabled={invited.has(r.profileId)}
+                        onClick={async () => {
+                          try {
+                            await smartApi3.invite(token, r.profileId, jobId);
+                            setInvited(new Set(invited).add(r.profileId));
+                          } catch (e) {
+                            alert(e instanceof Error ? e.message : 'Không mời được');
+                          }
+                        }}
+                        className="rounded-lg border border-primary text-primary font-bold text-[12px] px-2.5 py-1 disabled:opacity-60"
+                      >
+                        {invited.has(r.profileId) ? 'Đã mời' : 'Mời ứng tuyển'}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {view === 'active' && token && (
               <ApplicantBulkTools
                 token={token}
@@ -500,6 +577,11 @@ function UngVienPageInner() {
                               {sortBest ? '↓ Phù hợp nhất' : 'Mới nộp trước'}
                             </button>
                           )}
+                          {view === 'active' && Object.keys(scores).length > 0 && (
+                            <button type="button" onClick={() => setShowWeights((v) => !v)} className="ml-1 rounded-full border border-border px-2 py-0.5 text-[11px] font-bold text-primary">
+                              ⚖ Chỉnh trọng số
+                            </button>
+                          )}
                         </th>
                         <th className="py-2.5 px-3 font-semibold">Ngày nộp</th>
                         {view === 'active' && <th className="py-2.5 px-3 font-semibold">Đánh giá</th>}
@@ -513,7 +595,7 @@ function UngVienPageInner() {
                     </thead>
                     <tbody>
                       {(view === 'active' && sortBest
-                        ? [...applicants].sort((a, b) => (scores[b.id]?.score ?? -1) - (scores[a.id]?.score ?? -1))
+                        ? [...applicants].sort((a, b) => (adjScore(b.id) ?? -1) - (adjScore(a.id) ?? -1))
                         : applicants
                       ).map((app) => (
                         <tr key={app.id} className="border-t border-border align-top">
@@ -570,14 +652,34 @@ function UngVienPageInner() {
                               <div className="mt-1 max-w-xs" title={[...scores[app.id].reasons, ...scores[app.id].gaps.map((g) => `⚠ ${g}`)].join('\n')}>
                                 <span
                                   className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-extrabold ${
-                                    scores[app.id].score >= 80 ? 'bg-success text-white' : scores[app.id].score >= 65 ? 'bg-primary text-white' : 'bg-surface-alt border border-border-strong text-ink'
+                                    (adjScore(app.id) ?? 0) >= 80 ? 'bg-success text-white' : (adjScore(app.id) ?? 0) >= 65 ? 'bg-primary text-white' : 'bg-surface-alt border border-border-strong text-ink'
                                   }`}
                                 >
-                                  Phù hợp {scores[app.id].score}%
+                                  Phù hợp {adjScore(app.id)}%
                                 </span>
+                                {scores[app.id].hot && (
+                                  <span className="ml-1 inline-block rounded px-1.5 py-0.5 text-[11px] font-extrabold bg-warning-tint text-[#7A4A00]" title={scores[app.id].hot}>
+                                    🔥 Đang quan tâm
+                                  </span>
+                                )}
+                                {scores[app.id].hot && <div className="text-[11.5px] text-[#7A4A00]">{scores[app.id].hot}</div>}
                                 <div className="text-[11.5px] text-ink-muted mt-0.5">
                                   {scores[app.id].reasons[0] ?? scores[app.id].gaps[0]}
                                 </div>
+                                {scores[app.id].parts && (
+                                  <details className="mt-0.5">
+                                    <summary className="text-[11.5px] text-primary cursor-pointer font-bold">Chi tiết từng tiêu chí</summary>
+                                    <ul className="mt-1 flex flex-col gap-0.5">
+                                      {scores[app.id].parts!.map((p) => (
+                                        <li key={p.key} className="flex items-center gap-1.5 text-[11.5px]">
+                                          <span className="w-[76px] shrink-0">{p.label}</span>
+                                          <span className="flex-1 h-1.5 rounded bg-surface-alt overflow-hidden"><span className="block h-full bg-primary" style={{ width: `${p.score}%` }} /></span>
+                                          <span className="w-8 text-right tabular-nums">{p.score}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </details>
+                                )}
                               </div>
                             )}
                             {app.coverLetter && (

@@ -53,6 +53,9 @@ export interface MatchResult {
   score: number; // 0–100
   reasons: string[]; // vì sao phù hợp (tối đa 3)
   gaps: string[]; // điểm chưa khớp (tối đa 2)
+  // Đợt 65 — điểm từng tiêu chí (0–100) + trọng số mặc định, để NTD xem chi tiết và tự chỉnh trọng số.
+  parts?: { key: string; label: string; score: number; weight: number }[];
+  bonus?: number;
 }
 
 const strip = (h?: string | null) => (h ?? '').replace(/<[^>]*>/g, ' ');
@@ -193,5 +196,18 @@ export function scoreMatch(p: MatchProfile, j: MatchJob): MatchResult {
   if (skills.length && missing.length && skillScore < 60)
     gaps.push(`Còn thiếu kỹ năng: ${missing.join(', ')}`);
 
-  return { score, reasons: reasons.slice(0, 3), gaps: gaps.slice(0, 2) };
+  return {
+    score,
+    reasons: reasons.slice(0, 3),
+    gaps: gaps.slice(0, 2),
+    parts: [
+      { key: 'skill', label: 'Kỹ năng', score: skillScore, weight: 30 },
+      { key: 'exp', label: 'Kinh nghiệm', score: expScore, weight: 20 },
+      { key: 'level', label: 'Cấp bậc', score: levelScore, weight: 15 },
+      { key: 'salary', label: 'Lương', score: salaryScore, weight: 15 },
+      { key: 'loc', label: 'Địa điểm', score: locScore, weight: 10 },
+      { key: 'ind', label: 'Ngành', score: indScore, weight: 10 },
+    ],
+    bonus: titleHit ? 6 : 0,
+  };
 }

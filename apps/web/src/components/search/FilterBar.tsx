@@ -1,4 +1,5 @@
 'use client';
+import { nearestProvince, saveHome } from '@/lib/geo';
 
 import { MultiSelectPopover } from './MultiSelectPopover';
 import {
@@ -79,6 +80,24 @@ export function FilterBar({
             selected={value.provinces ?? []}
             onChange={(v) => onChange({ provinces: v })}
             emptyText="Chọn địa điểm"
+            topAction={{
+              label: 'Dùng vị trí của tôi',
+              onClick: () =>
+                new Promise<string | void>((resolve) => {
+                  if (!navigator.geolocation) return resolve('Trình duyệt không hỗ trợ định vị');
+                  navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                      const lat = Math.round(pos.coords.latitude * 100) / 100;
+                      const lon = Math.round(pos.coords.longitude * 100) / 100;
+                      saveHome({ lat, lon });
+                      onChange({ provinces: [nearestProvince(lat, lon)] });
+                      resolve();
+                    },
+                    () => resolve('Không lấy được vị trí, hãy chọn tỉnh thủ công'),
+                    { timeout: 8000 },
+                  );
+                }),
+            }}
           />
         </div>
         <div className="sm:flex-1 min-w-0">

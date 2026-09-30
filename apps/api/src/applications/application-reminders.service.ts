@@ -215,6 +215,9 @@ export class ApplicationRemindersService implements OnModuleInit, OnModuleDestro
     for (const r of rows) {
       const link = `/viec-lam/${r.jobId}?n=saved-closing`;
       if (await this.notifRepo.exists({ where: { userId: r.userId, type: 'saved_job_closing', link } })) continue;
+      // Đợt 65 — nhắc vào giờ ứng viên hay online nhất (lấy từ lượt truy cập 30 ngày, giờ Việt Nam). Hạn còn ≤ 1 ngày thì nhắc ngay.
+      const dueSoon = new Date(String(r.deadline).slice(0, 10)).getTime() - Date.now() < DAY;
+      if (!dueSoon && !(await this.isPreferredHour(r.userId))) continue;
       const d = String(r.deadline).slice(0, 10).split('-').reverse().join('/');
       await this.notifications.create(
         r.userId,
@@ -225,6 +228,34 @@ export class ApplicationRemindersService implements OnModuleInit, OnModuleDestro
       sent++;
     }
     return sent;
+  }
+
+  // Giờ (0–23, múi giờ Việt Nam) ứng viên truy cập nhiều nhất; không đủ dữ liệu (<8 lượt) hoặc lỗi → luôn coi là hợp lệ (nhắc như cũ).
+  private hourCache = new Map<string, number | null>();
+  private async isPreferredHour(userId: string): Promise<boolean> {
+    try {
+      let pref = this.hourCache.get(userId);
+      if (pref === undefined) {
+        const rows: { h: number; c: string }[] = await this.appRepo.manager.query(
+          `SELECT EXTRACT(HOUR FROM started_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::int AS h, COUNT(*) AS c
+             FROM analytics_pageviews WHERE user_id::text = $1 AND started_at >= now() - interval '30 days' GROUP BY 1 ORDER BY 2 DESC LIMIT 1`,
+          [userId],
+        );
+        const total: { t: string }[] = await this.appRepo.manager.query(
+          `SELECT COUNT(*) AS t FROM analytics_pageviews WHERE user_id::text = $1 AND started_at >= now() - interval '30 days'`,
+          [userId],
+        );
+        pref = rows[0] && Number(total[0]?.t) >= 8 ? rows[0].h : null;
+        if (this.hourCache.size > 2000) this.hourCache.clear();
+        this.hourCache.set(userId, pref);
+      }
+      if (pref == null) return true;
+      const nowH = Number(new Date().toLocaleString('en-GB', { hour: '2-digit', hour12: false, timeZone: 'Asia/Ho_Chi_Minh' }));
+      const diff = Math.min(Math.abs(nowH - pref), 24 - Math.abs(nowH - pref));
+      return diff <= 1;
+    } catch {
+      return true;
+    }
   }
 
   private profileUserCache = new Map<string, string | null>();

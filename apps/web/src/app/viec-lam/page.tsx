@@ -4,7 +4,6 @@ import { useMatches } from '@/lib/match';
 import { Fragment, Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { parseNaturalQuery } from '@/lib/nl-search';
-import HomePlacePicker from '@/components/HomePlacePicker';
 import SiteHeader from '@/components/SiteHeader';
 import { JobCard } from '@/components/JobCard';
 import { FilterBar } from '@/components/search/FilterBar';
@@ -35,7 +34,14 @@ function JobSearchPage() {
   const { me, token } = useAuth();
   const [sortMatch, setSortMatch] = useState(false);
   // Đợt 59 — "Chỉ hiện tin mới với tôi": ẩn tin đã xem gần đây + tin đã ứng tuyển (trong trang đang xem).
-  const [onlyNew, setOnlyNew] = useState(false);
+  const [onlyNew, setOnlyNewState] = useState(false);
+  useEffect(() => {
+    try { if (localStorage.getItem('tvl_only_new') === '1') setOnlyNewState(true); } catch {}
+  }, []);
+  const setOnlyNew = (v: boolean) => {
+    setOnlyNewState(v);
+    try { localStorage.setItem('tvl_only_new', v ? '1' : '0'); } catch {}
+  };
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
   const [appliedIds, setAppliedIds] = useState<Set<string>>(new Set());
   const [saveSearchState, setSaveSearchState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -227,7 +233,7 @@ function JobSearchPage() {
         <div className="grid lg:grid-cols-[1fr_280px] gap-5 mt-2 items-start">
           <div>
             <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
-              <div className="flex items-center gap-3 flex-wrap min-w-0">
+              <div className="flex items-center gap-x-3 gap-y-1 flex-wrap min-w-0 flex-1">
                 <h1 className="font-extrabold text-lg">
                   {/* Đợt 13 (24/09/2026) — thiếu formatNumber() khiến số hàng nghìn hiện dính liền
                       (VD "1106" thay vì "1.106") — xem Quy tắc chung mục A. */}
@@ -235,7 +241,51 @@ function JobSearchPage() {
                 </h1>
                 {/* Đợt 58 — "Tin vừa xem" ngay sau tiêu đề, xổ danh sách "Tiêu đề - Công ty". */}
                 <RecentJobs />
+                {/* Đợt 66 — cùng dòng: lọc nhanh theo thời gian đăng + "Chỉ hiện tin mới". */}
+                <div className="flex items-center gap-1.5 flex-wrap text-[13px]" role="group" aria-label="Thu hẹp nhanh theo ngày đăng">
+                  <span className="font-semibold text-ink-muted">💡 Thu hẹp nhanh: chỉ tin đăng</span>
+                  {[['3d', '3 ngày'], ['7d', '7 ngày'], ['15d', '15 ngày'], ['30d', '30 ngày']].map(([v, l]) => {
+                    const on = filters.postedWithin === v;
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => updateParams({ postedWithin: on ? undefined : v })}
+                        className={`rounded-full border px-2.5 py-0.5 whitespace-nowrap font-semibold ${on ? 'bg-primary text-white border-primary' : 'border-primary text-primary hover:bg-primary-tint'}`}
+                      >
+                        {l}
+                      </button>
+                    );
+                  })}
+                </div>
+                <label className="flex items-center gap-2 text-[13px] font-semibold" htmlFor="only-new">
+                  <input id="only-new" type="checkbox" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} />
+                  🆕 Chỉ hiện tin mới với tôi{onlyNew && hiddenCount > 0 ? ` (đã ẩn ${hiddenCount})` : ''}
+                </label>
               </div>
+            </div>
+
+            <FilterSuggestions
+              filters={filters}
+              total={result?.total ?? 0}
+              facets={facets}
+              loading={loading}
+              onApply={(patch) => updateParams(patch)}
+            />
+
+            <div className="flex items-center gap-x-5 gap-y-1 flex-wrap text-sm font-semibold">
+              {me?.role === 'candidate' && (result?.items.length ?? 0) > 1 && (
+                <label className="flex items-center gap-2" htmlFor="sort-match">
+                  <input id="sort-match" type="checkbox" checked={sortMatch} onChange={(e) => setSortMatch(e.target.checked)} />
+                  ✨ Ưu tiên tin phù hợp với hồ sơ của tôi nhất
+                </label>
+              )}
+              {!me && (
+                <a href="/dang-nhap" className="text-primary hover:underline font-semibold">
+                  ✨ Đăng nhập để xem % phù hợp với hồ sơ của bạn
+                </a>
+              )}
               {/* Đợt 12m — chỉ hiện khi đã đăng nhập bằng tài khoản ứng viên và có ít nhất 1 tiêu chí
                   lọc (q/ngành/tỉnh), tránh lưu "tìm kiếm rỗng" vô nghĩa. */}
               {(!me || me.role === 'candidate') && (filters.q || filters.industries?.length || filters.provinces?.length) ? (
@@ -254,34 +304,6 @@ function JobSearchPage() {
                         : '🔔 Báo tôi khi có việc mới khớp bộ lọc này'}
                 </button>
               ) : null}
-            </div>
-
-            <FilterSuggestions
-              filters={filters}
-              total={result?.total ?? 0}
-              facets={facets}
-              loading={loading}
-              onApply={(patch) => updateParams(patch)}
-            />
-
-            <HomePlacePicker onNearMe={(provinces) => updateParams({ provinces, location: undefined, district: undefined })} />
-
-            <div className="flex items-center gap-x-5 gap-y-1 flex-wrap text-sm font-semibold">
-              {me?.role === 'candidate' && (result?.items.length ?? 0) > 1 && (
-                <label className="flex items-center gap-2" htmlFor="sort-match">
-                  <input id="sort-match" type="checkbox" checked={sortMatch} onChange={(e) => setSortMatch(e.target.checked)} />
-                  ✨ Ưu tiên tin phù hợp với hồ sơ của tôi nhất
-                </label>
-              )}
-              {!me && (
-                <a href="/dang-nhap" className="text-primary hover:underline font-semibold">
-                  ✨ Đăng nhập để xem % phù hợp với hồ sơ của bạn
-                </a>
-              )}
-              <label className="flex items-center gap-2" htmlFor="only-new">
-                <input id="only-new" type="checkbox" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} />
-                🆕 Chỉ hiện tin mới với tôi{onlyNew && hiddenCount > 0 ? ` (đã ẩn ${hiddenCount} tin đã xem/đã nộp)` : ''}
-              </label>
             </div>
 
             {!loading && result?.items.length === 0 && (

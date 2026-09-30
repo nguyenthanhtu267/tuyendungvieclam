@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { smartApi3, type AppEta } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 import type { Application } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 
@@ -15,6 +17,11 @@ const COLS: { id: string; label: string; hint: string; pick: (a: Application) =>
 ];
 
 export default function ApplicationTracker({ applications }: { applications: Application[] }) {
+  const { token } = useAuth();
+  const [eta, setEta] = useState<AppEta | null>(null);
+  useEffect(() => {
+    if (token) smartApi3.eta(token).then(setEta).catch(() => {});
+  }, [token]);
   const cols = useMemo(() => COLS.map((c) => ({ ...c, items: applications.filter(c.pick) })), [applications]);
   const waits = applications.filter((a) => a.status === 'new').map((a) => Math.floor((Date.now() - new Date(a.appliedAt).getTime()) / DAY));
   return (
@@ -22,6 +29,14 @@ export default function ApplicationTracker({ applications }: { applications: App
       {waits.length > 0 && (
         <div className="text-[12.5px] text-ink-muted">
           {waits.length} đơn đang chờ phản hồi, lâu nhất <b className="text-ink">{Math.max(...waits)} ngày</b>. Sau 7 ngày bạn sẽ nhận nhắc kèm gợi ý việc tương tự.
+        </div>
+      )}
+      {eta?.enough && (
+        <div className="rounded-lg bg-surface-alt border border-border p-2.5 text-[12.5px] text-ink">
+          Theo {eta.sample} đơn đã có kết quả trên hệ thống: khoảng <b>{eta.interviewRate ?? 0}%</b> đơn được mời phỏng vấn
+          {eta.medianDays != null ? <>, thường sau <b>{eta.medianDays} ngày</b></> : null}.
+          {eta.pending ? <> Bạn đang chờ {eta.pending} đơn, dự kiến ~<b>{eta.expectedInterviews}</b> lời mời.</> : null}
+          {eta.applicationsForOne ? <> Trung bình cần nộp khoảng <b>{eta.applicationsForOne} đơn</b> để có 1 lời mời.</> : null}
         </div>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">

@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { JobReport } from './entities/job-report.entity';
 import { DataSource } from 'typeorm';
 import {
   User,
@@ -102,6 +103,7 @@ export const AppDataSource = new DataSource({
     AdCampaign,
     AdCampaignStat,
     BgImage,
+    JobReport,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,

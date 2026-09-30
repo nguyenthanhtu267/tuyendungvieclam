@@ -14,6 +14,7 @@
 // nằm trong file này — mỗi trang gọi nó (`nha-tuyen-dung/dang-tin`, `admin/sua-tin/[id]`,
 // `admin/dashboard` AddJobForm) tự quản lý state `form`/`step`, tự viết `onSubmit`, tự truyền chữ
 // hiển thị (`submitLabel`, `previewNote`...) — file này chỉ là phần GIAO DIỆN dùng chung.
+import { lintJob } from '@/lib/job-lint';
 import JobQualityPanel from './JobQualityPanel';
 import JobForecastPanel from '@/components/JobForecastPanel';
 import { suggestJobContent } from '@/lib/job-writer';
@@ -472,7 +473,23 @@ export function JobWizardSteps({
         {step === 3 && (
           <>
             <JobQualityPanel form={form} />
-            <JobForecastPanel industry={form.industries[0]} level={form.level} salaryMin={form.negotiable ? undefined : Number(form.salaryMin) || undefined} salaryMax={form.negotiable ? undefined : Number(form.salaryMax) || undefined} />
+            {(() => {
+              const issues = lintJob(form);
+              if (!issues.length) return <div className="rounded-lg bg-success-tint text-[#0B5D2A] text-[12.5px] font-bold p-3">Kiểm tra ngôn từ: chưa thấy vấn đề nào.</div>;
+              return (
+                <div className="rounded-lg border border-border bg-white p-3">
+                  <div className="font-extrabold text-[13px] mb-1.5">Kiểm tra ngôn từ trước khi đăng ({issues.length})</div>
+                  <ul className="flex flex-col gap-1.5">
+                    {issues.map((i, k) => (
+                      <li key={k} className={`text-[12.5px] leading-snug ${i.level === 'high' ? 'text-critical font-bold' : 'text-[#7A4A00]'}`}>
+                        {i.level === 'high' ? 'Nên sửa: ' : 'Gợi ý: '}{i.text}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })()}
+            <JobForecastPanel province={form.provinces[0]} industry={form.industries[0]} level={form.level} salaryMin={form.negotiable ? undefined : Number(form.salaryMin) || undefined} salaryMax={form.negotiable ? undefined : Number(form.salaryMax) || undefined} />
             <h2 className="font-bold text-sm">Xem trước tin tuyển dụng</h2>
             <div className="rounded-lg bg-surface-alt p-4">
               <div className="font-extrabold text-sm flex items-center gap-2 flex-wrap">

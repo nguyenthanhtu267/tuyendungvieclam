@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { parseNaturalQuery, nlToParams } from '@/lib/nl-search';
+import AskAnswerBox from '@/components/AskAnswerBox';
 import SiteHeader from '@/components/SiteHeader';
 import OnlineBanner from '@/components/OnlineBanner';
 import { JobCard } from '@/components/JobCard';
@@ -118,6 +119,7 @@ export default function Home() {
                   }}
                 />
               </div>
+              <AskAnswerBox text={keyword} />
               <div className="flex gap-3 flex-wrap">
                 <button type="submit" className="tvl-btn-accent !w-auto px-6">
                   {t('home.searchButton')}

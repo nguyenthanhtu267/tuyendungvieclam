@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { smartApi, type JobInsights } from '@/lib/api';
+import { smartApi3, type JobInsights } from '@/lib/api';
+import { getJobInsights } from '@/lib/insights-cache';
 
 const CHANCE = {
   high: { label: 'Cơ hội cao', cls: 'text-success' },
@@ -15,9 +16,11 @@ const CHANCE = {
 export default function JobInsightsPanel({ jobId }: { jobId: string }) {
   const { me, token } = useAuth();
   const [data, setData] = useState<JobInsights | null>(null);
+  const [certs, setCerts] = useState<{ name: string; jobs: number; percent: number }[]>([]);
   useEffect(() => {
     if (!token || me?.role !== 'candidate') return;
-    smartApi.jobInsights(token, jobId).then(setData).catch(() => setData(null));
+    getJobInsights(token, jobId).then(setData);
+    smartApi3.certificates(token, jobId).then((r) => setCerts(r.items)).catch(() => setCerts([]));
   }, [token, me?.role, jobId]);
   if (!data || !data.hasProfile || !data.chance) return null;
   const c = CHANCE[data.chance.level];
@@ -64,6 +67,20 @@ export default function JobInsightsPanel({ jobId }: { jobId: string }) {
             <span className="text-ink-faint">{data.salary.p75} tr</span>
           </div>
           <div className="text-[13px] text-ink-muted mt-1">{data.salary.advice}</div>
+        </div>
+      )}
+
+      {certs.length > 0 && (
+        <div>
+          <div className="text-[13px] font-bold text-ink mb-1">Chứng chỉ nên có</div>
+          <ul className="text-[13px] text-ink-muted list-disc pl-4">
+            {certs.map((c) => (
+              <li key={c.name}>
+                <b className="text-ink">{c.name}</b> — {c.percent}% tin cùng ngành nhắc tới ({c.jobs} tin)
+              </li>
+            ))}
+          </ul>
+          <div className="text-[11.5px] text-ink-faint mt-0.5">Bạn chưa ghi các chứng chỉ này trong hồ sơ. Nếu đã có, hãy thêm vào mục Chứng chỉ.</div>
         </div>
       )}
 

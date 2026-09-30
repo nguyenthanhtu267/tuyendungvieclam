@@ -2602,7 +2602,7 @@ export interface QualityOverview {
 export const smartApi = {
   jobInsights: (token: string, jobId: string) => request<JobInsights>(`/jobs/${jobId}/insights`, { headers: authHeaders(token) }),
   applicantScores: (token: string, jobId: string) =>
-    request<{ scores: Record<string, { score: number; reasons: string[]; gaps: string[] }> }>(`/employer/applicant-scores?jobId=${jobId}`, { headers: authHeaders(token) }),
+    request<{ scores: Record<string, ApplicantScoreInfo> }>(`/employer/applicant-scores?jobId=${jobId}`, { headers: authHeaders(token) }),
   jobHealth: (token: string) => request<{ items: JobHealthItem[] }>('/employer/job-health', { headers: authHeaders(token) }),
   qualityOverview: (token: string) => request<QualityOverview>('/admin/quality/overview', { headers: authHeaders(token) }),
 };
@@ -2626,6 +2626,8 @@ export interface JobForecast {
   daysTo10?: number | null;
   salary?: { p25: number; median: number; p75: number; scope: string } | null;
   advice?: string[];
+  bestTime?: { hours: number[]; days: string[]; sample: number; scope: string } | null;
+  competitors?: { title: string; company: string; salaryMin: number | null; salaryMax: number | null; benefitCount: number; deadline: string | null }[];
 }
 export interface SystemHealth {
   metrics: { pendingJobs: number; pendingCompanies: number; users24h: number; jobs24h: number; apps24h: number; rejected7d: number };
@@ -2634,8 +2636,9 @@ export interface SystemHealth {
 }
 export const smartApi2 = {
   responseStats: (companyId: string) => request<CompanyResponseStats>(`/companies/${companyId}/response-stats`),
-  forecast: (token: string, p: { industry?: string; level?: string; salaryMin?: number; salaryMax?: number }) => {
+  forecast: (token: string, p: { industry?: string; level?: string; province?: string; salaryMin?: number; salaryMax?: number }) => {
     const qs = new URLSearchParams();
+    if (p.province) qs.set('province', p.province);
     if (p.industry) qs.set('industry', p.industry);
     if (p.level) qs.set('level', p.level);
     if (p.salaryMin) qs.set('salaryMin', String(p.salaryMin));
@@ -2651,4 +2654,67 @@ export const smartApi2 = {
       headers: authHeaders(token),
       body: JSON.stringify({ status, message }),
     }),
+};
+
+// Đợt 65
+export interface ApplicantScoreInfo {
+  score: number;
+  reasons: string[];
+  gaps: string[];
+  parts?: { key: string; label: string; score: number; weight: number }[];
+  bonus?: number;
+  hot?: string;
+}
+export interface WeeklyReport {
+  metrics: { key: string; label: string; cur: number; prev: number; changePct: number }[];
+  notes: string[];
+}
+export interface AdTargeting {
+  items: { area: string; slot: string; total: number; candidate: number; employer: number; guest: number; audience: string; suggestion: string }[];
+  since: number;
+}
+export interface ReportGroup {
+  jobId: string;
+  title: string;
+  company: string;
+  count: number;
+  categories: string[];
+  priority: 'high' | 'normal';
+  lastAt: string;
+  notes: string[];
+}
+export interface AppEta {
+  enough: boolean;
+  sample?: number;
+  interviewRate?: number;
+  medianDays?: number | null;
+  pending?: number;
+  expectedInterviews?: number;
+  applicationsForOne?: number | null;
+}
+export interface SharedProfile {
+  fullName: string;
+  title: string | null;
+  province: string | null;
+  yearsOfExperience: number | null;
+  desiredLevel: string | null;
+  skills: string[];
+  experiences: { position: string; company: string | null; from: string | null; to: string | null }[];
+  educations: { school: string | null; major: string | null; degree: string | null }[];
+}
+export const smartApi3 = {
+  certificates: (token: string, jobId: string) => request<{ items: { name: string; jobs: number; percent: number }[]; total: number; industry?: string | null }>(`/jobs/${jobId}/certificates`, { headers: authHeaders(token) }),
+  eta: (token: string) => request<AppEta>('/me/applications-eta', { headers: authHeaders(token) }),
+  share: (token: string) => request<{ token: string; days: number }>('/me/profile-share', { method: 'POST', headers: authHeaders(token) }),
+  shared: (t: string) => request<SharedProfile>(`/public/profile-share/${encodeURIComponent(t)}`),
+  reinvite: (token: string, jobId: string) =>
+    request<{ items: { profileId: string; name: string; title: string | null; score: number; reasons: string[]; oldJob: string; oldStatus: string }[] }>(`/employer/reinvite?jobId=${jobId}`, { headers: authHeaders(token) }),
+  invite: (token: string, profileId: string, jobPostingId: string) =>
+    request<unknown>(`/cv-search/${profileId}/invite`, { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ jobPostingId }) }),
+  report: (token: string, jobId: string, reason: string, note?: string) =>
+    request<{ ok: boolean }>(`/jobs/${jobId}/report`, { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ reason, note }) }),
+  reports: (token: string) => request<{ items: ReportGroup[] }>('/admin/quality/reports', { headers: authHeaders(token) }),
+  resolveReports: (token: string, jobId: string) => request<{ ok: boolean }>(`/admin/quality/reports/${jobId}/resolve`, { method: 'POST', headers: authHeaders(token) }),
+  weekly: (token: string) => request<WeeklyReport>('/admin/quality/weekly', { headers: authHeaders(token) }),
+  adTargeting: (token: string) => request<AdTargeting>('/admin/quality/ad-targeting', { headers: authHeaders(token) }),
 };

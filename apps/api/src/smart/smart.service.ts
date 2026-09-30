@@ -160,17 +160,39 @@ export class SmartService {
     if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng của công ty bạn');
     const apps = await this.appRepo.find({ where: { jobPostingId: jobId }, relations: { cv: true }, take: 500 });
     const profileIds = [...new Set(apps.map((a) => a.cv?.candidateProfileId).filter(Boolean) as string[])];
-    const out: Record<string, { score: number; reasons: string[]; gaps: string[] }> = {};
+    type Out = { score: number; reasons: string[]; gaps: string[]; parts?: { key: string; label: string; score: number; weight: number }[]; bonus?: number; hot?: string };
+    const out: Record<string, Out> = {};
     if (!profileIds.length) return { scores: out };
     const profiles = await this.profileRepo.find({ where: { id: In(profileIds) }, relations: { skills: true } });
     const byId = new Map(profiles.map((p) => [p.id, p]));
+    // Đợt 65 — "ứng viên nóng": xem lại tin nhiều lần (14 ngày) hoặc vừa cập nhật hồ sơ.
+    const views = new Map<string, number>();
+    try {
+      const uids = profiles.map((p) => p.userId).filter(Boolean);
+      if (uids.length) {
+        const rows: { uid: string; c: string }[] = await this.jobRepo.manager.query(
+          `SELECT user_id::text AS uid, COUNT(*) AS c FROM analytics_pageviews
+            WHERE entity_type = 'job' AND entity_id::text = $1 AND user_id::text = ANY($2::text[]) AND started_at >= now() - interval '14 days'
+            GROUP BY user_id`,
+          [jobId, uids],
+        );
+        rows.forEach((r) => views.set(r.uid, Number(r.c)));
+      }
+    } catch { /* chưa có bảng analytics */ }
     for (const a of apps) {
       const p = a.cv?.candidateProfileId ? byId.get(a.cv.candidateProfileId) : null;
       if (!p) continue;
       const m = scoreMatch({ ...p, skillNames: (p.skills ?? []).map((s) => s.skillName) }, job);
       const toEmployer = (t: string) =>
         t.replace(/bạn quan tâm/g, 'ứng viên quan tâm').replace(/bạn muốn làm việc/g, 'ứng viên muốn làm việc').replace(/bạn mong muốn/g, 'ứng viên mong muốn').replace(/bạn chọn/g, 'ứng viên chọn').replace(/mức mong muốn/g, 'mức ứng viên mong muốn').replace(/hơn mong muốn/g, 'hơn ứng viên mong muốn').replace(/\bbạn\b/g, 'ứng viên');
-      out[a.id] = { score: m.score, reasons: m.reasons.map(toEmployer), gaps: m.gaps.map(toEmployer) };
+      let hot: string | undefined;
+      const v = views.get(p.userId) ?? 0;
+      const fresh = p.updatedAt && Date.now() - new Date(p.updatedAt).getTime() < 3 * 86400000 && new Date(p.updatedAt).getTime() > new Date(a.appliedAt).getTime() + 60000;
+      if (a.status === 'new' || a.status === 'reviewing') {
+        if (v >= 3) hot = `Xem lại tin ${v} lần trong 14 ngày`;
+        else if (fresh) hot = 'Vừa cập nhật hồ sơ sau khi nộp';
+      }
+      out[a.id] = { score: m.score, reasons: m.reasons.map(toEmployer), gaps: m.gaps.map(toEmployer), parts: m.parts, bonus: m.bonus, hot };
     }
     return { scores: out };
   }

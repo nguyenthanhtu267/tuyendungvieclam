@@ -2,21 +2,27 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { adminApi, smartApi, smartApi2, type QualityOverview, type SystemHealth } from '@/lib/api';
+import { adminApi, smartApi, smartApi2, smartApi3, type QualityOverview, type SystemHealth, type ReportGroup, type WeeklyReport, type AdTargeting } from '@/lib/api';
 
-type Sub = 'system' | 'duplicates' | 'suspicious' | 'lowQuality' | 'spam';
+type Sub = 'reports' | 'weekly' | 'ads' | 'system' | 'duplicates' | 'suspicious' | 'lowQuality' | 'spam';
 
 // Đợt 63 — Admin: phát hiện tin trùng, tin đáng ngờ (dùng bộ chấm rủi ro) và chấm chất lượng tin tổng hợp.
 export function QualityPanel({ token }: { token: string }) {
   const [data, setData] = useState<QualityOverview | null>(null);
   const [sub, setSub] = useState<Sub>('system');
   const [sys, setSys] = useState<SystemHealth | null>(null);
+  const [reports, setReports] = useState<ReportGroup[] | null>(null);
+  const [weekly, setWeekly] = useState<WeeklyReport | null>(null);
+  const [ads, setAds] = useState<AdTargeting | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
   const load = useCallback(() => {
     setError('');
     smartApi.qualityOverview(token).then(setData).catch(() => setError('Không tải được dữ liệu chất lượng.'));
     smartApi2.systemHealth(token).then(setSys).catch(() => undefined);
+    smartApi3.reports(token).then((r) => setReports(r.items)).catch(() => setReports([]));
+    smartApi3.weekly(token).then(setWeekly).catch(() => undefined);
+    smartApi3.adTargeting(token).then(setAds).catch(() => undefined);
   }, [token]);
   useEffect(load, [load]);
 
@@ -33,12 +39,27 @@ export function QualityPanel({ token }: { token: string }) {
   }
 
   const tabs: { id: Sub; label: string; n: number }[] = [
+    { id: 'reports', label: 'Người dùng báo cáo', n: reports?.length ?? 0 },
+    { id: 'weekly', label: 'Báo cáo tuần', n: 0 },
+    { id: 'ads', label: 'Gợi ý nhắm quảng cáo', n: ads?.items.length ?? 0 },
     { id: 'system', label: 'Sức khoẻ hệ thống', n: sys?.alerts.filter((a) => a.level === 'warn').length ?? 0 },
     { id: 'spam', label: 'Nghi spam ứng tuyển', n: (sys?.spam.burst.length ?? 0) + (sys?.spam.sameLetter.length ?? 0) },
     { id: 'lowQuality', label: 'Tin tổng hợp chất lượng thấp', n: data?.lowQuality.length ?? 0 },
     { id: 'duplicates', label: 'Tin trùng', n: data?.duplicates.length ?? 0 },
     { id: 'suspicious', label: 'Tin đáng ngờ', n: data?.suspicious.length ?? 0 },
   ];
+  async function resolve(id: string) {
+    setBusy(id);
+    try {
+      await smartApi3.resolveReports(token, id);
+      load();
+    } catch {
+      setError('Không đánh dấu được, thử lại.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <div>
@@ -63,6 +84,58 @@ export function QualityPanel({ token }: { token: string }) {
         </button>
       </div>
       {error && <div className="text-critical text-sm">{error}</div>}
+      {sub === 'reports' && (
+        <div className="rounded-xl bg-white border border-border divide-y divide-border">
+          {!reports && <div className="p-4 text-ink-faint text-sm">Đang tải…</div>}
+          {reports?.length === 0 && <div className="p-4 text-ink-faint text-sm">Chưa có báo cáo nào đang mở.</div>}
+          {reports?.map((r) => (
+            <Row key={r.jobId} id={r.jobId} title={r.title} company={r.company} badge={`${r.count} báo cáo${r.priority === 'high' ? ' · URGENT' : ''}`} note={`${r.categories.join(', ')}${r.notes[0] ? ` — “${r.notes[0]}”` : ''}`}>
+              <div className="flex gap-2 shrink-0">
+                <button type="button" disabled={busy === r.jobId} onClick={() => resolve(r.jobId)} className="rounded-lg border border-border text-[12.5px] font-bold px-2.5 py-1 disabled:opacity-50">Đã xử lý</button>
+                <Btn busy={busy === r.jobId} onClick={() => hide(r.jobId, 'Người dùng báo cáo vi phạm').then(() => resolve(r.jobId))} />
+              </div>
+            </Row>
+          ))}
+        </div>
+      )}
+      {sub === 'weekly' && weekly && (
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            {weekly.metrics.map((m) => (
+              <div key={m.key} className="rounded-xl bg-white border border-border p-3">
+                <div className="text-xl font-extrabold tabular-nums">{m.cur}</div>
+                <div className="text-[12.5px] text-ink-muted">{m.label}</div>
+                <div className={`text-[12px] font-bold tabular-nums ${m.changePct >= 0 ? 'text-[#0B5D2A]' : 'text-critical'}`}>
+                  {m.changePct >= 0 ? '▲' : '▼'} {Math.abs(m.changePct)}% so với tuần trước ({m.prev})
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="rounded-xl bg-white border border-border p-3">
+            <div className="font-extrabold text-[13.5px] mb-1">Nhận xét tự động</div>
+            <ul className="list-disc pl-5 text-[13px] leading-relaxed">{weekly.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>
+          </div>
+        </div>
+      )}
+      {sub === 'ads' && (
+        <div className="rounded-xl bg-white border border-border overflow-x-auto">
+          {!ads || ads.items.length === 0 ? (
+            <div className="p-4 text-ink-faint text-sm">Chưa đủ dữ liệu truy cập để gợi ý.</div>
+          ) : (
+            <table className="w-full text-[12.5px]">
+              <thead><tr className="text-left text-ink-muted"><th className="p-2">Khu vực</th><th className="p-2">Vị trí</th><th className="p-2">Lượt</th><th className="p-2">Đối tượng</th><th className="p-2">Gợi ý</th></tr></thead>
+              <tbody>
+                {ads.items.map((a, i) => (
+                  <tr key={i} className="border-t border-border">
+                    <td className="p-2 font-bold">{a.area}</td><td className="p-2">{a.slot}</td><td className="p-2 tabular-nums">{a.total}</td>
+                    <td className="p-2">{a.audience}</td><td className="p-2">{a.suggestion}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
       {sub === 'system' && sys && (
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -105,7 +178,7 @@ export function QualityPanel({ token }: { token: string }) {
           ))}
         </div>
       )}
-      {sub !== 'system' && sub !== 'spam' && (!data ? (
+      {sub !== 'system' && sub !== 'spam' && sub !== 'reports' && sub !== 'weekly' && sub !== 'ads' && (!data ? (
         <div className="text-ink-faint text-sm py-6">Đang quét…</div>
       ) : (
         <div className="rounded-xl bg-white border border-border divide-y divide-border">

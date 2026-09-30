@@ -27,6 +27,7 @@ export const POSTED_WITHIN_DAYS: Record<string, number> = {
   '3d': 3,
   '7d': 7,
   '14d': 14,
+  '15d': 15,
   '30d': 30,
 };
 

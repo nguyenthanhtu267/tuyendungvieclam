@@ -16,6 +16,9 @@ import { GuestApplyForm } from '@/components/GuestApplyForm';
 import { CompatibilityChecklist } from '@/components/CompatibilityChecklist';
 import JobInsightsPanel from '@/components/JobInsightsPanel';
 import InterviewPrepPanel from '@/components/InterviewPrepPanel';
+import SalaryNudge from '@/components/SalaryNudge';
+import TranslateHint from '@/components/TranslateHint';
+import ReportJobButton from '@/components/ReportJobButton';
 import CompanyResponseBadge from '@/components/CompanyResponseBadge';
 import { scamWarnings } from '@/lib/scam';
 import {
@@ -301,6 +304,7 @@ function JobDetailInner() {
 
         {applyOpen && (
           <div className="mt-3 rounded-xl border border-border bg-white p-5">
+            {me?.role === 'candidate' && <SalaryNudge jobId={params.id} />}
             {!me ? (
               // Đợt 22 — khách chưa đăng nhập vẫn ứng tuyển được (họ tên/SĐT/email + file hoặc link CV).
               <GuestApplyForm jobId={params.id} jobTitle={job.title} onCancel={() => setApplyOpen(false)} />
@@ -525,6 +529,7 @@ function JobDetailInner() {
                   {job.description && (
                     <div className="mt-6">
                       <h3 className="font-bold text-sm mb-2">Mô tả công việc</h3>
+                      <TranslateHint html={job.description} />
                       <RichTextView value={job.description} className="text-[12.8px] text-ink-muted" />
                     </div>
                   )}
@@ -584,6 +589,8 @@ function JobDetailInner() {
                       <li>Lương: {formatSalaryTag(job.salaryMin, job.salaryMax)}</li>
                     </ul>
                   </div>
+
+                  <div className="mt-4"><ReportJobButton jobId={job.id} /></div>
 
                   {/* Đợt 12v (21/09/2026) — "JOB TAGS / SKILLS": thẻ từ khoá/kỹ năng NTD tự nhập khi
                       đăng tin (theo ảnh mẫu người dùng gửi), chỉ hiện khi tin có ít nhất 1 tag. */}
