@@ -29,7 +29,7 @@ export function PopularKeywords({ sticky = false }: { sticky?: boolean } = {}) {
           <Link
             key={k}
             href={`/viec-lam?q=${encodeURIComponent(k)}`}
-            className="rounded-md bg-primary-tint text-primary font-bold text-[13.5px] px-2.5 py-1 hover:bg-primary hover:text-white transition-colors capitalize"
+            className="rounded-md bg-primary-tint text-primary font-normal text-[13.5px] px-2.5 py-1 hover:bg-primary hover:text-white transition-colors capitalize"
           >
             {k}
           </Link>

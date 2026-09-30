@@ -449,9 +449,6 @@ function JobDetailInner() {
                     </div>
                   )}
 
-                  {/* Đợt 28 — banner giữa bài (mọi thiết bị, kể cả điện thoại). */}
-                  <AdSlot slot="job-mid" className="mt-4" />
-
                   {job.requirements && (
                     <div className="mt-4">
                       <h3 className="font-bold text-sm mb-2">Yêu cầu ứng viên</h3>
@@ -517,7 +514,7 @@ function JobDetailInner() {
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         {job.tags.map((t) => (
-                          <span key={t} className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full bg-surface-alt text-ink-muted">
+                          <span key={t} className="text-[11.5px] font-normal px-2.5 py-1 rounded-full bg-surface-alt text-ink-muted">
                             {t}
                           </span>
                         ))}
@@ -678,8 +675,9 @@ function JobDetailInner() {
           </div>
         </div>
 
-        {/* Đợt 24 — banner cuối nội dung tin (mọi thiết bị). */}
-        <AdSlot slot="job-bottom" className="mt-4" />
+        {/* Đợt 45 — không chèn quảng cáo giữa nội dung tin (mất thiện cảm): banner "job-mid" đặt SAU toàn bộ
+            nội dung tin (sau Thông tin liên hệ), "job-bottom" dời xuống cuối trang sau "Các công việc tương tự". */}
+        <AdSlot slot="job-mid" className="mt-4" />
 
         {/* Đợt 12n (21/09/2026) — "Các công việc tương tự" chuyển từ khối nhỏ trên sidebar xuống
             cuối trang, dạng lưới đầy đủ như JobCard ở trang tìm việc, theo mẫu tham khảo. */}
@@ -696,6 +694,8 @@ function JobDetailInner() {
             </div>
           </div>
         )}
+
+        <AdSlot slot="job-bottom" className="mt-6" />
       </div>
     </main>
   );
