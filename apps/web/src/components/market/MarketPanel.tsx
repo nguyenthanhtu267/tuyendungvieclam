@@ -23,7 +23,8 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'type', label: 'Hình thức' },
   { id: 'salary', label: 'Mức lương' },
 ];
-const PALETTE = ['#163B7A', '#FF5A36', '#1FA97D', '#F0A93E', '#2F6FED', '#7A4FD6'];
+// Bảng màu SÁNG (biểu đồ nằm trên nền tối của khung số liệu).
+const PALETTE = ['#7FB2FF', '#FF8A6B', '#4FE0B0', '#FFC857', '#9DB8FF', '#C4A8FF'];
 const ROTATE_MS = 7000;
 
 function reducedMotion() {
@@ -89,7 +90,7 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
 function Kpi({ label, value, color, series, change }: { label: string; value: number | null; color: string; series?: number[]; change?: number | null }) {
   const shown = useCountUp(value);
   return (
-    <div className="rounded-lg bg-surface-alt border border-border px-2.5 py-2 min-w-0">
+    <div className="mp-tile rounded-lg bg-white border border-border px-2.5 py-2 min-w-0">
       <div className="font-mono font-extrabold text-[19px] leading-none tabular-nums" style={{ color }}>
         {shown === null ? '—' : formatNumber(shown)}
       </div>
@@ -126,13 +127,13 @@ function AreaChart({ data, color, title }: { data: { day: string; n: number }[];
   return (
     <div>
       <div className="flex items-baseline justify-between gap-2">
-        <div className="text-[13.5px] font-extrabold text-ink">
+        <div className="text-[13.5px] font-extrabold text-ink whitespace-nowrap">
           {title} <span className="font-mono tabular-nums" style={{ color }}>{formatNumber(total)}</span>
-          <span className="text-[12px] font-semibold text-ink-muted"> / 14 ngày</span>
+          <span className="text-[12px] font-semibold text-ink-muted"> /14 ngày</span>
         </div>
         {ch !== null && (
-          <span className={`text-[12px] font-bold ${ch >= 0 ? 'text-success' : 'text-critical'}`}>
-            {ch >= 0 ? '▲' : '▼'} {Math.abs(ch)}% so với 7 ngày trước
+          <span className={`text-[12px] font-bold shrink-0 ${ch >= 0 ? 'text-success' : 'text-critical'}`} title="So với 7 ngày trước đó">
+            {ch >= 0 ? '▲' : '▼'} {Math.abs(ch)}%
           </span>
         )}
       </div>
@@ -157,13 +158,13 @@ function AreaChart({ data, color, title }: { data: { day: string; n: number }[];
               </linearGradient>
             </defs>
             {[0.33, 0.66].map((f) => (
-              <line key={f} x1={padL} x2={w - padR} y1={padT + f * (H - padT - padB)} y2={padT + f * (H - padT - padB)} stroke="#D5DBE5" strokeDasharray="3 4" />
+              <line key={f} x1={padL} x2={w - padR} y1={padT + f * (H - padT - padB)} y2={padT + f * (H - padT - padB)} stroke="#fff" strokeOpacity="0.22" strokeDasharray="3 4" />
             ))}
             <path d={area} fill={`url(#${gid})`} />
             <path d={line} fill="none" stroke={color} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" />
             {hover !== null && cur && (
               <>
-                <line x1={x(hover)} x2={x(hover)} y1={padT} y2={H - padB} stroke="#0A0E14" strokeOpacity="0.35" />
+                <line x1={x(hover)} x2={x(hover)} y1={padT} y2={H - padB} stroke="#fff" strokeOpacity="0.6" />
                 <circle cx={x(hover)} cy={y(cur.n)} r="4.5" fill="#fff" stroke={color} strokeWidth="2.4" />
               </>
             )}
@@ -171,7 +172,7 @@ function AreaChart({ data, color, title }: { data: { day: string; n: number }[];
         )}
         {cur && w > 0 && (
           <div
-            className="absolute top-0 -translate-x-1/2 rounded-md bg-ink text-white text-[12px] font-bold px-2 py-0.5 pointer-events-none whitespace-nowrap"
+            className="absolute top-0 -translate-x-1/2 rounded-md bg-white text-[#0A0E14] shadow text-[12px] font-bold px-2 py-0.5 pointer-events-none whitespace-nowrap"
             style={{ left: Math.max(40, Math.min(w - 40, x(hover as number))) }}
           >
             {dm(cur.day)}: {formatNumber(cur.n)}
@@ -235,7 +236,7 @@ function Donut({ rows, href }: { rows: { label: string; count: number }[]; href:
   return (
     <div className="flex items-center gap-4">
       <svg viewBox="0 0 120 120" className="w-[92px] h-[92px] shrink-0 -rotate-90" role="img" aria-label="Cơ cấu việc làm theo hình thức">
-        <circle cx="60" cy="60" r={R} fill="none" stroke="#E8EDF7" strokeWidth="16" />
+        <circle cx="60" cy="60" r={R} fill="none" stroke="#fff" strokeOpacity="0.2" strokeWidth="16" />
         {rows.map((r, i) => {
           const len = (r.count / total) * C;
           const seg = (
@@ -255,8 +256,8 @@ function Donut({ rows, href }: { rows: { label: string; count: number }[]; href:
           return seg;
         })}
         <g className="rotate-90" style={{ transformOrigin: '60px 60px' }}>
-          <text x="60" y="58" textAnchor="middle" className="font-mono" fontSize="17" fontWeight="800" fill="#0A0E14">{formatNumber(total)}</text>
-          <text x="60" y="74" textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#3D4654">việc làm</text>
+          <text x="60" y="58" textAnchor="middle" className="font-mono" fontSize="17" fontWeight="800" fill="#fff">{formatNumber(total)}</text>
+          <text x="60" y="74" textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#DCE6FA">việc làm</text>
         </g>
       </svg>
       <ul className="flex-1 min-w-0 flex flex-col gap-0.5">
@@ -403,7 +404,7 @@ export function MarketPanel(p: MarketPanelProps) {
           ))}
           {auto && !paused && <span className="self-center ml-1 text-[12px] font-semibold text-white/90 shrink-0">tự chuyển…</span>}
         </div>
-        <div className="w-full rounded-xl bg-white/[0.96] p-3 sm:p-3.5 shadow-lg flex flex-col gap-2.5">
+        <div className="mp-dark w-full rounded-xl bg-[#04122e]/60 ring-1 ring-white/25 p-3 sm:p-3.5 shadow-lg flex flex-col gap-2.5">
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
           <Kpi label="Việc làm" value={p.openJobs} color="#163B7A" series={jobsSeries} change={market ? delta(market.newJobsDaily) : null} />
           <Kpi label="Ứng tuyển" value={p.applicationsToday} color="#E5484D" series={appsSeries} change={market ? delta(market.applicationsDaily) : null} />
@@ -415,15 +416,15 @@ export function MarketPanel(p: MarketPanelProps) {
         <div className="min-h-[112px]" role="tabpanel">
           {tab === 'trend' &&
             (market ? (
-              <div className="flex flex-col gap-2.5">
-                <AreaChart data={market.newJobsDaily} color="#163B7A" title="Việc làm đăng mới" />
-                <AreaChart data={market.applicationsDaily} color="#E5484D" title="Lượt ứng tuyển" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5">
+                <AreaChart data={market.newJobsDaily} color="#8DBBFF" title="Việc làm đăng mới" />
+                <AreaChart data={market.applicationsDaily} color="#FF9AA0" title="Lượt ứng tuyển" />
               </div>
             ) : (
               <Empty />
             ))}
-          {tab === 'industry' && <Bars rows={industryRows} href={(l) => q('industries', l)} color="#163B7A" />}
-          {tab === 'location' && <Bars rows={locationRows} href={(l) => q('provinces', l)} color="#1FA97D" />}
+          {tab === 'industry' && <Bars rows={industryRows} href={(l) => q('industries', l)} color="#8DBBFF" />}
+          {tab === 'location' && <Bars rows={locationRows} href={(l) => q('provinces', l)} color="#4FE0B0" />}
           {tab === 'type' && (market ? <Donut rows={market.employmentTypes} href={(l) => q('employmentType', l)} /> : <Empty />)}
           {tab === 'salary' && (market ? <Columns rows={market.salaryBands} /> : <Empty />)}
         </div>
