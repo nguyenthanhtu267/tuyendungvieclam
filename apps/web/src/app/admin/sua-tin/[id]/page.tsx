@@ -127,7 +127,7 @@ function AdminSuaTinInner() {
     <main className="min-h-screen bg-bg">
       <div className="sticky top-0 z-10 bg-primary-dark text-white px-4 sm:px-8 py-3 flex items-center justify-between gap-3">
         <div className="font-bold text-sm">✎ Sửa tin tuyển dụng (chế độ Admin)</div>
-        <Link href={`/admin/xem-tin/${params.id}`} className="text-xs font-semibold text-white/80 hover:text-white">
+        <Link href={`/admin/xem-tin/${params.id}`} className="text-xs font-semibold text-white/95 hover:text-white">
           ← Quay lại Xem tin
         </Link>
       </div>

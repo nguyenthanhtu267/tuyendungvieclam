@@ -179,3 +179,28 @@
   .pm:hover { transform: none; }
   .pm:hover .pm-arrow { transform: none; }
 }
+
+/* Đợt 26 — chữ tối thiểu to & rõ: nâng các cỡ chữ nhỏ dạng text-[Npx] (không nằm trong thang Tailwind). */
+.text-\[9px\] { font-size: 12.5px; line-height: 1.45; }
+.text-\[9\.5px\] { font-size: 12.5px; line-height: 1.45; }
+.text-\[10px\] { font-size: 12.5px; line-height: 1.45; }
+.text-\[10\.5px\] { font-size: 12.5px; line-height: 1.45; }
+.text-\[11px\] { font-size: 13.5px; line-height: 1.45; }
+.text-\[11\.3px\] { font-size: 13.5px; line-height: 1.45; }
+.text-\[11\.5px\] { font-size: 13.5px; line-height: 1.45; }
+.text-\[12px\] { font-size: 14px; line-height: 1.45; }
+.text-\[12\.3px\] { font-size: 14px; line-height: 1.45; }
+.text-\[12\.5px\] { font-size: 14.5px; line-height: 1.45; }
+.text-\[12\.8px\] { font-size: 14.5px; line-height: 1.45; }
+.text-\[13px\] { font-size: 15px; line-height: 1.45; }
+.text-\[13\.5px\] { font-size: 15px; line-height: 1.45; }
+.text-\[14px\] { font-size: 16px; line-height: 1.45; }
+.text-\[14\.5px\] { font-size: 16px; line-height: 1.45; }
+.text-\[15px\] { font-size: 16.5px; line-height: 1.45; }
+.text-\[16px\] { font-size: 17px; line-height: 1.45; }
+.text-\[20px\] { font-size: 21px; line-height: 1.45; }
+.text-\[22px\] { font-size: 23px; line-height: 1.45; }
+body { font-weight: 500; color: #0A0E14; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+h1, h2, h3, h4 { color: #0A0E14; }
+input, select, textarea, button { font-family: inherit; }
+::placeholder { color: #3D4654 !important; opacity: 1 !important; }

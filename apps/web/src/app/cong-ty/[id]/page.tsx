@@ -64,7 +64,7 @@ export default function CongTyPage() {
     return (
       <main className="min-h-screen">
         <SiteHeader />
-        <div className="max-w-6xl mx-auto px-4 py-16 text-center text-ink-faint text-sm">Đang tải...</div>
+        <div className="max-w-7xl mx-auto px-4 py-16 text-center text-ink-faint text-sm">Đang tải...</div>
       </main>
     );
   }
@@ -73,7 +73,7 @@ export default function CongTyPage() {
     return (
       <main className="min-h-screen">
         <SiteHeader />
-        <div className="max-w-6xl mx-auto px-4 py-16 text-center">
+        <div className="max-w-7xl mx-auto px-4 py-16 text-center">
           <div className="text-ink-muted text-sm mb-3">Không tìm thấy công ty này.</div>
           <Link href="/viec-lam" className="text-primary font-semibold text-sm">
             ← Quay lại tìm việc làm
@@ -88,7 +88,7 @@ export default function CongTyPage() {
   return (
     <main className="min-h-screen">
       <SiteHeader />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6">
         <div className="text-[11.5px] text-ink-faint mb-3">
           <Link href="/viec-lam" className="hover:text-primary">
             Tìm việc làm
@@ -105,7 +105,7 @@ export default function CongTyPage() {
                 {company.name}
                 {isCompanyUnverified(company) && <SourcedBadge />}
               </div>
-              <div className="text-white/75 text-[13px] mt-1">
+              <div className="text-white/95 text-[13px] mt-1">
                 {formatNumber(totalJobs)} tin đang tuyển{company.industry ? ` · ${company.industry}` : ''}
                 {' · '}
                 {formatNumber(company.followersCount ?? 0)} người theo dõi

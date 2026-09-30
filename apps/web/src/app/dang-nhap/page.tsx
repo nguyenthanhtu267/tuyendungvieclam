@@ -88,18 +88,18 @@ export default function DangNhapPage() {
           <h1 className="text-3xl font-extrabold leading-snug text-balance">
             Kết nối việc làm — đúng người, đúng việc
           </h1>
-          <p className="mt-3 text-white/80 max-w-sm">
+          <p className="mt-3 text-white/95 max-w-sm">
             Hàng ngàn việc làm từ các doanh nghiệp trên toàn quốc, cập nhật mỗi ngày.
           </p>
         </div>
         <div className="flex gap-8 text-sm">
           <div>
             <div className="text-2xl font-extrabold font-mono">10.000+</div>
-            <div className="text-white/70">Việc làm đang tuyển</div>
+            <div className="text-white/95">Việc làm đang tuyển</div>
           </div>
           <div>
             <div className="text-2xl font-extrabold font-mono">2.000+</div>
-            <div className="text-white/70">Doanh nghiệp</div>
+            <div className="text-white/95">Doanh nghiệp</div>
           </div>
         </div>
       </div>

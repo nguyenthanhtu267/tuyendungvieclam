@@ -67,7 +67,7 @@ export default function XemTinNtdPage() {
     return (
       <main className="min-h-screen">
         <EmployerHeader />
-        <div className="max-w-6xl mx-auto px-4 py-16 text-center text-ink-faint text-sm">Đang tải...</div>
+        <div className="max-w-7xl mx-auto px-4 py-16 text-center text-ink-faint text-sm">Đang tải...</div>
       </main>
     );
   }
@@ -76,7 +76,7 @@ export default function XemTinNtdPage() {
     return (
       <main className="min-h-screen">
         <EmployerHeader />
-        <div className="max-w-6xl mx-auto px-4 py-16 text-center">
+        <div className="max-w-7xl mx-auto px-4 py-16 text-center">
           <div className="text-ink-muted text-sm mb-3">{error ?? 'Không tìm thấy tin tuyển dụng này.'}</div>
           <Link href="/nha-tuyen-dung/tin-dang" className="text-primary font-semibold text-sm">
             ← Quay lại Quản lý tin đăng
@@ -92,7 +92,7 @@ export default function XemTinNtdPage() {
   return (
     <main className="min-h-screen bg-bg">
       <EmployerHeader />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
         <div className="rounded-xl bg-info-tint border border-info/30 px-4 py-3 mb-4 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2.5 flex-wrap">
             <span className="text-[12.5px] font-bold text-info">👁️ Xem trước — đây là nội dung ứng viên sẽ thấy</span>
@@ -121,7 +121,7 @@ export default function XemTinNtdPage() {
                 </span>
               )}
             </div>
-            <div className="text-white/75 text-[13px] mt-1">{job.company.name}</div>
+            <div className="text-white/95 text-[13px] mt-1">{job.company.name}</div>
           </div>
         </div>
 

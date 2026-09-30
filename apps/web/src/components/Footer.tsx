@@ -15,7 +15,7 @@ export default function Footer() {
   const { t } = useLanguage();
   return (
     <footer className="border-t border-border bg-white mt-auto">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-ink-faint">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-ink-faint">
         <div>© {year} {t('footer.rights')} — tuyendungvieclam</div>
         <div className="flex items-center gap-x-4 gap-y-1 flex-wrap justify-center">
           <Link href="/dieu-khoan-su-dung" className="hover:text-primary font-semibold">

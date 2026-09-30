@@ -164,7 +164,7 @@ function JobSearchPage() {
     <main className="min-h-screen">
       <SiteHeader />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6 flex flex-col gap-3">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6 flex flex-col gap-3">
         {/* Đợt 12t (21/09/2026) — gộp ô tìm từ khóa + nút "Tìm" vào chung 1 dòng với Tỉnh/Thành +
             Ngành nghề trong FilterBar (trước đây là 2 khối trắng tách rời, theo yêu cầu người dùng). */}
         <FilterBar
@@ -270,7 +270,7 @@ function JobSearchPage() {
           <div className="flex flex-col gap-3.5">
             <div className="rounded-xl bg-primary p-[18px] flex flex-col gap-2">
               <div className="text-white font-extrabold text-sm">Lọc việc phù hợp nhanh hơn</div>
-              <div className="text-white/75 text-xs">Tạo hồ sơ để nhận gợi ý việc làm mỗi ngày</div>
+              <div className="text-white/95 text-xs">Tạo hồ sơ để nhận gợi ý việc làm mỗi ngày</div>
               <a href="/dang-nhap" className="bg-white text-primary rounded-lg text-xs font-bold px-3.5 py-2 w-fit mt-1">
                 Tạo hồ sơ ngay
               </a>

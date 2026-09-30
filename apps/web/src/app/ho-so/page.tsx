@@ -148,7 +148,7 @@ export default function MyCenterPage() {
     return (
       <main className="min-h-screen">
         <SiteHeader />
-        <div className="max-w-6xl mx-auto px-4 py-16 text-center text-ink-faint text-sm">Đang tải...</div>
+        <div className="max-w-7xl mx-auto px-4 py-16 text-center text-ink-faint text-sm">Đang tải...</div>
       </main>
     );
   }
@@ -165,7 +165,7 @@ export default function MyCenterPage() {
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6">
         {/* Đợt 24 — banner đầu trang My Center của ứng viên. */}
         <AdSlot slot="candidate-top" className="mb-3" />
         <div className="grid md:grid-cols-[210px_1fr] gap-5 items-start">

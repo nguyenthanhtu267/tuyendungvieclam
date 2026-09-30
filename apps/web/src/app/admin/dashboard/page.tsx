@@ -268,7 +268,7 @@ export default function AdminDashboardPage() {
             key={item.id}
             onClick={() => setTab(item.id)}
             className={`text-left px-2.5 py-2 rounded-lg text-xs font-bold ${
-              tab === item.id ? 'bg-white/15 text-white' : 'text-white/70 hover:text-white'
+              tab === item.id ? 'bg-white/15 text-white' : 'text-white/95 hover:text-white'
             }`}
           >
             {item.label}
@@ -277,7 +277,7 @@ export default function AdminDashboardPage() {
             {item.id === 'orders' ? ` (${formatNumber(pendingOrders.length)})` : ''}
           </button>
         ))}
-        <button onClick={logout} className="mt-auto text-left px-2.5 py-2 rounded-lg text-xs font-bold text-white/70 hover:text-white">
+        <button onClick={logout} className="mt-auto text-left px-2.5 py-2 rounded-lg text-xs font-bold text-white/95 hover:text-white">
           Đăng xuất
         </button>
       </aside>

@@ -282,7 +282,7 @@ export function AdEditor({
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center bg-black/45 sm:p-4" role="dialog" aria-modal="true" aria-label="Soạn banner quảng cáo">
-      <div className="bg-white w-full max-w-6xl sm:rounded-2xl shadow-2xl flex flex-col max-h-screen sm:max-h-[94vh]" data-testid="ad-editor">
+      <div className="bg-white w-full max-w-7xl sm:rounded-2xl shadow-2xl flex flex-col max-h-screen sm:max-h-[94vh]" data-testid="ad-editor">
         <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-border">
           <div className="font-bold text-[15px]">{initial ? 'Sửa chiến dịch banner' : 'Tạo chiến dịch banner'}</div>
           <button type="button" onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-surface-alt text-lg" aria-label="Đóng">

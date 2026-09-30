@@ -164,7 +164,7 @@ export default function OnlineProfilePage() {
     <>
       <SiteHeader />
       <main className="min-h-screen bg-bg pb-20">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-5 px-4 py-6 lg:grid-cols-[1fr_260px]">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-5 px-4 py-6 lg:grid-cols-[1fr_260px]">
           <div className="flex flex-col gap-4">
             {/* Thẻ tổng quan */}
             <section className="rounded-2xl bg-white p-5 shadow-sm">

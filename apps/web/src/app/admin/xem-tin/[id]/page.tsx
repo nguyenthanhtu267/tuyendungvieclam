@@ -95,11 +95,11 @@ export default function AdminJobReviewPage() {
           {/* Đợt 12x (21/09/2026) — "Sửa tin trước khi duyệt": Admin thấy sai sót thì sửa luôn ở
               đây thay vì phải Từ chối rồi chờ NTD tự sửa gửi lại. */}
           {job && !done && (
-            <Link href={`/admin/sua-tin/${params.id}`} className="text-xs font-semibold text-white/80 hover:text-white">
+            <Link href={`/admin/sua-tin/${params.id}`} className="text-xs font-semibold text-white/95 hover:text-white">
               ✎ Sửa tin
             </Link>
           )}
-          <Link href="/admin/dashboard" className="text-xs font-semibold text-white/80 hover:text-white">
+          <Link href="/admin/dashboard" className="text-xs font-semibold text-white/95 hover:text-white">
             ← Quay lại Admin Console
           </Link>
         </div>

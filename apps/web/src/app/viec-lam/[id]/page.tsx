@@ -210,7 +210,7 @@ function JobDetailInner() {
     return (
       <main className="min-h-screen">
         <SiteHeader />
-        <div className="max-w-6xl mx-auto px-4 py-16 text-center text-ink-faint text-sm">Đang tải...</div>
+        <div className="max-w-7xl mx-auto px-4 py-16 text-center text-ink-faint text-sm">Đang tải...</div>
       </main>
     );
   }
@@ -219,7 +219,7 @@ function JobDetailInner() {
     return (
       <main className="min-h-screen">
         <SiteHeader />
-        <div className="max-w-6xl mx-auto px-4 py-16 text-center">
+        <div className="max-w-7xl mx-auto px-4 py-16 text-center">
           <div className="text-ink-muted text-sm mb-3">Không tìm thấy tin tuyển dụng này.</div>
           <Link href="/viec-lam" className="text-primary font-semibold text-sm">
             ← Quay lại tìm việc làm
@@ -232,7 +232,7 @@ function JobDetailInner() {
   return (
     <main className="min-h-screen">
       <SiteHeader />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6">
         <div className="text-[11.5px] text-ink-faint mb-3">
           <Link href="/viec-lam" className="hover:text-primary">
             Tìm việc làm
@@ -260,7 +260,7 @@ function JobDetailInner() {
               )}
             </div>
             <div className="flex items-center gap-2 flex-wrap mt-1">
-              <Link href={`/cong-ty/${job.company.id}`} className="text-white/75 text-[13px] hover:text-white hover:underline">
+              <Link href={`/cong-ty/${job.company.id}`} className="text-white/95 text-[13px] hover:text-white hover:underline">
                 {job.company.name}
               </Link>
               {isCompanyUnverified(job.company) && <SourcedBadge />}

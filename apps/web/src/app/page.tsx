@@ -86,7 +86,7 @@ export default function Home() {
       <SiteHeader />
       <OnlineBanner />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6">
         <div className="grid md:grid-cols-2 gap-3 items-stretch">
           <div className="rounded-2xl border border-border bg-white p-7 flex flex-col gap-4 justify-center">
             <div className="text-xs font-bold text-primary uppercase tracking-wide">

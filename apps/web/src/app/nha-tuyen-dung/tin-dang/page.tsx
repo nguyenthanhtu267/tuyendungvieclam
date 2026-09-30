@@ -90,7 +90,7 @@ export default function TinDangPage() {
   return (
     <main className="min-h-screen bg-bg">
       <EmployerHeader />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col gap-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h1 className="font-extrabold text-base uppercase">Quản lý tin đăng</h1>
           <Link href="/nha-tuyen-dung/dang-tin" className="tvl-btn-primary !w-auto px-5">

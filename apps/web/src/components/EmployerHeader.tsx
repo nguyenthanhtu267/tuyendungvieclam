@@ -55,13 +55,13 @@ export default function EmployerHeader() {
               key={link.label}
               href={link.href}
               className={
-                pathname?.startsWith(link.href) ? 'text-white' : 'text-white/65 hover:text-white transition-colors'
+                pathname?.startsWith(link.href) ? 'text-white' : 'text-white/95 hover:text-white transition-colors'
               }
             >
               {link.label}
             </Link>
           ) : (
-            <span key={link.label} className="text-white/40 cursor-default" title="Sắp ra mắt">
+            <span key={link.label} className="text-white/80 cursor-default" title="Sắp ra mắt">
               {link.label}
             </span>
           ),
@@ -91,7 +91,7 @@ export default function EmployerHeader() {
         <div className="hidden md:block">
         <NavDropdown
           trigger={
-            <span className={pathname?.startsWith('/nha-tuyen-dung/tai-khoan') ? 'text-white' : 'text-white/80'}>
+            <span className={pathname?.startsWith('/nha-tuyen-dung/tai-khoan') ? 'text-white' : 'text-white/95'}>
               Tài Khoản
             </span>
           }
