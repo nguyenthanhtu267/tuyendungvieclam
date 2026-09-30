@@ -150,30 +150,34 @@
   font-size: 14px; line-height: 1; background: var(--ad-tag-bg); color: inherit; opacity: 0.85; cursor: pointer;
 }
 .pm-close:hover { opacity: 1; }
-/* Dải ngang: khung đủ rộng → chữ trái, nút phải. */
+/* Dải ngang (Đợt 35): khung đủ rộng → MỘT DÒNG duy nhất, thấp tối thiểu: [nhãn] Tiêu đề — mô tả …  [Nút]  [Quảng cáo ×]. */
 @container (min-width: 540px) {
-  .pm-wide .pm { flex-direction: row; align-items: center; justify-content: space-between; gap: 20px; min-height: 76px; padding: 14px 24px 12px; }
-  .pm-wide .pm-title { font-size: clamp(18px, 3cqi, 22px); }
-  .pm-wide .pm-sub { font-size: clamp(13px, 1.7cqi, 15px); }
-  .pm-wide .pm-cta { align-self: center; font-size: 14px; padding: 8px 18px; }
+  .pm-wide .pm, .pm-compact .pm { flex-direction: row; align-items: center; justify-content: space-between; gap: 14px; min-height: 0; height: 46px; padding: 0 92px 0 16px; border-radius: 10px; }
+  .pm-wide .pm-text, .pm-compact .pm-text { flex-direction: row; align-items: center; gap: 10px; flex: 1; min-width: 0; overflow: hidden; }
+  .pm-wide .pm-eyebrow, .pm-compact .pm-eyebrow { flex: none; padding: 2px 7px; font-size: 10px; }
+  .pm-wide .pm-title, .pm-compact .pm-title { flex: none; max-width: 60%; font-size: 16px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-wrap: nowrap; }
+  .pm-wide .pm-sub, .pm-compact .pm-sub { flex: 1; min-width: 0; font-size: 13px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pm-wide .pm-cta, .pm-compact .pm-cta { flex: none; align-self: center; font-size: 13px; padding: 6px 14px; }
+  .pm-wide .pm-corner, .pm-compact .pm-corner { top: 50%; transform: translateY(-50%); right: 8px; }
+}
+@container (min-width: 540px) and (max-width: 819px) {
+  .pm-wide .pm-eyebrow, .pm-compact .pm-eyebrow { display: none; }
+}
+@container (min-width: 540px) and (max-width: 699px) {
+  .pm-wide .pm-sub, .pm-compact .pm-sub { display: none; }
+}
+@container (max-width: 539px) {
+  .pm-wide .pm, .pm-compact .pm { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; min-height: 0; padding: 18px 10px 8px 12px; }
+  .pm-wide .pm-text, .pm-compact .pm-text { flex-direction: row; flex: 1; min-width: 0; }
+  .pm-wide .pm-eyebrow, .pm-wide .pm-sub, .pm-compact .pm-sub { display: none; }
+  .pm-wide .pm-title, .pm-compact .pm-title { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-wrap: nowrap; }
+  .pm-wide .pm-cta, .pm-compact .pm-cta { flex: none; align-self: center; font-size: 12.5px; padding: 6px 11px; }
 }
 /* Khung dọc cột phải. */
 .pm-tall .pm { min-height: 270px; justify-content: space-between; padding: 30px 20px 20px; }
 .pm-tall .pm-title { font-size: clamp(19px, 8.4cqi, 25px); }
 .pm-tall .pm-sub { font-size: 13.5px; }
 .pm-tall .pm-cta { align-self: stretch; justify-content: center; padding: 11px 15px; }
-/* Dải nhỏ gọn (sau khi nộp đơn, menu điện thoại). */
-.pm-compact .pm { min-height: 0; padding: 22px 14px 12px; gap: 8px; border-radius: 12px; }
-.pm-compact .pm-title { font-size: 15px; }
-.pm-compact .pm-sub { font-size: 12.5px; }
-.pm-compact .pm-cta { font-size: 12px; padding: 7px 12px; }
-@container (min-width: 460px) {
-  .pm-compact .pm { flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; }
-  .pm-compact .pm-cta { align-self: center; }
-}
-@container (max-width: 300px) {
-  .pm-compact .pm-sub { display: none; }
-}
 @media (prefers-reduced-motion: reduce) {
   .pm, .pm-arrow { transition: none; }
   .pm:hover { transform: none; }

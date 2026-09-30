@@ -101,17 +101,22 @@ export function eligibleAds(feed: AdFeed | null, slot: string, audience: AdAudie
 }
 
 // Vùng đang hiện gì trên trang hiện tại (để 2 vùng cùng trang không hiện trùng 1 banner).
-const onPage = new Map<string, string>();
-export function registerSlot(slot: string, id: string) {
-  onPage.set(slot, id);
+// Đợt 35 — "trùng" tính theo NỘI DUNG (tiêu đề + link), không chỉ theo mã chiến dịch: 2 chiến dịch khác ảnh nhưng cùng chữ
+// (VD banner mẫu + bản sao) cũng không được hiện cùng lúc trên 1 trang.
+export const adKey = (c: Pick<PublicAd, 'title' | 'url'>) => `${(c.title || '').trim().toLowerCase().replace(/\s+/g, ' ')}|${(c.url || '').trim().toLowerCase()}`;
+const onPage = new Map<string, { id: string; key: string }>();
+export function registerSlot(slot: string, ad: Pick<PublicAd, 'id' | 'title' | 'url'>) {
+  onPage.set(slot, { id: ad.id, key: adKey(ad) });
 }
 export function unregisterSlot(slot: string) {
   onPage.delete(slot);
 }
 
 export function pickAd(list: PublicAd[], slot: string): PublicAd | null {
-  const taken = new Set(Array.from(onPage.entries()).filter(([s]) => s !== slot).map(([, id]) => id));
-  const pool = list.filter((c) => !taken.has(c.id));
+  const others = Array.from(onPage.entries()).filter(([s]) => s !== slot).map(([, v]) => v);
+  const takenIds = new Set(others.map((v) => v.id));
+  const takenKeys = new Set(others.map((v) => v.key));
+  const pool = list.filter((c) => !takenIds.has(c.id) && !takenKeys.has(adKey(c)));
   if (!pool.length) return null;
   const total = pool.reduce((t, c) => t + Math.max(1, c.weight), 0);
   let x = Math.random() * total;

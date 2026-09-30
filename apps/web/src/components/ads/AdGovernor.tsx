@@ -23,13 +23,24 @@ function govern() {
   const all = Array.from(document.querySelectorAll<HTMLElement>('[data-ad-slot]'));
   all.forEach((e) => e.classList.remove('ad-suppressed'));
 
+  // Trùng nội dung (cùng tiêu đề + link) → chỉ giữ cái xuất hiện trước trên trang.
+  const seenKeys = new Set<string>();
+  all
+    .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)
+    .forEach((e) => {
+      const k = e.dataset.adKey || '';
+      if (!k) return;
+      if (seenKeys.has(k)) e.classList.add('ad-suppressed');
+      else seenKeys.add(k);
+    });
+
   // Cột phải: giữ banner đầu tiên của mỗi AdStack.
   document.querySelectorAll<HTMLElement>('[data-ad-stack]').forEach((stack) => {
-    Array.from(stack.querySelectorAll<HTMLElement>('[data-ad-slot]')).slice(1).forEach((e) => e.classList.add('ad-suppressed'));
+    Array.from(stack.querySelectorAll<HTMLElement>('[data-ad-slot]:not(.ad-suppressed)')).slice(1).forEach((e) => e.classList.add('ad-suppressed'));
   });
 
   // Dải ngang: chọn tham lam theo ưu tiên.
-  const wides = all.filter((e) => e.dataset.adGov === 'wide' && e.offsetParent !== null);
+  const wides = all.filter((e) => e.dataset.adGov === 'wide' && !e.classList.contains('ad-suppressed') && e.offsetParent !== null);
   const box = (e: HTMLElement) => {
     const r = e.getBoundingClientRect();
     return { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY };

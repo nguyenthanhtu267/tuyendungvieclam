@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth-context';
 import {
   audienceOf,
   closeAd,
+  adKey,
   eligibleAds,
   loadAdFeed,
   peekAdFeed,
@@ -34,7 +35,7 @@ export function AdSlot({ slot, className = '' }: { slot: string; className?: str
       const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
       if ((def.devices === 'desktop' && !isDesktop) || (def.devices === 'mobile' && isDesktop)) return setAd(null);
       const picked = pickAd(eligibleAds(feed, slot, audienceOf(me?.role), isDesktop), slot);
-      if (picked) registerSlot(slot, picked.id);
+      if (picked) registerSlot(slot, picked);
       setAd(picked);
     };
     const hit = peekAdFeed();
@@ -67,7 +68,7 @@ export function AdSlot({ slot, className = '' }: { slot: string; className?: str
 
   if (!ad || !def) return null;
   return (
-    <div ref={ref} className={className} data-ad-slot={slot} data-ad-gov={def.variant === 'wide' || slot === 'footer-top' ? 'wide' : def.variant}>
+    <div ref={ref} className={className} data-ad-slot={slot} data-ad-key={adKey(ad)} data-ad-gov={def.variant === 'wide' || slot === 'footer-top' ? 'wide' : def.variant}>
       <AdBanner
         ad={ad}
         variant={def.variant}
