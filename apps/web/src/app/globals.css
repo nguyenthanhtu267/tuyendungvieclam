@@ -178,6 +178,11 @@
 .pm-tall .pm-title { font-size: clamp(19px, 8.4cqi, 25px); }
 .pm-tall .pm-sub { font-size: 13.5px; }
 .pm-tall .pm-cta { align-self: stretch; justify-content: center; padding: 11px 15px; }
+/* Khung nhỏ ngang trong cột phải (Đợt 56): ~ 320 × 105px. */
+.pm-mini .pm { min-height: 104px; justify-content: space-between; gap: 8px; padding: 24px 14px 12px; }
+.pm-mini .pm-eyebrow, .pm-mini .pm-sub { display: none; }
+.pm-mini .pm-title { font-size: 15px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pm-mini .pm-cta { font-size: 12.5px; padding: 6px 12px; }
 @media (prefers-reduced-motion: reduce) {
   .pm, .pm-arrow { transition: none; }
   .pm:hover { transform: none; }

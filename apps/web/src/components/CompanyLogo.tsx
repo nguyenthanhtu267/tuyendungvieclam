@@ -13,6 +13,7 @@ export function CompanyLogo({
   size = 44,
   className = '',
   variant = 'tint',
+  hideIfEmpty = false,
 }: {
   name: string;
   logoUrl?: string | null;
@@ -21,9 +22,12 @@ export function CompanyLogo({
   // 'tint' — nền primary-tint nhạt (dùng trên nền trắng, mặc định). 'light' — nền trắng mờ trên chữ
   // trắng (dùng trên banner màu primary, VD viec-lam/[id] và cong-ty/[id]).
   variant?: 'tint' | 'light';
+  // Đợt 56 — công ty chưa có logo thật (hoặc ảnh lỗi) → không vẽ ô chữ viết tắt, ẩn hẳn ô logo.
+  hideIfEmpty?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   const showImage = !!logoUrl && !failed;
+  if (hideIfEmpty && !showImage) return null;
   const bgClass = variant === 'light' ? 'bg-white/15 text-white' : 'bg-white text-primary border border-border shadow-sm';
 
   return (

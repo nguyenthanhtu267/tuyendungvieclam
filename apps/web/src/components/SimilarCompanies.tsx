@@ -24,7 +24,7 @@ export function SimilarCompanies({ companyId }: { companyId: string }) {
         {list.map((c) => (
           <li key={c.id}>
             <Link href={`/cong-ty/${c.id}`} className="flex items-center gap-3 group">
-              <CompanyLogo name={c.name} logoUrl={c.logoUrl} size={48} className="text-xs" />
+              <CompanyLogo name={c.name} logoUrl={c.logoUrl} size={48} className="text-xs" hideIfEmpty />
               <span className="min-w-0">
                 <FitText lines={2} min={0.7} className="co-name text-[13px] leading-snug group-hover:underline">{c.name}</FitText>
                 <span className="text-[12.5px] text-ink-muted">{c.jobCount} việc đang tuyển</span>

@@ -26,6 +26,7 @@ export const AD_SLOTS = [
   'candidate-bottom',
   'tools-bottom',
   'employer-manage',
+  'jobs-side-mini',
 ] as const;
 export type AdSlot = (typeof AD_SLOTS)[number];
 

@@ -261,7 +261,10 @@ function JobDetailInner() {
         </div>
 
         <div className="rounded-2xl bg-primary p-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
+          <div className="flex items-center gap-4 min-w-0">
+            {/* Đợt 56 — logo công ty ở góc trái banner (chỉ khi có logo thật). */}
+            <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={72} className="text-lg" hideIfEmpty />
+          <div className="min-w-0">
             <div className="text-white text-xl font-extrabold flex items-center gap-2 flex-wrap">
               {job.title}
               {job.isUrgent && (
@@ -276,6 +279,7 @@ function JobDetailInner() {
               </Link>
               {isCompanyUnverified(job.company) && <SourcedBadge />}
             </div>
+          </div>
           </div>
           <div className="flex gap-2 items-center">
             <button
@@ -641,11 +645,14 @@ function JobDetailInner() {
             {/* Đợt 49 — tab "Tổng quan công ty" đã có khung công ty + nút FOLLOW → ẩn thẻ công ty cột phải để không trùng. */}
             {tab !== 'company' && (
             <div className="rounded-xl border border-border bg-white p-4">
-              <div className="flex flex-col gap-2.5 min-w-0">
-                <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={96} className="text-lg" />
-                <Link href={`/cong-ty/${job.company.id}`} className="font-bold text-[13px] hover:text-primary hover:underline block min-w-0">
-                  <FitText lines={2} min={0.7} className="co-name">{job.company.name}</FitText>
-                </Link>
+              <div className="flex flex-col gap-2 min-w-0">
+                {/* Đợt 57 — logo nhỏ bên trái, tên công ty bên phải (tối đa 2 dòng, tràn thì tự co chữ). */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={52} className="text-sm" hideIfEmpty />
+                  <Link href={`/cong-ty/${job.company.id}`} className="font-bold text-[13px] hover:text-primary hover:underline block min-w-0 flex-1">
+                    <FitText lines={2} min={0.6} className="co-name">{job.company.name}</FitText>
+                  </Link>
+                </div>
                 {isCompanyUnverified(job.company) && (
                   <div>
                     <FitText>

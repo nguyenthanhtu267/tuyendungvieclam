@@ -81,7 +81,11 @@ function WrapFit({ children, className, min, lines }: { children: ReactNode; cla
     return () => ro.disconnect();
   }, [children, min, lines]);
   return (
-    <span ref={ref} className={`block w-full min-w-0 break-words ${className}`}>
+    <span
+      ref={ref}
+      className={`w-full min-w-0 break-words ${className}`}
+      style={{ display: '-webkit-box', WebkitLineClamp: lines, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+    >
       {children}
     </span>
   );

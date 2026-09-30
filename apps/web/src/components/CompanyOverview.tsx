@@ -76,9 +76,11 @@ export default function CompanyOverview({
           {isCompanyUnverified(company) && <SourcedBadge />}
         </div>
         <div className="flex gap-4 items-start flex-col sm:flex-row">
-          <div className="shrink-0 w-[128px] h-[108px] rounded-md bg-white border border-border flex items-center justify-center">
-            <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={104} className="text-xl" />
-          </div>
+          {company.logoUrl && (
+            <div className="shrink-0 w-[128px] h-[108px] rounded-md bg-white border border-border flex items-center justify-center">
+              <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={104} className="text-xl" hideIfEmpty />
+            </div>
+          )}
           <div className="flex-1 min-w-0 w-full">
             {company.address && (
               <div className="text-[14px] pb-2 border-b border-border-strong/60">

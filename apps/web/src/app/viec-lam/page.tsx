@@ -9,12 +9,15 @@ import SiteHeader from '@/components/SiteHeader';
 import { JobCard } from '@/components/JobCard';
 import { FilterBar } from '@/components/search/FilterBar';
 import { DistrictChips } from '@/components/search/DistrictChips';
-import { jobsApi, candidatesApi, type JobFacets, type JobListParams, type JobListResponse, type DistrictFacet } from '@/lib/api';
+import { jobsApi, candidatesApi, applicationsApi, type JobFacets, type JobListParams, type JobListResponse, type DistrictFacet } from '@/lib/api';
 import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth-context';
 import { formatNumber } from '@/lib/format';
 import { AdSlot } from '@/components/ads/AdSlot';
+import { AdStack } from '@/components/ads/AdStack';
 import { RecentJobs } from '@/components/RecentJobs';
+import { FilterSuggestions } from '@/components/search/FilterSuggestions';
+import { readRecentJobs } from '@/lib/recent-jobs';
 
 // Đợt 10 — trang tìm việc làm nâng cao đầy đủ (claude/06-spec-tim-kiem-nang-cao.md): thanh lọc
 // FilterBar (tỉnh/thành + ngành nghề multi-select, 5 dropdown đơn, khẩn cấp, doanh nghiệp yêu thích),
@@ -31,6 +34,10 @@ function JobSearchPage() {
   const searchParams = useSearchParams();
   const { me, token } = useAuth();
   const [sortMatch, setSortMatch] = useState(false);
+  // Đợt 59 — "Chỉ hiện tin mới với tôi": ẩn tin đã xem gần đây + tin đã ứng tuyển (trong trang đang xem).
+  const [onlyNew, setOnlyNew] = useState(false);
+  const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
+  const [appliedIds, setAppliedIds] = useState<Set<string>>(new Set());
   const [saveSearchState, setSaveSearchState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const filters: JobListParams = {
@@ -57,6 +64,16 @@ function JobSearchPage() {
     if (!sortMatch) return items;
     return [...items].sort((a, b) => (matchMap[b.id]?.score ?? -1) - (matchMap[a.id]?.score ?? -1));
   })();
+  useEffect(() => {
+    setSeenIds(new Set(readRecentJobs().map((j) => j.id)));
+    if (me?.role === 'candidate' && token)
+      applicationsApi
+        .listOwn(token)
+        .then((list) => setAppliedIds(new Set(list.map((a) => (a as unknown as { jobPostingId?: string; jobPosting?: { id: string } }).jobPostingId ?? (a as unknown as { jobPosting?: { id: string } }).jobPosting?.id ?? ''))))
+        .catch(() => undefined);
+  }, [me, token]);
+  const visibleItems = onlyNew ? sortedItems.filter((j) => !seenIds.has(j.id) && !appliedIds.has(j.id)) : sortedItems;
+  const hiddenCount = sortedItems.length - visibleItems.length;
   const [facets, setFacets] = useState<JobFacets | null>(null);
   const [districts, setDistricts] = useState<DistrictFacet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -210,17 +227,21 @@ function JobSearchPage() {
         <div className="grid lg:grid-cols-[1fr_280px] gap-5 mt-2 items-start">
           <div>
             <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
-              <h1 className="font-extrabold text-lg">
-                {/* Đợt 13 (24/09/2026) — thiếu formatNumber() khiến số hàng nghìn hiện dính liền
-                    (VD "1106" thay vì "1.106") — xem Quy tắc chung mục A. */}
-                {loading ? 'Đang tìm...' : `${formatNumber(result?.total ?? 0)} ${heading}`}
-              </h1>
+              <div className="flex items-center gap-3 flex-wrap min-w-0">
+                <h1 className="font-extrabold text-lg">
+                  {/* Đợt 13 (24/09/2026) — thiếu formatNumber() khiến số hàng nghìn hiện dính liền
+                      (VD "1106" thay vì "1.106") — xem Quy tắc chung mục A. */}
+                  {loading ? 'Đang tìm...' : `${formatNumber(result?.total ?? 0)} ${heading}`}
+                </h1>
+                {/* Đợt 58 — "Tin vừa xem" ngay sau tiêu đề, xổ danh sách "Tiêu đề - Công ty". */}
+                <RecentJobs />
+              </div>
               {/* Đợt 12m — chỉ hiện khi đã đăng nhập bằng tài khoản ứng viên và có ít nhất 1 tiêu chí
                   lọc (q/ngành/tỉnh), tránh lưu "tìm kiếm rỗng" vô nghĩa. */}
-              {me?.role === 'candidate' && (filters.q || filters.industries?.length || filters.provinces?.length) ? (
+              {(!me || me.role === 'candidate') && (filters.q || filters.industries?.length || filters.provinces?.length) ? (
                 <button
                   type="button"
-                  onClick={handleSaveSearch}
+                  onClick={me ? handleSaveSearch : () => router.push('/dang-nhap')}
                   disabled={saveSearchState === 'saving' || saveSearchState === 'saved'}
                   className="tvl-btn-ghost !w-auto px-3.5 py-1.5 text-xs disabled:opacity-70"
                 >
@@ -230,21 +251,38 @@ function JobSearchPage() {
                       ? 'Đang lưu...'
                       : saveSearchState === 'error'
                         ? 'Lỗi, thử lại'
-                        : '🔔 Lưu tìm kiếm này'}
+                        : '🔔 Báo tôi khi có việc mới khớp bộ lọc này'}
                 </button>
               ) : null}
             </div>
 
-            <RecentJobs />
+            <FilterSuggestions
+              filters={filters}
+              total={result?.total ?? 0}
+              facets={facets}
+              loading={loading}
+              onApply={(patch) => updateParams(patch)}
+            />
 
             <HomePlacePicker onNearMe={(provinces) => updateParams({ provinces, location: undefined, district: undefined })} />
 
-            {me?.role === 'candidate' && (result?.items.length ?? 0) > 1 && (
-              <label className="flex items-center gap-2 text-sm font-semibold -mt-1" htmlFor="sort-match">
-                <input id="sort-match" type="checkbox" checked={sortMatch} onChange={(e) => setSortMatch(e.target.checked)} />
-                ✨ Ưu tiên tin phù hợp với hồ sơ của tôi nhất (sắp xếp trong trang này)
+            <div className="flex items-center gap-x-5 gap-y-1 flex-wrap text-sm font-semibold">
+              {me?.role === 'candidate' && (result?.items.length ?? 0) > 1 && (
+                <label className="flex items-center gap-2" htmlFor="sort-match">
+                  <input id="sort-match" type="checkbox" checked={sortMatch} onChange={(e) => setSortMatch(e.target.checked)} />
+                  ✨ Ưu tiên tin phù hợp với hồ sơ của tôi nhất
+                </label>
+              )}
+              {!me && (
+                <a href="/dang-nhap" className="text-primary hover:underline font-semibold">
+                  ✨ Đăng nhập để xem % phù hợp với hồ sơ của bạn
+                </a>
+              )}
+              <label className="flex items-center gap-2" htmlFor="only-new">
+                <input id="only-new" type="checkbox" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} />
+                🆕 Chỉ hiện tin mới với tôi{onlyNew && hiddenCount > 0 ? ` (đã ẩn ${hiddenCount} tin đã xem/đã nộp)` : ''}
               </label>
-            )}
+            </div>
 
             {!loading && result?.items.length === 0 && (
               <div className="rounded-xl border border-border bg-white p-8 text-center text-ink-muted text-sm">
@@ -254,7 +292,7 @@ function JobSearchPage() {
 
             <div className="flex flex-col gap-3">
               {/* Đợt 24 — banner xen giữa danh sách: sau tin thứ 5 (ít hơn 5 tin thì sau tin cuối). */}
-              {sortedItems.map((job, i, arr) => (
+              {visibleItems.map((job, i, arr) => (
                 <Fragment key={job.id}>
                   <JobCard job={job} />
                   {i === Math.min(4, arr.length - 1) && <AdSlot slot="jobs-inline" />}
@@ -340,6 +378,9 @@ function JobSearchPage() {
                 )}
               </div>
             )}
+            <AdStack sticky={false}>
+              <AdSlot slot="jobs-side-mini" />
+            </AdStack>
             {facets && facets.industries.length > 0 && (
               <div className="rounded-xl border border-border bg-white p-4">
                 <div className="text-[11px] font-bold text-primary uppercase tracking-wide mb-2.5">

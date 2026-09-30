@@ -120,7 +120,7 @@ export function JobCard({
       {/* Đợt 13 (24/09/2026) — mục 4 danh sách lỗi: logo công ty trên thẻ việc làm quá nhỏ so với
           các trang khác (chi tiết tin, trang công ty đều dùng size lớn hơn). Tăng 44→60px + cỡ chữ
           initials theo tỷ lệ để không bị vỡ layout khi công ty chưa có logoUrl. */}
-      <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={80} className="text-base" />
+      <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={80} className="text-base" hideIfEmpty />
       <div className="flex-1 min-w-0 pr-6">
         <div className="font-bold text-[13.5px] text-ink">
           {job.title}
@@ -157,6 +157,25 @@ export function JobCard({
           {dist && <span className="whitespace-nowrap text-primary" title="Ước tính từ nơi ở của bạn">🚗 {dist}</span>}
           <span className="whitespace-nowrap">Cập nhật: {formatDate(job.updatedAt ?? job.createdAt)}</span>
           {job.deadline && <span className="whitespace-nowrap">Hạn nộp: {formatDate(job.deadline)}</span>}
+          {/* Đợt 59 — "Việc tương tự": lọc cùng ngành + cấp bậc + tỉnh đầu tiên của tin này. */}
+          {(job.industry || job.level) && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const qs = new URLSearchParams();
+                if (job.industry) qs.set('industries', job.industry);
+                if (job.level) qs.set('level', job.level);
+                const pv = job.provinces?.[0] ?? job.location;
+                if (pv) qs.set('provinces', pv);
+                router.push(`/viec-lam?${qs.toString()}`);
+              }}
+              className="whitespace-nowrap text-primary font-semibold hover:underline"
+            >
+              ≈ Việc tương tự
+            </button>
+          )}
         </div>
 
         {/* Đợt 15 (25/09/2026) — mục 17 danh sách lỗi: bỏ hẳn khối chip "Phúc lợi" khỏi thẻ tin (theo

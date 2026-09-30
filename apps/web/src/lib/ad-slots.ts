@@ -1,7 +1,7 @@
 // Đợt 24 (29/09/2026) — các "vùng" đặt banner quảng cáo. Mã vùng PHẢI khớp apps/api/src/ads/ad-slots.ts.
 // variant: wide = dải ngang co dãn theo bề rộng · tall = khung dọc cột phải · compact = dải nhỏ gọn.
 // devices: nơi vùng xuất hiện (vùng cột phải chỉ có trên máy tính vì điện thoại không có cột phải).
-export type AdVariant = 'wide' | 'tall' | 'compact';
+export type AdVariant = 'wide' | 'tall' | 'compact' | 'mini';
 
 export interface AdSlotDef {
   id: string;
@@ -39,6 +39,7 @@ export const AD_SLOT_DEFS: AdSlotDef[] = [
   { id: 'candidate-bottom', page: 'Hồ sơ ứng viên', label: 'Cuối trang My Center', variant: 'wide', devices: 'all', audience: 'Ứng viên', onlyFor: 'candidate', size: 'Ngang toàn khung' },
   { id: 'tools-bottom', page: 'Tiện ích / So sánh việc làm', label: 'Cuối trang Tính lương và So sánh việc làm', variant: 'wide', devices: 'all', audience: 'Mọi người', size: 'Ngang toàn khung' },
   { id: 'employer-manage', page: 'NTD · Quản lý tin', label: 'Cuối trang Quản lý tin đăng', variant: 'wide', devices: 'all', audience: 'Nhà tuyển dụng', onlyFor: 'employer', size: 'Ngang toàn khung' },
+  { id: 'jobs-side-mini', page: 'Tìm việc làm', label: 'Cột phải, giữa "Địa điểm phổ biến" và "Ngành nghề phổ biến"', variant: 'mini', devices: 'desktop', audience: 'Mọi người', size: 'Nhỏ ngang ~ 320 × 105px' },
 ];
 
 export const AD_SLOT_MAP: Record<string, AdSlotDef> = Object.fromEntries(AD_SLOT_DEFS.map((s) => [s.id, s]));

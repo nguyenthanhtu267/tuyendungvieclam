@@ -8,6 +8,7 @@ export default function HomePlacePicker({ onNearMe }: { onNearMe: (provinces: st
   const home = useHomePlace();
   const [editing, setEditing] = useState(false);
   const [msg, setMsg] = useState('');
+  const [radius, setRadius] = useState(60);
   const label = home ? (home.province ?? (home.lat != null ? `Gần ${nearestProvince(home.lat, home.lon!)}` : '')) : '';
 
   function useGps() {
@@ -54,8 +55,20 @@ export default function HomePlacePicker({ onNearMe }: { onNearMe: (provinces: st
         📍 Nơi ở: <b>{label}</b>
       </span>
       <button onClick={() => setEditing(true)} className="text-ink-faint underline">Đổi</button>
-      <button onClick={() => onNearMe(provincesNear(home))} className="rounded-lg border border-primary text-primary font-semibold px-2.5 py-0.5 hover:bg-primary-tint">
-        Việc gần tôi (≤ 60 km)
+      <select
+        aria-label="Bán kính tìm việc gần nhà"
+        className="tvl-input !w-auto !py-0.5"
+        value={radius}
+        onChange={(e) => setRadius(Number(e.target.value))}
+      >
+        {[10, 25, 60, 100, 200].map((r) => (
+          <option key={r} value={r}>
+            ≤ {r} km
+          </option>
+        ))}
+      </select>
+      <button onClick={() => onNearMe(provincesNear(home, radius))} className="rounded-lg border border-primary text-primary font-semibold px-2.5 py-0.5 hover:bg-primary-tint">
+        Việc gần tôi
       </button>
       <span className="text-ink-faint text-[12px]">Khoảng cách ước tính theo tỉnh/thành.</span>
     </div>
