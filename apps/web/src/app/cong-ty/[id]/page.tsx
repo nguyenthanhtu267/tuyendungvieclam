@@ -88,7 +88,7 @@ export default function CongTyPage() {
   return (
     <main className="min-h-screen">
       <SiteHeader />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6">
         <div className="text-[11.5px] text-ink-faint mb-3">
           <Link href="/viec-lam" className="hover:text-primary">
             Tìm việc làm
@@ -173,7 +173,7 @@ export default function CongTyPage() {
           </div>
         </div>
         {/* Đợt 24 — banner cuối trang công ty. */}
-        <AdSlot slot="company-bottom" className="mt-6" />
+        <AdSlot slot="company-bottom" className="mt-4" />
       </div>
     </main>
   );

@@ -63,7 +63,7 @@ export default function EmployerDashboardPage() {
   return (
     <main className="min-h-screen bg-bg">
       <EmployerHeader />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col gap-5">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6 flex flex-col gap-3">
         <div className="rounded-2xl p-6 bg-gradient-to-br from-primary to-primary-dark text-white flex flex-wrap justify-between items-center gap-4">
           <div>
             <div className="font-extrabold text-lg">Chào {company?.name ?? '...'} 👋</div>

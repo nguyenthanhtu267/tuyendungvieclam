@@ -199,7 +199,7 @@ export default function TimHoSoPage() {
   return (
     <main className="min-h-screen bg-bg">
       <EmployerHeader />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6 flex flex-col gap-3">
         {/* Đợt 24 — banner đầu trang Tìm hồ sơ của NTD. */}
         <AdSlot slot="employer-search" />
         <div className="flex items-center justify-between flex-wrap gap-3">

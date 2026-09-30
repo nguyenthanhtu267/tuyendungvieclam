@@ -232,7 +232,7 @@ function JobDetailInner() {
   return (
     <main className="min-h-screen">
       <SiteHeader />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6">
         <div className="text-[11.5px] text-ink-faint mb-3">
           <Link href="/viec-lam" className="hover:text-primary">
             Tìm việc làm
@@ -669,7 +669,7 @@ function JobDetailInner() {
         </div>
 
         {/* Đợt 24 — banner cuối nội dung tin (mọi thiết bị). */}
-        <AdSlot slot="job-bottom" className="mt-6" />
+        <AdSlot slot="job-bottom" className="mt-4" />
 
         {/* Đợt 12n (21/09/2026) — "Các công việc tương tự" chuyển từ khối nhỏ trên sidebar xuống
             cuối trang, dạng lưới đầy đủ như JobCard ở trang tìm việc, theo mẫu tham khảo. */}

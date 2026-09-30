@@ -165,9 +165,9 @@ export default function MyCenterPage() {
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6">
         {/* Đợt 24 — banner đầu trang My Center của ứng viên. */}
-        <AdSlot slot="candidate-top" className="mb-5" />
+        <AdSlot slot="candidate-top" className="mb-3" />
         <div className="grid md:grid-cols-[210px_1fr] gap-5 items-start">
           <nav className="hidden md:flex flex-col gap-1 rounded-xl border border-border bg-white p-2.5 sticky top-20">
             {NAV_ITEMS.map((item) => (
