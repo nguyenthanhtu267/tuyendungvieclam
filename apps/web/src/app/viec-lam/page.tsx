@@ -4,6 +4,7 @@ import { useMatches } from '@/lib/match';
 import { Fragment, Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { parseNaturalQuery } from '@/lib/nl-search';
+import HomePlacePicker from '@/components/HomePlacePicker';
 import SiteHeader from '@/components/SiteHeader';
 import { JobCard } from '@/components/JobCard';
 import { FilterBar } from '@/components/search/FilterBar';
@@ -232,6 +233,8 @@ function JobSearchPage() {
                 </button>
               ) : null}
             </div>
+
+            <HomePlacePicker onNearMe={(provinces) => updateParams({ provinces, location: undefined, district: undefined })} />
 
             {me?.role === 'candidate' && (result?.items.length ?? 0) > 1 && (
               <label className="flex items-center gap-2 text-sm font-semibold -mt-1" htmlFor="sort-match">

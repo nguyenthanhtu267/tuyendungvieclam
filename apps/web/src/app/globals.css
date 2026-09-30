@@ -252,3 +252,28 @@ input, select, textarea, button { font-family: inherit; }
 .mp-dark .mp-tile { border-color: #D5DBE5 !important; }
 .mp-dark .market-ticker .bg-accent-tint { background: #FFE3DA !important; }
 .mp-dark .market-ticker .text-accent-dark { color: #B5320F !important; }
+
+/* Đợt 47 — tên công ty: luôn IN HOA cho trang trọng + nền nhạt để tương phản, dễ thấy. */
+.co-name {
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  font-weight: 700;
+  color: #0F2957;
+  background: #E8EDF7;
+  border-radius: 4px;
+  padding: 1px 6px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+/* trên nền tối (banner đầu trang tin, trang công ty) */
+.co-name-dark {
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  font-weight: 700;
+  color: #0F2957;
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 5px;
+  padding: 1px 8px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}

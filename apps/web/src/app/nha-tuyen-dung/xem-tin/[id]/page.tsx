@@ -121,7 +121,7 @@ export default function XemTinNtdPage() {
                 </span>
               )}
             </div>
-            <div className="text-white/95 text-[13px] mt-1">{job.company.name}</div>
+            <div className="text-[13px] mt-1"><span className="co-name-dark">{job.company.name}</span></div>
           </div>
         </div>
 
@@ -232,7 +232,7 @@ export default function XemTinNtdPage() {
 
           <div className="flex flex-col gap-3.5">
             <div className="rounded-xl border border-border bg-white p-4 text-[12.5px] text-ink-muted">
-              <div className="font-bold text-ink text-sm mb-1.5">{job.company.name}</div>
+              <div className="text-sm mb-1.5"><span className="co-name">{job.company.name}</span></div>
               <div>Mã số thuế: {job.company.taxCode}</div>
               {job.company.industry && <div>Lĩnh vực: {job.company.industry}</div>}
               {job.company.size && <div>Quy mô: {job.company.size}</div>}

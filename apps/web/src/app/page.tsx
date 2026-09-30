@@ -253,7 +253,7 @@ export default function Home() {
                 >
                   <CompanyLogo name={c.name} logoUrl={c.logoUrl} size={40} className="text-xs" />
                   <div className="min-w-0">
-                    <div className="font-bold text-[12.5px] truncate">{c.name}</div>
+                    <div className="text-[12.5px] truncate"><span className="co-name">{c.name}</span></div>
                     <div className="text-ink-faint text-[11px]">{c.jobCount} việc làm đang tuyển</div>
                   </div>
                 </a>

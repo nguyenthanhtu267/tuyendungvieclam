@@ -273,8 +273,9 @@ export const jobsApi = {
   // Đợt 27 — số liệu thị trường thật (14 ngày, hình thức, mức lương) cho bảng ở trang chủ.
   marketStats: () => request<MarketStats>('/jobs/stats/market'),
   // Đợt 29 — từ khoá được tìm nhiều nhất (khối cột phải trang tìm việc).
-  salaryStats: (industry?: string, province?: string) => {
+  salaryStats: (industry?: string, province?: string, level?: string) => {
     const q = new URLSearchParams();
+    if (level) q.set('level', level);
     if (industry) q.set('industry', industry);
     if (province) q.set('province', province);
     return request<SalaryStats>(`/jobs/stats/salary?${q.toString()}`);
@@ -435,6 +436,11 @@ export interface Application {
   coverLetter?: string;
   appliedAt: string;
   jobPosting: JobPosting;
+  // Đợt 46 — hẹn lịch phỏng vấn.
+  interviewSlots?: string[] | null;
+  interviewAt?: string | null;
+  interviewPlace?: string | null;
+  interviewNote?: string | null;
 }
 
 export const candidatesApi = {
@@ -711,6 +717,12 @@ export const applicationsApi = {
       body: JSON.stringify(dto),
     }),
   listOwn: (token: string) => request<Application[]>('/me/applications', { headers: authHeaders(token) }),
+  chooseInterview: (token: string, applicationId: string, slot: string) =>
+    request<{ interviewAt: string }>(`/me/applications/${applicationId}/interview/choose`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ slot }),
+    }),
   getHistory: (token: string, applicationId: string) =>
     request<ApplicationStatusHistoryItem[]>(`/me/applications/${applicationId}/history`, {
       headers: authHeaders(token),
@@ -754,6 +766,11 @@ export interface EmployerApplication {
   rating?: number;
   folder?: string;
   deletedAt?: string;
+  // Đợt 46 — hẹn lịch phỏng vấn.
+  interviewSlots?: string[] | null;
+  interviewAt?: string | null;
+  interviewPlace?: string | null;
+  interviewNote?: string | null;
   cv: {
     id: string;
     // Đợt 21 (27/09/2026) — 'template' = ứng viên dùng thẳng "Hồ sơ trực tuyến" (cách 2, không có
@@ -1009,6 +1026,12 @@ export const employerApi = {
       method: 'PATCH',
       headers: authHeaders(token),
       body: JSON.stringify({ rating }),
+    }),
+  proposeInterview: (token: string, applicationId: string, dto: { slots: string[]; place?: string; note?: string }) =>
+    request<EmployerApplication>(`/employer/applications/${applicationId}/interview`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(dto),
     }),
   setApplicationFolder: (token: string, applicationId: string, folder?: string) =>
     request<EmployerApplication>(`/employer/applications/${applicationId}/folder`, {

@@ -20,6 +20,8 @@ import {
 } from '../database/entities/job-posting.entity';
 import { ApplyJobDto } from './dto/apply-job.dto';
 import { GuestApplyDto } from './dto/guest-apply.dto';
+import { vnDateTime } from '../common/vn-datetime.util';
+import { NotificationsService } from '../notifications/notifications.service';
 import { FileStorageService } from '../storage/file-storage.service';
 import { CvArchiveService } from '../cv-archive/cv-archive.service';
 
@@ -42,6 +44,7 @@ export class ApplicationsService {
     private readonly jobRepo: Repository<JobPosting>,
     private readonly cvArchiveService: CvArchiveService,
     private readonly storage: FileStorageService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async apply(
@@ -262,6 +265,37 @@ export class ApplicationsService {
       .where('cv.candidateProfileId = :profileId', { profileId: profile.id })
       .orderBy('application.appliedAt', 'DESC')
       .getMany();
+  }
+
+  // Đợt 46 — ứng viên chọn 1 trong các khung giờ phỏng vấn NTD đề xuất.
+  async chooseInterview(userId: string, applicationId: string, slot: string) {
+    const profile = await this.profileRepo.findOne({ where: { userId } });
+    if (!profile) throw new NotFoundException('Không tìm thấy hồ sơ ứng viên');
+    const app = await this.applicationRepo.findOne({
+      where: { id: applicationId },
+      relations: { cv: true, jobPosting: { company: true } },
+    });
+    if (!app || app.cv?.candidateProfileId !== profile.id) throw new NotFoundException('Không tìm thấy đơn ứng tuyển');
+    const iso = new Date(slot).toISOString();
+    if (!(app.interviewSlots ?? []).includes(iso)) throw new BadRequestException('Khung giờ không nằm trong đề xuất của nhà tuyển dụng');
+    if (new Date(iso).getTime() < Date.now()) throw new BadRequestException('Khung giờ này đã qua');
+    app.interviewAt = new Date(iso);
+    app.interviewReminded = false;
+    await this.applicationRepo.save(app);
+    const when = vnDateTime(new Date(iso));
+    const cus = await this.applicationRepo.manager
+      .createQueryBuilder()
+      .select('cu.user_id', 'userId')
+      .from('company_users', 'cu')
+      .where('cu.company_id = :cid', { cid: app.jobPosting.companyId })
+      .getRawMany<{ userId: string }>();
+    await this.notificationsService.createMany(
+      cus.map((c) => c.userId),
+      'interview_confirmed',
+      `${profile.fullName} đã chọn giờ phỏng vấn ${when} cho vị trí "${app.jobPosting.title}".`,
+      `/nha-tuyen-dung/ung-vien?job=${app.jobPostingId}`,
+    );
+    return { interviewAt: app.interviewAt };
   }
 
   // Đợt 12o (21/09/2026) — "Nhật ký trạng thái ứng tuyển": ứng viên xem dòng thời gian xử lý đơn

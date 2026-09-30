@@ -75,6 +75,22 @@ export class Application {
   @DeleteDateColumn({ name: 'deleted_at' })
   deletedAt?: Date;
 
+  // Đợt 46 — hẹn lịch phỏng vấn.
+  @Column({ name: 'interview_slots', type: 'jsonb', nullable: true })
+  interviewSlots?: string[] | null;
+
+  @Column({ name: 'interview_at', type: 'timestamptz', nullable: true })
+  interviewAt?: Date | null;
+
+  @Column({ name: 'interview_place', type: 'varchar', length: 300, nullable: true })
+  interviewPlace?: string | null;
+
+  @Column({ name: 'interview_note', type: 'text', nullable: true })
+  interviewNote?: string | null;
+
+  @Column({ name: 'interview_reminded', type: 'boolean', default: false })
+  interviewReminded: boolean;
+
   @CreateDateColumn({ name: 'applied_at' })
   appliedAt: Date;
 

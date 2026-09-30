@@ -17,6 +17,7 @@ import { GuestApplyDto } from './dto/guest-apply.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { ApplicationsService } from './applications.service';
+import { ChooseInterviewDto } from './dto/choose-interview.dto';
 import { ApplyJobDto } from './dto/apply-job.dto';
 
 @Controller()
@@ -36,6 +37,15 @@ export class ApplicationsController {
   @Get('me/applications')
   listOwn(@CurrentUser() user: { userId: string }) {
     return this.applicationsService.listOwn(user.userId);
+  }
+
+  @Post('me/applications/:id/interview/choose')
+  chooseInterview(
+    @CurrentUser() user: { userId: string },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ChooseInterviewDto,
+  ) {
+    return this.applicationsService.chooseInterview(user.userId, id, dto.slot);
   }
 
   @Get('me/applications/:id/history')

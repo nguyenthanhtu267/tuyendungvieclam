@@ -421,9 +421,12 @@ export class CandidatesService {
 
     const scoreExpr = scoreParts.length ? scoreParts.join(' + ') : '0';
 
+    // Đợt 47 — sửa lỗi 500 "(CASE WHEN job" alias was not found: TypeORM không cho orderBy biểu thức
+    // thô khi có join + take → đặt biểu thức thành cột chọn thêm có bí danh rồi sắp xếp theo bí danh.
     const jobs = await qb
       .andWhere(`(${scoreExpr}) > 0`)
-      .orderBy(scoreExpr, 'DESC')
+      .addSelect(`(${scoreExpr})`, 'rec_score')
+      .orderBy('rec_score', 'DESC')
       .addOrderBy('job.createdAt', 'DESC')
       .take(limit)
       .getMany();

@@ -11,6 +11,8 @@ import { formatDate, formatSalaryTag, isNewJob } from '@/lib/format';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { SourcedBadge, isCompanyUnverified } from '@/components/SourcedBadge';
 import { matchTone, useMatches } from '@/lib/match';
+import { useCompare } from '@/lib/compare';
+import { distanceLabel, useHomePlace } from '@/lib/geo';
 
 // Đợt 10 — thẻ việc làm theo mục 4 đặc tả: tiêu đề đậm + badge (MỚI) chữ đỏ trong ngoặc (không phải
 // pill), dòng lương đỏ, nhiều tỉnh ngăn bởi "|", hạn nộp/cập nhật, tag phúc lợi có icon, nút đỏ
@@ -29,6 +31,11 @@ export function JobCard({
   const [isSaved, setIsSaved] = useState(!!saved);
   const [busy, setBusy] = useState(false);
   const match = useMatches([job.id])[job.id];
+  const compare = useCompare();
+  const home = useHomePlace();
+  const dist = home ? distanceLabel(home, job.provinces ?? []) : null;
+  const inCompare = compare.has(job.id);
+  const [compareMsg, setCompareMsg] = useState('');
 
   const locationText = job.provinces?.length ? job.provinces.join(' | ') : job.location;
 
@@ -92,6 +99,22 @@ export function JobCard({
       >
         {isSaved ? '♥' : '♡'}
       </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const r = compare.toggle({ id: job.id, title: job.title });
+          setCompareMsg(r === 'full' ? 'Tối đa 3 tin' : '');
+        }}
+        aria-pressed={inCompare}
+        title={compareMsg || (inCompare ? 'Bỏ khỏi so sánh' : 'Thêm vào so sánh')}
+        className={`absolute top-2.5 right-9 text-[11px] font-semibold rounded px-1.5 py-0.5 border ${
+          inCompare ? 'bg-primary text-white border-primary' : 'text-ink-faint border-border hover:text-primary hover:border-primary'
+        }`}
+      >
+        {compareMsg || (inCompare ? '✓ So sánh' : '⇄ So sánh')}
+      </button>
 
       {/* Đợt 13 (24/09/2026) — mục 4 danh sách lỗi: logo công ty trên thẻ việc làm quá nhỏ so với
           các trang khác (chi tiết tin, trang công ty đều dùng size lớn hơn). Tăng 44→60px + cỡ chữ
@@ -117,7 +140,7 @@ export function JobCard({
           )}
         </div>
         <div className="text-xs text-ink-muted mt-0.5 truncate flex items-center gap-1.5">
-          <span className="truncate">{job.company.name}</span>
+          <span className="truncate co-name">{job.company.name}</span>
           {isCompanyUnverified(job.company) && <SourcedBadge />}
         </div>
 
@@ -128,6 +151,7 @@ export function JobCard({
         {/* Đợt 44 — địa điểm hiện ĐỦ (không cắt "Hồ..."), rồi theo trình tự thời gian: Cập nhật → Hạn nộp. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5 text-[11.5px] text-ink-faint">
           {locationText && <span className="whitespace-nowrap">📍 {locationText}</span>}
+          {dist && <span className="whitespace-nowrap text-primary" title="Ước tính từ nơi ở của bạn">🚗 {dist}</span>}
           <span className="whitespace-nowrap">Cập nhật: {formatDate(job.updatedAt ?? job.createdAt)}</span>
           {job.deadline && <span className="whitespace-nowrap">Hạn nộp: {formatDate(job.deadline)}</span>}
         </div>

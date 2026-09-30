@@ -1,3 +1,4 @@
+import CompareTray from '@/components/CompareTray';
 import type { Metadata } from 'next';
 import '@fontsource/inter/400.css';
 import '@fontsource/inter/500.css';
@@ -42,6 +43,7 @@ export default function RootLayout({
             <ImpersonationBanner />
             <AnalyticsTracker />
             <div className="flex-1 flex flex-col">{children}</div>
+            <CompareTray />
             <Footer />
             </BackgroundProvider>
           </LanguageProvider>

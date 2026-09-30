@@ -1,5 +1,6 @@
 'use client';
 
+import InterviewChooser from '@/components/InterviewChooser';
 import ApplicationStepper from '@/components/ApplicationStepper';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -226,7 +227,7 @@ export default function MyCenterPage() {
                     <div className="flex-1 min-w-0">
                       <div className="font-bold text-[12.8px] truncate">{job.title}</div>
                       <div className="text-ink-faint text-[11.3px] truncate">
-                        {job.company.name} · {job.location} · {formatSalary(job.salaryMin, job.salaryMax)}
+                        <span className="co-name">{job.company.name}</span> · {job.location} · {formatSalary(job.salaryMin, job.salaryMax)}
                       </div>
                     </div>
                     <Link href={`/viec-lam/${job.id}`} className="tvl-btn-ghost !w-auto px-3 py-1.5 text-xs shrink-0">
@@ -237,7 +238,7 @@ export default function MyCenterPage() {
               </div>
             </div>
 
-            <div id="applications" className="grid lg:grid-cols-2 gap-4 scroll-mt-20">
+            <div id="applications" className="grid gap-4 scroll-mt-20">
               <div className="rounded-xl border border-border bg-white p-[18px]">
                 <div className="flex items-center justify-between mb-2">
                   <h2 className="font-extrabold text-[15px]">Việc làm của tôi</h2>
@@ -265,12 +266,19 @@ export default function MyCenterPage() {
                                 {a.jobPosting.title}
                               </Link>
                             </td>
-                            <td className="py-2 px-1 text-ink-muted">{a.jobPosting.company.name}</td>
+                            <td className="py-2 px-1 min-w-[180px]"><span className="co-name">{a.jobPosting.company.name}</span></td>
                             <td className="py-2 px-1 text-ink-muted font-mono tabular-nums">
                               {formatDate(a.appliedAt)}
                             </td>
                             <td className="py-2 px-1">
                               <ApplicationStepper status={a.status} appliedAt={a.appliedAt} />
+                              {token && (
+                                <InterviewChooser
+                                  token={token}
+                                  app={a}
+                                  onChosen={(iso) => setApplications((list) => list.map((x) => (x.id === a.id ? { ...x, interviewAt: iso } : x)))}
+                                />
+                              )}
                             </td>
                             <td className="py-2 px-1 text-right">
                               <button

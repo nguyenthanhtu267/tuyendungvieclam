@@ -1,5 +1,6 @@
 'use client';
 
+import InterviewScheduler from '@/components/InterviewScheduler';
 import { Suspense, useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -533,6 +534,11 @@ function UngVienPageInner() {
                               >
                                 {APPLICATION_STATUS_LABEL[app.status]}
                               </span>
+                              {token && (
+                                <div className="mt-1.5">
+                                  <InterviewScheduler token={token} app={app} onDone={loadApplicants} />
+                                </div>
+                              )}
                             </td>
                           )}
                           <td className="py-3 px-3">

@@ -55,8 +55,12 @@ export class JobsController {
   }
 
   @Get('stats/salary')
-  salaryStats(@Query('industry') industry?: string, @Query('province') province?: string) {
-    return this.jobsService.getSalaryStats(industry || undefined, province || undefined);
+  salaryStats(
+    @Query('industry') industry?: string,
+    @Query('province') province?: string,
+    @Query('level') level?: string,
+  ) {
+    return this.jobsService.getSalaryStats(industry || undefined, province || undefined, level || undefined);
   }
 
   // Đợt 29 — từ khoá được tìm nhiều nhất (công khai).

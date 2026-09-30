@@ -506,6 +506,35 @@ export class EmployerService {
     return saved;
   }
 
+  // Đợt 46 — hẹn lịch phỏng vấn: lưu khung giờ, chuyển trạng thái "Mời phỏng vấn", báo ứng viên chọn giờ.
+  async proposeInterview(userId: string, applicationId: string, dto: { slots: string[]; place?: string; note?: string }) {
+    const now = Date.now();
+    const slots = Array.from(new Set(dto.slots.map((s) => new Date(s).toISOString())))
+      .filter((s) => new Date(s).getTime() > now + 30 * 60_000)
+      .sort();
+    if (slots.length === 0) throw new BadRequestException('Khung giờ phải ở tương lai (sau ít nhất 30 phút)');
+    const application = await this.getOwnedApplication(userId, applicationId);
+    application.interviewSlots = slots;
+    application.interviewAt = null;
+    application.interviewReminded = false;
+    application.interviewPlace = dto.place?.trim() || null;
+    application.interviewNote = dto.note?.trim() || null;
+    await this.applicationRepo.save(application);
+    if (application.status !== ApplicationStatus.INTERVIEW) {
+      await this.updateApplicationStatus(userId, applicationId, ApplicationStatus.INTERVIEW);
+    }
+    const candidateUserId = application.cv?.candidateProfile?.userId;
+    if (candidateUserId) {
+      await this.notificationsService.create(
+        candidateUserId,
+        'interview_invite',
+        `Chọn giờ phỏng vấn cho vị trí "${application.jobPosting.title}" — có ${slots.length} khung giờ để bạn chọn.`,
+        `/ho-so?app=${application.id}#applications`,
+      );
+    }
+    return this.getOwnedApplication(userId, applicationId);
+  }
+
   async rateApplication(userId: string, applicationId: string, rating: number) {
     const application = await this.getOwnedApplication(userId, applicationId);
     application.rating = rating;

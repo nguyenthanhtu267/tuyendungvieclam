@@ -14,6 +14,7 @@
 // nằm trong file này — mỗi trang gọi nó (`nha-tuyen-dung/dang-tin`, `admin/sua-tin/[id]`,
 // `admin/dashboard` AddJobForm) tự quản lý state `form`/`step`, tự viết `onSubmit`, tự truyền chữ
 // hiển thị (`submitLabel`, `previewNote`...) — file này chỉ là phần GIAO DIỆN dùng chung.
+import JobQualityPanel from './JobQualityPanel';
 import { MultiSelectPopover } from '@/components/search/MultiSelectPopover';
 import { ChipsInput } from '@/components/profile/ui';
 import { RichTextEditor } from '@/components/RichTextEditor';
@@ -449,6 +450,7 @@ export function JobWizardSteps({
 
         {step === 3 && (
           <>
+            <JobQualityPanel form={form} />
             <h2 className="font-bold text-sm">Xem trước tin tuyển dụng</h2>
             <div className="rounded-lg bg-surface-alt p-4">
               <div className="font-extrabold text-sm flex items-center gap-2 flex-wrap">

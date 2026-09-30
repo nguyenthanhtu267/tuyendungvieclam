@@ -37,6 +37,9 @@ import {
   jobWorkScheduleDisplay,
 } from '@/lib/format';
 import { benefitsRichTextValue } from '@/lib/richtext';
+import { JobSummaryBox, useSalaryEstimate, fmtTrieu } from '@/components/JobInsights';
+import { draftCoverLetter } from '@/lib/job-insights';
+import { distanceLabel, useHomePlace } from '@/lib/geo';
 import { AdSlot } from '@/components/ads/AdSlot';
 
 type Tab = 'details' | 'company';
@@ -55,6 +58,7 @@ function JobDetailInner() {
   const [cvs, setCvs] = useState<CV[] | null>(null);
   const [selectedCvId, setSelectedCvId] = useState('');
   const [coverLetter, setCoverLetter] = useState('');
+  const [drafting, setDrafting] = useState(false);
   const [applyState, setApplyState] = useState<'idle' | 'submitting' | 'done'>('idle');
   const [applyError, setApplyError] = useState<string | null>(null);
   // Đợt 21 (27/09/2026) — 2 cách chia sẻ hồ sơ khi ứng tuyển: chọn 1 CV file/link có sẵn, HOẶC dùng
@@ -71,6 +75,8 @@ function JobDetailInner() {
   // Đợt 12ac (24/09/2026) — tab "Tổng quan công ty": giới thiệu công ty + số lượt theo dõi + danh
   // sách tin đang tuyển khác ngay trong tab (trước đó chỉ có 1 link "Xem tất cả…"). Tải lười (chỉ khi
   // mở tab) vì đa số người xem không bấm sang tab này.
+  const salaryEst = useSalaryEstimate(job);
+  const home = useHomePlace();
   const [companyOverview, setCompanyOverview] = useState<CompanyProfileResponse | null | undefined>(undefined);
 
   useEffect(() => {
@@ -262,7 +268,7 @@ function JobDetailInner() {
               )}
             </div>
             <div className="flex items-center gap-2 flex-wrap mt-1">
-              <Link href={`/cong-ty/${job.company.id}`} className="text-white/95 text-[13px] hover:text-white hover:underline">
+              <Link href={`/cong-ty/${job.company.id}`} className="co-name-dark text-[13px] hover:underline">
                 {job.company.name}
               </Link>
               {isCompanyUnverified(job.company) && <SourcedBadge />}
@@ -376,9 +382,25 @@ function JobDetailInner() {
                   </label>
                 )}
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-bold">Thư ứng tuyển (không bắt buộc)</span>
+                  <span className="text-xs font-bold flex items-center justify-between gap-2">
+                    Thư ứng tuyển (không bắt buộc)
+                    <button
+                      type="button"
+                      disabled={drafting}
+                      onClick={async () => {
+                        if (coverLetter.trim() && !window.confirm('Thay thư đang viết bằng thư gợi ý?')) return;
+                        setDrafting(true);
+                        const profile = token ? await candidatesApi.getProfile(token).catch(() => null) : null;
+                        setCoverLetter(draftCoverLetter(job, profile as never, compatibility?.checklist));
+                        setDrafting(false);
+                      }}
+                      className="text-primary font-semibold hover:underline text-[12px] disabled:opacity-50"
+                    >
+                      ✨ {drafting ? 'Đang soạn…' : 'Gợi ý thư ứng tuyển'}
+                    </button>
+                  </span>
                   <textarea
-                    className="tvl-input min-h-[80px]"
+                    className={`tvl-input whitespace-pre-wrap ${coverLetter.length > 200 ? "min-h-[220px]" : "min-h-[80px]"}`}
                     value={coverLetter}
                     onChange={(e) => setCoverLetter(e.target.value)}
                     placeholder="Giới thiệu ngắn gọn vì sao bạn phù hợp với vị trí này..."
@@ -426,21 +448,37 @@ function JobDetailInner() {
             <div className="rounded-b-xl border border-t-0 border-border bg-white p-5">
               {tab === 'details' ? (
                 <>
+                  <JobSummaryBox job={job} />
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-[12.5px]">
                     <Detail
                       label="📍 Địa điểm"
                       value={job.provinces?.length ? job.provinces.join(' | ') : job.location ?? '—'}
                     />
                     {job.district && <Detail label="🏙️ Quận/Huyện" value={job.district} />}
+                    {home && distanceLabel(home, job.provinces ?? []) && (
+                      <Detail label="🚗 Khoảng cách (ước tính)" value={distanceLabel(home, job.provinces ?? [])!} />
+                    )}
                     <Detail label="🕒 Cập nhật" value={formatDate(job.updatedAt ?? job.createdAt)} />
                     <Detail label="🏷️ Ngành nghề" value={job.industry ?? '—'} />
                     <Detail label="💼 Hình thức" value={job.employmentType ?? '—'} />
-                    <Detail label="💰 Lương" value={formatSalary(job.salaryMin, job.salaryMax)} />
+                    <Detail
+                      label="💰 Lương"
+                      value={
+                        salaryEst
+                          ? `${formatSalary(job.salaryMin, job.salaryMax)} (thường ${fmtTrieu(salaryEst.low)}–${fmtTrieu(salaryEst.high)} triệu*)`
+                          : formatSalary(job.salaryMin, job.salaryMax)
+                      }
+                    />
                     <Detail label="🎖️ Cấp bậc" value={job.level ?? '—'} />
                     {job.experienceLevel && <Detail label="📊 Kinh nghiệm" value={job.experienceLevel} />}
                     <Detail label="⏳ Hạn nộp" value={job.deadline ? formatDate(job.deadline) : '—'} />
                     <Detail label="👥 Số lượng" value={String(job.headcount)} />
                   </div>
+                  {salaryEst && (
+                    <div className="mt-2 text-[11.5px] text-ink-faint">
+                      * Ước lượng từ {salaryEst.count} tin ghi rõ lương ngành {salaryEst.scope} trên web — chỉ mang tính tham khảo.
+                    </div>
+                  )}
 
                   {job.description && (
                     <div className="mt-5">
@@ -564,7 +602,7 @@ function JobDetailInner() {
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <Link href={`/cong-ty/${job.company.id}`} className="font-bold text-ink text-sm hover:text-primary hover:underline">
-                          {job.company.name}
+                          <span className="co-name">{job.company.name}</span>
                         </Link>
                         {isCompanyUnverified(job.company) && <SourcedBadge />}
                       </div>
@@ -597,23 +635,17 @@ function JobDetailInner() {
                   {/* Đợt 12ac (24/09/2026) — danh sách tin đang tuyển khác NGAY trong tab (trước đó
                       phải bấm sang trang /cong-ty/[id] mới xem được), giống mẫu careerviet.vn. */}
                   {companyOverview && companyOverview.jobs.length > 1 && (
-                    <div className="flex flex-col gap-2 pt-2 border-t border-border">
-                      <div className="font-bold text-ink text-xs">Tin đang tuyển khác của công ty</div>
-                      {companyOverview.jobs
-                        .filter((j) => j.id !== job.id)
-                        .slice(0, 5)
-                        .map((j) => (
-                          <Link
-                            key={j.id}
-                            href={`/viec-lam/${j.id}`}
-                            className="rounded-lg border border-border px-3 py-2.5 hover:border-primary/40 hover:bg-surface-alt"
-                          >
-                            <div className="font-semibold text-ink text-[12.5px]">{j.title}</div>
-                            <div className="text-ink-faint text-[11px] mt-0.5">
-                              {[j.level, formatSalary(j.salaryMin, j.salaryMax)].filter(Boolean).join(' · ')}
-                            </div>
-                          </Link>
-                        ))}
+                    <div className="flex flex-col gap-2 pt-3 border-t border-border">
+                      <div className="font-extrabold text-ink text-[14px]">Tin đang tuyển khác của công ty</div>
+                      {/* Đợt 47 — hiển thị bằng thẻ việc làm chuẩn (JobCard) giống giao diện chính. */}
+                      <div className="grid grid-cols-1 gap-3">
+                        {companyOverview.jobs
+                          .filter((j) => j.id !== job.id)
+                          .slice(0, 6)
+                          .map((j) => (
+                            <JobCard key={j.id} job={{ ...j, company: j.company ?? companyOverview.company }} />
+                          ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -627,7 +659,7 @@ function JobDetailInner() {
                 <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={40} className="text-xs" />
                 <div>
                   <Link href={`/cong-ty/${job.company.id}`} className="font-bold text-[13px] hover:text-primary hover:underline">
-                    {job.company.name}
+                    <span className="co-name">{job.company.name}</span>
                   </Link>
                   {isCompanyUnverified(job.company) && (
                     <div className="mt-1">

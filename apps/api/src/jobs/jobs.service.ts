@@ -400,10 +400,10 @@ export class JobsService {
   }
 
   // Đợt 39 — thống kê lương thật theo ngành/tỉnh từ tin đang tuyển (công khai, cho máy tính lương).
-  async getSalaryStats(industry?: string, province?: string) {
+  async getSalaryStats(industry?: string, province?: string, level?: string) {
     const rows = await this.baseQueryPublic()
       .andWhere('(job.salaryMin IS NOT NULL OR job.salaryMax IS NOT NULL)')
-      .select(['job.id', 'job.industry', 'job.provinces', 'job.salaryMin', 'job.salaryMax'])
+      .select(['job.id', 'job.industry', 'job.provinces', 'job.level', 'job.salaryMin', 'job.salaryMax'])
       .take(5000)
       .getMany();
     const mids = (list: typeof rows) =>
@@ -430,6 +430,11 @@ export class JobsService {
     let filtered = rows;
     if (industry) filtered = filtered.filter((j) => j.industry === industry);
     if (province) filtered = filtered.filter((j) => (j.provinces ?? []).includes(province));
+    if (level) {
+      // Nếu lọc thêm cấp bậc còn quá ít tin thì bỏ điều kiện cấp bậc (vẫn giữ ngành/tỉnh).
+      const byLevel = filtered.filter((j) => j.level === level);
+      if (byLevel.length >= 3) filtered = byLevel;
+    }
     const industries = Array.from(new Set(rows.map((j) => j.industry).filter(Boolean))) as string[];
     const provinces = Array.from(new Set(rows.flatMap((j) => j.provinces ?? []))).sort();
     return {

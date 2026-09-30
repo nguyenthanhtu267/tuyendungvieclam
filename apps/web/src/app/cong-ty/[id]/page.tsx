@@ -95,7 +95,7 @@ export default function CongTyPage() {
             Tìm việc làm
           </Link>
           {' / '}
-          <span className="text-ink-muted font-semibold">{company.name}</span>
+          <span className="co-name text-[12px]">{company.name}</span>
         </div>
 
         <div className="rounded-2xl bg-primary p-6 flex items-center gap-4 flex-wrap justify-between">
@@ -103,7 +103,7 @@ export default function CongTyPage() {
             <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={64} variant="light" className="text-lg" />
             <div>
               <div className="text-white text-xl font-extrabold flex items-center gap-2 flex-wrap">
-                {company.name}
+                <span className="co-name-dark">{company.name}</span>
                 {isCompanyUnverified(company) && <SourcedBadge />}
               </div>
               <div className="text-white/95 text-[13px] mt-1">

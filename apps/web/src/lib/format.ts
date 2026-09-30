@@ -10,7 +10,12 @@ export function normalizeSalaryAmount(raw: number | undefined | null): number | 
   return Math.round(raw);
 }
 
-export function formatSalary(min?: number, max?: number): string {
+// Đợt 47 — tin cũ lỡ lưu số tiền đầy đủ (35000000) thay vì số triệu (35): quy đổi khi HIỂN THỊ.
+const toTrieu = (v?: number | null) => (v && v >= 100_000 ? Math.round(v / 100_000) / 10 : v ?? undefined);
+
+export function formatSalary(rawMin?: number, rawMax?: number): string {
+  const min = toTrieu(rawMin);
+  const max = toTrieu(rawMax);
   if (!min && !max) return 'Thoả thuận';
   if (min && max) return `${min}–${max} triệu`;
   if (min) return `Từ ${min} triệu`;
@@ -20,7 +25,9 @@ export function formatSalary(min?: number, max?: number): string {
 
 // Đợt 10 — dòng lương màu đỏ trên thẻ việc làm (mục 4 đặc tả): dạng khoảng "10 Tr – 13 Tr VND"
 // hoặc chữ "Cạnh tranh" khi chưa khai mức lương.
-export function formatSalaryTag(min?: number, max?: number): string {
+export function formatSalaryTag(rawMin?: number, rawMax?: number): string {
+  const min = toTrieu(rawMin);
+  const max = toTrieu(rawMax);
   if (!min && !max) return 'Cạnh tranh';
   if (min && max) return `${min} Tr – ${max} Tr VND`;
   if (min) return `Từ ${min} Tr VND`;

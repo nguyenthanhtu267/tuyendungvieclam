@@ -1,3 +1,4 @@
+import { ProposeInterviewDto } from './dto/propose-interview.dto';
 import {
   BadRequestException,
   Body,
@@ -190,6 +191,15 @@ export class EmployerController {
     @Body() dto: UpdateApplicationStatusDto,
   ) {
     return this.employerService.updateApplicationStatus(user.userId, id, dto.status);
+  }
+
+  @Patch('employer/applications/:id/interview')
+  proposeInterview(
+    @CurrentUser() user: { userId: string },
+    @Param('id') id: string,
+    @Body() dto: ProposeInterviewDto,
+  ) {
+    return this.employerService.proposeInterview(user.userId, id, dto);
   }
 
   @Patch('employer/applications/:id/rating')

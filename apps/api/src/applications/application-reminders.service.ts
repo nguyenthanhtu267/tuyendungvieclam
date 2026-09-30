@@ -2,11 +2,13 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, In, IsNull, MoreThan, Repository } from 'typeorm';
 import { Application, ApplicationStatus } from '../database/entities/application.entity';
+import { JobApprovalStatus, JobPosting } from '../database/entities/job-posting.entity';
 import { CompanyUser } from '../database/entities/company-user.entity';
 import { Notification } from '../database/entities/notification.entity';
+import { vnDateTime } from '../common/vn-datetime.util';
 import { NotificationsService } from '../notifications/notifications.service';
 
-const RUN_EVERY_MS = 6 * 60 * 60_000;
+const RUN_EVERY_MS = 60 * 60_000; // Đợt 46: 1 giờ/lần để nhắc lịch phỏng vấn kịp 24h trước
 const SILENT_DAYS = 7;
 const DAY = 24 * 60 * 60_000;
 
@@ -25,6 +27,7 @@ export class ApplicationRemindersService implements OnModuleInit, OnModuleDestro
     @InjectRepository(Application) private readonly appRepo: Repository<Application>,
     @InjectRepository(CompanyUser) private readonly companyUserRepo: Repository<CompanyUser>,
     @InjectRepository(Notification) private readonly notifRepo: Repository<Notification>,
+    @InjectRepository(JobPosting) private readonly jobRepo: Repository<JobPosting>,
     private readonly notifications: NotificationsService,
   ) {}
 
@@ -95,11 +98,88 @@ export class ApplicationRemindersService implements OnModuleInit, OnModuleDestro
           employers++;
         }
       }
-      if (candidates || employers) this.log.log(`Nhắc ứng tuyển: ${candidates} ứng viên, ${employers} nhà tuyển dụng`);
+      const interviews = await this.remindInterviews();
+      const closing = await this.remindJobClosing();
+      if (candidates || employers || interviews || closing)
+        this.log.log(`Nhắc: ${candidates} ứng viên, ${employers} NTD, ${interviews} lịch phỏng vấn, ${closing} tin cần đóng/gia hạn`);
       return { candidates, employers };
     } finally {
       this.running = false;
     }
+  }
+
+  // Đợt 46 — nhắc lịch phỏng vấn trong vòng 24 giờ tới (1 lần/lịch) cho cả ứng viên và NTD.
+  private async remindInterviews(): Promise<number> {
+    const now = new Date();
+    const soon = new Date(Date.now() + DAY);
+    const apps = await this.appRepo.find({
+      where: { interviewAt: Between(now, soon), interviewReminded: false, deletedAt: IsNull() },
+      relations: { jobPosting: { company: true }, cv: true },
+      take: 300,
+    });
+    for (const a of apps) {
+      const when = vnDateTime(a.interviewAt!);
+      const place = a.interviewPlace ? ` tại ${a.interviewPlace}` : '';
+      const uid = a.cv?.candidateProfileId ? await this.userIdOfProfile(a.cv.candidateProfileId) : null;
+      if (uid)
+        await this.notifications.create(uid, 'interview_reminder', `Nhắc lịch: phỏng vấn "${a.jobPosting?.title}" lúc ${when}${place}.`, `/ho-so?app=${a.id}#applications`);
+      const cus = await this.companyUserRepo.find({ where: { companyId: a.jobPosting.companyId } });
+      await this.notifications.createMany(
+        cus.map((c) => c.userId),
+        'interview_reminder',
+        `Nhắc lịch: phỏng vấn ứng viên cho "${a.jobPosting?.title}" lúc ${when}${place}.`,
+        `/nha-tuyen-dung/ung-vien?job=${a.jobPostingId}`,
+      );
+      a.interviewReminded = true;
+      await this.appRepo.save(a);
+    }
+    return apps.length;
+  }
+
+  // Đợt 46 — nhắc NTD đóng/gia hạn tin: (1) hạn nộp còn ≤ 3 ngày; (2) đã đủ ứng viên phù hợp
+  // (số đơn "Phù hợp"/"Mời phỏng vấn" ≥ số lượng cần tuyển và tổng đơn ≥ 10). Mỗi loại 1 lần/tin.
+  private async remindJobClosing(): Promise<number> {
+    const today = new Date();
+    const in3 = new Date(Date.now() + 3 * DAY);
+    const ymd = (d: Date) => d.toISOString().slice(0, 10);
+    const jobs = await this.jobRepo
+      .createQueryBuilder('j')
+      .where('j.approval_status = :st', { st: JobApprovalStatus.APPROVED })
+      .andWhere('j.is_paused = false')
+      .andWhere('(j.deadline BETWEEN :a AND :b OR j.id IN (SELECT a.job_posting_id FROM applications a WHERE a.deleted_at IS NULL GROUP BY a.job_posting_id HAVING COUNT(*) >= 10))', {
+        a: ymd(today),
+        b: ymd(in3),
+      })
+      .take(500)
+      .getMany();
+    let sent = 0;
+    for (const j of jobs) {
+      const cus = await this.companyUserRepo.find({ where: { companyId: j.companyId } });
+      const uids = cus.map((c) => c.userId);
+      if (!uids.length) continue;
+      const deadlineSoon = j.deadline && String(j.deadline) >= ymd(today) && String(j.deadline) <= ymd(in3);
+      if (deadlineSoon) {
+        const link = `/nha-tuyen-dung/tin-dang?job=${j.id}&n=deadline`;
+        if (!(await this.notifRepo.exists({ where: { type: 'job_closing', link } }))) {
+          await this.notifications.createMany(uids, 'job_closing', `Tin "${j.title}" hết hạn nộp vào ${String(j.deadline).split('-').reverse().join('/')}. Gia hạn nếu vẫn cần tuyển, hoặc để tin tự đóng.`, link);
+          sent++;
+        }
+      }
+      const counts = await this.appRepo
+        .createQueryBuilder('a')
+        .select('COUNT(*)', 'total')
+        .addSelect(`COUNT(*) FILTER (WHERE a.status IN ('suitable','interview'))`, 'good')
+        .where('a.job_posting_id = :id', { id: j.id })
+        .getRawOne<{ total: string; good: string }>();
+      if (Number(counts?.total) >= 10 && Number(counts?.good) >= Math.max(1, j.headcount ?? 1)) {
+        const link = `/nha-tuyen-dung/tin-dang?job=${j.id}&n=full`;
+        if (!(await this.notifRepo.exists({ where: { type: 'job_closing', link } }))) {
+          await this.notifications.createMany(uids, 'job_closing', `Tin "${j.title}" đã có ${counts!.good} ứng viên phù hợp/mời phỏng vấn trên ${counts!.total} hồ sơ. Nếu đã tuyển đủ, hãy tạm ngưng tin để ứng viên khác không chờ đợi.`, link);
+          sent++;
+        }
+      }
+    }
+    return sent;
   }
 
   private profileUserCache = new Map<string, string | null>();
