@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth-context';
 import { formatDate, formatSalaryTag, isNewJob } from '@/lib/format';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { SourcedBadge, isCompanyUnverified } from '@/components/SourcedBadge';
+import { matchTone, useMatches } from '@/lib/match';
 
 // Đợt 10 — thẻ việc làm theo mục 4 đặc tả: tiêu đề đậm + badge (MỚI) chữ đỏ trong ngoặc (không phải
 // pill), dòng lương đỏ, nhiều tỉnh ngăn bởi "|", hạn nộp/cập nhật, tag phúc lợi có icon, nút đỏ
@@ -27,6 +28,7 @@ export function JobCard({
   const { me, token } = useAuth();
   const [isSaved, setIsSaved] = useState(!!saved);
   const [busy, setBusy] = useState(false);
+  const match = useMatches([job.id])[job.id];
 
   const locationText = job.provinces?.length ? job.provinces.join(' | ') : job.location;
 
@@ -99,6 +101,15 @@ export function JobCard({
         <div className="font-bold text-[13.5px] text-ink">
           {job.title}
           {isNewJob(job.createdAt) && <span className="text-critical font-extrabold ml-1.5">(MỚI)</span>}
+          {match && (
+            <span
+              className={`inline-flex items-center ml-1.5 align-middle text-[11px] font-extrabold px-1.5 py-0.5 rounded ${matchTone(match.score).cls}`}
+              title={[`Độ phù hợp với hồ sơ của bạn: ${match.score}%`, ...match.reasons.map((r) => `✔ ${r}`), ...match.gaps.map((g) => `• ${g}`)].join('\n')}
+              data-testid="match-badge"
+            >
+              ✨ Phù hợp {match.score}%
+            </span>
+          )}
           {job.isUrgent && (
             <span className="inline-flex items-center gap-1 ml-1.5 align-middle text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-critical text-white tracking-wide">
               ⚡ URGENT
@@ -114,10 +125,11 @@ export function JobCard({
           $ {formatSalaryTag(job.salaryMin, job.salaryMax)}
         </div>
 
-        <div className="flex flex-nowrap items-center gap-x-3 mt-1.5 text-[11.5px] text-ink-faint whitespace-nowrap overflow-hidden">
-          {locationText && <span className="truncate min-w-0 shrink">📍 {locationText}</span>}
-          {job.deadline && <span className="shrink-0">Hạn nộp: {formatDate(job.deadline)}</span>}
-          <span className="shrink-0">Cập nhật: {formatDate(job.updatedAt ?? job.createdAt)}</span>
+        {/* Đợt 44 — địa điểm hiện ĐỦ (không cắt "Hồ..."), rồi theo trình tự thời gian: Cập nhật → Hạn nộp. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5 text-[11.5px] text-ink-faint">
+          {locationText && <span className="whitespace-nowrap">📍 {locationText}</span>}
+          <span className="whitespace-nowrap">Cập nhật: {formatDate(job.updatedAt ?? job.createdAt)}</span>
+          {job.deadline && <span className="whitespace-nowrap">Hạn nộp: {formatDate(job.deadline)}</span>}
         </div>
 
         {/* Đợt 15 (25/09/2026) — mục 17 danh sách lỗi: bỏ hẳn khối chip "Phúc lợi" khỏi thẻ tin (theo

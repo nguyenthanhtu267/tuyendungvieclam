@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { parseNaturalQuery, nlToParams } from '@/lib/nl-search';
 import SiteHeader from '@/components/SiteHeader';
 import OnlineBanner from '@/components/OnlineBanner';
 import { JobCard } from '@/components/JobCard';
+import { RecommendedJobs } from '@/components/RecommendedJobs';
 import { jobsApi, type JobFacets, type JobPosting, type FeaturedEmployer, type HomepageStats } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { PINNED_PROVINCES } from '@/lib/catalogs';
@@ -77,8 +79,7 @@ export default function Home() {
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    const params = new URLSearchParams();
-    if (keyword.trim()) params.set('q', keyword.trim());
+    const params = nlToParams(parseNaturalQuery(keyword).filters);
     router.push(`/viec-lam${params.toString() ? `?${params}` : ''}`);
   }
 
@@ -182,6 +183,8 @@ export default function Home() {
         {/* Đợt 24 — banner quảng cáo (vùng home-top). */}
         <AdSlot slot="home-top" className="mt-3" />
 
+        <RecommendedJobs />
+
         <div className="flex items-center justify-between mt-5 mb-2.5">
           <h2 className="font-extrabold text-lg">{t('home.latestJobs')}</h2>
           <a href="/viec-lam" className="text-primary text-xs font-bold">
@@ -262,10 +265,6 @@ export default function Home() {
         {/* Đợt 28 — banner cuối trang chủ. */}
         <AdSlot slot="home-bottom" className="mt-5" />
 
-        <div className="mt-6 pt-3 border-t border-border text-[11.3px] text-ink-faint flex flex-wrap justify-between gap-2">
-          <span>© 2026 Tuyển Dụng Việc Làm · tuyendungvieclam</span>
-          <span>Về chúng tôi · Điều khoản · Bảo mật · Liên hệ</span>
-        </div>
       </div>
     </main>
   );

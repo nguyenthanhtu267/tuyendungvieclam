@@ -1,8 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThanOrEqual, Repository, SelectQueryBuilder } from 'typeorm';
-import { JobPosting, JobApprovalStatus } from '../database/entities/job-posting.entity';
-import { Company, CompanyApprovalStatus } from '../database/entities/company.entity';
+import { In, MoreThanOrEqual, Repository, SelectQueryBuilder } from 'typeorm';
+import {
+  JobPosting,
+  JobApprovalStatus,
+} from '../database/entities/job-posting.entity';
+import {
+  Company,
+  CompanyApprovalStatus,
+} from '../database/entities/company.entity';
 import { CandidateProfile } from '../database/entities/candidate-profile.entity';
 import { CandidateSkill } from '../database/entities/candidate-sections.entity';
 import { Application } from '../database/entities/application.entity';
@@ -33,6 +39,8 @@ const LEVEL_ORDER: string[] = [
   'Điều hành cấp cao',
 ];
 
+import { scoreMatch, type MatchProfile, type MatchResult } from './job-match';
+
 function stripHtml(html?: string): string {
   return (html ?? '').replace(/<[^>]*>/g, ' ');
 }
@@ -60,46 +68,70 @@ export class JobsService {
   // Dùng chung cho findAll() và facets() để 2 nơi luôn lọc giống hệt nhau (đợt 10, tránh lệch số
   // liệu giữa danh sách và bộ đếm facet như đã rút kinh nghiệm ở đợt 9 cv-search).
   private baseQuery(): SelectQueryBuilder<JobPosting> {
-    return this.jobRepo
-      .createQueryBuilder('job')
-      .leftJoinAndSelect('job.company', 'company')
-      .where('job.approvalStatus = :status', { status: JobApprovalStatus.APPROVED })
-      // Đợt 11b — NTD tự tạm ngưng tin (mục #4 ATS) thì không hiện trong tìm kiếm công khai nữa,
-      // dù vẫn ở approvalStatus = APPROVED (Admin không cần duyệt lại khi đăng lại).
-      .andWhere('job.isPaused = false');
+    return (
+      this.jobRepo
+        .createQueryBuilder('job')
+        .leftJoinAndSelect('job.company', 'company')
+        .where('job.approvalStatus = :status', {
+          status: JobApprovalStatus.APPROVED,
+        })
+        // Đợt 11b — NTD tự tạm ngưng tin (mục #4 ATS) thì không hiện trong tìm kiếm công khai nữa,
+        // dù vẫn ở approvalStatus = APPROVED (Admin không cần duyệt lại khi đăng lại).
+        .andWhere('job.isPaused = false')
+    );
   }
 
   private applyFilters(qb: SelectQueryBuilder<JobPosting>, query: ListJobsDto) {
     if (query.q) {
-      qb.andWhere('(job.title ILIKE :q OR company.name ILIKE :q)', { q: `%${query.q}%` });
+      qb.andWhere('(job.title ILIKE :q OR company.name ILIKE :q)', {
+        q: `%${query.q}%`,
+      });
     }
     // provinces (đợt 10) khớp bất kỳ; location (đợt 7, tương thích ngược) khớp chuỗi con.
     if (query.provinces?.length) {
       qb.andWhere(
         `(${query.provinces.map((_, i) => `job.provinces ILIKE :prov${i}`).join(' OR ')})`,
-        Object.fromEntries(query.provinces.map((v, i) => [`prov${i}`, `%${v}%`])),
+        Object.fromEntries(
+          query.provinces.map((v, i) => [`prov${i}`, `%${v}%`]),
+        ),
       );
     } else if (query.location) {
-      qb.andWhere('(job.location ILIKE :location OR job.provinces ILIKE :location)', {
-        location: `%${query.location}%`,
-      });
+      qb.andWhere(
+        '(job.location ILIKE :location OR job.provinces ILIKE :location)',
+        {
+          location: `%${query.location}%`,
+        },
+      );
     }
     if (query.district) {
       qb.andWhere('job.district = :district', { district: query.district });
     }
     if (query.industries?.length) {
-      qb.andWhere('job.industry IN (:...industries)', { industries: query.industries });
+      qb.andWhere('job.industry IN (:...industries)', {
+        industries: query.industries,
+      });
     } else if (query.industry) {
-      qb.andWhere('job.industry ILIKE :industry', { industry: `%${query.industry}%` });
+      qb.andWhere('job.industry ILIKE :industry', {
+        industry: `%${query.industry}%`,
+      });
     }
     if (query.salaryTier != null) {
-      qb.andWhere('(job.salaryMax >= :tier OR job.salaryMin >= :tier)', { tier: query.salaryTier });
+      qb.andWhere('(job.salaryMax >= :tier OR job.salaryMin >= :tier)', {
+        tier: query.salaryTier,
+      });
     }
     if (query.level) qb.andWhere('job.level = :level', { level: query.level });
-    if (query.employmentType) qb.andWhere('job.employmentType = :employmentType', { employmentType: query.employmentType });
-    if (query.experienceLevel) qb.andWhere('job.experienceLevel = :experienceLevel', { experienceLevel: query.experienceLevel });
+    if (query.employmentType)
+      qb.andWhere('job.employmentType = :employmentType', {
+        employmentType: query.employmentType,
+      });
+    if (query.experienceLevel)
+      qb.andWhere('job.experienceLevel = :experienceLevel', {
+        experienceLevel: query.experienceLevel,
+      });
     if (query.urgentOnly) qb.andWhere('job.isUrgent = true');
-    if (query.featuredEmployerOnly) qb.andWhere('company.isFeaturedEmployer = true');
+    if (query.featuredEmployerOnly)
+      qb.andWhere('company.isFeaturedEmployer = true');
     if (query.postedWithin) {
       const days = POSTED_WITHIN_DAYS[query.postedWithin];
       const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -143,15 +175,24 @@ export class JobsService {
   }
 
   async findOne(id: string) {
-    const job = await this.jobRepo.findOne({ where: { id }, relations: { company: true } });
-    if (!job || job.approvalStatus !== JobApprovalStatus.APPROVED || job.isPaused) {
+    const job = await this.jobRepo.findOne({
+      where: { id },
+      relations: { company: true },
+    });
+    if (
+      !job ||
+      job.approvalStatus !== JobApprovalStatus.APPROVED ||
+      job.isPaused
+    ) {
       throw new NotFoundException('Không tìm thấy tin tuyển dụng');
     }
 
     const related = await this.jobRepo
       .createQueryBuilder('job')
       .leftJoinAndSelect('job.company', 'company')
-      .where('job.approvalStatus = :status', { status: JobApprovalStatus.APPROVED })
+      .where('job.approvalStatus = :status', {
+        status: JobApprovalStatus.APPROVED,
+      })
       .andWhere('job.isPaused = false')
       .andWhere('job.id != :id', { id })
       .andWhere('job.industry = :industry', { industry: job.industry ?? '' })
@@ -173,7 +214,11 @@ export class JobsService {
   // liệu ĐÃ lọc theo các tiêu chí còn lại (không tính chính chiều đang hỏi) — cho cảm giác lọc mượt
   // giống careerviet.vn thay vì facet cố định trên toàn bộ dữ liệu.
   async facets(query: ListJobsDto = {}) {
-    const industryQb = this.applyFilters(this.baseQuery(), { ...query, industries: undefined, industry: undefined });
+    const industryQb = this.applyFilters(this.baseQuery(), {
+      ...query,
+      industries: undefined,
+      industry: undefined,
+    });
     const industries = await industryQb
       .clone()
       .select('job.industry', 'industry')
@@ -189,8 +234,15 @@ export class JobsService {
     // `provinces` (mỗi tin lưu danh sách tỉnh/thành riêng biệt) của các tin khớp bộ lọc, tách và
     // đếm từng tỉnh trong Node — 1 tin đăng ở N tỉnh sẽ cộng +1 cho cả N tỉnh đó, không tạo mục tổ
     // hợp. Tin cũ (đợt 7, chưa có `provinces`) vẫn dùng lại `location` để không mất số liệu.
-    const locationQb = this.applyFilters(this.baseQuery(), { ...query, provinces: undefined, location: undefined });
-    const locationRows: Array<{ provinces: string | null; location: string | null }> = await locationQb
+    const locationQb = this.applyFilters(this.baseQuery(), {
+      ...query,
+      provinces: undefined,
+      location: undefined,
+    });
+    const locationRows: Array<{
+      provinces: string | null;
+      location: string | null;
+    }> = await locationQb
       .clone()
       .select('job.provinces', 'provinces')
       .addSelect('job.location', 'location')
@@ -203,7 +255,9 @@ export class JobsService {
         : row.location
           ? row.location.split('|')
           : [];
-      const provinces = Array.from(new Set(raw.map((p) => p.trim()).filter(Boolean)));
+      const provinces = Array.from(
+        new Set(raw.map((p) => p.trim()).filter(Boolean)),
+      );
       for (const p of provinces) {
         locationCounts.set(p, (locationCounts.get(p) ?? 0) + 1);
       }
@@ -216,7 +270,10 @@ export class JobsService {
 
     return {
       total,
-      industries: industries.map((r) => ({ industry: r.industry, count: Number(r.count) })),
+      industries: industries.map((r) => ({
+        industry: r.industry,
+        count: Number(r.count),
+      })),
       locations,
     };
   }
@@ -224,7 +281,11 @@ export class JobsService {
   // Chip quận/huyện kèm số lượng (mục 3 đặc tả) — chỉ có ý nghĩa khi đã chọn 1 tỉnh/thành cụ thể.
   async districtFacets(province: string, query: ListJobsDto = {}) {
     if (!province) return [];
-    const qb = this.applyFilters(this.baseQuery(), { ...query, provinces: [province], district: undefined });
+    const qb = this.applyFilters(this.baseQuery(), {
+      ...query,
+      provinces: [province],
+      district: undefined,
+    });
     const rows = await qb
       .select('job.district', 'district')
       .addSelect('COUNT(*)', 'count')
@@ -248,7 +309,12 @@ export class JobsService {
         industry: c.industry,
         size: c.size,
         logoUrl: resolveCompanyLogoUrl(c),
-        jobCount: await this.jobRepo.count({ where: { companyId: c.id, approvalStatus: JobApprovalStatus.APPROVED } }),
+        jobCount: await this.jobRepo.count({
+          where: {
+            companyId: c.id,
+            approvalStatus: JobApprovalStatus.APPROVED,
+          },
+        }),
       })),
     );
     return withJobCount;
@@ -259,15 +325,143 @@ export class JobsService {
   // ứng viên đã có sẵn (không cần thêm bảng/cột mới) — nếu thiếu dữ liệu ở tiêu chí nào thì chấm điểm
   // trung tính (không cộng cũng không trừ mạnh) thay vì 0, tránh hồ sơ chưa điền đầy đủ bị đánh giá
   // sai là "không phù hợp".
+  // Đợt 38 — % phù hợp cho nhiều tin cùng lúc (thẻ tin ở danh sách) — chỉ tài khoản ứng viên có hồ sơ.
+  private async loadMatchProfile(userId: string): Promise<MatchProfile | null> {
+    const profile = await this.candidateProfileRepo.findOne({
+      where: { userId },
+    });
+    if (!profile) return null;
+    const skills = await this.candidateSkillRepo.find({
+      where: { candidateProfileId: profile.id },
+    });
+    return { ...profile, skillNames: skills.map((s) => s.skillName) };
+  }
+
+  async matchScores(userId: string, ids: string[]) {
+    const mp = await this.loadMatchProfile(userId);
+    if (!mp)
+      return { hasProfile: false, scores: {} as Record<string, MatchResult> };
+    const clean = Array.from(
+      new Set(ids.filter((i) => /^[0-9a-f-]{36}$/i.test(i))),
+    ).slice(0, 60);
+    if (!clean.length)
+      return { hasProfile: true, scores: {} as Record<string, MatchResult> };
+    const jobs = await this.jobRepo.find({ where: { id: In(clean) } });
+    const scores: Record<string, MatchResult> = {};
+    for (const j of jobs) scores[j.id] = scoreMatch(mp, j);
+    return { hasProfile: true, scores };
+  }
+
+  // "Việc gợi ý cho bạn": chấm điểm các tin đang tuyển mới nhất, lấy N tin cao điểm nhất (≥ 55%).
+  async recommended(userId: string, limit = 6) {
+    const mp = await this.loadMatchProfile(userId);
+    if (!mp) return { hasProfile: false, items: [] as unknown[] };
+    const jobs = await this.applyFilters(this.baseQuery(), {} as ListJobsDto)
+      .orderBy('job.createdAt', 'DESC')
+      .take(300)
+      .getMany();
+    const ranked = jobs
+      .map((j) => ({ job: j, match: scoreMatch(mp, j) }))
+      .filter((r) => r.match.score >= 55)
+      .sort((a, b) => b.match.score - a.match.score)
+      .slice(0, Math.min(12, Math.max(1, limit)));
+    return {
+      hasProfile: true,
+      items: ranked.map((r) => ({ ...r.job, match: r.match })),
+    };
+  }
+
+  // Đợt 38 — cảnh báo việc mới: các tin đang tuyển, đăng SAU mốc `since`, khớp bộ lọc đã lưu.
+  async newMatchingSince(
+    criteria: Record<string, unknown>,
+    since: Date,
+    take = 3,
+  ) {
+    const qb = this.applyFilters(this.baseQuery(), {
+      ...(criteria as ListJobsDto),
+      postedWithin: undefined,
+      page: undefined,
+    });
+    qb.andWhere('job.createdAt > :sinceAlert', { sinceAlert: since }).orderBy(
+      'job.createdAt',
+      'DESC',
+    );
+    const [items, count] = await qb.take(take).getManyAndCount();
+    return { count, items };
+  }
+
+  // Tin đang tuyển đăng gần đây (để chấm điểm theo hồ sơ trong bản tin hằng ngày).
+  async recentApproved(since: Date, take = 200) {
+    return this.baseQueryPublic()
+      .andWhere('job.createdAt > :sinceRecent', { sinceRecent: since })
+      .orderBy('job.createdAt', 'DESC')
+      .take(take)
+      .getMany();
+  }
+
+  // Đợt 39 — thống kê lương thật theo ngành/tỉnh từ tin đang tuyển (công khai, cho máy tính lương).
+  async getSalaryStats(industry?: string, province?: string) {
+    const rows = await this.baseQueryPublic()
+      .andWhere('(job.salaryMin IS NOT NULL OR job.salaryMax IS NOT NULL)')
+      .select(['job.id', 'job.industry', 'job.provinces', 'job.salaryMin', 'job.salaryMax'])
+      .take(5000)
+      .getMany();
+    const mids = (list: typeof rows) =>
+      list
+        .map((j) => {
+          const a = j.salaryMin ?? j.salaryMax!;
+          const b = j.salaryMax ?? j.salaryMin!;
+          return (a + b) / 2;
+        })
+        .filter((v) => v > 0)
+        .sort((x, y) => x - y);
+    const pct = (arr: number[], p: number) =>
+      arr.length ? arr[Math.min(arr.length - 1, Math.floor((arr.length - 1) * p))] : null;
+    const summarize = (list: typeof rows) => {
+      const m = mids(list);
+      return {
+        count: m.length,
+        p25: pct(m, 0.25),
+        median: pct(m, 0.5),
+        p75: pct(m, 0.75),
+        avg: m.length ? Math.round(m.reduce((s, v) => s + v, 0) / m.length) : null,
+      };
+    };
+    let filtered = rows;
+    if (industry) filtered = filtered.filter((j) => j.industry === industry);
+    if (province) filtered = filtered.filter((j) => (j.provinces ?? []).includes(province));
+    const industries = Array.from(new Set(rows.map((j) => j.industry).filter(Boolean))) as string[];
+    const provinces = Array.from(new Set(rows.flatMap((j) => j.provinces ?? []))).sort();
+    return {
+      ...summarize(filtered),
+      overall: summarize(rows),
+      industries: industries.sort(),
+      provinces,
+    };
+  }
+
+  private baseQueryPublic() {
+    return this.baseQuery();
+  }
+
   async getCompatibility(userId: string, jobId: string) {
-    const job = await this.jobRepo.findOne({ where: { id: jobId }, relations: { company: true } });
+    const job = await this.jobRepo.findOne({
+      where: { id: jobId },
+      relations: { company: true },
+    });
     if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng');
 
-    const profile = await this.candidateProfileRepo.findOne({ where: { userId } });
+    const profile = await this.candidateProfileRepo.findOne({
+      where: { userId },
+    });
     if (!profile) throw new NotFoundException('Không tìm thấy hồ sơ ứng viên');
 
-    const skills = await this.candidateSkillRepo.find({ where: { candidateProfileId: profile.id } });
-    const skillNames = skills.map((s) => s.skillName.toLowerCase().trim()).filter(Boolean);
+    const skills = await this.candidateSkillRepo.find({
+      where: { candidateProfileId: profile.id },
+    });
+    const skillNames = skills
+      .map((s) => s.skillName.toLowerCase().trim())
+      .filter(Boolean);
 
     // 1) Kỹ năng — bao nhiêu % kỹ năng của ứng viên xuất hiện trong tags/tiêu đề/yêu cầu công việc.
     const jobText = [
@@ -279,15 +473,20 @@ export class JobsService {
       .join(' ')
       .toLowerCase();
     const matchedSkills = skillNames.filter((s) => jobText.includes(s));
-    const skillScore = skillNames.length ? clamp(Math.round((matchedSkills.length / skillNames.length) * 100)) : 40;
+    const skillScore = skillNames.length
+      ? clamp(Math.round((matchedSkills.length / skillNames.length) * 100))
+      : 40;
 
     // 2) Kinh nghiệm — số năm kinh nghiệm ứng viên so với khoảng yêu cầu của tin.
     let experienceScore = 60;
-    const bucket = EXPERIENCE_LEVEL_YEARS.find((b) => b.label === job.experienceLevel);
+    const bucket = EXPERIENCE_LEVEL_YEARS.find(
+      (b) => b.label === job.experienceLevel,
+    );
     if (bucket && profile.yearsOfExperience != null) {
       const y = profile.yearsOfExperience;
       if (y >= bucket.min && y <= bucket.max) experienceScore = 100;
-      else if (y < bucket.min) experienceScore = clamp(100 - (bucket.min - y) * 20);
+      else if (y < bucket.min)
+        experienceScore = clamp(100 - (bucket.min - y) * 20);
       else experienceScore = clamp(100 - (y - bucket.max) * 5, 40);
     } else if (bucket && bucket.min === 0 && bucket.max === Infinity) {
       experienceScore = 100; // "Không yêu cầu kinh nghiệm" — luôn phù hợp dù hồ sơ chưa điền số năm.
@@ -295,7 +494,9 @@ export class JobsService {
 
     // 3) Cấp bậc — khoảng cách giữa cấp bậc mong muốn của ứng viên và cấp bậc tin tuyển dụng.
     let levelScore = 50;
-    const candidateLevelIdx = LEVEL_ORDER.indexOf(profile.desiredLevel ?? profile.currentLevel ?? '');
+    const candidateLevelIdx = LEVEL_ORDER.indexOf(
+      profile.desiredLevel ?? profile.currentLevel ?? '',
+    );
     const jobLevelIdx = LEVEL_ORDER.indexOf(job.level ?? '');
     if (candidateLevelIdx >= 0 && jobLevelIdx >= 0) {
       levelScore = clamp(100 - Math.abs(candidateLevelIdx - jobLevelIdx) * 25);
@@ -304,7 +505,10 @@ export class JobsService {
     // 4) Mức lương — job trả thấp hơn mức mong muốn mới bị trừ điểm; trả bằng/cao hơn luôn tối đa.
     let salaryScore = 60;
     if (profile.desiredSalaryMin != null && job.salaryMax != null) {
-      salaryScore = job.salaryMax >= profile.desiredSalaryMin ? 100 : clamp(100 - (profile.desiredSalaryMin - job.salaryMax) * 5);
+      salaryScore =
+        job.salaryMax >= profile.desiredSalaryMin
+          ? 100
+          : clamp(100 - (profile.desiredSalaryMin - job.salaryMax) * 5);
     } else if (profile.desiredSalaryMin == null && job.salaryMax == null) {
       salaryScore = 60;
     } else {
@@ -313,12 +517,19 @@ export class JobsService {
 
     // 5) Địa điểm — tỉnh/thành ứng viên mong muốn (hoặc nơi ở) có khớp nơi làm việc của tin không.
     let locationScore = 60;
-    const candidateLocations = [profile.province, ...(profile.desiredLocations ?? [])]
+    const candidateLocations = [
+      profile.province,
+      ...(profile.desiredLocations ?? []),
+    ]
       .filter(Boolean)
       .map((v) => (v as string).toLowerCase());
-    const jobLocations = [job.location, ...(job.provinces ?? [])].filter(Boolean).map((v) => (v as string).toLowerCase());
+    const jobLocations = [job.location, ...(job.provinces ?? [])]
+      .filter(Boolean)
+      .map((v) => (v as string).toLowerCase());
     if (candidateLocations.length && jobLocations.length) {
-      const match = candidateLocations.some((cl) => jobLocations.some((jl) => jl.includes(cl) || cl.includes(jl)));
+      const match = candidateLocations.some((cl) =>
+        jobLocations.some((jl) => jl.includes(cl) || cl.includes(jl)),
+      );
       locationScore = match ? 100 : 25;
     }
 
@@ -326,19 +537,33 @@ export class JobsService {
     let industryScore = 60;
     if (profile.desiredIndustries?.length && job.industry) {
       const jobIndustry = job.industry.toLowerCase();
-      const match = profile.desiredIndustries.some((i) => i.toLowerCase() === jobIndustry);
+      const match = profile.desiredIndustries.some(
+        (i) => i.toLowerCase() === jobIndustry,
+      );
       industryScore = match ? 100 : 30;
     }
 
     const criteria = [
       { key: 'skills', label: 'Kỹ năng', score: skillScore, weight: 30 },
-      { key: 'experience', label: 'Kinh nghiệm', score: experienceScore, weight: 20 },
+      {
+        key: 'experience',
+        label: 'Kinh nghiệm',
+        score: experienceScore,
+        weight: 20,
+      },
       { key: 'level', label: 'Cấp bậc', score: levelScore, weight: 15 },
       { key: 'salary', label: 'Mức lương', score: salaryScore, weight: 15 },
       { key: 'location', label: 'Địa điểm', score: locationScore, weight: 10 },
-      { key: 'industry', label: 'Ngành nghề', score: industryScore, weight: 10 },
+      {
+        key: 'industry',
+        label: 'Ngành nghề',
+        score: industryScore,
+        weight: 10,
+      },
     ];
-    const overall = Math.round(criteria.reduce((sum, c) => sum + c.score * c.weight, 0) / 100);
+    const overall = Math.round(
+      criteria.reduce((sum, c) => sum + c.score * c.weight, 0) / 100,
+    );
 
     // Đợt 13 (24/09/2026) — "TIÊU CHÍ ĐÁNH GIÁ" dạng checklist chia nhóm (theo mẫu careerviet.vn,
     // người dùng nhớ đã yêu cầu ở Đợt 12ab nhưng lúc đó chỉ ra được biểu đồ radar). Người dùng chọn
@@ -358,7 +583,9 @@ export class JobsService {
     const titleMatched =
       !!candidateTitleText &&
       (jobTitleLower.includes(candidateTitleText) ||
-        candidateTitleText.split(/\s+/).some((w) => w.length > 2 && jobTitleLower.includes(w)));
+        candidateTitleText
+          .split(/\s+/)
+          .some((w) => w.length > 2 && jobTitleLower.includes(w)));
 
     // "Trình độ học vấn" — dữ liệu tin tuyển dụng hiện KHÔNG có trường yêu cầu bằng cấp riêng (chỉ
     // hồ sơ ứng viên có `highestDegree`), nên chỉ hiện mang tính thông tin, không có gì để so khớp
@@ -368,21 +595,28 @@ export class JobsService {
 
     // "Kỹ năng bạn còn thiếu" — job.tags (Đợt 12v, NTD tự nhập) là danh sách kỹ năng/từ khoá có cấu
     // trúc DUY NHẤT hiện có ở phía tin tuyển dụng, dùng làm nguồn để tính phần bù còn thiếu.
-    const missingSkills = (job.tags ?? []).filter((t) => !skillNames.includes(t.toLowerCase().trim()));
+    const missingSkills = (job.tags ?? []).filter(
+      (t) => !skillNames.includes(t.toLowerCase().trim()),
+    );
 
     const checklist = [
       {
         group: 'overview' as const,
         key: 'location',
         label: 'Địa điểm làm việc',
-        detail: jobLocations.length ? jobLocations.join(', ') : 'Chưa rõ địa điểm',
+        detail: jobLocations.length
+          ? jobLocations.join(', ')
+          : 'Chưa rõ địa điểm',
         matched: locationScore >= MATCH_THRESHOLD,
       },
       {
         group: 'overview' as const,
         key: 'salary',
         label: 'Mức lương',
-        detail: job.salaryMin || job.salaryMax ? `${job.salaryMin ?? '?'} – ${job.salaryMax ?? '?'} triệu` : 'Thoả thuận',
+        detail:
+          job.salaryMin || job.salaryMax
+            ? `${job.salaryMin ?? '?'} – ${job.salaryMax ?? '?'} triệu`
+            : 'Thoả thuận',
         matched: salaryScore >= MATCH_THRESHOLD,
       },
       {
@@ -424,7 +658,9 @@ export class JobsService {
         group: 'skills' as const,
         key: 'skillsSummary',
         label: 'Kỹ năng',
-        detail: skillNames.length ? `${matchedSkills.length}/${skillNames.length} kỹ năng khớp với tin` : 'Chưa cập nhật kỹ năng',
+        detail: skillNames.length
+          ? `${matchedSkills.length}/${skillNames.length} kỹ năng khớp với tin`
+          : 'Chưa cập nhật kỹ năng',
         matched: skillScore >= MATCH_THRESHOLD,
       },
     ];
@@ -447,10 +683,18 @@ export class JobsService {
     ] = await Promise.all([
       // Đợt 18c — không tính hồ sơ nguồn tổng hợp (do Admin tạo, không phải thành viên tự đăng ký).
       this.candidateProfileRepo.count({ where: { isAdminSourced: false } }),
-      this.companyRepo.count({ where: { approvalStatus: CompanyApprovalStatus.APPROVED } }),
-      this.jobRepo.count({ where: { approvalStatus: JobApprovalStatus.APPROVED, isPaused: false } }),
-      this.candidateProfileRepo.count({ where: { updatedAt: MoreThanOrEqual(since24h) } }),
-      this.applicationRepo.count({ where: { appliedAt: MoreThanOrEqual(since24h) } }),
+      this.companyRepo.count({
+        where: { approvalStatus: CompanyApprovalStatus.APPROVED },
+      }),
+      this.jobRepo.count({
+        where: { approvalStatus: JobApprovalStatus.APPROVED, isPaused: false },
+      }),
+      this.candidateProfileRepo.count({
+        where: { updatedAt: MoreThanOrEqual(since24h) },
+      }),
+      this.applicationRepo.count({
+        where: { appliedAt: MoreThanOrEqual(since24h) },
+      }),
     ]);
 
     return {
@@ -468,7 +712,8 @@ export class JobsService {
   private marketCache?: { at: number; data: unknown };
 
   async getMarketStats() {
-    if (this.marketCache && Date.now() - this.marketCache.at < 5 * 60 * 1000) return this.marketCache.data;
+    if (this.marketCache && Date.now() - this.marketCache.at < 5 * 60 * 1000)
+      return this.marketCache.data;
     const DAYS = 14;
     const [jobsDaily, appsDaily, types, salaries] = await Promise.all([
       this.jobRepo.query(
@@ -497,19 +742,37 @@ export class JobsService {
     // Dải ngày liên tục (giờ VN), ngày không có dữ liệu = 0.
     const vnNow = new Date(Date.now() + 7 * 3600 * 1000);
     const days: string[] = [];
-    for (let i = DAYS - 1; i >= 0; i--) days.push(new Date(vnNow.getTime() - i * 86400000).toISOString().slice(0, 10));
+    for (let i = DAYS - 1; i >= 0; i--)
+      days.push(
+        new Date(vnNow.getTime() - i * 86400000).toISOString().slice(0, 10),
+      );
     const toSeries = (rows: { day: string; n: number }[]) => {
       const m = new Map(rows.map((r) => [r.day, r.n]));
       return days.map((d) => ({ day: d, n: m.get(d) ?? 0 }));
     };
-    const LABELS = ['Dưới 7 triệu', '7–10 triệu', '10–15 triệu', '15–25 triệu', '25–40 triệu', 'Trên 40 triệu'];
-    const sal = new Map<number, number>((salaries as { b: number; n: number }[]).map((r) => [Number(r.b), r.n]));
+    const LABELS = [
+      'Dưới 7 triệu',
+      '7–10 triệu',
+      '10–15 triệu',
+      '15–25 triệu',
+      '25–40 triệu',
+      'Trên 40 triệu',
+    ];
+    const sal = new Map<number, number>(
+      (salaries as { b: number; n: number }[]).map((r) => [Number(r.b), r.n]),
+    );
     const data = {
       updatedAt: new Date().toISOString(),
       newJobsDaily: toSeries(jobsDaily),
       applicationsDaily: toSeries(appsDaily),
-      employmentTypes: (types as { label: string; n: number }[]).map((r) => ({ label: r.label, count: r.n })),
-      salaryBands: LABELS.map((label, i) => ({ label, count: sal.get(i) ?? 0 })),
+      employmentTypes: (types as { label: string; n: number }[]).map((r) => ({
+        label: r.label,
+        count: r.n,
+      })),
+      salaryBands: LABELS.map((label, i) => ({
+        label,
+        count: sal.get(i) ?? 0,
+      })),
     };
     this.marketCache = { at: Date.now(), data };
     return data;
@@ -522,7 +785,8 @@ export class JobsService {
   private kwCache?: { at: number; data: string[] };
 
   async getPopularKeywords(): Promise<string[]> {
-    if (this.kwCache && Date.now() - this.kwCache.at < 10 * 60 * 1000) return this.kwCache.data;
+    if (this.kwCache && Date.now() - this.kwCache.at < 10 * 60 * 1000)
+      return this.kwCache.data;
     let rows: { q: string }[] = [];
     try {
       rows = await this.jobRepo.query(
@@ -546,7 +810,8 @@ export class JobsService {
       );
       for (const i of inds) {
         if (out.length >= 12) break;
-        if (!out.some((x) => x.toLowerCase() === i.industry.toLowerCase())) out.push(i.industry);
+        if (!out.some((x) => x.toLowerCase() === i.industry.toLowerCase()))
+          out.push(i.industry);
       }
     }
     this.kwCache = { at: Date.now(), data: out };

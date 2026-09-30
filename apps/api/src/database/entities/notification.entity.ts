@@ -27,6 +27,10 @@ export class Notification {
   @Column({ type: 'text' })
   content: string;
 
+  // Đợt 38 — đường dẫn mở khi bấm vào thông báo (VD /viec-lam?q=kế toán).
+  @Column({ name: 'link', type: 'varchar', nullable: true })
+  link?: string | null;
+
   @Column({ name: 'is_read', default: false })
   isRead: boolean;
 

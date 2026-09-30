@@ -1,3 +1,4 @@
+import { assessJobRisk, RISK_THRESHOLD } from './job-risk';
 import {
   BadRequestException,
   ConflictException,
@@ -156,64 +157,6 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  // Job alert (đợt 12m) — khi 1 tin được duyệt, đối chiếu với các "Tìm kiếm đã lưu" của ứng viên
-  // (bảng search_histories, owner_type='candidate_profile') để báo tin mới phù hợp. Khớp đơn giản:
-  // có lọc ngành thì phải trùng ngành; có lọc tỉnh/thành thì phải trùng ít nhất 1 tỉnh; nếu tìm kiếm
-  // không lọc gì (chỉ có từ khoá) thì so khớp từ khoá với chức danh tin.
-  private async notifyJobAlertMatches(job: JobPosting) {
-    const rows = await this.searchHistoryRepo.find({
-      where: { ownerType: 'candidate_profile' },
-    });
-    if (rows.length === 0) return;
-
-    const jobProvinces = job.provinces?.length
-      ? job.provinces
-      : job.location
-        ? job.location
-            .split('|')
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [];
-
-    const matchingProfileIds = new Set<string>();
-    for (const row of rows) {
-      const criteria = (row.criteria ?? {}) as Record<string, unknown>;
-      const industries = Array.isArray(criteria.industries)
-        ? (criteria.industries as string[])
-        : [];
-      const provinces = Array.isArray(criteria.provinces)
-        ? (criteria.provinces as string[])
-        : [];
-      const q =
-        typeof criteria.q === 'string' ? criteria.q.trim().toLowerCase() : '';
-
-      let matched = true;
-      if (industries.length > 0)
-        matched =
-          matched && !!job.industry && industries.includes(job.industry);
-      if (provinces.length > 0)
-        matched = matched && jobProvinces.some((p) => provinces.includes(p));
-      if (industries.length === 0 && provinces.length === 0) {
-        matched = q.length > 0 && job.title.toLowerCase().includes(q);
-      }
-      if (matched) matchingProfileIds.add(row.ownerId);
-    }
-    if (matchingProfileIds.size === 0) return;
-
-    const profiles = await this.candidateProfileRepo.find({
-      where: {
-        id: In(Array.from(matchingProfileIds)),
-        allowJobNotifications: true,
-      },
-    });
-    if (profiles.length === 0) return;
-    await this.notificationsService.createMany(
-      profiles.map((p) => p.userId),
-      'job_suggested',
-      `Có tin mới phù hợp với tìm kiếm đã lưu của bạn: "${job.title}"`,
-    );
-  }
-
   // Đợt 15 (25/09/2026) — "Tự động duyệt tin": tab "Duyệt tin" giờ hiện CẢ tin đang PENDING (chưa
   // duyệt) LẪN tin đã được tự động duyệt nhưng Admin CHƯA bấm "Tin đã kiểm tra" (approvalStatus =
   // APPROVED, autoApproved = true, adminReviewed = false) — dùng chung điều kiện này ở cả
@@ -283,11 +226,28 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   // đầu. updated_at tự động cập nhật mỗi lần save() kể cả khi resubmit nên phản ánh đúng "vừa gửi".
   // Đợt 15 (25/09/2026) — xem ghi chú pendingReviewWhere() ở trên: giờ gồm cả tin tự động duyệt
   // chưa được Admin kiểm tra lần 2.
-  listPendingJobs() {
-    return this.jobRepo.find({
+  async listPendingJobs() {
+    const jobs = await this.jobRepo.find({
       where: this.pendingReviewWhere(),
       relations: { company: true },
       order: { updatedAt: 'DESC' },
+    });
+    // Đợt 42 — kèm điểm rủi ro (tin khả nghi/trùng) để Admin ưu tiên soát.
+    const others = await this.riskContextFor(jobs);
+    return jobs.map((j) => ({ ...j, risk: assessJobRisk(j, { others }) }));
+  }
+
+  // Tin dùng để so trùng: các tin đang chờ + đã duyệt gần đây (tối đa 2000) — đủ cho quy mô hiện tại.
+  private async riskContextFor(jobs: JobPosting[]) {
+    if (jobs.length === 0) return [];
+    return this.jobRepo.find({
+      where: [
+        { approvalStatus: JobApprovalStatus.PENDING },
+        { approvalStatus: JobApprovalStatus.APPROVED },
+      ],
+      select: { id: true, companyId: true, title: true, description: true, requirements: true },
+      order: { updatedAt: 'DESC' },
+      take: 2000,
     });
   }
 
@@ -405,7 +365,12 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     });
     if (dueJobs.length === 0) return 0;
 
-    for (const job of dueJobs) {
+    // Đợt 42 — tin khả nghi (điểm rủi ro ≥ ngưỡng) KHÔNG được tự duyệt, chờ Admin xem tay.
+    const others = await this.riskContextFor(dueJobs);
+    const safeJobs = dueJobs.filter((j) => assessJobRisk(j, { others }).score < RISK_THRESHOLD);
+    if (safeJobs.length === 0) return 0;
+
+    for (const job of safeJobs) {
       job.approvalStatus = JobApprovalStatus.APPROVED;
       job.autoApproved = true;
       job.adminReviewed = false;
@@ -417,7 +382,6 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         'job_approved',
         `Tin "${job.title}" đã được TỰ ĐỘNG duyệt sau 15 phút và hiển thị công khai trong tìm kiếm việc làm.`,
       );
-      await this.notifyJobAlertMatches(saved);
       await this.logAction(
         AUTO_APPROVE_ACTOR,
         'job.auto_approve',
@@ -426,7 +390,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         job.title,
       );
     }
-    return dueJobs.length;
+    return safeJobs.length;
   }
 
   // Đợt 15 (25/09/2026) — nút "Tin đã kiểm tra": Admin xem lại tin đã tự động duyệt (có thể đã sửa
@@ -484,7 +448,6 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         'job_approved',
         `Tin "${job.title}" đã được duyệt và hiển thị công khai trong tìm kiếm việc làm.`,
       );
-      await this.notifyJobAlertMatches(saved);
     } else {
       await this.notifyCompanyUsers(
         job.companyId,

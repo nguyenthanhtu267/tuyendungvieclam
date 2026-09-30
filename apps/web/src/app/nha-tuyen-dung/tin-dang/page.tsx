@@ -237,6 +237,12 @@ export default function TinDangPage() {
                                 {status === 'tam_ngung' ? 'Đăng lại' : 'Tạm ngưng'}
                               </button>
                             )}
+                            <Link
+                              href={`/nha-tuyen-dung/tin-dang/${job.id}/goi-y`}
+                              className="rounded-lg border border-primary text-primary px-2.5 py-1.5 font-semibold hover:bg-primary-tint whitespace-nowrap"
+                            >
+                              Hồ sơ gợi ý
+                            </Link>
                             <button
                               onClick={() => handleDuplicate(job)}
                               disabled={actingId === job.id}

@@ -422,6 +422,19 @@ export default function AdminDashboardPage() {
                                 </span>
                               </div>
                             )}
+                            {job.risk && job.risk.score >= 40 && (
+                              <div className="mt-1.5 rounded-lg bg-critical-tint text-critical px-2.5 py-1.5 text-[12px] font-semibold leading-snug">
+                                ⚠ Khả nghi {job.risk.score}/100 — không tự duyệt
+                                <ul className="mt-0.5 list-disc pl-4 font-normal">
+                                  {job.risk.reasons.map((r) => (
+                                    <li key={r}>{r}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {job.risk && job.risk.score > 0 && job.risk.score < 40 && (
+                              <div className="mt-1 text-[11px] text-ink-faint">Lưu ý: {job.risk.reasons.join('; ')}</div>
+                            )}
                             {(scan.hasLink || scan.sensitiveHits.length > 0) && (
                               <div className="flex flex-wrap gap-1 mt-1.5">
                                 {scan.hasLink && (

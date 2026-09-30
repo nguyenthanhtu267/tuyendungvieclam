@@ -17,21 +17,48 @@ export class NotificationsService {
     private readonly notificationRepo: Repository<Notification>,
   ) {}
 
-  async create(userId: string, type: string, content: string): Promise<Notification> {
-    return this.notificationRepo.save(this.notificationRepo.create({ userId, type, content }));
+  async create(
+    userId: string,
+    type: string,
+    content: string,
+    link?: string,
+  ): Promise<Notification> {
+    return this.notificationRepo.save(
+      this.notificationRepo.create({
+        userId,
+        type,
+        content,
+        link: link ?? null,
+      }),
+    );
   }
 
   // Nhiều người nhận cùng lúc (VD: tin công ty có nhiều tài khoản Chính/Phụ) — dùng khi duyệt
   // tin/công ty ở admin.service.ts.
-  async createMany(userIds: string[], type: string, content: string): Promise<void> {
+  async createMany(
+    userIds: string[],
+    type: string,
+    content: string,
+    link?: string,
+  ): Promise<void> {
     const uniqueIds = Array.from(new Set(userIds)).filter(Boolean);
     if (uniqueIds.length === 0) return;
     await this.notificationRepo.save(
-      uniqueIds.map((userId) => this.notificationRepo.create({ userId, type, content })),
+      uniqueIds.map((userId) =>
+        this.notificationRepo.create({
+          userId,
+          type,
+          content,
+          link: link ?? null,
+        }),
+      ),
     );
   }
 
-  async list(userId: string, limit = NOTIFICATION_LIST_LIMIT): Promise<Notification[]> {
+  async list(
+    userId: string,
+    limit = NOTIFICATION_LIST_LIMIT,
+  ): Promise<Notification[]> {
     return this.notificationRepo.find({
       where: { userId },
       order: { createdAt: 'DESC' },
@@ -45,13 +72,17 @@ export class NotificationsService {
 
   async markRead(userId: string, id: string): Promise<Notification> {
     const notif = await this.notificationRepo.findOne({ where: { id } });
-    if (!notif || notif.userId !== userId) throw new NotFoundException('Không tìm thấy thông báo');
+    if (!notif || notif.userId !== userId)
+      throw new NotFoundException('Không tìm thấy thông báo');
     notif.isRead = true;
     return this.notificationRepo.save(notif);
   }
 
   async markAllRead(userId: string): Promise<{ success: true }> {
-    await this.notificationRepo.update({ userId, isRead: false }, { isRead: true });
+    await this.notificationRepo.update(
+      { userId, isRead: false },
+      { isRead: true },
+    );
     return { success: true };
   }
 }

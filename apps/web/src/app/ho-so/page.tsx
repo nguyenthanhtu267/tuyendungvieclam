@@ -1,5 +1,6 @@
 'use client';
 
+import ApplicationStepper from '@/components/ApplicationStepper';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -269,11 +270,7 @@ export default function MyCenterPage() {
                               {formatDate(a.appliedAt)}
                             </td>
                             <td className="py-2 px-1">
-                              <span
-                                className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full ${APPLICATION_STATUS_CLASS[a.status]}`}
-                              >
-                                {APPLICATION_STATUS_LABEL[a.status]}
-                              </span>
+                              <ApplicationStepper status={a.status} appliedAt={a.appliedAt} />
                             </td>
                             <td className="py-2 px-1 text-right">
                               <button
@@ -423,6 +420,22 @@ export default function MyCenterPage() {
                         <div className="text-ink-faint text-[11.3px]">Đã lưu {formatDate(s.createdAt)}</div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
+                        <label className="flex items-center gap-1 text-[12px] font-semibold text-ink-muted cursor-pointer" title="Nhận thông báo (chuông) khi có việc mới khớp tìm kiếm này">
+                          <input
+                            type="checkbox"
+                            checked={s.alertEnabled !== false}
+                            onChange={async (e) => {
+                              const v = e.target.checked;
+                              setSavedSearches((prev) => prev.map((x) => (x.id === s.id ? { ...x, alertEnabled: v } : x)));
+                              try {
+                                await candidatesApi.setSavedSearchAlert(token, s.id, v);
+                              } catch {
+                                setSavedSearches((prev) => prev.map((x) => (x.id === s.id ? { ...x, alertEnabled: !v } : x)));
+                              }
+                            }}
+                          />
+                          🔔 Báo tin mới
+                        </label>
                         <Link href={savedSearchUrl(s.criteria)} className="text-primary text-xs font-semibold hover:underline">
                           Xem tin
                         </Link>

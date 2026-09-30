@@ -17,6 +17,9 @@ const TYPE_ICON: Record<string, string> = {
   company_approved: '✅',
   company_rejected: '⛔',
   job_alert_match: '🔔',
+  job_digest: '✨',
+  job_suggested: '💡',
+  application_reminder: '⏰',
 };
 
 // variant "dark" — dùng trên nền primary (EmployerHeader); "light" (mặc định) — dùng trên nền
@@ -70,6 +73,10 @@ export function NotificationBell({ token, variant = 'light' }: { token: string; 
   }
 
   async function handleItemClick(n: AppNotification) {
+    if (n.link && n.link.startsWith('/')) {
+      setOpen(false);
+      window.location.href = n.link;
+    }
     if (n.isRead) return;
     setItems((prev) => prev?.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)) ?? prev);
     setUnread((c) => Math.max(0, c - 1));

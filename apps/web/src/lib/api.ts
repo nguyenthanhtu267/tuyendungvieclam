@@ -118,7 +118,15 @@ export interface Company {
 
 export type JobApprovalStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'expired';
 
+export interface JobRisk {
+  score: number;
+  level: 'low' | 'medium' | 'high';
+  reasons: string[];
+}
+
 export interface JobPosting {
+  // Đợt 42 — chỉ có ở danh sách 'Duyệt tin' của Admin.
+  risk?: JobRisk;
   id: string;
   title: string;
   industry?: string;
@@ -242,6 +250,11 @@ export const jobsApi = {
     return request<JobListResponse>(`/jobs${qs ? `?${qs}` : ''}`);
   },
   get: (id: string) => request<{ job: JobPosting; related: JobPosting[] }>(`/jobs/${id}`),
+  // Đợt 38 — độ phù hợp việc ↔ hồ sơ (ứng viên đăng nhập).
+  match: (token: string, ids: string[]) =>
+    request<{ hasProfile: boolean; scores: Record<string, { score: number; reasons: string[]; gaps: string[] }> }>(`/jobs/match?ids=${ids.join(',')}`, { headers: authHeaders(token) }),
+  recommended: (token: string, limit = 6) =>
+    request<{ hasProfile: boolean; items: (JobPosting & { match: { score: number; reasons: string[]; gaps: string[] } })[] }>(`/jobs/recommended?limit=${limit}`, { headers: authHeaders(token) }),
   facets: (params: JobListParams = {}) => {
     const qs = buildJobQuery(params);
     return request<JobFacets>(`/jobs/facets${qs ? `?${qs}` : ''}`);
@@ -260,6 +273,12 @@ export const jobsApi = {
   // Đợt 27 — số liệu thị trường thật (14 ngày, hình thức, mức lương) cho bảng ở trang chủ.
   marketStats: () => request<MarketStats>('/jobs/stats/market'),
   // Đợt 29 — từ khoá được tìm nhiều nhất (khối cột phải trang tìm việc).
+  salaryStats: (industry?: string, province?: string) => {
+    const q = new URLSearchParams();
+    if (industry) q.set('industry', industry);
+    if (province) q.set('province', province);
+    return request<SalaryStats>(`/jobs/stats/salary?${q.toString()}`);
+  },
   popularKeywords: () => request<{ keywords: string[] }>('/jobs/stats/popular-keywords'),
 };
 
@@ -401,6 +420,8 @@ export interface SavedSearch {
   ownerId: string;
   criteria: Record<string, unknown>;
   resultCount: number;
+  alertEnabled?: boolean;
+  lastAlertAt?: string | null;
   createdAt: string;
 }
 
@@ -467,6 +488,8 @@ export const candidatesApi = {
       headers: authHeaders(token),
       body: JSON.stringify(dto),
     }),
+  setSavedSearchAlert: (token: string, id: string, alertEnabled: boolean) =>
+    request<SavedSearch>(`/me/saved-searches/${id}`, { method: 'PATCH', headers: { ...authHeaders(token), 'Content-Type': 'application/json' }, body: JSON.stringify({ alertEnabled }) }),
   removeSavedSearch: (token: string, id: string) =>
     request<void>(`/me/saved-searches/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
 
@@ -1509,6 +1532,11 @@ export const cvSearchApi = {
       headers: authHeaders(token),
       body: JSON.stringify(dto),
     }),
+  suggest: (token: string, jobId: string) =>
+    request<{ items: (CandidateSearchItem & { match: { score: number; reasons: string[]; gaps: string[] } })[] }>(
+      `/employer/candidates/suggest/${jobId}`,
+      { headers: authHeaders(token) },
+    ),
   invite: (token: string, id: string, jobPostingId: string) =>
     request<{ success: true }>(`/employer/candidates/${id}/invite`, {
       method: 'POST',
@@ -1541,6 +1569,7 @@ export interface AppNotification {
   userId: string;
   type: NotificationType;
   content: string;
+  link?: string | null;
   isRead: boolean;
   createdAt: string;
 }
@@ -2479,3 +2508,14 @@ export const adminAdsApi = {
   removeImage: (token: string, id: string) =>
     request<AdCampaignRow>(`/admin/ads/${id}/image`, { method: 'DELETE', headers: authHeaders(token) }),
 };
+
+export interface SalaryStats {
+  count: number;
+  p25: number | null;
+  median: number | null;
+  p75: number | null;
+  avg: number | null;
+  overall: { count: number; median: number | null; avg: number | null };
+  industries: string[];
+  provinces: string[];
+}

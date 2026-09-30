@@ -23,6 +23,11 @@ export class CvSearchController {
     return this.cvSearchService.getCredits(user.userId);
   }
 
+  @Get('suggest/:jobId')
+  suggest(@CurrentUser() user: { userId: string }, @Param('jobId') jobId: string) {
+    return this.cvSearchService.suggestForJob(user.userId, jobId);
+  }
+
   @Get('unlocked')
   listUnlocked(@CurrentUser() user: { userId: string }) {
     return this.cvSearchService.listUnlocked(user.userId);

@@ -1,3 +1,4 @@
+import { scoreMatch } from '../jobs/job-match';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
@@ -445,6 +446,42 @@ export class CvSearchService {
       `${company.name} mời bạn ứng tuyển vị trí "${job.title}".`,
     );
     return { success: true };
+  }
+
+  // Đợt 41 — gợi ý 10 hồ sơ phù hợp nhất cho một tin của công ty (chấm điểm ngược bằng scoreMatch).
+  // Dùng lại baseSearchQuery nên tôn trọng khoá hồ sơ, danh sách chặn công ty, hồ sơ đã ẩn; tên vẫn che
+  // nếu chưa mở khoá (toSummary).
+  async suggestForJob(userId: string, jobId: string, limit = 10) {
+    const company = await this.getCompany(userId);
+    const job = await this.jobRepo.findOne({ where: { id: jobId, companyId: company.id } });
+    if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng của công ty bạn');
+
+    const candidates = await this.baseSearchQuery(company.id, company.name)
+      .orderBy('profile.updated_at', 'DESC')
+      .limit(400)
+      .getMany();
+    if (candidates.length === 0) return { items: [] };
+    const profiles = await this.profileRepo.find({
+      where: { id: In(candidates.map((c) => c.id)) },
+      relations: { experiences: true, educations: true, skills: true, languages: true },
+    });
+    const ranked = profiles
+      .map((p) => ({
+        p,
+        match: scoreMatch({ ...p, skillNames: (p.skills ?? []).map((k) => k.skillName) }, job),
+      }))
+      .filter((r) => r.match.score >= 45)
+      .sort((a, b) => b.match.score - a.match.score)
+      .slice(0, Math.min(10, Math.max(1, limit)));
+    const ids = ranked.map((r) => r.p.id);
+    const unlockedSet = await this.getUnlockedIdSet(company.id, ids);
+    const notesMap = await this.getNotesMap(company.id, ids);
+    return {
+      items: ranked.map((r) => ({
+        ...this.toSummary(r.p, unlockedSet.has(r.p.id), notesMap.get(r.p.id)),
+        match: r.match,
+      })),
+    };
   }
 
   async listUnlocked(userId: string) {

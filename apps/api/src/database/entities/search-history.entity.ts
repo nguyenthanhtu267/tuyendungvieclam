@@ -23,6 +23,13 @@ export class SearchHistory {
   @Column({ name: 'result_count', type: 'int', default: 0 })
   resultCount: number;
 
+  // Đợt 38 — cảnh báo việc mới cho tìm kiếm đã lưu (ứng viên bật/tắt); mốc gửi gần nhất để không báo trùng.
+  @Column({ name: 'alert_enabled', type: 'boolean', default: true })
+  alertEnabled: boolean;
+
+  @Column({ name: 'last_alert_at', type: 'timestamp', nullable: true })
+  lastAlertAt?: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

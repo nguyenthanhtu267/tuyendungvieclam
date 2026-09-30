@@ -66,10 +66,13 @@ export const JOBS_MEGA_MENU: { columns: NavMenuGroup[][] } = {
 // "Tiện Ích" — 8 công cụ tính toán cho ứng viên. Theo quyết định đã chốt (claude/00-quyet-dinh-yeu-cau.md,
 // "Hub nội dung phụ trợ"), các công cụ này ở dạng placeholder "Sắp ra mắt" cho tới khi được lập trình
 // thật, không phải tính năng bị thiếu của đợt này.
+export const UTILITY_LIVE: { label: string; href: string }[] = [
+  { label: 'Tính lương Gross – Net', href: '/tien-ich/tinh-luong' },
+  { label: 'Tính thuế thu nhập cá nhân', href: '/tien-ich/tinh-luong' },
+  { label: 'Tính bảo hiểm xã hội', href: '/tien-ich/tinh-luong' },
+];
+
 export const UTILITY_TOOLS: string[] = [
-  'Tính lương Gross – Net',
-  'Tính thuế thu nhập cá nhân',
-  'Tính bảo hiểm xã hội',
   'Tính trợ cấp thất nghiệp',
   'Tính trợ cấp thôi việc',
   'Tính lãi suất vay ngân hàng',

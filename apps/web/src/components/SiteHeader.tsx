@@ -10,7 +10,7 @@ import { NavDropdown } from '@/components/nav/NavDropdown';
 import { NotificationBell } from '@/components/NotificationBell';
 import { PromoBadge } from '@/components/PromoBadge';
 import { AdSlot } from '@/components/ads/AdSlot';
-import { CANDIDATE_ACCOUNT_MENU, EMPLOYER_CTA_MENU, JOBS_MEGA_MENU, UTILITY_TOOLS } from '@/lib/nav-menu';
+import { CANDIDATE_ACCOUNT_MENU, EMPLOYER_CTA_MENU, JOBS_MEGA_MENU, UTILITY_LIVE, UTILITY_TOOLS } from '@/lib/nav-menu';
 
 // Đợt 11 — mega-menu điều hướng nhiều cấp theo claude/06-spec-tim-kiem-nang-cao.md mục 5:
 // "Tìm Việc Làm" (mega-menu 4 cột/5 nhóm), "Tiện Ích" (8 công cụ, placeholder), khối navy
@@ -55,17 +55,17 @@ export default function SiteHeader() {
         <PromoBadge />
         </div>
 
-        <nav className="hidden md:flex items-center gap-4 lg:gap-5 text-[13px] font-semibold text-ink-muted flex-1 min-w-0">
+        <nav className="hidden md:flex items-center gap-3.5 lg:gap-4 text-[14.5px] font-semibold text-ink-muted flex-1 min-w-0">
           <NavDropdown
             trigger={<span className={jobsActive ? 'text-primary' : ''}>{t('nav.jobs')}</span>}
-            panelClassName="w-[min(760px,90vw)] p-5"
+            panelClassName="w-[min(900px,94vw)] p-5"
           >
             <div className="grid grid-cols-4 gap-5">
               {JOBS_MEGA_MENU.columns.map((col, ci) => (
                 <div key={ci} className="flex flex-col gap-4 min-w-0">
                   {col.map((group) => (
                     <div key={group.title}>
-                      <div className="text-[11px] font-extrabold text-primary uppercase tracking-wide mb-1.5">
+                      <div className="text-[12.5px] font-extrabold text-primary uppercase tracking-wide mb-1.5">
                         {group.title}
                       </div>
                       <ul className="flex flex-col gap-0.5">
@@ -74,7 +74,7 @@ export default function SiteHeader() {
                             <Link
                               href={item.href}
                               title={item.label}
-                              className="block truncate text-[12.3px] text-ink-muted hover:text-primary py-0.5"
+                              className="block truncate text-[15px] text-ink-muted hover:text-primary py-0.5"
                             >
                               {item.label}
                             </Link>
@@ -82,7 +82,7 @@ export default function SiteHeader() {
                         ))}
                       </ul>
                       {group.more && (
-                        <Link href={group.more.href} className="block text-[11.5px] font-bold text-primary mt-1.5">
+                        <Link href={group.more.href} className="block text-[13.5px] font-bold text-primary mt-1.5">
                           {group.more.label}
                         </Link>
                       )}
@@ -94,14 +94,19 @@ export default function SiteHeader() {
           </NavDropdown>
 
           <NavDropdown trigger={t('nav.tools')} panelClassName="w-64 p-2">
-            <div className="px-2.5 py-1.5 text-[10.5px] font-bold text-ink-faint uppercase tracking-wide">
+            {UTILITY_LIVE.map((u) => (
+              <Link key={u.label} href={u.href} className="block px-3 py-2 text-[15px] font-semibold text-ink rounded-lg hover:bg-surface-alt">
+                {u.label}
+              </Link>
+            ))}
+            <div className="px-2.5 py-1.5 text-[12px] font-bold text-ink-faint uppercase tracking-wide">
               {t('nav.comingSoon')}
             </div>
             {UTILITY_TOOLS.map((tool) => (
               <div
                 key={tool}
                 title={t('nav.comingSoon')}
-                className="px-3 py-2 text-[12.3px] text-ink-faint cursor-default rounded-lg"
+                className="px-3 py-2 text-[14.5px] text-ink-faint cursor-default rounded-lg"
               >
                 {tool}
               </div>
@@ -118,7 +123,7 @@ export default function SiteHeader() {
 
         <div className="hidden md:flex items-center gap-3">
           <NavDropdown
-            trigger={<span className="text-white font-bold text-[12.5px]">{t('nav.forEmployer')}</span>}
+            trigger={<span className="text-white font-bold text-[14px]">{t('nav.forEmployer')}</span>}
             triggerClassName="!border-b-0 !text-white bg-primary-dark hover:bg-primary rounded-lg px-3.5 py-2"
             align="right"
             panelClassName="w-64 p-2"
@@ -128,7 +133,7 @@ export default function SiteHeader() {
                 key={item.label}
                 href={item.href}
                 title={item.label}
-                className="block truncate px-3 py-2 text-[12.3px] font-semibold text-ink-muted hover:text-primary hover:bg-surface-alt rounded-lg"
+                className="block truncate px-3 py-2 text-[14.5px] font-semibold text-ink-muted hover:text-primary hover:bg-surface-alt rounded-lg"
               >
                 {item.label}
               </Link>
@@ -171,7 +176,7 @@ export default function SiteHeader() {
                   key={item.label}
                   href={item.href}
                   title={item.label}
-                  className="block truncate px-3 py-2 text-[12.3px] font-semibold text-ink-muted hover:text-primary hover:bg-surface-alt rounded-lg"
+                  className="block truncate px-3 py-2 text-[14.5px] font-semibold text-ink-muted hover:text-primary hover:bg-surface-alt rounded-lg"
                 >
                   {item.label}
                 </Link>
@@ -179,7 +184,7 @@ export default function SiteHeader() {
               <div className="border-t border-border my-1.5" />
               <button
                 onClick={logout}
-                className="w-full text-left px-3 py-2 text-[12.3px] font-semibold text-critical hover:bg-critical-tint rounded-lg"
+                className="w-full text-left px-3 py-2 text-[14.5px] font-semibold text-critical hover:bg-critical-tint rounded-lg"
               >
                 {t('nav.logout')}
               </button>
@@ -225,7 +230,7 @@ export default function SiteHeader() {
                 <div className="pl-3 flex flex-col gap-2.5 pb-2 pt-1">
                   {JOBS_MEGA_MENU.columns.flat().map((group) => (
                     <div key={group.title}>
-                      <div className="text-[10.5px] font-extrabold text-primary uppercase tracking-wide mb-1">
+                      <div className="text-[12px] font-extrabold text-primary uppercase tracking-wide mb-1">
                         {group.title}
                       </div>
                       <div className="flex flex-col gap-0.5">
@@ -234,7 +239,7 @@ export default function SiteHeader() {
                             key={item.label}
                             href={item.href}
                             onClick={() => setDrawerOpen(false)}
-                            className="text-[12px] font-medium text-ink-muted py-0.5 truncate"
+                            className="text-[14px] font-medium text-ink-muted py-0.5 truncate"
                             title={item.label}
                           >
                             {item.label}
@@ -246,7 +251,7 @@ export default function SiteHeader() {
                   <Link
                     href="/viec-lam"
                     onClick={() => setDrawerOpen(false)}
-                    className="text-[12px] font-bold text-primary"
+                    className="text-[14px] font-bold text-primary"
                   >
                     {t('nav.viewAllJobs')}
                   </Link>
@@ -259,8 +264,11 @@ export default function SiteHeader() {
                   <span className="text-[10px] transition-transform group-open:rotate-180">▾</span>
                 </summary>
                 <div className="pl-3 flex flex-col gap-0.5 pb-2 pt-1">
+                  {UTILITY_LIVE.map((u) => (
+                    <Link key={u.label} href={u.href} className="text-[14px] text-ink py-0.5 font-semibold">{u.label}</Link>
+                  ))}
                   {UTILITY_TOOLS.map((tool) => (
-                    <span key={tool} className="text-[12px] text-ink-faint py-0.5">
+                    <span key={tool} className="text-[14px] text-ink-faint py-0.5">
                       {tool} <span className="text-[10px] font-normal">({t('nav.comingSoon')})</span>
                     </span>
                   ))}
@@ -284,7 +292,7 @@ export default function SiteHeader() {
                       key={item.label}
                       href={item.href}
                       onClick={() => setDrawerOpen(false)}
-                      className="text-[12px] font-medium text-ink-muted py-1 truncate"
+                      className="text-[14px] font-medium text-ink-muted py-1 truncate"
                       title={item.label}
                     >
                       {item.label}
@@ -302,7 +310,7 @@ export default function SiteHeader() {
                       key={item.label}
                       href={item.href}
                       onClick={() => setDrawerOpen(false)}
-                      className="text-[12.5px] font-semibold text-ink py-1"
+                      className="text-[14.5px] font-semibold text-ink py-1"
                     >
                       {item.label}
                     </Link>

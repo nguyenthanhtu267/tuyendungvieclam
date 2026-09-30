@@ -9,6 +9,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import SuggestedCandidates from '@/components/SuggestedCandidates';
 import EmployerHeader from '@/components/EmployerHeader';
 import { useAuth } from '@/lib/auth-context';
 import { employerApi, ApiError, type WorkLocation } from '@/lib/api';
@@ -30,6 +31,7 @@ function DangTinInner() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [createdId, setCreatedId] = useState<string | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(!!editId);
   // Đợt 12x (21/09/2026) — hiện lại lý do Admin từ chối (nếu có) ngay trên form Sửa tin, để NTD biết
   // chính xác cần sửa gì trước khi gửi duyệt lại. Không phải 1 field của FormState vì không gửi lại
@@ -137,7 +139,10 @@ function DangTinInner() {
     };
     try {
       if (editId) await employerApi.updateJob(token, editId, payload);
-      else await employerApi.createJob(token, payload);
+      else {
+        const created = await employerApi.createJob(token, payload);
+        setCreatedId(created?.id ?? null);
+      }
       setSuccess(true);
     } catch (err) {
       setError(
@@ -156,7 +161,7 @@ function DangTinInner() {
     return (
       <main className="min-h-screen">
         <EmployerHeader />
-        <div className="max-w-lg mx-auto px-4 py-24 text-center flex flex-col items-center gap-4">
+        <div className="max-w-2xl mx-auto px-4 py-24 text-center flex flex-col items-center gap-4">
           <div className="w-14 h-14 rounded-full bg-success-tint text-success flex items-center justify-center text-2xl">✓</div>
           <h1 className="font-extrabold text-lg">{editId ? 'Đã lưu thay đổi!' : 'Đã gửi tin để duyệt!'}</h1>
           <p className="text-sm text-ink-faint">
@@ -174,6 +179,12 @@ function DangTinInner() {
             </Link>{' '}
             để chia sẻ tin lên Facebook cá nhân — giúp tiếp cận thêm nhiều ứng viên.
           </p>
+          {createdId && (
+            <div className="w-full text-left mt-2">
+              <div className="font-extrabold text-[17px] text-ink mb-2">Hồ sơ phù hợp có thể mời ngay</div>
+              <SuggestedCandidates jobId={createdId} />
+            </div>
+          )}
           <div className="flex gap-3 mt-2">
             {!editId && (
               <button className="tvl-btn-ghost !w-auto px-5" onClick={() => { setForm(JOB_WIZARD_INITIAL); setStep(0); setSuccess(false); }}>

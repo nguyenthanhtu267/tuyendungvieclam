@@ -1,4 +1,12 @@
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 // Nhận cả 2 kiểu query string: ?provinces=a&provinces=b  hoặc  ?provinces=a,b

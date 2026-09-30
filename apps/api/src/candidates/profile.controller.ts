@@ -15,7 +15,11 @@ import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { ProfileService } from './profile.service';
-import { UpdatePersonalInfoDto, UpdateCareerInfoDto, QuickFieldsDto } from './dto/profile-sections.dto';
+import {
+  UpdatePersonalInfoDto,
+  UpdateCareerInfoDto,
+  QuickFieldsDto,
+} from './dto/profile-sections.dto';
 
 // Đợt 8 — hồ sơ 13 mục. Base path /me/profile, tách khỏi CandidatesController (/me/profile cũ,
 // vẫn giữ nguyên cho hồ sơ tóm tắt) bằng các đường dẫn con để không đụng route.
@@ -30,23 +34,40 @@ export class ProfileController {
   }
 
   @Patch('personal')
-  updatePersonal(@CurrentUser() user: { userId: string }, @Body() dto: UpdatePersonalInfoDto) {
+  updatePersonal(
+    @CurrentUser() user: { userId: string },
+    @Body() dto: UpdatePersonalInfoDto,
+  ) {
     return this.profileService.updatePersonalInfo(user.userId, dto);
   }
 
   @Patch('career')
-  updateCareer(@CurrentUser() user: { userId: string }, @Body() dto: UpdateCareerInfoDto) {
+  updateCareer(
+    @CurrentUser() user: { userId: string },
+    @Body() dto: UpdateCareerInfoDto,
+  ) {
     return this.profileService.updateCareerInfo(user.userId, dto);
   }
 
   @Patch('quick')
-  updateQuick(@CurrentUser() user: { userId: string }, @Body() dto: QuickFieldsDto) {
+  updateQuick(
+    @CurrentUser() user: { userId: string },
+    @Body() dto: QuickFieldsDto,
+  ) {
     return this.profileService.updateQuickFields(user.userId, dto);
   }
 
   @Post('avatar')
-  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 1 * 1024 * 1024 } }))
-  uploadAvatar(@CurrentUser() user: { userId: string }, @UploadedFile() file: Express.Multer.File) {
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 1 * 1024 * 1024 },
+    }),
+  )
+  uploadAvatar(
+    @CurrentUser() user: { userId: string },
+    @UploadedFile() file: Express.Multer.File,
+  ) {
     return this.profileService.setAvatar(user.userId, file);
   }
 
@@ -56,7 +77,10 @@ export class ProfileController {
   }
 
   @Get('sections/:section')
-  listSection(@CurrentUser() user: { userId: string }, @Param('section') section: string) {
+  listSection(
+    @CurrentUser() user: { userId: string },
+    @Param('section') section: string,
+  ) {
     return this.profileService.listSection(user.userId, section);
   }
 
@@ -76,7 +100,12 @@ export class ProfileController {
     @Param('id') id: string,
     @Body() body: unknown,
   ) {
-    return this.profileService.updateSectionItem(user.userId, section, id, body);
+    return this.profileService.updateSectionItem(
+      user.userId,
+      section,
+      id,
+      body,
+    );
   }
 
   @Delete('sections/:section/:id')

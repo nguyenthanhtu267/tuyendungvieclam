@@ -1,9 +1,9 @@
 'use client';
 
-import { PopularKeywords } from '@/components/PopularKeywords';
-import { AdStack } from '@/components/ads/AdStack';
+import { useMatches } from '@/lib/match';
 import { Fragment, Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { parseNaturalQuery } from '@/lib/nl-search';
 import SiteHeader from '@/components/SiteHeader';
 import { JobCard } from '@/components/JobCard';
 import { FilterBar } from '@/components/search/FilterBar';
@@ -28,6 +28,7 @@ function JobSearchPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { me, token } = useAuth();
+  const [sortMatch, setSortMatch] = useState(false);
   const [saveSearchState, setSaveSearchState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const filters: JobListParams = {
@@ -48,6 +49,12 @@ function JobSearchPage() {
 
   const [qInput, setQInput] = useState(filters.q ?? '');
   const [result, setResult] = useState<JobListResponse | null>(null);
+  const matchMap = useMatches(result?.items.map((j) => j.id) ?? []);
+  const sortedItems = (() => {
+    const items = result?.items ?? [];
+    if (!sortMatch) return items;
+    return [...items].sort((a, b) => (matchMap[b.id]?.score ?? -1) - (matchMap[a.id]?.score ?? -1));
+  })();
   const [facets, setFacets] = useState<JobFacets | null>(null);
   const [districts, setDistricts] = useState<DistrictFacet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,7 +134,19 @@ function JobSearchPage() {
 
   function handleSearchSubmit(e: React.FormEvent) {
     e.preventDefault();
-    updateParams({ q: qInput });
+    const nl = parseNaturalQuery(qInput);
+    const f = nl.filters;
+    // Chỉ áp bộ lọc thông minh khi câu có phần "hiểu được" ngoài từ khoá; ngược lại giữ hành vi cũ.
+    if (nl.chips.length === 0) return updateParams({ q: qInput });
+    updateParams({
+      q: f.q ?? '',
+      provinces: f.provinces,
+      industries: f.industries,
+      salaryTier: f.salaryTier,
+      postedWithin: f.postedWithin,
+      employmentType: f.employmentType,
+      urgentOnly: f.urgentOnly,
+    } as never);
   }
 
   function handleClearFilters() {
@@ -214,6 +233,13 @@ function JobSearchPage() {
               ) : null}
             </div>
 
+            {me?.role === 'candidate' && (result?.items.length ?? 0) > 1 && (
+              <label className="flex items-center gap-2 text-sm font-semibold -mt-1" htmlFor="sort-match">
+                <input id="sort-match" type="checkbox" checked={sortMatch} onChange={(e) => setSortMatch(e.target.checked)} />
+                ✨ Ưu tiên tin phù hợp với hồ sơ của tôi nhất (sắp xếp trong trang này)
+              </label>
+            )}
+
             {!loading && result?.items.length === 0 && (
               <div className="rounded-xl border border-border bg-white p-8 text-center text-ink-muted text-sm">
                 Không tìm thấy tin tuyển dụng phù hợp. Thử từ khoá hoặc bộ lọc khác.
@@ -222,7 +248,7 @@ function JobSearchPage() {
 
             <div className="flex flex-col gap-3">
               {/* Đợt 24 — banner xen giữa danh sách: sau tin thứ 5 (ít hơn 5 tin thì sau tin cuối). */}
-              {result?.items.map((job, i, arr) => (
+              {sortedItems.map((job, i, arr) => (
                 <Fragment key={job.id}>
                   <JobCard job={job} />
                   {i === Math.min(4, arr.length - 1) && <AdSlot slot="jobs-inline" />}
@@ -338,13 +364,7 @@ function JobSearchPage() {
                 )}
               </div>
             )}
-            {/* Đợt 29 — theo mẫu CareerViet: từ khoá được tìm nhiều nhất. */}
-            <PopularKeywords />
-            {/* Đợt 24 — banner cột phải (chỉ máy tính). */}
-            <AdStack>
-              <AdSlot slot="jobs-sidebar" />
-              <AdSlot slot="jobs-sidebar-2" />
-            </AdStack>
+            {/* Đợt 36 — bỏ khối "Việc làm được tìm kiếm nhiều nhất" và banner cột phải ở trang này: trùng với bộ lọc Ngành nghề ngay phía trên. */}
           </div>
         </div>
       </div>

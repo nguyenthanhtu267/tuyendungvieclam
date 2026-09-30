@@ -300,6 +300,19 @@ export class CandidatesService {
     );
   }
 
+  async setSavedSearchAlert(userId: string, id: string, alertEnabled: boolean) {
+    const profile = await this.getOwnProfile(userId);
+    const row = await this.searchHistoryRepo.findOne({ where: { id } });
+    if (
+      !row ||
+      row.ownerType !== 'candidate_profile' ||
+      row.ownerId !== profile.id
+    )
+      throw new ForbiddenException();
+    row.alertEnabled = alertEnabled;
+    return this.searchHistoryRepo.save(row);
+  }
+
   async removeSavedSearch(userId: string, id: string) {
     const profile = await this.getOwnProfile(userId);
     const row = await this.searchHistoryRepo.findOne({ where: { id } });

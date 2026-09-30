@@ -39,7 +39,10 @@ export class CandidatesController {
   }
 
   @Patch('me/profile')
-  updateProfile(@CurrentUser() user: { userId: string }, @Body() dto: UpdateProfileDto) {
+  updateProfile(
+    @CurrentUser() user: { userId: string },
+    @Body() dto: UpdateProfileDto,
+  ) {
     return this.candidatesService.updateOwnProfile(user.userId, dto);
   }
 
@@ -57,22 +60,37 @@ export class CandidatesController {
       limits: { fileSize: 2 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
         if (!ALLOWED_CV_MIME.has(file.mimetype)) {
-          cb(new BadRequestException('Chỉ chấp nhận tệp PDF hoặc Word (.doc, .docx)'), false);
+          cb(
+            new BadRequestException(
+              'Chỉ chấp nhận tệp PDF hoặc Word (.doc, .docx)',
+            ),
+            false,
+          );
           return;
         }
         cb(null, true);
       },
     }),
   )
-  uploadCv(@CurrentUser() user: { userId: string }, @UploadedFile() file: Express.Multer.File) {
+  uploadCv(
+    @CurrentUser() user: { userId: string },
+    @UploadedFile() file: Express.Multer.File,
+  ) {
     // Đợt 21 — tên file Tiếng Việt bị lỗi font do multer đọc nhầm bảng mã, sửa ngay khi nhận file.
-    file.originalname = fixMulterFilename(file.originalname) ?? file.originalname;
+    file.originalname =
+      fixMulterFilename(file.originalname) ?? file.originalname;
     return this.candidatesService.addCvFromUpload(user.userId, file);
   }
 
   @Post('me/cvs/link')
-  addCvLink(@CurrentUser() user: { userId: string }, @Body() dto: CreateCvLinkDto) {
-    return this.candidatesService.addCvFromLink(user.userId, dto.externalLinkUrl);
+  addCvLink(
+    @CurrentUser() user: { userId: string },
+    @Body() dto: CreateCvLinkDto,
+  ) {
+    return this.candidatesService.addCvFromLink(
+      user.userId,
+      dto.externalLinkUrl,
+    );
   }
 
   @Delete('me/cvs/:id')
@@ -81,7 +99,10 @@ export class CandidatesController {
   }
 
   @Patch('me/cvs/:id/primary')
-  setPrimaryCv(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+  setPrimaryCv(
+    @CurrentUser() user: { userId: string },
+    @Param('id') id: string,
+  ) {
     return this.candidatesService.setPrimaryCv(user.userId, id);
   }
 
@@ -91,12 +112,18 @@ export class CandidatesController {
   }
 
   @Post('me/saved-jobs/:jobId')
-  saveJob(@CurrentUser() user: { userId: string }, @Param('jobId') jobId: string) {
+  saveJob(
+    @CurrentUser() user: { userId: string },
+    @Param('jobId') jobId: string,
+  ) {
     return this.candidatesService.saveJob(user.userId, jobId);
   }
 
   @Delete('me/saved-jobs/:jobId')
-  unsaveJob(@CurrentUser() user: { userId: string }, @Param('jobId') jobId: string) {
+  unsaveJob(
+    @CurrentUser() user: { userId: string },
+    @Param('jobId') jobId: string,
+  ) {
     return this.candidatesService.unsaveJob(user.userId, jobId);
   }
 
@@ -106,12 +133,18 @@ export class CandidatesController {
   }
 
   @Post('me/blocked-companies')
-  blockCompany(@CurrentUser() user: { userId: string }, @Body() dto: BlockCompanyDto) {
+  blockCompany(
+    @CurrentUser() user: { userId: string },
+    @Body() dto: BlockCompanyDto,
+  ) {
     return this.candidatesService.blockCompany(user.userId, dto);
   }
 
   @Delete('me/blocked-companies/:id')
-  unblockCompany(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+  unblockCompany(
+    @CurrentUser() user: { userId: string },
+    @Param('id') id: string,
+  ) {
     return this.candidatesService.unblockCompany(user.userId, id);
   }
 
@@ -121,12 +154,31 @@ export class CandidatesController {
   }
 
   @Post('me/saved-searches')
-  saveSearch(@CurrentUser() user: { userId: string }, @Body() dto: SaveSearchDto) {
+  saveSearch(
+    @CurrentUser() user: { userId: string },
+    @Body() dto: SaveSearchDto,
+  ) {
     return this.candidatesService.saveSearch(user.userId, dto);
   }
 
+  @Patch('me/saved-searches/:id')
+  setSavedSearchAlert(
+    @CurrentUser() user: { userId: string },
+    @Param('id') id: string,
+    @Body('alertEnabled') alertEnabled: boolean,
+  ) {
+    return this.candidatesService.setSavedSearchAlert(
+      user.userId,
+      id,
+      !!alertEnabled,
+    );
+  }
+
   @Delete('me/saved-searches/:id')
-  removeSavedSearch(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+  removeSavedSearch(
+    @CurrentUser() user: { userId: string },
+    @Param('id') id: string,
+  ) {
     return this.candidatesService.removeSavedSearch(user.userId, id);
   }
 
@@ -155,12 +207,18 @@ export class CandidatesController {
   }
 
   @Post('me/followed-companies/:companyId')
-  followCompany(@CurrentUser() user: { userId: string }, @Param('companyId') companyId: string) {
+  followCompany(
+    @CurrentUser() user: { userId: string },
+    @Param('companyId') companyId: string,
+  ) {
     return this.candidatesService.followCompany(user.userId, companyId);
   }
 
   @Delete('me/followed-companies/:companyId')
-  unfollowCompany(@CurrentUser() user: { userId: string }, @Param('companyId') companyId: string) {
+  unfollowCompany(
+    @CurrentUser() user: { userId: string },
+    @Param('companyId') companyId: string,
+  ) {
     return this.candidatesService.unfollowCompany(user.userId, companyId);
   }
 }
