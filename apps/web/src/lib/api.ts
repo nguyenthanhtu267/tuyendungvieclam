@@ -2736,8 +2736,7 @@ export interface JobImportRow {
 export interface MailScanStatus {
   configured: boolean;
   cronKeySet: boolean;
-  user: string | null;
-  labels: string[];
+  accounts: { idx: number; user: string; labels: string[] }[];
   senders: string[];
   enabled: boolean;
   running: boolean;

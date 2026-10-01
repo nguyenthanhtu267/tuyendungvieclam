@@ -193,9 +193,10 @@ export const adminApi = {
   // Đợt 120 — tự đọc email thông báo việc làm.
   mailScanStatus: (token: string) => request<MailScanStatus>('/admin/mail-scan', { headers: authHeaders(token) }),
   mailScanNow: (token: string, days?: number) => request<{ started: boolean; reason?: string }>('/admin/mail-scan', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ days }) }),
-  mailScanLabels: (token: string) => request<{ path: string; selected: boolean }[]>('/admin/mail-scan/labels', { headers: authHeaders(token) }),
-  mailScanSetLabels: (token: string, labels: string[]) =>
-    request<MailScanStatus>('/admin/mail-scan/labels', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ labels }) }),
+  mailScanLabels: (token: string, account = 1) => request<{ path: string; selected: boolean }[]>(`/admin/mail-scan/labels?account=${account}`, { headers: authHeaders(token) }),
+  mergeImportDuplicates: (token: string) => request<{ merged: number }>('/admin/imports/merge-duplicates', { method: 'POST', headers: authHeaders(token) }),
+  mailScanSetLabels: (token: string, labels: string[], account = 1) =>
+    request<MailScanStatus>('/admin/mail-scan/labels', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ labels, account }) }),
   mailScanEnabled: (token: string, enabled: boolean) =>
     request<MailScanStatus>('/admin/mail-scan/enabled', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ enabled }) }),
   // Đợt 119 — Hộp nhập tin từ link.

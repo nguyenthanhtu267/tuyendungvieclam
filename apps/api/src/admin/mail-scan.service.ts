@@ -14,7 +14,6 @@ const SETTING_ID = 'singleton';
 const EVERY_MS = 30 * 60 * 1000;
 const MAX_MAILS = 40;
 const MAX_LINKS_PER_MAIL = 15;
-const CONCURRENCY = 4;
 const FIRST_RUN_DAYS = 3;
 const MAX_LINKS_PER_SCAN = 150;
 
@@ -77,8 +76,20 @@ export class MailScanService implements OnModuleInit, OnModuleDestroy {
     if (this.timer) clearInterval(this.timer);
   }
 
+  // Nhiều hộp thư: MAIL_IMAP_USER/PASS (hộp 1) và MAIL_IMAP_USER_2/PASS_2 … _5 (hộp 2–5).
+  accounts(): { idx: number; user: string; pass: string }[] {
+    const out: { idx: number; user: string; pass: string }[] = [];
+    for (let i = 1; i <= 5; i++) {
+      const sfx = i === 1 ? '' : `_${i}`;
+      const user = (process.env[`MAIL_IMAP_USER${sfx}`] || '').trim();
+      const pass = (process.env[`MAIL_IMAP_PASS${sfx}`] || '').replace(/\s+/g, '');
+      if (user && pass) out.push({ idx: i, user, pass });
+    }
+    return out;
+  }
+
   configured(): boolean {
-    return !!(process.env.MAIL_IMAP_USER && process.env.MAIL_IMAP_PASS);
+    return this.accounts().length > 0;
   }
 
   private async row(): Promise<AdminSetting> {
@@ -92,22 +103,32 @@ export class MailScanService implements OnModuleInit, OnModuleDestroy {
     return v.length ? v : ['INBOX'];
   }
 
-  private selectedLabels(s: AdminSetting): string[] {
+  // Nhãn đã chọn của từng hộp thư: lưu dạng {email: [nhãn…]}; dữ liệu cũ (mảng) thuộc hộp thư 1.
+  private labelMap(s: AdminSetting): Record<string, string[]> {
     try {
-      const arr = s.mailScanLabels ? (JSON.parse(s.mailScanLabels) as string[]) : [];
-      if (Array.isArray(arr) && arr.length) return arr.map(String);
+      const v = s.mailScanLabels ? JSON.parse(s.mailScanLabels) : null;
+      if (Array.isArray(v)) {
+        const first = this.accounts()[0];
+        return first ? { [first.user.toLowerCase()]: v.map(String) } : {};
+      }
+      if (v && typeof v === 'object') return v as Record<string, string[]>;
     } catch {
       /* dùng mặc định */
     }
-    return this.envLabels();
+    return {};
   }
 
-  private newClient() {
+  private selectedLabels(s: AdminSetting, user: string): string[] {
+    const l = this.labelMap(s)[user.toLowerCase()];
+    return l && l.length ? l : this.envLabels();
+  }
+
+  private newClient(acc: { user: string; pass: string }) {
     const c = new ImapFlow({
       host: process.env.MAIL_IMAP_HOST || 'imap.gmail.com',
       port: Number(process.env.MAIL_IMAP_PORT) || 993,
       secure: process.env.MAIL_IMAP_SECURE !== 'false',
-      auth: { user: process.env.MAIL_IMAP_USER as string, pass: process.env.MAIL_IMAP_PASS as string },
+      auth: { user: acc.user, pass: acc.pass },
       logger: false,
     });
     c.on('error', () => undefined);
@@ -115,10 +136,11 @@ export class MailScanService implements OnModuleInit, OnModuleDestroy {
   }
 
   // Danh sách nhãn (thư mục) trong hộp thư để Admin tick chọn — bỏ các thư mục hệ thống của Gmail ([Gmail]/…).
-  async labels(): Promise<{ path: string; selected: boolean }[]> {
-    if (!this.configured()) return [];
-    const sel = new Set(this.selectedLabels(await this.row()));
-    const client = this.newClient();
+  async labels(idx = 1): Promise<{ path: string; selected: boolean }[]> {
+    const acc = this.accounts().find((a) => a.idx === idx);
+    if (!acc) return [];
+    const sel = new Set(this.selectedLabels(await this.row(), acc.user));
+    const client = this.newClient(acc);
     try {
       await client.connect();
       const list = await client.list();
@@ -137,11 +159,17 @@ export class MailScanService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async setLabels(labels: string[]) {
+  async setLabels(labels: string[], idx = 1) {
+    const acc = this.accounts().find((a) => a.idx === idx);
     const s = await this.row();
-    const clean = (labels || []).map((x) => String(x).trim()).filter(Boolean).slice(0, 30);
-    s.mailScanLabels = clean.length ? JSON.stringify(clean) : null;
-    await this.settings.save(s);
+    if (acc) {
+      const map = this.labelMap(s);
+      const clean = (labels || []).map((x) => String(x).trim()).filter(Boolean).slice(0, 30);
+      if (clean.length) map[acc.user.toLowerCase()] = clean;
+      else delete map[acc.user.toLowerCase()];
+      s.mailScanLabels = Object.keys(map).length ? JSON.stringify(map) : null;
+      await this.settings.save(s);
+    }
     return this.status();
   }
 
@@ -156,8 +184,7 @@ export class MailScanService implements OnModuleInit, OnModuleDestroy {
     return {
       configured: this.configured(),
       cronKeySet: !!process.env.MAIL_CRON_KEY,
-      user: process.env.MAIL_IMAP_USER ? process.env.MAIL_IMAP_USER.replace(/^(.).*(@.*)$/, '$1***$2') : null,
-      labels: this.selectedLabels(s),
+      accounts: this.accounts().map((a) => ({ idx: a.idx, user: a.user.replace(/^(.).*(@.*)$/, '$1***$2'), labels: this.selectedLabels(s, a.user) })),
       senders: (process.env.MAIL_SENDERS || '').split(',').map((x) => x.trim()).filter(Boolean),
       enabled: s.mailScanEnabled,
       running: this.running,
@@ -203,66 +230,73 @@ export class MailScanService implements OnModuleInit, OnModuleDestroy {
     const setting = await this.row();
     const lookback = days && days > 0 ? Math.min(30, Math.floor(days)) : 0;
     const since = lookback ? new Date(Date.now() - lookback * 86400000) : setting.mailScanLastAt ? new Date(setting.mailScanLastAt.getTime() - 10 * 60 * 1000) : new Date(Date.now() - FIRST_RUN_DAYS * 86400000);
-    const client = this.newClient();
     const senders = (process.env.MAIL_SENDERS || '').toLowerCase().split(',').map((x) => x.trim()).filter(Boolean);
+    const errors: string[] = [];
     try {
-      await client.connect();
       const jobs: { url: string; note: string }[] = [];
-      for (const label of this.selectedLabels(setting)) {
-        let lock;
+      for (const acc of this.accounts()) {
+        const client = this.newClient(acc);
         try {
-          lock = await client.getMailboxLock(label, { readOnly: true });
-        } catch {
-          continue; // nhãn không còn tồn tại
-        }
-        try {
-          const uids = (await client.search({ since }, { uid: true })) || [];
-          // Thư mới nhất trước — nếu quá nhiều link thì phần cũ để lần quét sau ("quét lùi ngày").
-          for (const uid of uids.slice(-MAX_MAILS).reverse()) {
-            if (jobs.length >= MAX_LINKS_PER_SCAN) break;
-            const msg = await client.fetchOne(String(uid), { source: true, internalDate: true }, { uid: true });
-            if (!msg || !msg.source) continue;
-            if (msg.internalDate && new Date(msg.internalDate as Date).getTime() < since.getTime()) continue;
-            const mail = await simpleParser(msg.source);
-            const from = (mail.from?.text || '').toLowerCase();
-            if (senders.length && !senders.some((x) => from.includes(x))) continue;
-            sum.mails++;
-            const note = `Từ email: ${(mail.subject || '').slice(0, 120)}`;
-            for (const url of pickJobLinks(typeof mail.html === 'string' ? mail.html : '', mail.text || '')) {
-              if (jobs.length < MAX_LINKS_PER_SCAN) jobs.push({ url, note });
+          await client.connect();
+          for (const label of this.selectedLabels(setting, acc.user)) {
+            let lock;
+            try {
+              lock = await client.getMailboxLock(label, { readOnly: true });
+            } catch {
+              continue; // nhãn không còn tồn tại
+            }
+            try {
+              const uids = (await client.search({ since }, { uid: true })) || [];
+              // Thư mới nhất trước — nếu quá nhiều link thì phần cũ để lần quét sau ("quét lùi ngày").
+              for (const uid of uids.slice(-MAX_MAILS).reverse()) {
+                if (jobs.length >= MAX_LINKS_PER_SCAN) break;
+                const msg = await client.fetchOne(String(uid), { source: true, internalDate: true }, { uid: true });
+                if (!msg || !msg.source) continue;
+                if (msg.internalDate && new Date(msg.internalDate as Date).getTime() < since.getTime()) continue;
+                const mail = await simpleParser(msg.source);
+                const from = (mail.from?.text || '').toLowerCase();
+                if (senders.length && !senders.some((x) => from.includes(x))) continue;
+                sum.mails++;
+                const note = `Từ email: ${(mail.subject || '').slice(0, 120)}`;
+                for (const url of pickJobLinks(typeof mail.html === 'string' ? mail.html : '', mail.text || '')) {
+                  if (jobs.length < MAX_LINKS_PER_SCAN) jobs.push({ url, note });
+                }
+              }
+            } finally {
+              lock.release();
             }
           }
-        } finally {
-          lock.release();
-        }
-      }
-      await client.logout().catch(() => undefined);
-
-      sum.links = jobs.length;
-      let i = 0;
-      const worker = async () => {
-        while (i < jobs.length) {
-          const j = jobs[i++];
+          await client.logout().catch(() => undefined);
+        } catch (e) {
+          errors.push(`${acc.user.replace(/^(.).*(@.*)$/, '$1***$2')}: ${(e as Error).message?.slice(0, 120) || 'lỗi'}`);
           try {
-            const r = await this.imports.addOne(j.url, { quiet: true, note: j.note });
-            if (r.result === 'new') sum.added++;
-            else if (r.result === 'duplicate') sum.duplicates++;
-            else sum.skipped++;
+            await client.logout();
           } catch {
-            sum.skipped++;
+            /* bỏ qua */
           }
         }
-      };
-      await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-    } catch (e) {
-      sum.error = (e as Error).message?.slice(0, 200) || 'Lỗi không rõ';
-      this.log.warn(`Quét email lỗi: ${sum.error}`);
-      try {
-        await client.logout();
-      } catch {
-        /* bỏ qua */
       }
+
+      sum.links = jobs.length;
+      // Xử lý lần lượt từng link (không song song) để 2 link cùng một tin không lọt qua kiểm tra trùng cùng lúc.
+      for (const j of jobs) {
+        try {
+          const r = await this.imports.addOne(j.url, { quiet: true, note: j.note });
+          if (r.result === 'new') sum.added++;
+          else if (r.result === 'duplicate') sum.duplicates++;
+          else sum.skipped++;
+        } catch {
+          sum.skipped++;
+        }
+      }
+      await this.imports.mergeDuplicates().catch(() => undefined);
+    } catch (e) {
+      errors.push((e as Error).message?.slice(0, 200) || 'Lỗi không rõ');
     } finally {
+      if (errors.length) {
+        sum.error = errors.join(' | ');
+        this.log.warn(`Quét email lỗi: ${sum.error}`);
+      }
       this.running = false;
     }
     const s = await this.row();

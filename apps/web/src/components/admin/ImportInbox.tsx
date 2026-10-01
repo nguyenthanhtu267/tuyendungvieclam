@@ -33,7 +33,7 @@ function MailAutoPanel({ token, onNewItems }: { token: string; onNewItems: () =>
   const [showGuide, setShowGuide] = useState<boolean | null>(null);
   const [days, setDays] = useState(0); // 0 = từ lần quét trước
   const [pick, setPick] = useState<{ path: string; selected: boolean }[] | null>(null);
-  const [pickOpen, setPickOpen] = useState(false);
+  const [pickOpen, setPickOpen] = useState<number | null>(null);
   const [pickBusy, setPickBusy] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -66,11 +66,11 @@ function MailAutoPanel({ token, onNewItems }: { token: string; onNewItems: () =>
       setMsg(e instanceof ApiError ? e.message : 'Có lỗi, thử lại.');
     }
   }
-  async function openPick() {
-    setPickOpen(true);
+  async function openPick(idx: number) {
+    setPickOpen(idx);
     setPick(null);
     try {
-      setPick(await adminApi.mailScanLabels(token));
+      setPick(await adminApi.mailScanLabels(token, idx));
     } catch {
       setPick([]);
     }
@@ -79,8 +79,8 @@ function MailAutoPanel({ token, onNewItems }: { token: string; onNewItems: () =>
     if (!pick) return;
     setPickBusy(true);
     try {
-      setSt(await adminApi.mailScanSetLabels(token, pick.filter((p) => p.selected).map((p) => p.path)));
-      setPickOpen(false);
+      setSt(await adminApi.mailScanSetLabels(token, pick.filter((p) => p.selected).map((p) => p.path), pickOpen ?? 1));
+      setPickOpen(null);
     } catch {
       setMsg('Không lưu được nhãn.');
     } finally {
@@ -103,7 +103,9 @@ function MailAutoPanel({ token, onNewItems }: { token: string; onNewItems: () =>
         <div className="font-bold text-sm">📧 Tự động từ email thông báo việc làm</div>
         {st.configured ? (
           <>
-            <span className="text-[11px] font-bold rounded-full bg-success-tint text-success px-2 py-0.5">Đã kết nối {st.user}</span>
+            {st.accounts.map((a) => (
+              <span key={a.idx} className="text-[11px] font-bold rounded-full bg-success-tint text-success px-2 py-0.5">Đã kết nối {a.user}</span>
+            ))}
             <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer ml-auto">
               <input type="checkbox" checked={st.enabled} onChange={(e) => toggle(e.target.checked)} />
               Tự quét mỗi 30 phút
@@ -126,8 +128,12 @@ function MailAutoPanel({ token, onNewItems }: { token: string; onNewItems: () =>
       {msg && <div className="text-xs font-semibold text-ink-muted mt-2">{msg}</div>}
       {st.configured && (
         <div className="text-xs text-ink-faint mt-2">
-          Nhãn đang đọc: <b>{st.labels.join(', ')}</b>{' '}
-          <button type="button" onClick={openPick} className="font-bold text-primary underline">Chọn nhãn</button>
+          {st.accounts.map((a) => (
+            <div key={a.idx}>
+              {a.user}: nhãn đang đọc <b>{a.labels.join(', ')}</b>{' '}
+              <button type="button" onClick={() => openPick(a.idx)} className="font-bold text-primary underline">Chọn nhãn</button>
+            </div>
+          ))}
           {st.senders.length ? <> · chỉ đọc thư từ: <b>{st.senders.join(', ')}</b></> : ' · đọc mọi thư trong các nhãn đã chọn (nếu có INBOX là cả hộp thư đến — nên bỏ tick INBOX và chỉ chọn nhãn tuyển dụng)'}
           {last ? (
             <>
@@ -138,9 +144,9 @@ function MailAutoPanel({ token, onNewItems }: { token: string; onNewItems: () =>
           . Tin tìm được vào tab &ldquo;Chờ xem&rdquo; bên dưới — web không tự đăng.
         </div>
       )}
-      {st.configured && pickOpen && (
+      {st.configured && pickOpen !== null && (
         <div className="mt-3 rounded-lg border border-border p-3">
-          <div className="text-xs font-bold mb-2">Tick các nhãn Gmail chứa thư thông báo việc làm</div>
+          <div className="text-xs font-bold mb-2">Tick các nhãn Gmail chứa thư thông báo việc làm{st.accounts.length > 1 ? ` (${st.accounts.find((a) => a.idx === pickOpen)?.user ?? ''})` : ''}</div>
           {!pick ? (
             <div className="text-xs text-ink-faint">Đang tải danh sách nhãn…</div>
           ) : pick.length === 0 ? (
@@ -157,7 +163,7 @@ function MailAutoPanel({ token, onNewItems }: { token: string; onNewItems: () =>
           )}
           <div className="flex gap-2 mt-3">
             <button type="button" disabled={pickBusy || !pick?.length} onClick={savePick} className="tvl-btn-primary !w-auto px-4 disabled:opacity-50">Lưu nhãn</button>
-            <button type="button" onClick={() => setPickOpen(false)} className="tvl-btn-ghost !w-auto px-4">Đóng</button>
+            <button type="button" onClick={() => setPickOpen(null)} className="tvl-btn-ghost !w-auto px-4">Đóng</button>
           </div>
         </div>
       )}
@@ -168,6 +174,7 @@ function MailAutoPanel({ token, onNewItems }: { token: string; onNewItems: () =>
           <li>Mở <b>myaccount.google.com/apppasswords</b> → đặt tên &ldquo;Web tuyển dụng&rdquo; → <b>Tạo</b> → chép dãy 16 ký tự (chỉ hiện 1 lần). Đây là &ldquo;mật khẩu ứng dụng&rdquo;, KHÁC mật khẩu Gmail; thu hồi được bất cứ lúc nào. Đừng gửi cho ai, kể cả tôi.</li>
           <li>Nếu Gmail của bạn đã có nhãn riêng cho từng trang tuyển dụng (vd. Việc làm/CareerViet) thì dùng luôn — sau khi kết nối sẽ tick chọn nhãn ngay trên web. Chưa có thì tạo nhãn + bộ lọc để thư tuyển dụng tự gắn nhãn, web sẽ không đọc thư cá nhân.</li>
           <li>Vào <b>Render → dịch vụ API → Environment → Add</b>, thêm các biến: <code>MAIL_IMAP_USER</code> = địa chỉ Gmail · <code>MAIL_IMAP_PASS</code> = 16 ký tự ở bước 3 · <code>MAIL_SENDERS</code> = tên người gửi cách nhau dấu phẩy, ví dụ careerviet,topcv (không bắt buộc) · <code>MAIL_CRON_KEY</code> = một chuỗi bí mật tự đặt (dùng ở bước 7).</li>
+          <li>Muốn thêm Gmail thứ 2 (tối đa 5): lặp lại bước 1–3 cho Gmail đó, rồi thêm <code>MAIL_IMAP_USER_2</code> và <code>MAIL_IMAP_PASS_2</code> (Gmail thứ 3: <code>_3</code>…). Mỗi Gmail chọn nhãn riêng.</li>
           <li>Bấm <b>Save</b> rồi chờ Render khởi động lại. Quay lại đây tải lại trang: thấy &ldquo;Đã kết nối&rdquo; → bấm <b>Quét email ngay</b> để thử, rồi tick <b>Tự quét mỗi 30 phút</b>.</li>
           <li>(Để tự quét ổn định dù Render miễn phí ngủ) Tạo tài khoản miễn phí ở <b>cron-job.org</b> → Create cronjob → URL: <code className="break-all">{API_URL}/public/mail-scan/run?key=KHÓA_Ở_BƯỚC_5</code> → chạy mỗi 30 phút. Cách này vừa đánh thức Render vừa quét email.</li>
         </ol>
@@ -254,6 +261,7 @@ export function ImportInbox({ token }: { token: string }) {
       </div>
       <textarea id="imp-links" value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder="https://…" className="tvl-input w-full text-xs" />
       <div className="flex items-center gap-3 mt-2 flex-wrap">
+        <button type="button" onClick={async () => { const r = await adminApi.mergeImportDuplicates(token); setMsg(r.merged ? `Đã gộp ${r.merged} tin trùng.` : 'Không có tin trùng.'); load(); }} className="tvl-btn-ghost !w-auto px-4">Gộp tin trùng</button>
         <button type="button" disabled={busy || !text.trim()} onClick={readLinks} className="tvl-btn-primary !w-auto px-5 disabled:opacity-50">
           {busy ? 'Đang đọc… (có thể mất vài giây)' : 'Đọc tin'}
         </button>

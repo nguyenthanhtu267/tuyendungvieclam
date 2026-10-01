@@ -244,13 +244,18 @@ export class AdminController {
   }
 
   @Get('mail-scan/labels')
-  mailScanLabels() {
-    return this.mailScan.labels();
+  mailScanLabels(@Query('account') account?: string) {
+    return this.mailScan.labels(Number(account) || 1);
   }
 
   @Post('mail-scan/labels')
-  mailScanSetLabels(@Body('labels') labels: string[]) {
-    return this.mailScan.setLabels(Array.isArray(labels) ? labels : []);
+  mailScanSetLabels(@Body('labels') labels: string[], @Body('account') account?: number) {
+    return this.mailScan.setLabels(Array.isArray(labels) ? labels : [], Number(account) || 1);
+  }
+
+  @Post('imports/merge-duplicates')
+  async mergeImportDuplicates() {
+    return { merged: await this.imports.mergeDuplicates() };
   }
 
   @Post('mail-scan/enabled')

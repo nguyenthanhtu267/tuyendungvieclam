@@ -123,6 +123,18 @@ export class JobImportService {
       const d2 = await isDup(finalUrl);
       if (d2) return { url: finalUrl, result: 'duplicate', id: d2.imp?.id, message: 'Tin này đã có (link nguồn trùng)' };
     }
+    // Trùng nội dung: cùng chức danh + cùng công ty (+ cùng địa điểm) dù khác link — tránh 1 tin hiện 2 lần.
+    if (ex.found) {
+      const key = this.contentKey(ex.data as Record<string, unknown>);
+      if (key) {
+        const sameImp = await this.repo
+          .createQueryBuilder('i')
+          .where("i.status <> 'failed'")
+          .andWhere(`${unaccentSql("(i.data->>'title')")} = :t AND ${unaccentSql("(i.data->>'companyName')")} = :c`, { t: key.t, c: key.c })
+          .getMany();
+        if (sameImp.some((x) => this.contentKey(x.data)?.l === key.l)) return { url: finalUrl, result: 'duplicate', id: sameImp[0].id, message: 'Tin trùng nội dung (cùng chức danh, công ty, địa điểm)' };
+      }
+    }
     if (!ex.found && opts.quiet) return { url: finalUrl, result: 'failed', message: ex.warning };
     const data = { ...(ex.data as Record<string, unknown>), ...(finalUrl !== url ? { rawUrl: url } : {}) };
     const match = ex.found ? await this.matchCompany(ex.data.companyName, ex.data.companyWebsite) : null;
@@ -138,6 +150,32 @@ export class JobImportService {
       }),
     );
     return { url: finalUrl, result: ex.found ? 'new' : 'failed', id: row.id, message: ex.found ? undefined : row.note ?? undefined };
+  }
+
+  private contentKey(d: Record<string, unknown>): { t: string; c: string; l: string } | null {
+    const t = normalizeSearchText(String(d?.title ?? ''));
+    const c = normalizeSearchText(String(d?.companyName ?? ''));
+    if (!t || !c) return null;
+    return { t, c, l: normalizeSearchText(String(d?.location ?? '')) };
+  }
+
+  // Gộp các mục đang chờ bị lặp (cùng chức danh + công ty + địa điểm): giữ mục cũ nhất, các mục còn lại chuyển sang "Bỏ qua".
+  async mergeDuplicates(): Promise<number> {
+    const rows = await this.repo.find({ where: { status: 'pending' }, order: { createdAt: 'ASC' } });
+    const seen = new Map<string, string>();
+    let n = 0;
+    for (const r of rows) {
+      const k = this.contentKey(r.data);
+      if (!k) continue;
+      const id = `${k.t}|${k.c}|${k.l}`;
+      if (seen.has(id)) {
+        r.status = 'skipped';
+        r.note = 'Trùng nội dung với mục đã có';
+        await this.repo.save(r);
+        n++;
+      } else seen.set(id, r.id);
+    }
+    return n;
   }
 
   // Dán nhiều link một lần.
