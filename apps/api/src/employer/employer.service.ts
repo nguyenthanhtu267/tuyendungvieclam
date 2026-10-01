@@ -427,6 +427,7 @@ export class EmployerService {
     }
     if ('district' in dto || 'provinces' in dto) assertDistrictInProvinces(job.district, job.provinces as unknown as string[]);
     job.approvalStatus = JobApprovalStatus.PENDING;
+    job.adminReviewed = false; // Đợt 116 — gửi lại sau khi sửa: cho phép tự duyệt trở lại
     return this.jobRepo.save(job);
   }
 

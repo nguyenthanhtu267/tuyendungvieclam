@@ -93,6 +93,15 @@ export class AdminController {
     return this.adminService.getAuditLog(page ? Number(page) : undefined);
   }
 
+  // Đợt 115 — danh sách theo trạng thái: ?status=approved|rejected (đặt trước 'jobs/:id').
+  @Get('jobs/by-status')
+  listJobsByStatus(@Query('status') status?: string, @Query('q') q?: string) {
+    return this.adminService.listJobsByStatus(
+      status === 'rejected' ? JobApprovalStatus.REJECTED : JobApprovalStatus.APPROVED,
+      q,
+    );
+  }
+
   @Get('jobs/pending')
   listPendingJobs() {
     return this.adminService.listPendingJobs();
@@ -117,6 +126,15 @@ export class AdminController {
 
   // Đợt 15 (25/09/2026) — nút "Tin đã kiểm tra": chỉ dùng cho tin đã được TỰ ĐỘNG duyệt (còn hiện
   // trong tab "Duyệt tin" chờ Admin xem lại lần 2) — bấm xong thì dòng tin biến mất khỏi danh sách.
+  // Đợt 115 — "Thu hồi": đưa tin đã duyệt về hàng chờ.
+  @Patch('jobs/:id/revoke')
+  revokeJob(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+  ) {
+    return this.adminService.setJobStatus(admin, id, JobApprovalStatus.PENDING);
+  }
+
   @Patch('jobs/:id/mark-reviewed')
   markJobReviewed(
     @CurrentUser() admin: { userId: string; email: string },

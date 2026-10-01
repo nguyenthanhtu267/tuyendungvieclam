@@ -52,6 +52,16 @@ export function parseLogoCandidates(html: string, base: URL): Cand[] {
   return out.sort((a, b) => b.weight - a.weight).filter((c, i, arr) => arr.findIndex((x) => x.url === c.url) === i);
 }
 
+export function guessSlug(name: string): string {
+  return (name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/gi, 'd')
+    .toLowerCase()
+    .replace(/\b(cong ty|tnhh|co phan|cp|mtv|tm|dv|sx|xnk|dau tu|thuong mai|dich vu|san xuat|viet nam|vietnam|chi nhanh|tap doan)\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, '');
+}
+
 @Injectable()
 export class CompanyLogoFinder implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(CompanyLogoFinder.name);
@@ -118,6 +128,33 @@ export class CompanyLogoFinder implements OnModuleInit, OnModuleDestroy {
       if (await this.isGoodImage(c.url)) return c.url;
     }
     return null;
+  }
+
+  // Đợt 116 — "Gợi ý logo" cho Admin: gom nhiều ảnh ứng viên để Admin tự bấm chọn (không tự gán).
+  // Nguồn: (1) website công ty đã khai; (2) tên miền ĐOÁN từ tên công ty (bỏ "Công ty TNHH…", không dấu,
+  // thử .com.vn/.vn/.com) — chỉ là gợi ý nên Admin nhìn ảnh rồi mới chọn, không sợ gắn nhầm.
+  async suggest(name: string, website?: string | null): Promise<{ url: string; source: string }[]> {
+    const out: { url: string; source: string }[] = [];
+    const seen = new Set<string>();
+    const hosts: { host: string; source: string }[] = [];
+    if (website?.trim()) hosts.push({ host: website.trim(), source: 'Website công ty' });
+    const slug = guessSlug(name);
+    if (slug.length >= 3) {
+      for (const tld of ['.com.vn', '.vn', '.com']) {
+        const h = slug + tld;
+        if (!hosts.some((x) => x.host.includes(h))) hosts.push({ host: h, source: `Đoán từ tên (${h})` });
+      }
+    }
+    await Promise.all(
+      hosts.slice(0, 5).map(async (h) => {
+        const url = await this.findForWebsite(h.host).catch(() => null);
+        if (url && !seen.has(url)) {
+          seen.add(url);
+          out.push({ url, source: h.source });
+        }
+      }),
+    );
+    return out;
   }
 
   async scan(limit = BATCH): Promise<{ checked: number; found: number }> {

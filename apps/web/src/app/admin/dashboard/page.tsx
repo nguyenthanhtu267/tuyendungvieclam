@@ -80,9 +80,86 @@ export default function AdminDashboardPage() {
   }, []);
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [pendingJobs, setPendingJobs] = useState<JobPosting[]>([]);
+  // Đợt 115 — tab Duyệt tin: 3 trạng thái, tìm kiếm, lọc, sắp xếp, cột logo/ngày (giống Duyệt công ty).
+  const [jStatus, setJStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  const [jLists, setJLists] = useState<{ approved: { items: JobPosting[]; total: number }; rejected: { items: JobPosting[]; total: number } } | null>(null);
+  const [jq, setJq] = useState('');
+  const [jIndustry, setJIndustry] = useState('');
+  const [jRange, setJRange] = useState<'all' | 'today' | '7d'>('all');
+  const [jPrio, setJPrio] = useState<'' | 'high' | 'newco' | 'fast' | 'warn'>('');
+  const [jSort, setJSort] = useState<'default' | 'new' | 'old' | 'salary'>('default');
+  const [jLimit, setJLimit] = useState(50);
+  const [jRemote, setJRemote] = useState<{ status: string; q: string; items: JobPosting[] } | null>(null);
   const [verifyId, setVerifyId] = useState<string | null>(null);
   const [pendingCompanies, setPendingCompanies] = useState<Company[]>([]);
   // Đợt 112 — hàng chờ duyệt công ty: tìm kiếm, lọc ngành/thời gian, sắp xếp (mặc định MỚI NHẤT trên cùng).
+  const loadJobLists = useCallback(async () => {
+    if (!token) return;
+    try {
+      const [a, r] = await Promise.all([adminApi.listJobsByStatus(token, 'approved'), adminApi.listJobsByStatus(token, 'rejected')]);
+      setJLists({ approved: a, rejected: r });
+    } catch {
+      /* lỗi mạng tạm thời — bỏ qua */
+    }
+  }, [token]);
+  useEffect(() => {
+    if (tab === 'jobs') loadJobLists();
+    // tải lại khi danh sách chờ đổi (sau khi duyệt/từ chối/thu hồi → loadAll cập nhật pendingJobs)
+  }, [tab, pendingJobs, loadJobLists]);
+  useEffect(() => {
+    const q = jq.trim();
+    if (jStatus === 'pending' || q.length < 2 || !token) { setJRemote(null); return; }
+    const t = setTimeout(() => {
+      adminApi.listJobsByStatus(token, jStatus, q).then((r) => setJRemote({ status: jStatus, q, items: r.items })).catch(() => undefined);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [jq, jStatus, token]);
+  const jRemoteHit = jRemote && jRemote.status === jStatus && jRemote.q === jq.trim() ? jRemote.items : null;
+  const jBase: JobPosting[] = jStatus === 'pending' ? pendingJobs : jRemoteHit ?? jLists?.[jStatus].items ?? [];
+  const jTotal = jStatus === 'pending' ? pendingJobs.length : jLists?.[jStatus].total ?? 0;
+  const jTs = (j: JobPosting) => new Date((j.updatedAt ?? j.createdAt) as string).getTime() || 0;
+  const jToday = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })();
+  const jIndustries = Array.from(new Set(jBase.flatMap((j) => (j.industry ? [j.industry] : [])))).sort((a, b) => a.localeCompare(b, 'vi'));
+  const jHasWarn = (j: JobPosting) => {
+    const sc = scanJobContent(j.title, j.description, j.requirements);
+    return (j.risk?.score ?? 0) > 0 || sc.hasLink || sc.sensitiveHits.length > 0;
+  };
+  const shownJobs = (() => {
+    const q = jq.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase();
+    const fold = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase();
+    const from = jRange === 'today' ? jToday : jRange === '7d' ? Date.now() - 7 * 86400000 : 0;
+    const rows = jBase.filter((j) => {
+      if (q && !fold(`${j.title} ${j.company?.name ?? ''} ${j.industry ?? ''}`).includes(q)) return false;
+      if (jIndustry && j.industry !== jIndustry) return false;
+      if (from && jTs(j) < from) return false;
+      if (jStatus === 'pending' && jPrio) {
+        const rp = (j as { reviewPriority?: string }).reviewPriority;
+        if (jPrio === 'warn' ? !jHasWarn(j) : rp !== jPrio) return false;
+      }
+      return true;
+    });
+    if (jSort === 'new' || (jSort === 'default' && jStatus !== 'pending')) return rows.sort((a, b) => jTs(b) - jTs(a));
+    if (jSort === 'old') return rows.sort((a, b) => jTs(a) - jTs(b));
+    if (jSort === 'salary') return rows.sort((a, b) => (b.salaryMax ?? b.salaryMin ?? 0) - (a.salaryMax ?? a.salaryMin ?? 0));
+    return rows; // mặc định (tab Chờ duyệt): thứ tự ưu tiên của máy chủ
+  })();
+  const jNewToday = jBase.filter((j) => jTs(j) >= jToday).length;
+  const jAgeText = (j: JobPosting) => {
+    const h = Math.floor((Date.now() - jTs(j)) / 3600000);
+    return h < 1 ? 'vừa xong' : h < 24 ? `${h} giờ trước` : `${Math.floor(h / 24)} ngày trước`;
+  };
+  async function handleJobRevoke(id: string, title: string) {
+    if (!token) return;
+    const warn = autoApproveEnabled ? '\n\nLƯU Ý: "Tự động duyệt tin" đang BẬT — tin sẽ lại được tự động duyệt sau 15 phút trừ khi bạn tắt công tắc hoặc xử lý trước.' : '';
+    if (!window.confirm(`Thu hồi duyệt tin "${title}"? Tin sẽ ẩn khỏi web và quay về hàng chờ duyệt.${warn}`)) return;
+    setBusyId(id);
+    try {
+      await adminApi.revokeJob(token, id);
+      await Promise.all([loadAll(), loadJobLists()]);
+    } finally {
+      setBusyId(null);
+    }
+  }
   const [cq, setCq] = useState('');
   const [cStatus, setCStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
   const [statusLists, setStatusLists] = useState<{ approved: { items: Company[]; total: number }; rejected: { items: Company[]; total: number } } | null>(null);
@@ -212,7 +289,7 @@ export default function AdminDashboardPage() {
     setBusyId(id);
     try {
       await adminApi.approveJob(token, id);
-      await loadAll();
+      await Promise.all([loadAll(), loadJobLists()]);
     } finally {
       setBusyId(null);
     }
@@ -302,7 +379,7 @@ export default function AdminDashboardPage() {
       if (decision === 'approve') await adminApi.bulkApproveJobs(token, ids);
       else await adminApi.bulkRejectJobs(token, ids);
       setSelectedJobIds(new Set());
-      await loadAll();
+      await Promise.all([loadAll(), loadJobLists()]);
     } finally {
       setBulkBusy(false);
     }
@@ -446,10 +523,27 @@ export default function AdminDashboardPage() {
               viên nộp hồ sơ sau 15 phút nếu Admin chưa duyệt tay. Tin vẫn còn hiện trong danh sách này (nhãn
               &quot;Đã tự động duyệt&quot;) để kiểm tra lại lần 2 — bấm &quot;Tin đã kiểm tra&quot; khi xong.
             </div>
-            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-              {/* Đợt 12q (21/09/2026) — Batch 5 mục #2: thanh thao tác hàng loạt, chỉ hiện khi đã chọn
-                  ít nhất 1 dòng. */}
-              {selectedJobIds.size > 0 && (
+            <div className="flex gap-1 mb-3 border-b border-border text-sm font-bold" role="tablist">
+              {([
+                ['pending', `⏳ Chờ duyệt (${pendingJobs.length})`],
+                ['approved', `✅ Đã duyệt${jLists ? ` (${jLists.approved.total})` : ''}`],
+                ['rejected', `⛔ Từ chối${jLists ? ` (${jLists.rejected.total})` : ''}`],
+              ] as const).map(([k, l]) => (
+                <button
+                  key={k}
+                  type="button"
+                  role="tab"
+                  aria-selected={jStatus === k}
+                  onClick={() => { setJStatus(k); setSelectedJobIds(new Set()); setJLimit(50); setJPrio(''); }}
+                  className={`px-4 py-2.5 border-b-2 -mb-px ${jStatus === k ? 'text-primary border-primary' : 'text-ink-faint border-transparent'}`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+              {/* Đợt 12q — thanh thao tác hàng loạt; Đợt 115 — theo tab: Chờ duyệt (duyệt/từ chối), Từ chối (duyệt lại), Đã duyệt (không có). */}
+              {selectedJobIds.size > 0 && jStatus !== 'approved' && (
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-ink-faint font-semibold">Đã chọn {selectedJobIds.size}</span>
                   <button
@@ -457,21 +551,69 @@ export default function AdminDashboardPage() {
                     onClick={() => handleBulkJobDecision('approve')}
                     className="font-bold rounded-md bg-success-tint text-success px-2.5 py-1.5 disabled:opacity-50"
                   >
-                    Duyệt tất cả đã chọn
+                    {jStatus === 'rejected' ? 'Duyệt lại tất cả đã chọn' : 'Duyệt tất cả đã chọn'}
                   </button>
-                  <button
-                    disabled={bulkBusy}
-                    onClick={() => handleBulkJobDecision('reject')}
-                    className="font-bold rounded-md bg-critical-tint text-critical px-2.5 py-1.5 disabled:opacity-50"
-                  >
-                    Từ chối tất cả đã chọn
-                  </button>
+                  {jStatus === 'pending' && (
+                    <button
+                      disabled={bulkBusy}
+                      onClick={() => handleBulkJobDecision('reject')}
+                      className="font-bold rounded-md bg-critical-tint text-critical px-2.5 py-1.5 disabled:opacity-50"
+                    >
+                      Từ chối tất cả đã chọn
+                    </button>
+                  )}
                 </div>
               )}
             </div>
-            {pendingJobs.length === 0 ? (
-              <div className="text-center text-ink-faint text-sm py-16">Không có tin nào đang chờ duyệt 🎉</div>
+            {jTotal === 0 ? (
+              <div className="text-center text-ink-faint text-sm py-16">
+                {jStatus === 'pending' ? 'Không có tin nào đang chờ duyệt 🎉' : jStatus === 'approved' ? 'Chưa có tin nào được duyệt.' : 'Chưa có tin nào bị từ chối.'}
+              </div>
             ) : (
+              <>
+              <div className="flex items-center gap-2 flex-wrap mb-3 text-xs">
+                <input id="jq" value={jq} onChange={(e) => { setJq(e.target.value); setJLimit(50); }} placeholder="🔎 Tìm tên tin, công ty, ngành…" className="tvl-input !w-[300px] max-w-full" />
+                <select id="j-industry" value={jIndustry} onChange={(e) => { setJIndustry(e.target.value); setJLimit(50); }} className="tvl-input !w-auto">
+                  <option value="">Tất cả ngành</option>
+                  {jIndustries.map((i) => (
+                    <option key={i} value={i}>{i}</option>
+                  ))}
+                </select>
+                <div className="inline-flex rounded-lg border border-border-strong overflow-hidden font-semibold">
+                  {([['all', 'Tất cả'], ['today', `Hôm nay (${jNewToday})`], ['7d', '7 ngày']] as const).map(([k, l]) => (
+                    <button key={k} type="button" onClick={() => { setJRange(k); setJLimit(50); }} aria-pressed={jRange === k} className={`px-3 py-2 ${jRange === k ? 'bg-primary text-white' : 'bg-white text-ink-muted'}`}>{l}</button>
+                  ))}
+                </div>
+                <select id="j-sort" value={jSort} onChange={(e) => setJSort(e.target.value as typeof jSort)} className="tvl-input !w-auto">
+                  <option value="default">{jStatus === 'pending' ? 'Thứ tự ưu tiên duyệt' : 'Mới cập nhật nhất'}</option>
+                  {jStatus === 'pending' && <option value="new">Mới gửi nhất</option>}
+                  <option value="old">Cũ nhất trước</option>
+                  <option value="salary">Lương cao nhất</option>
+                </select>
+                {(jq || jIndustry || jRange !== 'all' || jPrio) && (
+                  <button type="button" onClick={() => { setJq(''); setJIndustry(''); setJRange('all'); setJPrio(''); }} className="font-bold text-primary underline">Xóa lọc</button>
+                )}
+                <span className="ml-auto text-ink-faint font-semibold">
+                  Hiển thị {Math.min(shownJobs.length, jLimit)}/{shownJobs.length}
+                  {jStatus !== 'pending' && !jRemoteHit && jTotal > jBase.length ? ` (đang tải ${jBase.length} mới nhất / ${jTotal} — gõ tìm để tìm trên toàn bộ)` : ''}
+                </span>
+              </div>
+              {jStatus === 'pending' && (
+                <div className="flex items-center gap-1.5 flex-wrap mb-3 text-[11.5px]">
+                  <span className="text-ink-faint font-semibold">Lọc nhanh:</span>
+                  {([['high', '🔴 Rủi ro cao'], ['newco', '🟠 Công ty mới'], ['fast', '🟢 Duyệt nhanh'], ['warn', '⚠ Có cảnh báo / link']] as const).map(([k, l]) => (
+                    <button key={k} type="button" aria-pressed={jPrio === k} onClick={() => { setJPrio(jPrio === k ? '' : k); setJLimit(50); }} className={`rounded-full border px-2.5 py-1 font-semibold ${jPrio === k ? 'bg-primary text-white border-primary' : 'bg-white text-ink-muted border-border-strong'}`}>{l}</button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedJobIds(new Set(shownJobs.filter((j) => (j as { reviewPriority?: string }).reviewPriority === 'fast').map((j) => j.id)))}
+                    className="rounded-full border border-success text-success px-2.5 py-1 font-bold"
+                    title="Tick sẵn các tin công ty uy tín + nội dung sạch để duyệt một lần"
+                  >
+                    ☑ Chọn tất cả tin "Duyệt nhanh"
+                  </button>
+                </div>
+              )}
               <div className="rounded-xl bg-white border border-border overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
@@ -479,33 +621,48 @@ export default function AdminDashboardPage() {
                       <tr className="text-left text-ink-faint bg-surface-alt">
                         <th className="py-2.5 px-3 w-8">
                           <input
-                            hidden={cStatus === 'approved'}
+                            hidden={jStatus === 'approved'}
                             type="checkbox"
-                            checked={selectedJobIds.size > 0 && selectedJobIds.size === pendingJobs.length}
-                            onChange={toggleAllJobsSelected}
+                            checked={shownJobs.length > 0 && shownJobs.every((j) => selectedJobIds.has(j.id))}
+                            onChange={() => setSelectedJobIds((prev) => (shownJobs.length > 0 && shownJobs.every((j) => prev.has(j.id)) ? new Set() : new Set(shownJobs.map((j) => j.id))))}
                           />
                         </th>
+                        <th className="py-2.5 px-3 font-semibold">Logo</th>
                         <th className="py-2.5 px-4 font-semibold">Tin đăng</th>
                         <th className="py-2.5 px-3 font-semibold">Công ty</th>
+                        <th className="py-2.5 px-3 font-semibold">Ngành</th>
                         <th className="py-2.5 px-3 font-semibold">Mức lương</th>
-                        <th className="py-2.5 px-3 font-semibold">Gửi lúc</th>
+                        <th className="py-2.5 px-3 font-semibold whitespace-nowrap">{jStatus === 'pending' ? 'Gửi lúc' : 'Cập nhật'}</th>
                         <th className="py-2.5 px-4 font-semibold text-right">Thao tác</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {pendingJobs.map((job) => {
+                      {shownJobs.length === 0 && (
+                        <tr><td colSpan={9} className="py-10 text-center text-ink-faint">Không có tin nào khớp bộ lọc.</td></tr>
+                      )}
+                      {shownJobs.slice(0, jLimit).map((job) => {
                         const scan = scanJobContent(job.title, job.description, job.requirements);
                         return (
                         <tr key={job.id} className="border-t border-border align-top">
                           <td className="py-3 px-3">
                             <input
+                              hidden={jStatus === 'approved'}
                               type="checkbox"
                               checked={selectedJobIds.has(job.id)}
                               onChange={() => toggleJobSelected(job.id)}
                             />
                           </td>
+                          <td className="py-3 px-3">
+                            <CompanyLogo name={job.company?.name ?? ''} logoUrl={job.company?.logoUrl} size={36} className="text-[10px]" />
+                          </td>
                           <td className="py-3 px-4 font-bold">
                             {job.title}
+                            {jStatus === 'pending' && jTs(job) >= Date.now() - 3600000 && <span className="ml-2 rounded bg-primary text-white text-[10px] px-1.5 py-0.5 align-middle">MỚI</span>}
+                            {jStatus === 'rejected' && (job.rejectionReasons?.length || job.rejectionNote) && (
+                              <div className="mt-1.5 text-[11px] font-normal text-critical">
+                                Lý do từ chối: {(job.rejectionReasons ?? []).join('; ')}{job.rejectionNote ? ` — ${job.rejectionNote}` : ''}
+                              </div>
+                            )}
                             {/* Đợt 15 (25/09/2026) — nhãn phân biệt tin đã được TỰ ĐỘNG duyệt (còn
                                 chờ Admin kiểm tra lần 2) với tin CHƯA duyệt (đang chờ) — theo lựa
                                 chọn người dùng qua AskUserQuestion: "Có, nhãn riêng". */}
@@ -566,8 +723,12 @@ export default function AdminDashboardPage() {
                             )}
                           </td>
                           <td className="py-3 px-3 text-ink-faint">{job.company?.name}</td>
+                          <td className="py-3 px-3 text-ink-faint">{job.industry ?? '—'}</td>
                           <td className="py-3 px-3 tabular-nums">{formatSalary(job.salaryMin, job.salaryMax)}</td>
-                          <td className="py-3 px-3 tabular-nums whitespace-nowrap">{formatDate(job.updatedAt ?? job.createdAt)}</td>
+                          <td className="py-3 px-3 tabular-nums whitespace-nowrap" title={formatDateTime((job.updatedAt ?? job.createdAt) as string)}>
+                            {formatDate(job.updatedAt ?? job.createdAt)}
+                            <div className="text-[10.5px] text-ink-faint">{jAgeText(job)}</div>
+                          </td>
                           <td className="py-3 px-4 text-right whitespace-nowrap">
                             <a
                               href={`/admin/xem-tin/${job.id}`}
@@ -577,10 +738,28 @@ export default function AdminDashboardPage() {
                             >
                               Xem trước
                             </a>
-                            {job.autoApproved && !job.adminReviewed ? (
-                              // Đợt 15 — tin này ĐÃ được duyệt (tự động), không cần nút "Duyệt" nữa;
-                              // "Tin đã kiểm tra" chỉ ẩn dòng khỏi danh sách, không đổi trạng thái.
-                              // Vẫn giữ "Từ chối" phòng khi Admin kiểm tra lại thấy nội dung có vấn đề.
+                            {jStatus === 'approved' && (
+                              <>
+                                <a href={`/admin/sua-tin/${job.id}`} target="_blank" rel="noopener noreferrer" className="inline-block text-[11px] font-bold rounded-md bg-primary-tint text-primary px-2.5 py-1.5 mr-1.5">Sửa</a>
+                                <button
+                                  disabled={busyId === job.id}
+                                  onClick={() => handleJobRevoke(job.id, job.title)}
+                                  className="text-[11px] font-bold rounded-md bg-warning-tint text-[#7A4A00] px-2.5 py-1.5 mr-1.5 disabled:opacity-50"
+                                >
+                                  Thu hồi
+                                </button>
+                              </>
+                            )}
+                            {jStatus === 'rejected' && (
+                              <button
+                                disabled={busyId === job.id}
+                                onClick={() => handleJobApprove(job.id)}
+                                className="text-[11px] font-bold rounded-md bg-success-tint text-success px-2.5 py-1.5 mr-1.5 disabled:opacity-50"
+                              >
+                                Duyệt lại
+                              </button>
+                            )}
+                            {jStatus === 'pending' && (job.autoApproved && !job.adminReviewed ? (
                               <button
                                 disabled={busyId === job.id}
                                 onClick={() => handleMarkReviewed(job.id)}
@@ -596,17 +775,19 @@ export default function AdminDashboardPage() {
                               >
                                 Duyệt
                               </button>
-                            )}
+                            ))}
                             {/* Đợt 12x — Từ chối giờ bắt buộc chọn lý do, không còn là 1 click ở
                                 bảng này nữa: đưa sang trang Xem trước có modal chọn lý do. */}
-                            <a
-                              href={`/admin/xem-tin/${job.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-block text-[11px] font-bold rounded-md bg-critical-tint text-critical px-2.5 py-1.5"
-                            >
-                              Từ chối
-                            </a>
+                            {jStatus !== 'rejected' && (
+                              <a
+                                href={`/admin/xem-tin/${job.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-block text-[11px] font-bold rounded-md bg-critical-tint text-critical px-2.5 py-1.5"
+                              >
+                                Từ chối
+                              </a>
+                            )}
                           </td>
                         </tr>
                         );
@@ -614,7 +795,13 @@ export default function AdminDashboardPage() {
                     </tbody>
                   </table>
                 </div>
+                {shownJobs.length > jLimit && (
+                  <div className="p-3 text-center border-t border-border">
+                    <button type="button" onClick={() => setJLimit((n) => n + 50)} className="tvl-btn-ghost !w-auto px-5">Xem thêm {Math.min(50, shownJobs.length - jLimit)} tin</button>
+                  </div>
+                )}
               </div>
+              </>
             )}
           </>
         ) : tab === 'companies' ? (
@@ -701,6 +888,7 @@ export default function AdminDashboardPage() {
                       <tr className="text-left text-ink-faint bg-surface-alt">
                         <th className="py-2.5 px-3 w-8">
                           <input
+                            hidden={cStatus === 'approved'}
                             type="checkbox"
                             checked={shownCompanies.length > 0 && shownCompanies.every((c) => selectedCompanyIds.has(c.id))}
                             onChange={toggleAllCompaniesSelected}
@@ -730,7 +918,7 @@ export default function AdminDashboardPage() {
                             />
                           </td>
                           <td className="py-3 px-3 align-top">
-                            <CompanyLogoEditor company={c} busy={busyId === c.id} onSave={(url) => handleRowLogo(c.id, url)} />
+                            <CompanyLogoEditor company={c} token={token} busy={busyId === c.id} onSave={(url) => handleRowLogo(c.id, url)} />
                           </td>
                           <td className="py-3 px-4 font-bold">
                             {c.name}
@@ -1090,7 +1278,7 @@ function FeaturedEmployersCard({ token }: { token: string }) {
                       <input type="checkbox" checked={sel.has(c.id)} onChange={() => setSel((p) => { const n = new Set(p); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); return n; })} />
                     </td>
                     <td className="py-3 px-3">
-                      <CompanyLogoEditor company={c} busy={busyId === c.id} onSave={(url) => handleSaveLogo(c.id, url)} />
+                      <CompanyLogoEditor company={c} token={token} busy={busyId === c.id} onSave={(url) => handleSaveLogo(c.id, url)} />
                     </td>
                     <td className="py-3 px-4 font-bold">
                       {c.name}
@@ -1142,14 +1330,31 @@ function FeaturedEmployersCard({ token }: { token: string }) {
 // ô bên dưới (không tự động tải/xác nhận thay Admin vì cần con người kiểm tra đúng logo thật).
 function CompanyLogoEditor({
   company,
+  token,
   busy,
   onSave,
 }: {
   company: Company;
+  token?: string | null;
   busy: boolean;
   onSave: (logoUrl: string) => void;
 }) {
   const [value, setValue] = useState(company.logoUrl ?? '');
+  // Đợt 116 — "Gợi ý logo": web tự tìm vài ảnh từ website/tên miền đoán theo tên, Admin bấm chọn 1 ảnh.
+  const [sugg, setSugg] = useState<{ url: string; source: string }[] | null>(null);
+  const [suggBusy, setSuggBusy] = useState(false);
+  const loadSugg = async () => {
+    if (!token) return;
+    setSuggBusy(true);
+    try {
+      const r = await adminApi.logoSuggestions(token, company.id);
+      setSugg(r.items);
+    } catch {
+      setSugg([]);
+    } finally {
+      setSuggBusy(false);
+    }
+  };
 
   useEffect(() => {
     setValue(company.logoUrl ?? '');
@@ -1177,6 +1382,11 @@ function CompanyLogoEditor({
           >
             🔍 Tìm ảnh
           </a>
+          {token && (
+            <button type="button" disabled={suggBusy} onClick={loadSugg} className="text-[10.5px] font-semibold text-primary hover:underline disabled:opacity-50">
+              {suggBusy ? 'Đang tìm…' : '✨ Gợi ý'}
+            </button>
+          )}
           <button
             type="button"
             disabled={busy}
@@ -1186,6 +1396,24 @@ function CompanyLogoEditor({
             Lưu
           </button>
         </div>
+        {sugg && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {sugg.length === 0 && <span className="text-[10.5px] text-ink-muted">Không tìm thấy ảnh — hãy dùng “Tìm ảnh” rồi dán link.</span>}
+            {sugg.map((g) => (
+              <button
+                key={g.url}
+                type="button"
+                title={`${g.source} — bấm để dùng ảnh này`}
+                disabled={busy}
+                onClick={() => { setValue(g.url); onSave(g.url); setSugg(null); }}
+                className="h-9 w-9 rounded-md border border-gray-300 bg-white p-0.5 hover:border-primary"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={g.url} alt="" referrerPolicy="no-referrer" className="h-full w-full object-contain" />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -256,6 +256,23 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     return out.sort((x, y) => rank[x.reviewPriority] - rank[y.reviewPriority] || +new Date(x.updatedAt) - +new Date(y.updatedAt));
   }
 
+  // Đợt 115 — danh sách tin theo trạng thái (đã duyệt / từ chối), mới cập nhật nhất trước. "Đã duyệt" không gồm tin tự duyệt đang chờ kiểm tra lần 2 (đã nằm ở tab Chờ duyệt).
+  async listJobsByStatus(status: JobApprovalStatus, q?: string) {
+    const qb = this.jobRepo
+      .createQueryBuilder('job')
+      .leftJoinAndSelect('job.company', 'company')
+      .where('job.approvalStatus = :status', { status })
+      .orderBy('job.updatedAt', 'DESC');
+    if (status === JobApprovalStatus.APPROVED) {
+      qb.andWhere('NOT (job.autoApproved = true AND job.adminReviewed = false)');
+    }
+    if (q?.trim()) {
+      qb.andWhere('(job.title ILIKE :q OR company.name ILIKE :q)', { q: `%${q.trim()}%` });
+    }
+    const [items, total] = await qb.take(300).getManyAndCount();
+    return { items, total };
+  }
+
   // Tin dùng để so trùng: các tin đang chờ + đã duyệt gần đây (tối đa 2000) — đủ cho quy mô hiện tại.
   private async riskContextFor(jobs: JobPosting[]) {
     if (jobs.length === 0) return [];
@@ -379,6 +396,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const dueJobs = await this.jobRepo.find({
       where: {
         approvalStatus: JobApprovalStatus.PENDING,
+        adminReviewed: false,
         updatedAt: LessThanOrEqual(cutoff),
       },
     });
@@ -440,11 +458,28 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   async setJobStatus(
     admin: AdminActor,
     id: string,
-    status: JobApprovalStatus.APPROVED | JobApprovalStatus.REJECTED,
+    status:
+      | JobApprovalStatus.APPROVED
+      | JobApprovalStatus.REJECTED
+      | JobApprovalStatus.PENDING,
   ) {
     const job = await this.jobRepo.findOne({ where: { id } });
     if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng');
     job.approvalStatus = status;
+    // Đợt 115 — PENDING = "thu hồi": đưa tin đã duyệt về hàng chờ để xem xét lại (không còn là tin tự duyệt cũ).
+    if (status === JobApprovalStatus.PENDING) {
+      job.autoApproved = false;
+      // Đợt 116 — adminReviewed = true ở đây là cờ "thu hồi thủ công": bộ tự duyệt bỏ qua tin này cho đến khi NTD sửa và gửi lại (employer.updateJob đặt lại false).
+      job.adminReviewed = true;
+      const savedPending = await this.jobRepo.save(job);
+      await this.notifyCompanyUsers(
+        job.companyId,
+        'job_revoked',
+        `Tin "${job.title}" được chuyển về trạng thái chờ duyệt để xem xét lại và tạm thời không hiển thị công khai.`,
+      );
+      await this.logAction(admin, 'job.revoke', 'job', job.id, job.title);
+      return savedPending;
+    }
     // Đợt 12x (21/09/2026) — tin được duyệt (kể cả sau khi từng bị từ chối rồi NTD sửa lại gửi lên)
     // thì xoá lý do từ chối cũ, tránh còn sót lại gây hiểu nhầm khi xem lại tin đã duyệt.
     if (status === JobApprovalStatus.APPROVED) {

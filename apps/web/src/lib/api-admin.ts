@@ -64,6 +64,12 @@ export const adminApi = {
       headers: authHeaders(token),
       body: JSON.stringify(dto),
     }),
+  listJobsByStatus: (token: string, status: 'approved' | 'rejected', q = '') =>
+    request<{ items: JobPosting[]; total: number }>(`/admin/jobs/by-status?status=${status}${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ''}`, { headers: authHeaders(token) }),
+  revokeJob: (token: string, id: string) =>
+    request<JobPosting>(`/admin/jobs/${id}/revoke`, { method: 'PATCH', headers: authHeaders(token) }),
+  logoSuggestions: (token: string, id: string) =>
+    request<{ items: { url: string; source: string }[] }>(`/admin/companies/${id}/logo-suggestions`, { headers: authHeaders(token) }),
   listPendingCompanies: (token: string) =>
     request<Company[]>('/admin/companies/pending', { headers: authHeaders(token) }),
   listCompaniesByStatus: (token: string, status: 'pending' | 'approved' | 'rejected', q = '') =>
