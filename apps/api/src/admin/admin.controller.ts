@@ -263,6 +263,16 @@ export class AdminController {
     return this.mailScan.setEnabled(!!enabled);
   }
 
+  @Post('imports/publish-many')
+  publishManyImports(@CurrentUser() admin: { userId: string; email: string }, @Body('ids') ids: string[]) {
+    return this.imports.publishMany(admin, Array.isArray(ids) ? ids : []);
+  }
+
+  @Post('imports/:id/reopen')
+  reopenImport(@CurrentUser() admin: { userId: string; email: string }, @Param('id') id: string) {
+    return this.imports.reopen(admin, id);
+  }
+
   @Post('imports/:id/publish')
   publishImport(
     @CurrentUser() admin: { userId: string; email: string },

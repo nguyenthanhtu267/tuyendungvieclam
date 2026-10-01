@@ -33,6 +33,7 @@ function MailAutoPanel({ token, onNewItems }: { token: string; onNewItems: () =>
   const [showGuide, setShowGuide] = useState<boolean | null>(null);
   const [days, setDays] = useState(0); // 0 = từ lần quét trước
   const [pick, setPick] = useState<{ path: string; selected: boolean }[] | null>(null);
+  const [pickErr, setPickErr] = useState('');
   const [pickOpen, setPickOpen] = useState<number | null>(null);
   const [pickBusy, setPickBusy] = useState(false);
 
@@ -69,10 +70,14 @@ function MailAutoPanel({ token, onNewItems }: { token: string; onNewItems: () =>
   async function openPick(idx: number) {
     setPickOpen(idx);
     setPick(null);
+    setPickErr('');
     try {
-      setPick(await adminApi.mailScanLabels(token, idx));
+      const r = await adminApi.mailScanLabels(token, idx);
+      setPick(r.items);
+      setPickErr(r.error ?? '');
     } catch {
       setPick([]);
+      setPickErr('Không gọi được máy chủ, thử lại.');
     }
   }
   async function savePick() {
@@ -134,7 +139,7 @@ function MailAutoPanel({ token, onNewItems }: { token: string; onNewItems: () =>
               <button type="button" onClick={() => openPick(a.idx)} className="font-bold text-primary underline">Chọn nhãn</button>
             </div>
           ))}
-          {st.senders.length ? <> · chỉ đọc thư từ: <b>{st.senders.join(', ')}</b></> : ' · đọc mọi thư trong các nhãn đã chọn (nếu có INBOX là cả hộp thư đến — nên bỏ tick INBOX và chỉ chọn nhãn tuyển dụng)'}
+          {st.senders.length ? <div>Chỉ đọc thư từ: <b>{st.senders.join(', ')}</b></div> : <div>Đọc mọi thư trong các nhãn đã chọn (INBOX là cả hộp thư đến — nên bỏ tick INBOX).</div>}
           {last ? (
             <>
               {' · '}Lần quét gần nhất {formatDateTime(last.at)}:{' '}
@@ -150,7 +155,7 @@ function MailAutoPanel({ token, onNewItems }: { token: string; onNewItems: () =>
           {!pick ? (
             <div className="text-xs text-ink-faint">Đang tải danh sách nhãn…</div>
           ) : pick.length === 0 ? (
-            <div className="text-xs text-critical">Không lấy được danh sách nhãn (kiểm tra lại mật khẩu ứng dụng trên Render).</div>
+            <div className="text-xs text-critical">{pickErr || 'Không lấy được danh sách nhãn.'}</div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 max-h-56 overflow-y-auto">
               {pick.map((p, i) => (
@@ -183,6 +188,92 @@ function MailAutoPanel({ token, onNewItems }: { token: string; onNewItems: () =>
   );
 }
 
+// Đợt 124 — tin đã đăng: Xem như người dùng + Chỉnh sửa nhanh (chức danh, địa chỉ, lương, hạn, mô tả) + Đăng lại nếu gắn nhầm công ty.
+function PostedJobTools({ token, row, onChanged }: { token: string; row: JobImportRow; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [f, setF] = useState<{ title: string; address: string; salaryMin: string; salaryMax: string; deadline: string; description: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [m, setM] = useState('');
+
+  async function startEdit() {
+    setM('');
+    setBusy(true);
+    try {
+      const j = (await adminApi.getJobForReview(token, row.jobId as string)) as unknown as Record<string, any>;
+      setF({
+        title: j.title ?? '',
+        address: j.address ?? j.location ?? '',
+        salaryMin: j.salaryMin != null ? String(j.salaryMin) : '',
+        salaryMax: j.salaryMax != null ? String(j.salaryMax) : '',
+        deadline: j.deadline ? String(j.deadline).slice(0, 10) : '',
+        description: j.description ?? '',
+      });
+      setEditing(true);
+    } catch (e) {
+      setM(e instanceof ApiError ? e.message : 'Không mở được tin (có thể đã bị xóa).');
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function save() {
+    if (!f) return;
+    setBusy(true);
+    setM('');
+    try {
+      await adminApi.updateJob(token, row.jobId as string, {
+        title: f.title.trim(),
+        address: f.address,
+        salaryMin: f.salaryMin ? Number(f.salaryMin) : null,
+        salaryMax: f.salaryMax ? Number(f.salaryMax) : null,
+        deadline: f.deadline || undefined,
+        description: f.description,
+      });
+      setEditing(false);
+      setM('Đã lưu thay đổi.');
+      onChanged();
+    } catch (e) {
+      setM(e instanceof ApiError ? e.message : 'Lưu không được, thử lại.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function reopen() {
+    if (!window.confirm('Xóa tin đã đăng này và đưa về tab "Chờ xem" để đăng lại (ví dụ khi gắn nhầm công ty)?')) return;
+    setBusy(true);
+    try {
+      await adminApi.reopenImport(token, row.id);
+      onChanged();
+    } catch (e) {
+      setM(e instanceof ApiError ? e.message : 'Có lỗi, thử lại.');
+      setBusy(false);
+    }
+  }
+  const setK = (k: keyof NonNullable<typeof f>, v: string) => setF((p) => (p ? { ...p, [k]: v } : p));
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="text-ink-muted">Tin đã được đăng{row.matchedCompany?.name ? ` ở công ty ${row.matchedCompany.name}` : ''}.</div>
+      <div className="flex gap-2 flex-wrap">
+        <a href={`/viec-lam/${row.jobId}`} target="_blank" rel="noopener noreferrer" className="tvl-btn-primary !w-auto px-4 inline-flex items-center">Xem tin tuyển dụng ↗</a>
+        <button type="button" disabled={busy} onClick={() => (editing ? setEditing(false) : startEdit())} className="tvl-btn-ghost !w-auto px-4 disabled:opacity-50">{editing ? 'Đóng chỉnh sửa' : 'Chỉnh sửa'}</button>
+        <button type="button" disabled={busy} onClick={reopen} className="tvl-btn-ghost !w-auto px-4 disabled:opacity-50">Đăng lại (gắn nhầm công ty)</button>
+      </div>
+      {m && <div className={m.startsWith('Đã lưu') ? 'text-success font-semibold' : 'text-critical font-semibold'}>{m}</div>}
+      {editing && f && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+          <label className="flex flex-col gap-1 sm:col-span-2">Chức danh<input className="tvl-input" value={f.title} onChange={(e) => setK('title', e.target.value)} /></label>
+          <label className="flex flex-col gap-1 sm:col-span-2">Địa chỉ làm việc<input className="tvl-input" value={f.address} onChange={(e) => setK('address', e.target.value)} /></label>
+          <label className="flex flex-col gap-1">Lương từ (triệu)<input className="tvl-input" inputMode="numeric" value={f.salaryMin} onChange={(e) => setK('salaryMin', e.target.value)} /></label>
+          <label className="flex flex-col gap-1">Lương đến (triệu)<input className="tvl-input" inputMode="numeric" value={f.salaryMax} onChange={(e) => setK('salaryMax', e.target.value)} /></label>
+          <label className="flex flex-col gap-1">Hạn nộp<input className="tvl-input" type="date" value={f.deadline} onChange={(e) => setK('deadline', e.target.value)} /></label>
+          <label className="flex flex-col gap-1 sm:col-span-2">Mô tả (HTML)<textarea className="tvl-input" rows={6} value={f.description} onChange={(e) => setK('description', e.target.value)} /></label>
+          <div className="sm:col-span-2"><button type="button" disabled={busy || !f.title.trim()} onClick={save} className="tvl-btn-primary !w-auto px-4 disabled:opacity-50">{busy ? 'Đang lưu…' : 'Lưu thay đổi'}</button></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ImportInbox({ token }: { token: string }) {
   const [text, setText] = useState('');
   const [tab, setTab] = useState<Tab>('pending');
@@ -193,6 +284,8 @@ export function ImportInbox({ token }: { token: string }) {
   const [edit, setEdit] = useState<JobImportData>({});
   const [rowBusy, setRowBusy] = useState<string | null>(null);
   const [rowMsg, setRowMsg] = useState('');
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -248,6 +341,20 @@ export function ImportInbox({ token }: { token: string }) {
     }
   }
 
+  async function publishSelected() {
+    if (!sel.size || !window.confirm(`Đăng ${sel.size} tin đã chọn? Mỗi công ty mới sẽ được tạo hồ sơ + tài khoản nháp.`)) return;
+    setBulkBusy(true);
+    try {
+      const r = await adminApi.publishManyImports(token, Array.from(sel));
+      setMsg(`Đã đăng ${r.ok} tin${r.failed.length ? `, ${r.failed.length} tin lỗi (xem lại từng tin)` : ''}.`);
+      setSel(new Set());
+      await load();
+    } catch (e) {
+      setMsg(e instanceof ApiError ? e.message : 'Có lỗi, thử lại.');
+    } finally {
+      setBulkBusy(false);
+    }
+  }
   const counts = data?.counts ?? {};
   const set = (k: keyof JobImportData, v: string) => setEdit((p) => ({ ...p, [k]: v }));
 
@@ -270,12 +377,23 @@ export function ImportInbox({ token }: { token: string }) {
 
       <div className="flex gap-1 mt-4 mb-3 border-b border-border text-[13px] font-bold overflow-x-auto" role="tablist">
         {TABS.map(([k, l]) => (
-          <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => { setTab(k); setOpen(null); }} className={`px-3 py-2 border-b-2 -mb-px whitespace-nowrap ${tab === k ? 'text-primary border-primary' : 'text-ink-faint border-transparent'}`}>
+          <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => { setTab(k); setOpen(null); setSel(new Set()); }} className={`px-3 py-2 border-b-2 -mb-px whitespace-nowrap ${tab === k ? 'text-primary border-primary' : 'text-ink-faint border-transparent'}`}>
             {l} ({counts[k] ?? 0})
           </button>
         ))}
       </div>
 
+      {tab === 'pending' && data && data.items.length > 0 && (
+        <div className="flex items-center gap-3 mb-2 text-xs flex-wrap">
+          <label className="flex items-center gap-1.5 font-semibold cursor-pointer">
+            <input type="checkbox" checked={sel.size === data.items.length} onChange={(e) => setSel(e.target.checked ? new Set(data.items.map((i) => i.id)) : new Set())} />
+            Chọn tất cả ({data.items.length})
+          </label>
+          {sel.size > 0 && (
+            <button type="button" disabled={bulkBusy} onClick={publishSelected} className="tvl-btn-primary !w-auto px-4 disabled:opacity-50">{bulkBusy ? 'Đang đăng…' : `Đăng ${sel.size} tin đã chọn`}</button>
+          )}
+        </div>
+      )}
       {!data ? (
         <div className="text-xs text-ink-faint py-4">Đang tải…</div>
       ) : data.items.length === 0 ? (
@@ -285,7 +403,9 @@ export function ImportInbox({ token }: { token: string }) {
           {data.items.map((r) => {
             const d = r.data ?? {};
             const mc = r.matchedCompany;
-            const badge = r.status === 'failed' ? null : mc?.name
+            const badge = r.status === 'failed' ? null : r.status === 'published'
+              ? { t: `Đã đăng ở công ty: ${mc?.name ?? '—'}`, c: 'bg-success-tint text-success' }
+              : mc?.name
               ? r.companyHasOwner
                 ? { t: `Công ty đã có chủ: ${mc.name}`, c: 'bg-critical-tint text-critical' }
                 : { t: `Thêm vào công ty có sẵn: ${mc.name}`, c: 'bg-success-tint text-success' }
@@ -293,7 +413,9 @@ export function ImportInbox({ token }: { token: string }) {
             const canPublish = r.status === 'pending' || r.status === 'failed';
             return (
               <li key={r.id} className="rounded-lg border border-border">
-                <button type="button" onClick={() => toggle(r)} className="w-full text-left px-3 py-2.5 flex items-start gap-3">
+                <div className="flex items-start">
+                {tab === 'pending' && <input type="checkbox" aria-label="Chọn tin" className="mt-3.5 ml-3" checked={sel.has(r.id)} onChange={() => setSel((p) => { const n = new Set(p); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} />}
+                <button type="button" onClick={() => toggle(r)} className="flex-1 text-left px-3 py-2.5 flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="font-bold text-[13px] truncate">{d.title || '(chưa đọc được chức danh)'}</div>
                     <div className="text-[11.5px] text-ink-faint truncate">
@@ -307,6 +429,7 @@ export function ImportInbox({ token }: { token: string }) {
                   </div>
                   <span className="text-ink-faint text-xs">{open === r.id ? '▲' : '▼'}</span>
                 </button>
+                </div>
                 {open === r.id && (
                   <div className="border-t border-border p-3 flex flex-col gap-2 text-xs">
                     <a href={r.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary font-semibold hover:underline break-all">↗ Mở link gốc để đối chiếu</a>
@@ -331,7 +454,7 @@ export function ImportInbox({ token }: { token: string }) {
                       <div className="text-ink-muted">
                         {r.status === 'owner_review' && 'Công ty này đã có chủ thật nên không đăng hộ. Bấm "Báo công ty nhận tin" để họ nhận tin đã điền sẵn trong mục Tin đăng.'}
                         {r.status === 'owner_notified' && 'Đã báo công ty, đang chờ họ nhận hoặc bỏ qua.'}
-                        {r.status === 'published' && 'Tin đã được đăng.'}
+                        {r.status === 'published' && (r.jobId ? <PostedJobTools token={token} row={r} onChanged={load} /> : 'Tin đã được đăng.')}
                         {r.status === 'skipped' && 'Mục này đã bị bỏ qua.'}
                       </div>
                     )}

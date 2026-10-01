@@ -1984,9 +1984,9 @@ function CompanyDetailPanel({
             ) : (
               <div className="flex flex-col gap-1.5 mt-2">
                 {data.jobs.map((j) => (
-                  <div key={j.id} className="flex items-center justify-between gap-2 text-xs border-t border-border pt-1.5">
-                    <span className="font-semibold truncate">{j.title}</span>
-                    <span className="flex items-center gap-2 shrink-0">
+                  <div key={j.id} className="flex items-center justify-between gap-x-2 gap-y-1 flex-wrap text-xs border-t border-border pt-1.5">
+                    <span className="font-semibold truncate min-w-0 flex-1 basis-40">{j.title}</span>
+                    <span className="flex items-center gap-2 flex-wrap">
                       <span className="text-ink-faint">{formatSalary(j.salaryMin, j.salaryMax)}</span>
                       {/* Đợt 17e — trước đây dòng tin ở đây chỉ hiển thị, không có cách nào sửa các
                           trường (lương/địa điểm/hình thức/hạn nộp/...) của tin đã cào từ nguồn ngoài
@@ -1994,6 +1994,16 @@ function CompanyDetailPanel({
                           Đợt 17f — theo lựa chọn người dùng: bấm vào tin phải ra trang XEM đầy đủ,
                           đúng bố cục thật, MỖI khối nội dung có nút Sửa riêng cạnh khối đó — không
                           nhảy thẳng vào form sửa chung nữa (đổi từ /admin/sua-tin sang /admin/xem-tin). */}
+                      {/* Đợt 124 — xem tin đúng như người dùng thấy (trang công khai). */}
+                      <a
+                        href={`/viec-lam/${j.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block text-[11px] font-bold rounded-md bg-primary-tint text-primary px-2 py-1"
+                        title="Mở tin như người dùng thấy"
+                      >
+                        🌐 Xem tin tuyển dụng
+                      </a>
                       <a
                         href={`/admin/xem-tin/${j.id}`}
                         target="_blank"

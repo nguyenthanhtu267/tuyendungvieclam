@@ -2726,6 +2726,7 @@ export interface JobImportRow {
   data: JobImportData;
   matchedCompanyId?: string | null;
   matchKind?: string | null;
+  jobId?: string | null;
   companyHasOwner: boolean;
   matchedCompany?: { id?: string; name?: string; isAdminSourced?: boolean } | null;
   note?: string | null;

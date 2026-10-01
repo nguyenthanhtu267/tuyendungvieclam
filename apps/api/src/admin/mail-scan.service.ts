@@ -136,26 +136,40 @@ export class MailScanService implements OnModuleInit, OnModuleDestroy {
   }
 
   // Danh sách nhãn (thư mục) trong hộp thư để Admin tick chọn — bỏ các thư mục hệ thống của Gmail ([Gmail]/…).
-  async labels(idx = 1): Promise<{ path: string; selected: boolean }[]> {
+  // Giải thích lỗi IMAP bằng tiếng Việt để Admin biết sửa chỗ nào.
+  private explain(e: unknown): string {
+    const err = e as { authenticationFailed?: boolean; responseText?: string; code?: string; message?: string };
+    const raw = `${err?.responseText || ''} ${err?.message || ''}`.toLowerCase();
+    if (err?.authenticationFailed || raw.includes('invalid credentials') || raw.includes('authenticationfailed') || raw.includes('application-specific password')) {
+      return 'Google từ chối đăng nhập: mật khẩu ứng dụng sai/đã bị thu hồi, hoặc địa chỉ Gmail trong biến USER viết sai. Tạo lại mật khẩu ứng dụng cho ĐÚNG Gmail này và dán lại.';
+    }
+    if (raw.includes('imap') && raw.includes('disabled')) return 'IMAP đang bị tắt cho Gmail này (Cài đặt → Chuyển tiếp và POP/IMAP → Bật IMAP).';
+    if (err?.code === 'ETIMEDOUT' || err?.code === 'ENOTFOUND' || err?.code === 'ECONNREFUSED') return 'Không kết nối được tới máy chủ Gmail, thử lại sau.';
+    return `Lỗi: ${(err?.responseText || err?.message || 'không rõ').toString().slice(0, 120)}`;
+  }
+
+  async labels(idx = 1): Promise<{ items: { path: string; selected: boolean }[]; error?: string }> {
     const acc = this.accounts().find((a) => a.idx === idx);
-    if (!acc) return [];
+    if (!acc) return { items: [], error: 'Chưa có biến môi trường cho hộp thư này trên Render.' };
     const sel = new Set(this.selectedLabels(await this.row(), acc.user));
     const client = this.newClient(acc);
     try {
       await client.connect();
       const list = await client.list();
       await client.logout().catch(() => undefined);
-      return list
-        .filter((m) => !m.flags?.has('\\Noselect') && !m.path.startsWith('[Gmail]') && !m.path.startsWith('[Google Mail]'))
-        .map((m) => ({ path: m.path, selected: sel.has(m.path) }))
-        .sort((a, b) => a.path.localeCompare(b.path, 'vi'));
-    } catch {
+      return {
+        items: list
+          .filter((m) => !m.flags?.has('\\Noselect') && !m.path.startsWith('[Gmail]') && !m.path.startsWith('[Google Mail]'))
+          .map((m) => ({ path: m.path, selected: sel.has(m.path) }))
+          .sort((a, b) => a.path.localeCompare(b.path, 'vi')),
+      };
+    } catch (e) {
       try {
         await client.logout();
       } catch {
         /* bỏ qua */
       }
-      return [];
+      return { items: [], error: this.explain(e) };
     }
   }
 
@@ -268,7 +282,7 @@ export class MailScanService implements OnModuleInit, OnModuleDestroy {
           }
           await client.logout().catch(() => undefined);
         } catch (e) {
-          errors.push(`${acc.user.replace(/^(.).*(@.*)$/, '$1***$2')}: ${(e as Error).message?.slice(0, 120) || 'lỗi'}`);
+          errors.push(`${acc.user.replace(/^(.).*(@.*)$/, '$1***$2')}: ${this.explain(e)}`);
           try {
             await client.logout();
           } catch {

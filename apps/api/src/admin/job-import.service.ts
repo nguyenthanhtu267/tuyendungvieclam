@@ -45,6 +45,12 @@ function hostOf(url?: string | null): string {
   }
 }
 
+// Website của trang việc làm (không phải website riêng của công ty) — không dùng để so khớp công ty / lưu làm website công ty.
+const BOARD_HOSTS = /(careerviet|vietnamworks|topcv|itviec|glints|jobsgo|timviec365|vieclam24h|123job|mywork|joboko|careerlink|vieclamtot|indeed|linkedin|jobstreet|navigos|ybox|topdev|viectotnhat|timviecnhanh|lamthem|facebook|zalo|google|youtube)\./i;
+function isBoardHost(h: string): boolean {
+  return !!h && BOARD_HOSTS.test(h + '.');
+}
+
 @Injectable()
 export class JobImportService {
   constructor(
@@ -69,7 +75,7 @@ export class JobImportService {
       const hit = rows.find((c) => coreCompanyName(c.name) === core);
       if (hit) return { company: hit, kind: 'name' };
     }
-    if (host && host.includes('.')) {
+    if (host && host.includes('.') && !isBoardHost(host)) {
       const rows = await this.companyRepo
         .createQueryBuilder('c')
         .where('c.website ILIKE :h', { h: `%${host}%` })
@@ -235,7 +241,7 @@ export class JobImportService {
       const host = hostOf(row.sourceUrl);
       const created = await this.admin.createDraftCompany(admin, {
         name: companyName,
-        website: d.companyWebsite || undefined,
+        website: d.companyWebsite && !isBoardHost(hostOf(d.companyWebsite)) ? d.companyWebsite : undefined,
         logoUrl: d.companyLogo || undefined,
         industry: d.industry || undefined,
         sourceLabel: host ? `Tổng hợp từ ${host}` : undefined,
@@ -262,6 +268,22 @@ export class JobImportService {
     return { import: row, job, company };
   }
 
+  // Đăng nhiều tin một lúc (đã xem lướt): lần lượt từng tin để công ty vừa tạo được nhận ra ở tin sau.
+  async publishMany(admin: AdminActor, ids: string[]) {
+    const list = Array.from(new Set((ids ?? []).map(String))).slice(0, 50);
+    let ok = 0;
+    const failed: { id: string; message: string }[] = [];
+    for (const id of list) {
+      try {
+        await this.publish(admin, id, {});
+        ok++;
+      } catch (e) {
+        failed.push({ id, message: (e as Error).message });
+      }
+    }
+    return { ok, failed };
+  }
+
   // Công ty đã có chủ thật: Admin bấm báo → thông báo tới tài khoản công ty để họ tự nhận hoặc bỏ qua.
   async notifyOwner(admin: AdminActor, id: string) {
     const row = await this.getOne(id);
@@ -277,6 +299,23 @@ export class JobImportService {
     row.status = 'owner_notified';
     await this.repo.save(row);
     return row;
+  }
+
+  // Tin đã đăng nhưng sai (ví dụ gắn nhầm công ty): xóa tin đã đăng và đưa mục về "Chờ xem" để đăng lại đúng.
+  async reopen(admin: AdminActor, id: string) {
+    const row = await this.getOne(id);
+    if (row.status !== 'published') throw new BadRequestException('Chỉ đăng lại được tin đã đăng');
+    if (row.jobId) {
+      try {
+        await this.admin.deleteJob(admin, row.jobId);
+      } catch {
+        /* tin đã bị xóa trước đó */
+      }
+    }
+    row.status = 'pending';
+    row.jobId = null as never;
+    row.matchedCompanyId = null as never;
+    return this.repo.save(row);
   }
 
   async skip(id: string) {

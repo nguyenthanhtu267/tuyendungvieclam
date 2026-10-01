@@ -193,7 +193,8 @@ export const adminApi = {
   // Đợt 120 — tự đọc email thông báo việc làm.
   mailScanStatus: (token: string) => request<MailScanStatus>('/admin/mail-scan', { headers: authHeaders(token) }),
   mailScanNow: (token: string, days?: number) => request<{ started: boolean; reason?: string }>('/admin/mail-scan', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ days }) }),
-  mailScanLabels: (token: string, account = 1) => request<{ path: string; selected: boolean }[]>(`/admin/mail-scan/labels?account=${account}`, { headers: authHeaders(token) }),
+  mailScanLabels: (token: string, account = 1) => request<{ items: { path: string; selected: boolean }[]; error?: string }>(`/admin/mail-scan/labels?account=${account}`, { headers: authHeaders(token) }),
+  publishManyImports: (token: string, ids: string[]) => request<{ ok: number; failed: { id: string; message: string }[] }>('/admin/imports/publish-many', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ ids }) }),
   mergeImportDuplicates: (token: string) => request<{ merged: number }>('/admin/imports/merge-duplicates', { method: 'POST', headers: authHeaders(token) }),
   mailScanSetLabels: (token: string, labels: string[], account = 1) =>
     request<MailScanStatus>('/admin/mail-scan/labels', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ labels, account }) }),
@@ -208,6 +209,8 @@ export const adminApi = {
     request<{ job: JobPosting; company: Company }>(`/admin/imports/${id}/publish`, { method: 'POST', headers: authHeaders(token), body: JSON.stringify(edit) }),
   notifyImportOwner: (token: string, id: string) =>
     request<unknown>(`/admin/imports/${id}/notify-owner`, { method: 'POST', headers: authHeaders(token) }),
+  reopenImport: (token: string, id: string) =>
+    request<unknown>(`/admin/imports/${id}/reopen`, { method: 'POST', headers: authHeaders(token) }),
   skipImport: (token: string, id: string) =>
     request<unknown>(`/admin/imports/${id}/skip`, { method: 'POST', headers: authHeaders(token) }),
   extractJobFromUrl: (token: string, url: string) =>
