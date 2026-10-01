@@ -1,3 +1,4 @@
+import { oldDistricts } from '../workers/vn-geo';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, MoreThanOrEqual, Repository, SelectQueryBuilder } from 'typeorm';
@@ -124,7 +125,9 @@ export class JobsService {
       });
     }
     if (query.salaryTier != null) {
-      qb.andWhere('(job.salaryMax >= :tier OR job.salaryMin >= :tier)', {
+      // Tin cũ có thể lưu số tiền đầy đủ (15000000) thay vì số triệu (15): quy đổi về triệu trước khi so.
+      const tr = (c: string) => `(CASE WHEN ${c} >= 100000 THEN ${c} / 1000000.0 ELSE ${c} END)`;
+      qb.andWhere(`(${tr('job.salaryMax')} >= :tier OR ${tr('job.salaryMin')} >= :tier)`, {
         tier: query.salaryTier,
       });
     }
@@ -341,9 +344,19 @@ export class JobsService {
       .addSelect('COUNT(*)', 'count')
       .andWhere('job.district IS NOT NULL')
       .groupBy('job.district')
-      .orderBy('count', 'DESC')
       .getRawMany();
-    return rows.map((r) => ({ district: r.district, count: Number(r.count) }));
+    // Chỉ nhận quận/huyện THUỘC tỉnh đang chọn (tin đăng nhiều tỉnh có thể mang quận của tỉnh khác, VD "Quận 7" của TP.HCM
+    // không được hiện khi đang chọn Bắc Ninh). Có danh mục hành chính → liệt kê ĐỦ quận/huyện của tỉnh, nơi chưa có tin ghi (0).
+    const catalog = oldDistricts(province);
+    const norm = (x: string) => x.trim().toLowerCase();
+    const counts = new Map<string, number>();
+    for (const r of rows) counts.set(norm(r.district), (counts.get(norm(r.district)) ?? 0) + Number(r.count));
+    if (!catalog.length) {
+      return rows.map((r) => ({ district: r.district as string, count: Number(r.count) })).sort((a, b) => b.count - a.count);
+    }
+    return catalog
+      .map((d) => ({ district: d, count: counts.get(norm(d)) ?? 0 }))
+      .sort((a, b) => b.count - a.count || a.district.localeCompare(b.district, 'vi'));
   }
 
   async featuredEmployers() {

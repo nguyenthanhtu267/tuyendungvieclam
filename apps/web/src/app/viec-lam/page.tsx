@@ -176,6 +176,7 @@ function JobSearchPage() {
   function updateParams(next: Partial<JobListParams>) {
     const params = new URLSearchParams(searchParams.toString());
     const patched: Record<string, unknown> = { ...filters, ...next };
+    if ('provinces' in next && !('district' in next)) patched.district = undefined; // đổi tỉnh → bỏ quận/huyện của tỉnh cũ
     (['q', 'location', 'provinces', 'district', 'industries', 'salaryTier', 'level', 'postedWithin', 'employmentType', 'experienceLevel', 'urgentOnly', 'featuredEmployerOnly'] as const).forEach(
       (key) => {
         const v = patched[key];

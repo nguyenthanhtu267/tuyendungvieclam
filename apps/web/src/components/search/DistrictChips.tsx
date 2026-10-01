@@ -31,7 +31,9 @@ export function DistrictChips({
             className={`shrink-0 whitespace-nowrap text-[11.5px] font-semibold px-3 py-1.5 rounded-full border transition-colors ${
               selected === d.district
                 ? 'bg-primary text-white border-primary'
-                : 'border-border-strong text-ink-muted hover:border-primary'
+                : d.count === 0
+                  ? 'border-border text-ink-faint hover:border-primary'
+                  : 'border-border-strong text-ink-muted hover:border-primary'
             }`}
           >
             {d.district} ({d.count})

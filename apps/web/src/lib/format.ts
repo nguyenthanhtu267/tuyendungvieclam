@@ -11,7 +11,7 @@ export function normalizeSalaryAmount(raw: number | undefined | null): number | 
 }
 
 // Đợt 47 — tin cũ lỡ lưu số tiền đầy đủ (35000000) thay vì số triệu (35): quy đổi khi HIỂN THỊ.
-const toTrieu = (v?: number | null) => (v && v >= 100_000 ? Math.round(v / 100_000) / 10 : v ?? undefined);
+export const toTrieu = (v?: number | null) => (v && v >= 100_000 ? Math.round(v / 100_000) / 10 : v ?? undefined);
 
 export function formatSalary(rawMin?: number, rawMax?: number): string {
   const min = toTrieu(rawMin);

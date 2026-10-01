@@ -7,7 +7,7 @@ import type { JobPosting } from '@/lib/api';
 import { track } from '@/lib/analytics';
 import { candidatesApi, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { formatDate, formatSalaryTag, isNewJob } from '@/lib/format';
+import { formatDate, formatSalaryTag, isNewJob, toTrieu } from '@/lib/format';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { scamWarnings } from '@/lib/scam';
 import { SourcedBadge, isCompanyUnverified } from '@/components/SourcedBadge';
@@ -148,7 +148,7 @@ export function JobCard({
               ⚡ URGENT
             </span>
           )}
-          {Math.max(job.salaryMin ?? 0, job.salaryMax ?? 0) >= 50 && (
+          {Math.max(toTrieu(job.salaryMin) ?? 0, toTrieu(job.salaryMax) ?? 0) >= 50 && (
             <button
               type="button"
               onClick={(e) => {
