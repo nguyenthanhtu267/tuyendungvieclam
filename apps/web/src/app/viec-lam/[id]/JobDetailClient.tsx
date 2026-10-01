@@ -756,7 +756,18 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
                     </ul>
                   </div>
 
-                  <div className="mt-4"><ReportJobButton jobId={job.id} /></div>
+                  {/* Đợt 129 — đọc hết tin rồi không phải cuộn lên: nút nộp đơn nhắc lại ở cuối tin (cùng hành vi thông minh với nút trên banner). */}
+                  <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
+                    <ReportJobButton jobId={job.id} />
+                    <button
+                      type="button"
+                      disabled={applyState === 'submitting' || applyState === 'done'}
+                      onClick={onApplyTap}
+                      className="tvl-btn-accent !w-auto px-6 !h-11 disabled:opacity-70 max-sm:flex-1"
+                    >
+                      {applyLabel}
+                    </button>
+                  </div>
 
                   {/* Đợt 12v (21/09/2026) — "JOB TAGS / SKILLS": thẻ từ khoá/kỹ năng NTD tự nhập khi
                       đăng tin (theo ảnh mẫu người dùng gửi), chỉ hiện khi tin có ít nhất 1 tag. */}
