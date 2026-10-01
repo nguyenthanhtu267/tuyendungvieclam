@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -25,6 +26,8 @@ import { CreateJobDto } from '../employer/dto/create-job.dto';
 import { CreateDraftCompanyDto } from './dto/create-draft-company.dto';
 import { ClaimCompanyDto } from './dto/claim-company.dto';
 import { ResolveClaimRequestDto } from './dto/resolve-claim-request.dto';
+import { JobImportService } from './job-import.service';
+import { MailScanService } from './mail-scan.service';
 import { ExtractJobUrlDto } from './dto/extract-job-url.dto';
 import { UpdatePromoBadgeDto } from './dto/promo-badge.dto';
 
@@ -43,7 +46,11 @@ export class PublicSettingsController {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN, UserRole.MODERATOR)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly imports: JobImportService,
+    private readonly mailScan: MailScanService,
+  ) {}
 
   @Get('dashboard')
   getDashboard() {
@@ -212,6 +219,62 @@ export class AdminController {
           ? CompanyApprovalStatus.REJECTED
           : CompanyApprovalStatus.PENDING;
     return this.adminService.listCompaniesByStatus(st, q);
+  }
+
+  // ===== Đợt 119 — Hộp nhập tin từ link =====
+  @Post('imports')
+  addImportLinks(@Body('urls') urls: string[]) {
+    return this.imports.addLinks(Array.isArray(urls) ? urls : []);
+  }
+
+  @Get('imports')
+  listImports(@Query('status') status?: string, @Query('q') q?: string) {
+    return this.imports.list(status, q);
+  }
+
+  // Đợt 120 — tự đọc email thông báo việc làm.
+  @Get('mail-scan')
+  mailScanStatus() {
+    return this.mailScan.status();
+  }
+
+  @Post('mail-scan')
+  mailScanNow(@Body('days') days?: number) {
+    return this.mailScan.start(Number(days) || undefined);
+  }
+
+  @Get('mail-scan/labels')
+  mailScanLabels() {
+    return this.mailScan.labels();
+  }
+
+  @Post('mail-scan/labels')
+  mailScanSetLabels(@Body('labels') labels: string[]) {
+    return this.mailScan.setLabels(Array.isArray(labels) ? labels : []);
+  }
+
+  @Post('mail-scan/enabled')
+  mailScanEnabled(@Body('enabled') enabled: boolean) {
+    return this.mailScan.setEnabled(!!enabled);
+  }
+
+  @Post('imports/:id/publish')
+  publishImport(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.imports.publish(admin, id, body ?? {});
+  }
+
+  @Post('imports/:id/notify-owner')
+  notifyImportOwner(@CurrentUser() admin: { userId: string; email: string }, @Param('id') id: string) {
+    return this.imports.notifyOwner(admin, id);
+  }
+
+  @Post('imports/:id/skip')
+  skipImport(@Param('id') id: string) {
+    return this.imports.skip(id);
   }
 
   @Get('companies/pending')
@@ -430,5 +493,18 @@ export class AdminController {
     @Param('id') id: string,
   ) {
     return this.adminService.confirmOrderPayment(admin, id);
+  }
+}
+
+// Đợt 120 — địa chỉ cho dịch vụ gọi định kỳ miễn phí (VD cron-job.org): vừa đánh thức Render miễn phí vừa chạy quét email.
+// Bảo vệ bằng khoá bí mật MAIL_CRON_KEY (biến môi trường), sai khoá thì báo 404 như không tồn tại.
+@Controller('public/mail-scan')
+export class MailScanCronController {
+  constructor(private readonly mailScan: MailScanService) {}
+
+  @Get('run')
+  run(@Query('key') key?: string) {
+    if (!this.mailScan.checkCronKey(key)) throw new NotFoundException();
+    return this.mailScan.start();
   }
 }

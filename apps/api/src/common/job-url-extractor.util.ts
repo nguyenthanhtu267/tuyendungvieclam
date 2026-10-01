@@ -7,6 +7,8 @@
 // đổi giao diện. Chỉ best-effort: trang không nhúng JSON-LD (VD nhóm Facebook, forum) thì trả về rỗng,
 // Admin tự nhập tay — KHÔNG coi đây là lỗi cứng.
 
+import { assertPublicHttpUrl } from './public-url.util';
+
 export interface ExtractedJobData {
   title?: string;
   companyName?: string;
@@ -17,12 +19,18 @@ export interface ExtractedJobData {
   salaryMax?: number;
   // Đợt 17d (25/09/2026) — schema.org `validThrough` là field chuẩn cho hạn nộp, trước đó bỏ sót.
   deadline?: string;
+  // Đợt 119 — thông tin công ty đọc kèm (schema.org hiringOrganization) + ngành, để tạo/so khớp công ty tự động.
+  companyWebsite?: string;
+  companyLogo?: string;
+  industry?: string;
 }
 
 export interface ExtractJobUrlResult {
   found: boolean;
   data: ExtractedJobData;
   warning?: string;
+  // Đợt 120 — link thật sau khi theo chuyển hướng (link theo dõi trong email → link tin gốc).
+  finalUrl?: string;
 }
 
 const FETCH_TIMEOUT_MS = 12_000;
@@ -163,6 +171,11 @@ function extractDeadline(raw: unknown): string | undefined {
   return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString().slice(0, 10);
 }
 
+function asUrl(value: unknown): string | undefined {
+  const v = asText(value);
+  return v && /^https?:\/\//i.test(v) ? v : undefined;
+}
+
 function asText(value: unknown): string | undefined {
   if (typeof value === 'string' && value.trim()) return decodeHtmlEntities(value.trim());
   if (Array.isArray(value) && value.length > 0) return asText(value[0]);
@@ -213,27 +226,41 @@ function findJobPostingNode(json: unknown): Record<string, unknown> | undefined 
 
 export async function extractJobFromUrl(url: string): Promise<ExtractJobUrlResult> {
   let html: string;
+  let finalUrl: string | undefined;
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          // Vài trang chặn user-agent mặc định của fetch/bot — giả lập trình duyệt thường để tăng khả
-          // năng tải được trang (không phải để né bất kỳ cơ chế xác thực/đăng nhập nào).
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-          Accept: 'text/html,application/xhtml+xml',
-        },
-      });
-    } finally {
-      clearTimeout(timeout);
+    // Đợt 119 — chỉ gọi tới địa chỉ Internet công khai (chặn mạng nội bộ), tự theo chuyển hướng tối đa 4 lần và kiểm tra lại từng chặng.
+    let target: URL | null = await assertPublicHttpUrl(url).catch(() => null);
+    if (!target) return { found: false, data: {}, warning: 'Link không hợp lệ hoặc không phải trang web công khai.' };
+    let res: Response | null = null;
+    for (let hop = 0; hop < 5; hop++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      try {
+        res = await fetch(target, {
+          signal: controller.signal,
+          redirect: 'manual',
+          headers: {
+            // Vài trang chặn user-agent mặc định của fetch/bot — giả lập trình duyệt thường để tăng khả
+            // năng tải được trang (không phải để né bất kỳ cơ chế xác thực/đăng nhập nào).
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+            Accept: 'text/html,application/xhtml+xml',
+          },
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+      const loc = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+      if (!loc) break;
+      target = await assertPublicHttpUrl(new URL(loc, target).toString()).catch(() => null);
+      if (!target) return { found: false, data: {}, warning: 'Trang chuyển hướng tới địa chỉ không hợp lệ.' };
+      res = null;
     }
+    if (!res) return { found: false, data: {}, warning: 'Trang chuyển hướng quá nhiều lần — vui lòng nhập tay.' };
     if (!res.ok) {
       return { found: false, data: {}, warning: `Không tải được trang (mã lỗi ${res.status}) — vui lòng nhập tay.` };
     }
+    finalUrl = target.toString();
     const buf = await res.arrayBuffer();
     html = Buffer.from(buf.slice(0, MAX_HTML_BYTES)).toString('utf-8');
   } catch {
@@ -268,14 +295,18 @@ export async function extractJobFromUrl(url: string): Promise<ExtractJobUrlResul
       salaryMin: salary.min,
       salaryMax: salary.max,
       deadline: extractDeadline(node.validThrough),
+      companyWebsite: asUrl(org?.sameAs) ?? asUrl(org?.url),
+      companyLogo: asUrl(org?.logo) ?? asUrl((org?.logo as Record<string, unknown> | undefined)?.url),
+      industry: asText(node.industry),
     };
     const hasAnyField = Object.values(data).some((v) => v !== undefined);
-    if (hasAnyField) return { found: true, data };
+    if (hasAnyField) return { found: true, data, finalUrl };
   }
 
   return {
     found: false,
     data: {},
     warning: 'Trang này không có sẵn dữ liệu chuẩn hoá (JSON-LD) để trích xuất tự động — vui lòng nhập tay.',
+    finalUrl,
   };
 }

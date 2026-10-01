@@ -18,6 +18,7 @@ import { INDUSTRIES, PROVINCES } from '@/lib/catalogs';
 // Đợt 93 — mỗi tab Admin nạp RIÊNG khi được mở (trước đây cả 9 bảng ~230KB JS tải ngay khi vào trang). Có `loading` riêng để
 // không làm ranh giới Suspense ở trên cùng hiện lại khung xương (xem DeferredWidgets).
 const PanelLoading = () => <div className="p-6 text-[14px] text-ink-muted">Đang tải…</div>;
+const ImportInbox = dynamic(() => import('@/components/admin/ImportInbox').then((m) => m.ImportInbox), { ssr: false, loading: PanelLoading });
 const CvSourcingPanel = dynamic(() => import('@/components/admin/CvSourcingPanel').then((m) => m.CvSourcingPanel), { ssr: false, loading: PanelLoading });
 const PeoplePanel = dynamic(() => import('@/components/admin/PeoplePanel').then((m) => m.PeoplePanel), { ssr: false, loading: PanelLoading });
 const CandidatesPanel = dynamic(() => import('@/components/admin/CandidatesPanel').then((m) => m.CandidatesPanel), { ssr: false, loading: PanelLoading });
@@ -1107,7 +1108,7 @@ function SourcedTabs({ token }: { token: string }) {
           </button>
         ))}
       </div>
-      {sub === 'companies' ? <SourcedCompaniesCard token={token} /> : <CvSourcingPanel token={token} />}
+      {sub === 'companies' ? <><ImportInbox token={token} /><SourcedCompaniesCard token={token} /></> : <CvSourcingPanel token={token} />}
     </div>
   );
 }

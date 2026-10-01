@@ -365,6 +365,16 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
   }
 
   const isLabor = !!job.channel && job.channel !== 'office';
+  // Đợt 118 — nút "Nộp Đơn Ứng Tuyển" thông minh (gộp thanh "Ứng tuyển nhanh" cũ): lần chạm đầu mở khối nộp hồ sơ + cuộn tới;
+  // khi đã chọn sẵn CV/hồ sơ trực tuyến và tin không có câu hỏi sàng lọc thì nút đổi thành "Xác nhận nộp" — 1 chạm là xong.
+  const quickReady = applyOpen && !isLabor && !!me && (useOnlineProfile || !!selectedCvId) && !(job.screeningQuestions ?? []).length;
+  const applyLabel =
+    applyState === 'done' ? '✓ Đã nộp hồ sơ' : applyState === 'submitting' ? 'Đang nộp…' : quickReady ? '⚡ Xác nhận nộp hồ sơ' : 'Nộp Đơn Ứng Tuyển';
+  function onApplyTap() {
+    if (quickReady) return void submitApply();
+    if (isLabor) return void document.getElementById('labor-apply')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    handleApplyClick().then(() => setTimeout(() => document.getElementById('apply-block')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150));
+  }
   return (
     <main className="min-h-screen">
       <SiteHeader />
@@ -385,41 +395,47 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
           <span className="text-ink-muted font-semibold">{job.title}</span>
         </div>
 
-        <div className="rounded-2xl bg-primary p-6 flex flex-wrap items-end justify-between gap-4">
-          <div className="flex items-center gap-4 min-w-0">
-            {/* Đợt 56 — logo công ty ở góc trái banner (chỉ khi có logo thật). */}
-            <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={72} className="text-lg" hideIfEmpty />
-          <div className="min-w-0">
-            <div className="text-white text-xl font-extrabold flex items-center gap-2 flex-wrap">
-              {job.title}
-              {job.isUrgent && (
-                <span className="text-[10.5px] font-bold px-2 py-0.5 rounded bg-white/20 text-white align-middle">
-                  URGENT
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2 flex-wrap mt-1">
-              <Link href={`/cong-ty/${job.company.id}`} className="co-name-dark text-[13px] hover:underline">
-                {job.company.name}
-              </Link>
-              {isCompanyUnverified(job.company) && <SourcedBadge />}
+        {/* Đợt 118 — banner gọn cho điện thoại: tiêu đề + URGENT chảy liền nhau; 4 nút nhanh chia đều bề ngang; hàng cuối = ♡ + nút nộp đơn
+            (nút nộp đơn là nút thông minh: đã chọn sẵn CV thì đổi thành "Xác nhận nộp" 1 chạm — thay cho thanh "Ứng tuyển nhanh" dính đáy). */}
+        <div className="rounded-2xl bg-primary p-4 sm:p-6 flex flex-col md:flex-row md:items-end md:justify-between gap-3.5">
+          <div className="flex flex-col gap-3 min-w-0 md:flex-1">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              {/* Đợt 56 — logo công ty ở góc trái banner (chỉ khi có logo thật). */}
+              <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={64} className="text-lg shrink-0" hideIfEmpty />
+              <div className="min-w-0">
+                <h1 className="text-white text-[19px] sm:text-xl font-extrabold leading-snug">
+                  {job.title}
+                  {job.isUrgent && (
+                    <span className="ml-2 text-[10.5px] font-bold px-2 py-0.5 rounded bg-white/20 text-white align-middle whitespace-nowrap">
+                      URGENT
+                    </span>
+                  )}
+                </h1>
+                <div className="flex items-center gap-2 flex-wrap mt-1">
+                  <Link href={`/cong-ty/${job.company.id}`} className="co-name-dark text-[13px] hover:underline">
+                    {job.company.name}
+                  </Link>
+                  {isCompanyUnverified(job.company) && <SourcedBadge />}
+                </div>
+              </div>
             </div>
             <JobQuickActions jobId={job.id} title={job.title} company={job.company.name} phone={job.contactPhone} />
           </div>
-          </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center md:shrink-0">
             <button
               onClick={toggleSave}
-              className="w-9 h-9 rounded-lg bg-white/15 text-white flex items-center justify-center"
+              className="w-11 h-11 shrink-0 rounded-xl bg-white/15 text-white flex items-center justify-center text-lg"
               aria-label="Lưu tin"
             >
               {saved ? '♥' : '♡'}
             </button>
             <button
-              onClick={() => (isLabor ? document.getElementById('labor-apply')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) : handleApplyClick())}
-              className="tvl-btn-accent !w-auto px-5"
+              type="button"
+              disabled={applyState === 'submitting' || applyState === 'done'}
+              onClick={onApplyTap}
+              className="tvl-btn-accent flex-1 md:flex-none md:!w-auto md:px-6 !h-11 disabled:opacity-70"
             >
-              Nộp Đơn Ứng Tuyển
+              {applyLabel}
             </button>
           </div>
         </div>
@@ -901,35 +917,6 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
         )}
 
         <AdSlot slot="job-bottom" className="mt-6" />
-      </div>
-      {/* Đợt 99 — thanh "Ứng tuyển nhanh" dính đáy (điện thoại), nằm trên thanh điều hướng. Đã chọn sẵn CV/hồ sơ + tin không có câu hỏi
-          sàng lọc → 1 chạm là nộp; ngược lại mở khối nộp hồ sơ rồi cuộn tới đó. */}
-      <div
-        data-no-slop
-        className="md:hidden fixed inset-x-0 z-30 px-3"
-        style={{ bottom: 'calc(60px + env(safe-area-inset-bottom, 0px))' }}
-      >
-        {applyState === 'done' ? (
-          <div className="h-12 rounded-xl bg-white/95 border border-border-strong shadow flex items-center justify-center font-bold text-[14px] text-primary">✓ Đã nộp hồ sơ</div>
-        ) : (
-          <button
-            type="button"
-            disabled={applyState === 'submitting'}
-            onClick={() => {
-              const ready = applyOpen && !isLabor && !!me && (useOnlineProfile || !!selectedCvId) && !(job.screeningQuestions ?? []).length;
-              if (ready) return void submitApply();
-              if (isLabor) return void document.getElementById('labor-apply')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              handleApplyClick().then(() => setTimeout(() => document.getElementById('apply-block')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150));
-            }}
-            className="w-full h-12 rounded-xl bg-accent text-white font-extrabold text-[15px] shadow-lg disabled:opacity-60"
-          >
-            {applyState === 'submitting'
-              ? 'Đang nộp…'
-              : applyOpen && !isLabor && !!me && (useOnlineProfile || !!selectedCvId) && !(job.screeningQuestions ?? []).length
-                ? `⚡ Xác nhận nộp ${useOnlineProfile ? 'bằng hồ sơ trực tuyến' : 'bằng CV đã chọn'}`
-                : '⚡ Ứng tuyển nhanh'}
-          </button>
-        )}
       </div>
     </main>
   );

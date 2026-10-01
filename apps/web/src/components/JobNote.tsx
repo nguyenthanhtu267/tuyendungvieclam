@@ -44,11 +44,11 @@ export function JobNoteButton({ jobId }: { jobId: string }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   useEffect(() => setText(cur.note), [cur.note]);
-  const btn = 'inline-flex items-center gap-1.5 h-10 px-4 rounded-full bg-white/15 text-white text-[13.5px] font-bold border border-white/30';
+  const btn = 'inline-flex items-center justify-center gap-1 h-10 flex-1 basis-0 min-w-[68px] px-2 rounded-full bg-white/15 text-white text-[13px] font-bold border border-white/30 whitespace-nowrap';
   return (
     <>
       <button type="button" onClick={() => setOpen((o) => !o)} className={btn} aria-pressed={cur.pinned}>
-        {cur.pinned ? '📌 Đã ghim' : '📌 Ghim / Ghi chú'}
+        {cur.pinned ? '📌 Đã ghim' : '📌 Ghim'}
       </button>
       {open && (
         <div className="basis-full rounded-xl bg-white text-ink p-3 flex flex-col gap-2">

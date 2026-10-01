@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdminService } from './admin.service';
-import { AdminController, PublicSettingsController } from './admin.controller';
+import { AdminController, PublicSettingsController, MailScanCronController } from './admin.controller';
 import { Company } from '../database/entities/company.entity';
 import { CompanyUser } from '../database/entities/company-user.entity';
 import { JobPosting } from '../database/entities/job-posting.entity';
@@ -15,6 +15,9 @@ import { SearchHistory } from '../database/entities/search-history.entity';
 import { AdminAuditLog } from '../database/entities/admin-audit-log.entity';
 import { AdminSetting } from '../database/entities/admin-setting.entity';
 import { CompanyClaimRequest } from '../database/entities/company-claim-request.entity';
+import { JobImport } from '../database/entities/job-import.entity';
+import { JobImportService } from './job-import.service';
+import { MailScanService } from './mail-scan.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
@@ -33,11 +36,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
       AdminAuditLog,
       AdminSetting,
       CompanyClaimRequest,
+      JobImport,
     ]),
     NotificationsModule,
   ],
-  controllers: [AdminController, PublicSettingsController],
-  providers: [AdminService],
-  exports: [AdminService],
+  controllers: [AdminController, PublicSettingsController, MailScanCronController],
+  providers: [AdminService, JobImportService, MailScanService],
+  exports: [AdminService, JobImportService],
 })
 export class AdminModule {}

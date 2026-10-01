@@ -22,9 +22,9 @@ export function JobQuickActions({ jobId, title, company, phone }: { jobId?: stri
       /* người dùng đóng bảng chia sẻ */
     }
   }
-  const btn = 'inline-flex items-center gap-1.5 h-10 px-4 rounded-full bg-white/15 text-white text-[13.5px] font-bold border border-white/30';
+  const btn = 'inline-flex items-center justify-center gap-1 h-10 flex-1 basis-0 min-w-[68px] px-2 rounded-full bg-white/15 text-white text-[13px] font-bold border border-white/30 whitespace-nowrap';
   return (
-    <div className="flex items-center gap-2 flex-wrap mt-2.5">
+    <div className="flex items-center gap-2 flex-wrap md:max-w-lg">
       {phone && (
         <a href={`tel:${phone.replace(/[^\d+]/g, '')}`} className={btn}>
           📞 Gọi
@@ -39,7 +39,7 @@ export function JobQuickActions({ jobId, title, company, phone }: { jobId?: stri
         ↗ Chia sẻ
       </button>
       {jobId && <JobNoteButton jobId={jobId} />}
-      {msg && <span className="text-[12.5px] text-white">{msg}</span>}
+      {msg && <span className="basis-full text-[12.5px] text-white">{msg}</span>}
     </div>
   );
 }

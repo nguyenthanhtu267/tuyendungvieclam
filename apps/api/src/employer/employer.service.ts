@@ -50,6 +50,8 @@ import {
 import { FileStorageService } from '../storage/file-storage.service';
 // Đợt 21 (27/09/2026) — NTD xem "Hồ sơ trực tuyến" của ứng viên đã ứng tuyển thẳng vào tin của họ.
 import { CvSearchService } from '../cv-search/cv-search.service';
+import { JobImportService } from '../admin/job-import.service';
+import { findProvince } from '../common/cv-parser.util';
 
 const LEGAL_DOC_MAX_BYTES = 3 * 1024 * 1024; // 3MB — theo Mục 9 SRS
 
@@ -109,6 +111,7 @@ export class EmployerService {
     @InjectRepository(WorkLocation)
     private readonly workLocationRepo: Repository<WorkLocation>,
     private readonly notificationsService: NotificationsService,
+    private readonly jobImports: JobImportService,
   ) {}
 
   // Mọi endpoint của module này đều thao tác trên công ty gắn với tài khoản NTD đang đăng nhập —
@@ -376,6 +379,40 @@ export class EmployerService {
       approvalStatus: JobApprovalStatus.PENDING,
     });
     return this.jobRepo.save(job);
+  }
+
+  // ===== Đợt 119 — đề xuất tin do Admin tìm thấy trên Internet: công ty tự nhận (đăng lên, chờ duyệt như tin thường) hoặc bỏ qua =====
+  async listJobSuggestions(userId: string) {
+    const companyId = await this.getCompanyIdForUser(userId);
+    const rows = await this.jobImports.suggestionsForCompany(companyId);
+    return rows.map((r) => ({ id: r.id, sourceUrl: r.sourceUrl, data: r.data, createdAt: r.createdAt }));
+  }
+
+  async acceptJobSuggestion(userId: string, id: string) {
+    const companyId = await this.getCompanyIdForUser(userId);
+    const row = await this.jobImports.getForCompany(companyId, id);
+    const d = (row.data ?? {}) as Record<string, any>;
+    const prov = findProvince(d.location);
+    const job = await this.createJob(userId, {
+      title: String(d.title ?? '').trim() || 'Tin tuyển dụng',
+      industry: d.industry || undefined,
+      provinces: prov ? [prov] : undefined,
+      address: d.location || undefined,
+      employmentType: d.employmentType || undefined,
+      salaryMin: d.salaryMin ?? undefined,
+      salaryMax: d.salaryMax ?? undefined,
+      description: d.description || undefined,
+      deadline: d.deadline || undefined,
+    } as never);
+    await this.jobRepo.update(job.id, { sourceUrl: row.sourceUrl });
+    await this.jobImports.markAccepted(row, job.id);
+    return job;
+  }
+
+  async dismissJobSuggestion(userId: string, id: string) {
+    const companyId = await this.getCompanyIdForUser(userId);
+    await this.jobImports.dismissForCompany(companyId, id);
+    return { ok: true };
   }
 
   private async getOwnedJob(

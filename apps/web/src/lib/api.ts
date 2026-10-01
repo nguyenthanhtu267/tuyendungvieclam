@@ -1139,6 +1139,13 @@ export const employerApi = {
     request<EmployerDashboard>('/employer/dashboard', { headers: authHeaders(token) }),
   listJobs: (token: string, status?: EmployerJobStatus) =>
     request<EmployerJob[]>(`/employer/jobs${status ? `?status=${status}` : ''}`, { headers: authHeaders(token) }),
+  // Đợt 119 — đề xuất tin do Admin tìm thấy trên Internet cho công ty này.
+  listJobSuggestions: (token: string) =>
+    request<{ id: string; sourceUrl: string; data: JobImportData; createdAt: string }[]>('/employer/job-suggestions', { headers: authHeaders(token) }),
+  acceptJobSuggestion: (token: string, id: string) =>
+    request<JobPosting>(`/employer/job-suggestions/${id}/accept`, { method: 'POST', headers: authHeaders(token) }),
+  dismissJobSuggestion: (token: string, id: string) =>
+    request<{ ok: boolean }>(`/employer/job-suggestions/${id}/dismiss`, { method: 'POST', headers: authHeaders(token) }),
   getJobStatusCounts: (token: string) =>
     request<EmployerJobStatusCounts>('/employer/jobs/status-counts', { headers: authHeaders(token) }),
   createJob: (token: string, dto: CreateJobPayload) =>
@@ -2696,4 +2703,44 @@ export interface ProvinceInsights {
   industries: { industry: string; count: number }[];
   zones: { name: string; count: number; q: string }[];
   districts: DistrictFacet[];
+}
+
+// Đợt 119 — mục trong "Hộp nhập tin từ link" (Admin) và đề xuất tin cho nhà tuyển dụng.
+export interface JobImportData {
+  title?: string;
+  companyName?: string;
+  companyWebsite?: string;
+  companyLogo?: string;
+  industry?: string;
+  description?: string;
+  location?: string;
+  employmentType?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  deadline?: string;
+}
+export interface JobImportRow {
+  id: string;
+  sourceUrl: string;
+  status: 'pending' | 'published' | 'owner_review' | 'owner_notified' | 'accepted' | 'skipped' | 'failed';
+  data: JobImportData;
+  matchedCompanyId?: string | null;
+  matchKind?: string | null;
+  companyHasOwner: boolean;
+  matchedCompany?: { id?: string; name?: string; isAdminSourced?: boolean } | null;
+  note?: string | null;
+  createdAt: string;
+}
+
+// Đợt 120 — trạng thái "Tự đọc email thông báo việc làm".
+export interface MailScanStatus {
+  configured: boolean;
+  cronKeySet: boolean;
+  user: string | null;
+  labels: string[];
+  senders: string[];
+  enabled: boolean;
+  running: boolean;
+  lastAt: string | null;
+  last: { at: string; mails: number; links: number; added: number; duplicates: number; skipped: number; error?: string } | null;
 }

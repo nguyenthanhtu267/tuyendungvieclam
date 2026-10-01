@@ -1,6 +1,6 @@
 // Đợt 93 — các nhóm API CHỈ Admin dùng, tách khỏi lib/api.ts để khách/ứng viên/nhà tuyển dụng không phải tải mã này.
 import { API_URL, ApiError, qs, request, requestForm, authHeaders } from './api';
-import type { AdCampaignInput, AdCampaignRow, AdStats, AdminAuditLogResponse, AdminCandidateDetail, AdminCandidateQuery, AdminCandidateRow, AdminDashboard, AdminPersonDetail, AdminPersonRow, AdminStatsPoint, AnalyticsBehavior, AnalyticsContent, AnalyticsHeatmap, AnalyticsOverview, AnalyticsRealtime, BulkActionResult, CandidateDraft, ClaimCompanyPayload, Company, CompanyClaimRequestRow, CompanyClaimRequestStatus, CreateDraftCompanyPayload, CreateJobPayload, CvCardDraftResponse, CvQueueResponse, CvShareStatus, DraftAccountInfo, ExtractJobUrlResult, ImpersonateResult, JobPosting, Order, ProfileRequestRow, ProfileVisibility, PromoBadgeSetting, SourcedProfileRow, StorageStatus, SuggestedJob } from './api';
+import type { MailScanStatus, JobImportRow, AdCampaignInput, AdCampaignRow, AdStats, AdminAuditLogResponse, AdminCandidateDetail, AdminCandidateQuery, AdminCandidateRow, AdminDashboard, AdminPersonDetail, AdminPersonRow, AdminStatsPoint, AnalyticsBehavior, AnalyticsContent, AnalyticsHeatmap, AnalyticsOverview, AnalyticsRealtime, BulkActionResult, CandidateDraft, ClaimCompanyPayload, Company, CompanyClaimRequestRow, CompanyClaimRequestStatus, CreateDraftCompanyPayload, CreateJobPayload, CvCardDraftResponse, CvQueueResponse, CvShareStatus, DraftAccountInfo, ExtractJobUrlResult, ImpersonateResult, JobPosting, Order, ProfileRequestRow, ProfileVisibility, PromoBadgeSetting, SourcedProfileRow, StorageStatus, SuggestedJob } from './api';
 import type { BgImage, BgSetting } from './bg-themes';
 export const adminApi = {
   getBackground: (token: string) => request<BgSetting>('/admin/settings/background', { headers: authHeaders(token) }),
@@ -190,6 +190,25 @@ export const adminApi = {
       headers: authHeaders(token),
       body: JSON.stringify(dto),
     }),
+  // Đợt 120 — tự đọc email thông báo việc làm.
+  mailScanStatus: (token: string) => request<MailScanStatus>('/admin/mail-scan', { headers: authHeaders(token) }),
+  mailScanNow: (token: string, days?: number) => request<{ started: boolean; reason?: string }>('/admin/mail-scan', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ days }) }),
+  mailScanLabels: (token: string) => request<{ path: string; selected: boolean }[]>('/admin/mail-scan/labels', { headers: authHeaders(token) }),
+  mailScanSetLabels: (token: string, labels: string[]) =>
+    request<MailScanStatus>('/admin/mail-scan/labels', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ labels }) }),
+  mailScanEnabled: (token: string, enabled: boolean) =>
+    request<MailScanStatus>('/admin/mail-scan/enabled', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ enabled }) }),
+  // Đợt 119 — Hộp nhập tin từ link.
+  addImportLinks: (token: string, urls: string[]) =>
+    request<{ results: { url: string; result: 'new' | 'duplicate' | 'failed'; id?: string; message?: string }[] }>('/admin/imports', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ urls }) }),
+  listImports: (token: string, status?: string) =>
+    request<{ items: JobImportRow[]; counts: Record<string, number> }>(`/admin/imports${status ? `?status=${status}` : ''}`, { headers: authHeaders(token) }),
+  publishImport: (token: string, id: string, edit: Record<string, unknown>) =>
+    request<{ job: JobPosting; company: Company }>(`/admin/imports/${id}/publish`, { method: 'POST', headers: authHeaders(token), body: JSON.stringify(edit) }),
+  notifyImportOwner: (token: string, id: string) =>
+    request<unknown>(`/admin/imports/${id}/notify-owner`, { method: 'POST', headers: authHeaders(token) }),
+  skipImport: (token: string, id: string) =>
+    request<unknown>(`/admin/imports/${id}/skip`, { method: 'POST', headers: authHeaders(token) }),
   extractJobFromUrl: (token: string, url: string) =>
     request<ExtractJobUrlResult>('/admin/extract-job-url', {
       method: 'POST',

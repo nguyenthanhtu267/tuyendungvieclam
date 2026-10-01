@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from '@/components/SmartLink';
 import EmployerHeader from '@/components/EmployerHeader';
 import { useAuth } from '@/lib/auth-context';
-import { employerApi, type EmployerJob, type EmployerJobStatus, type EmployerJobStatusCounts } from '@/lib/api';
+import { employerApi, type JobImportData, type EmployerJob, type EmployerJobStatus, type EmployerJobStatusCounts } from '@/lib/api';
 import { EMPLOYER_JOB_STATUS_CLASS, EMPLOYER_JOB_STATUS_LABEL, formatDate, formatNumber } from '@/lib/format';
 import { jobShareUrl, openFacebookShare } from '@/lib/social';
 import { AdSlot } from '@/components/ads/AdSlot';
@@ -32,6 +32,33 @@ export default function TinDangPage() {
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
+  // Đợt 119 — tin Admin tìm thấy trên Internet của công ty này: nhận (đăng ngay, chờ duyệt như tin thường) hoặc bỏ qua.
+  const [sugg, setSugg] = useState<{ id: string; sourceUrl: string; data: JobImportData }[]>([]);
+  const [suggBusy, setSuggBusy] = useState<string | null>(null);
+  const loadSugg = useCallback(async () => {
+    if (!token) return;
+    try {
+      setSugg(await employerApi.listJobSuggestions(token));
+    } catch {
+      setSugg([]);
+    }
+  }, [token]);
+  useEffect(() => {
+    loadSugg();
+  }, [loadSugg]);
+  async function handleSugg(id: string, accept: boolean) {
+    if (!token) return;
+    setSuggBusy(id);
+    try {
+      if (accept) await employerApi.acceptJobSuggestion(token, id);
+      else await employerApi.dismissJobSuggestion(token, id);
+      await Promise.all([loadSugg(), load()]);
+    } catch {
+      setErrorMsg('Không thực hiện được, vui lòng thử lại.');
+    } finally {
+      setSuggBusy(null);
+    }
+  }
 
   useEffect(() => {
     if (me === null) router.replace('/dang-nhap');
@@ -92,6 +119,28 @@ export default function TinDangPage() {
     <main className="min-h-screen">
       <EmployerHeader />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col gap-4">
+        {sugg.length > 0 && (
+          <div className="rounded-xl bg-white border border-primary/40 p-4">
+            <div className="font-bold text-sm">💡 Chúng tôi tìm thấy {sugg.length} tin của công ty bạn trên Internet</div>
+            <div className="text-xs text-ink-faint mb-2">Nội dung đã điền sẵn. Bấm &ldquo;Nhận &amp; đăng&rdquo; để đăng lên web (sẽ qua bước duyệt như tin thường), hoặc bỏ qua.</div>
+            <ul className="flex flex-col gap-2">
+              {sugg.map((g) => (
+                <li key={g.id} className="rounded-lg border border-border px-3 py-2.5 flex items-center gap-3 flex-wrap">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-[13px] truncate">{g.data.title ?? 'Tin tuyển dụng'}</div>
+                    <div className="text-[11.5px] text-ink-faint truncate">
+                      {g.data.location ?? ''}
+                      {g.data.salaryMin != null || g.data.salaryMax != null ? ` · ${g.data.salaryMin ?? '?'}–${g.data.salaryMax ?? '?'} triệu` : ''}
+                      <a href={g.sourceUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-primary font-semibold hover:underline">↗ Xem nguồn</a>
+                    </div>
+                  </div>
+                  <button type="button" disabled={suggBusy === g.id} onClick={() => handleSugg(g.id, true)} className="tvl-btn-primary !w-auto px-4 disabled:opacity-50">Nhận &amp; đăng</button>
+                  <button type="button" disabled={suggBusy === g.id} onClick={() => handleSugg(g.id, false)} className="tvl-btn-ghost !w-auto px-4">Bỏ qua</button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h1 className="font-extrabold text-base uppercase tvl-title">Quản lý tin đăng</h1>
           <Link href="/nha-tuyen-dung/dang-tin" className="tvl-btn-primary !w-auto px-5">

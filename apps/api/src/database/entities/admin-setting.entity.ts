@@ -20,6 +20,20 @@ export class AdminSetting {
   // Đợt 18c (26/09/2026) — công tắc chung "Tự động chia sẻ CV sau 15 phút" (cùng mô hình với "Tự động
   // duyệt tin"). CHỈ áp dụng cho CV nộp SAU thời điểm bật (`cv_auto_share_enabled_at`) để không "xả"
   // hàng nghìn CV cũ ra cùng lúc khi vừa bật — CV cũ Admin tự duyệt tay.
+  // Đợt 120 — tự đọc email thông báo việc làm (xem admin/mail-scan.service.ts): công tắc, lần quét gần nhất, kết quả.
+  @Column({ name: 'mail_scan_enabled', type: 'boolean', default: false })
+  mailScanEnabled: boolean;
+
+  // Các nhãn Gmail cần đọc (mảng JSON, vd ["Việc làm/CareerViet"]); trống thì dùng biến MAIL_LABEL hoặc INBOX.
+  @Column({ name: 'mail_scan_labels', type: 'text', nullable: true })
+  mailScanLabels?: string | null;
+
+  @Column({ name: 'mail_scan_last_at', type: 'timestamp', nullable: true })
+  mailScanLastAt?: Date | null;
+
+  @Column({ name: 'mail_scan_last_result', type: 'text', nullable: true })
+  mailScanLastResult?: string | null;
+
   @Column({ name: 'cv_auto_share_enabled', type: 'boolean', default: false })
   cvAutoShareEnabled: boolean;
 

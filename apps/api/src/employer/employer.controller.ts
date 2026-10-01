@@ -130,6 +130,21 @@ export class EmployerController {
     return this.employerService.countMyJobsByStatus(user.userId);
   }
 
+  @Get('employer/job-suggestions')
+  listJobSuggestions(@CurrentUser() user: { userId: string }) {
+    return this.employerService.listJobSuggestions(user.userId);
+  }
+
+  @Post('employer/job-suggestions/:id/accept')
+  acceptJobSuggestion(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.employerService.acceptJobSuggestion(user.userId, id);
+  }
+
+  @Post('employer/job-suggestions/:id/dismiss')
+  dismissJobSuggestion(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.employerService.dismissJobSuggestion(user.userId, id);
+  }
+
   @Post('employer/jobs')
   createJob(@CurrentUser() user: { userId: string }, @Body() dto: CreateJobDto) {
     return this.employerService.createJob(user.userId, dto);

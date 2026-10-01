@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { JobReport } from './entities/job-report.entity';
+import { JobImport } from './entities/job-import.entity';
 import { WorkerProfile, WorkerNote, WorkerApplication, WorkerContact } from './entities/worker-profile.entity';
 import { DataSource } from 'typeorm';
 import {
@@ -105,6 +106,7 @@ export const AppDataSource = new DataSource({
     AdCampaignStat,
     BgImage,
     JobReport,
+    JobImport,
     WorkerProfile,
     WorkerNote,
     WorkerApplication,
