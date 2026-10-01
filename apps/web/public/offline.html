@@ -30,12 +30,40 @@
   <button type="button" id="retry">Thử lại</button>
   <h2 id="h" hidden>Việc làm đã lưu trên máy này</h2>
   <ul id="list"></ul>
+  <h2 id="h2" hidden>Tin đã xem / đã ghim</h2>
+  <ul id="list2"></ul>
   <p class="note" id="note" hidden>Danh sách này được lưu lần gần nhất bạn mở trang Hồ sơ khi còn mạng.</p>
 </main>
 <script>
 (function () {
   document.getElementById('retry').onclick = function () { location.reload(); };
   window.addEventListener('online', function () { location.reload(); });
+  try {
+    var all = JSON.parse(localStorage.getItem('tvl_cache_jobs') || '{}');
+    var pins = JSON.parse(localStorage.getItem('tvl_pinned_jobs') || '[]');
+    var ids = Object.keys(all).sort(function (a, b) {
+      var pa = pins.indexOf(a) >= 0 ? 1 : 0, pb = pins.indexOf(b) >= 0 ? 1 : 0;
+      return pb - pa || all[b].t - all[a].t;
+    });
+    if (ids.length) {
+      var ul2 = document.getElementById('list2');
+      ids.forEach(function (id) {
+        var j = all[id].v.job || {};
+        var li = document.createElement('li');
+        var b = document.createElement('b'); b.textContent = (pins.indexOf(id) >= 0 ? '\ud83d\udccc ' : '') + String(j.title || '');
+        var c = document.createElement('span'); c.textContent = [j.company && j.company.name, (j.provinces || []).join(', ')].filter(Boolean).join(' \u00b7 ');
+        li.appendChild(b); li.appendChild(c);
+        var det = document.createElement('div'); det.hidden = true; det.style.whiteSpace = 'pre-line'; det.style.marginTop = '6px';
+        var strip = function (t) { return String(t || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); };
+        det.textContent = ['M\u00f4 t\u1ea3: ' + strip(j.description), j.requirements ? 'Y\u00eau c\u1ea7u: ' + strip(j.requirements) : '', j.benefits ? 'Quy\u1ec1n l\u1ee3i: ' + strip(j.benefits) : ''].filter(Boolean).join('\n');
+        li.appendChild(det);
+        li.style.cursor = 'pointer';
+        li.onclick = function () { det.hidden = !det.hidden; };
+        ul2.appendChild(li);
+      });
+      document.getElementById('h2').hidden = false;
+    }
+  } catch (e) {}
   try {
     var arr = JSON.parse(localStorage.getItem('tvl_saved_cache') || '[]');
     if (!Array.isArray(arr) || !arr.length) return;

@@ -4,6 +4,7 @@ import InterviewChooser from '@/components/InterviewChooser';
 import CvAutofill from '@/components/CvAutofill';
 import ShareProfileCard from '@/components/ShareProfileCard';
 import BulkApplyModal from '@/components/BulkApplyModal';
+import WeeklyStats from '@/components/WeeklyStats';
 import ApplicationTracker from '@/components/ApplicationTracker';
 import MyReportsPanel from '@/components/MyReportsPanel';
 import ProfileSmartCards from '@/components/ProfileSmartCards';
@@ -12,6 +13,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from '@/components/SmartLink';
 import SiteHeader from '@/components/SiteHeader';
+import { uploadWithRetry } from '@/lib/upload-retry';
 import { useAuth } from '@/lib/auth-context';
 import {
   candidatesApi,
@@ -294,6 +296,7 @@ export default function MyCenterPage() {
                     )}
                   </span>
                 </div>
+                <WeeklyStats applied={applications.map((x) => x.appliedAt)} saved={savedJobs.map((x) => x.createdAt)} />
                 <MyReportsPanel />
                 {applications.length === 0 ? (
                   <div className="text-[12.5px] text-ink-muted py-4">Bạn chưa ứng tuyển việc làm nào.</div>
@@ -855,7 +858,7 @@ function CvSection({
     }
     setUploading(true);
     try {
-      await candidatesApi.uploadCv(token, file);
+      await uploadWithRetry(() => candidatesApi.uploadCv(token, file), () => onToast('📶 Mạng đứt — tệp CV được giữ lại và sẽ TỰ gửi khi có mạng (đừng đóng trang này).'));
       await refreshCvs();
       onToast('Đã tải CV lên thành công');
     } catch (err) {

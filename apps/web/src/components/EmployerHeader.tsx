@@ -50,7 +50,7 @@ export default function EmployerHeader() {
         </span>
       </Link>
 
-      <nav className="hidden md:flex items-center gap-5 text-[13px] font-semibold flex-1">
+      <nav className="hidden lg:flex items-center gap-5 text-[13px] font-semibold flex-1">
         {NAV_LINKS.map((link) =>
           link.enabled ? (
             <Link
@@ -69,11 +69,11 @@ export default function EmployerHeader() {
           ),
         )}
       </nav>
-      <div className="flex-1 md:hidden" />
+      <div className="flex-1 lg:hidden" />
 
       <div className="flex items-center gap-3">
         <button
-          className="md:hidden w-9 h-9 rounded-lg border border-white/30 flex items-center justify-center text-white"
+          className="lg:hidden w-9 h-9 rounded-lg border border-white/30 flex items-center justify-center text-white"
           onClick={() => setDrawerOpen(true)}
           aria-label="Mở menu nhà tuyển dụng"
         >
@@ -90,7 +90,7 @@ export default function EmployerHeader() {
             không có chuông); dùng chung component với SiteHeader, biến thể "dark" cho nền primary. */}
         {me && token && <NotificationBell token={token} variant="dark" />}
 
-        <div className="hidden md:block">
+        <div className="hidden lg:block">
         <NavDropdown
           trigger={
             <span className={pathname?.startsWith('/nha-tuyen-dung/tai-khoan') ? 'text-white' : 'text-white/95'}>
@@ -123,7 +123,7 @@ export default function EmployerHeader() {
       </div>
 
       {drawerOpen && (
-        <div className="fixed inset-0 z-40 md:hidden text-ink">
+        <div className="fixed inset-0 z-40 lg:hidden text-ink">
           <div className="absolute inset-0 bg-black/40" onClick={() => setDrawerOpen(false)} />
           <nav className="absolute right-0 top-0 bottom-0 w-72 max-w-[86vw] bg-white shadow-xl flex flex-col overflow-y-auto">
             <div className="flex items-center justify-between px-4 h-14 border-b border-border shrink-0">

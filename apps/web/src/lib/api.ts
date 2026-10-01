@@ -1,5 +1,6 @@
 import type { BgImage, BgSetting } from './bg-themes';
 import { loadBoot } from './boot';
+import { markSlow } from './data-saver';
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 // Đợt 91 — logo công ty: nhờ API thu nhỏ (WebP ≤192px) thay vì tải ảnh gốc to. Bỏ qua ảnh đã nhỏ sẵn (favicon Google, data:).
@@ -32,6 +33,13 @@ function slowSignal(on: boolean) {
   window.dispatchEvent(new CustomEvent('tvl-api-slow', { detail: slowCount > 0 }));
 }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// Đợt 110 — số lời gọi API đang chạy (cho thanh tiến độ mỏng trên cùng).
+let busyCount = 0;
+function busySignal(d: number) {
+  if (typeof window === 'undefined') return;
+  busyCount = Math.max(0, busyCount + d);
+  window.dispatchEvent(new CustomEvent('tvl-api-busy', { detail: busyCount }));
+}
 
 async function fetchOnce(url: string, init: RequestInit): Promise<Response> {
   const ctrl = new AbortController();
@@ -41,11 +49,14 @@ async function fetchOnce(url: string, init: RequestInit): Promise<Response> {
   let slow = false;
   const s = setTimeout(() => {
     slow = true;
+    markSlow();
     slowSignal(true);
   }, SLOW_MS);
+  busySignal(1);
   try {
     return await fetch(url, { ...init, signal: ctrl.signal });
   } finally {
+    busySignal(-1);
     clearTimeout(t);
     clearTimeout(s);
     if (slow) slowSignal(false);
@@ -132,6 +143,8 @@ export async function requestForm<T>(path: string, token: string, form: FormData
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: form,
+  }).catch(() => {
+    throw new ApiError('Mất kết nối mạng — kiểm tra wifi rồi thử lại', 0);
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
@@ -365,6 +378,8 @@ export const jobsApi = {
   },
   suggest: (q: string) => request<{ suggestion: string | null; synonyms: string[] }>(`/jobs/suggest?q=${encodeURIComponent(q)}`),
   get: (id: string) => request<{ job: JobPosting; related: JobPosting[] }>(`/jobs/${id}`),
+  // Đợt 110 — tải ngầm để lưu offline: KHÔNG tính lượt xem.
+  getQuiet: (id: string) => request<{ job: JobPosting; related: JobPosting[] }>(`/jobs/${id}?noview=1`),
   countView: (id: string) => request<void>(`/jobs/${id}/view`, { method: 'POST' }),
   // Đợt 38 — độ phù hợp việc ↔ hồ sơ (ứng viên đăng nhập).
   match: (token: string, ids: string[]) =>

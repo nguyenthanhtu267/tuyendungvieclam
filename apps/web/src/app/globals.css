@@ -336,3 +336,25 @@ input, select, textarea, button { font-family: inherit; }
 
 /* Đợt 91 — thẻ giữ chỗ banner: ẩn mặc định; script ở <head> bật + đặt min-height theo chiều cao lần xem trước. */
 [data-ad-reserve] { display: none; }
+
+/* Đợt 102 — chế độ tối (thử nghiệm, người dùng tự bật ở menu 🌐): đảo màu toàn trang rồi xoay sắc về lại (giữ đúng tông cam/xanh),
+   ảnh/logo/video đảo ngược lần nữa nên giữ nguyên màu thật. Mặc định TẮT, không tự theo hệ thống để không làm lệch giao diện đang dùng. */
+html[data-theme='dark'] { filter: invert(1) hue-rotate(180deg); background: #f2f4f8; }
+html[data-theme='dark'] img,
+html[data-theme='dark'] video,
+html[data-theme='dark'] picture,
+html[data-theme='dark'] [data-keep-color] { filter: invert(1) hue-rotate(180deg); }
+
+/* Đợt 106 — máy tính bảng cảm ứng (≥640px nhưng dùng ngón tay): nút nhỏ trên thẻ tin (♡, ⇄ So sánh) đủ vùng chạm ≥40px. */
+@media (pointer: coarse) and (min-width: 640px) {
+  .tvl-touch-big { min-width: 38px; min-height: 38px; display: inline-flex; align-items: center; justify-content: center; }
+}
+
+/* Đợt 109 — chế độ chỉ chữ: ẩn ảnh trang trí còn sót (logo đã không được tải ở CompanyLogo). */
+:root[data-textonly='1'] .promo-banner-img,
+:root[data-textonly='1'] .tvl-deco-img { display: none !important; }
+
+/* Đợt 110 — thanh tiến độ mỏng trên cùng */
+@keyframes tvl-progress { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+.tvl-progress-bar { animation: tvl-progress 1.1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .tvl-progress-bar { animation: none; width: 100%; opacity: .6; } }

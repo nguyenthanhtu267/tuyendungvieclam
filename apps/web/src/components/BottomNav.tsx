@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { NotificationBell } from '@/components/NotificationBell';
 import { useSavedCount, setSavedCount } from '@/lib/saved-count';
-import { candidatesApi } from '@/lib/api';
+import { candidatesApi, applicationsApi } from '@/lib/api';
 
 // Đợt 91 — thanh điều hướng DƯỚI cho điện thoại (ngón cái với tới được, không phải mở menu ☰):
 // Trang chủ · Văn phòng · Đã lưu · Thông báo · Tài khoản. Mỗi mục cao 56px, có số đếm. Chỉ hiện ở màn hình < 768px,
@@ -52,6 +52,7 @@ export default function BottomNav() {
   const mobile = useIsMobile();
   const saved = useSavedCount();
   const [typing, setTyping] = useState(false);
+  const [appNews, setAppNews] = useState(0);
 
   const allowed = pathname === '/' || SHOW_PREFIXES.some((p) => pathname.startsWith(p));
   const role = me?.role;
@@ -77,6 +78,48 @@ export default function BottomNav() {
       else clearTimeout(id);
     };
   }, [visible, hasToken, saved, token]);
+
+  // Đợt 100 — chấm đỏ ở "Tài khoản" = số đơn ứng tuyển có thay đổi (NTD đã xem / đổi trạng thái / hẹn phỏng vấn) kể từ lần bạn mở trang Hồ sơ.
+  // Hỏi API 1 lần mỗi 10 phút (lúc rảnh), lần đầu chỉ ghi nhận mốc, không báo. Mở /ho-so thì coi như đã xem.
+  const isCandidate = role === 'candidate';
+  useEffect(() => {
+    if (!visible || !hasToken || !isCandidate) return;
+    const KEY = 'tvl_app_seen';
+    const sig = (a: { status: string; viewedAt?: string | null; interviewAt?: string | null }) => `${a.status}|${a.viewedAt ? 1 : 0}|${a.interviewAt ?? ''}`;
+    let off = false;
+    const run = async () => {
+      try {
+        const list = await applicationsApi.listOwn(token as string);
+        const raw = localStorage.getItem(KEY);
+        const seen: Record<string, string> = raw ? JSON.parse(raw) : {};
+        const now: Record<string, string> = {};
+        list.forEach((a) => (now[a.id] = sig(a)));
+        if (!raw || pathname.startsWith('/ho-so')) {
+          localStorage.setItem(KEY, JSON.stringify(now));
+          sessionStorage.setItem('tvl_app_news', '0');
+          if (!off) setAppNews(0);
+        } else if (!off) {
+          const n = list.filter((a) => seen[a.id] !== now[a.id]).length;
+          sessionStorage.setItem('tvl_app_news', String(n));
+          setAppNews(n);
+        }
+        sessionStorage.setItem('tvl_app_chk', String(Date.now()));
+      } catch {
+        /* bỏ qua */
+      }
+    };
+    const checked = Number(sessionStorage.getItem('tvl_app_chk') || 0);
+    if (Date.now() - checked < 10 * 60 * 1000 && !pathname.startsWith('/ho-so')) {
+      setAppNews(Number(sessionStorage.getItem('tvl_app_news') || 0));
+      return;
+    }
+    const w = window as unknown as { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number };
+    const id = w.requestIdleCallback ? w.requestIdleCallback(() => void run(), { timeout: 5000 }) : window.setTimeout(() => void run(), 3000);
+    return () => {
+      off = true;
+      if (!w.requestIdleCallback) clearTimeout(id);
+    };
+  }, [visible, hasToken, isCandidate, token, pathname]);
 
   useEffect(() => {
     if (!visible) return;
@@ -117,12 +160,12 @@ export default function BottomNav() {
           <div className="flex-1 min-w-0 h-full">
             <NotificationBell token={token as string} variant="tab" />
           </div>
-          <Tab href="/ho-so" icon="👤" label="Tài khoản" active={is('/ho-so')} />
+          <Tab href="/ho-so" icon="👤" label="Tài khoản" active={is('/ho-so')} badge={appNews} />
         </>
       ) : (
         <>
           <Tab href="/lao-dong-pho-thong" icon="🧰" label="Công nhân" active={is('/lao-dong-pho-thong')} />
-          <Tab href="/dang-nhap" icon="👤" label="Đăng nhập" active={false} />
+          <Tab href={pathname && pathname !== '/' && !pathname.startsWith('/dang-nhap') ? `/dang-nhap?next=${encodeURIComponent(pathname)}` : '/dang-nhap'} icon="👤" label="Đăng nhập" active={false} />
         </>
       )}
     </nav>

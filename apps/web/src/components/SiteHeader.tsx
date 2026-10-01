@@ -66,7 +66,7 @@ export default function SiteHeader() {
         <PromoBadge />
         </div>
 
-        <nav className="hidden md:flex items-center gap-3.5 lg:gap-4 text-[14.5px] font-semibold text-ink-muted flex-1 min-w-0">
+        <nav className="hidden xl:flex items-center gap-3.5 lg:gap-4 text-[14.5px] font-semibold text-ink-muted flex-1 min-w-0">
           <NavDropdown
             trigger={<span className={jobsActive ? 'text-primary' : ''}>{t('nav.jobs')}</span>}
             panelClassName="w-[min(900px,94vw)] p-5"
@@ -130,9 +130,9 @@ export default function SiteHeader() {
             </span>
           ))}
         </nav>
-        <div className="hidden md:flex flex-1" />
+        <div className="hidden xl:flex flex-1" />
 
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden xl:flex items-center gap-3">
           <NavDropdown
             trigger={<span className="text-white font-bold text-[14px]">{t('nav.forEmployer')}</span>}
             triggerClassName="!border-b-0 !text-white bg-primary-dark hover:bg-primary rounded-lg px-3.5 h-9 !py-0 inline-flex items-center"
@@ -197,7 +197,7 @@ export default function SiteHeader() {
         </div>
 
         <button
-          className="md:hidden ml-auto w-9 h-9 rounded-lg border border-border-strong flex items-center justify-center"
+          className="xl:hidden ml-auto w-11 h-11 rounded-lg border border-border-strong flex items-center justify-center"
           onClick={() => setDrawerOpen(true)}
           aria-label={t('nav.openMenu')}
         >
@@ -206,7 +206,7 @@ export default function SiteHeader() {
       </div>
 
       {drawerOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
+        <div className="fixed inset-0 z-40 xl:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setDrawerOpen(false)} />
           <nav className="absolute right-0 top-0 bottom-0 w-80 max-w-[86vw] bg-white shadow-xl flex flex-col overflow-y-auto">
             <div className="flex items-center justify-between px-4 h-16 border-b border-border shrink-0">

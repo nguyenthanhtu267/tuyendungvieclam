@@ -7,8 +7,19 @@ import { authApi, ApiError } from '@/lib/api';
 import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth-context';
 import PasswordInput from '@/components/PasswordInput';
+import { BrandBar } from '@/components/BrandBar';
 
 type Tab = 'login' | 'register';
+
+// Đợt 97 — đăng nhập xong quay lại ĐÚNG trang đang xem (?next=/viec-lam/...), không đá về trang chủ. Chỉ nhận đường dẫn nội bộ.
+function nextPath(): string | null {
+  try {
+    const n = new URLSearchParams(window.location.search).get('next');
+    return n && n.startsWith('/') && !n.startsWith('//') && !n.startsWith('/dang-nhap') ? n : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function DangNhapPage() {
   const router = useRouter();
@@ -41,7 +52,7 @@ export default function DangNhapPage() {
       setToken(res.accessToken);
       if (res.user.role.startsWith('employer')) router.push('/nha-tuyen-dung/dashboard');
       else if (res.user.role === 'admin' || res.user.role === 'moderator') router.push('/admin/dashboard');
-      else router.push('/');
+      else router.push(nextPath() ?? '/');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Không thể đăng nhập, vui lòng thử lại');
     } finally {
@@ -72,9 +83,10 @@ export default function DangNhapPage() {
 
   return (
     <main className="min-h-screen grid md:grid-cols-2">
+      <BrandBar className="md:hidden col-span-full border-b border-border bg-white" />
       {/* Trái: panel thương hiệu — theo màn A4 mockup */}
       <div className="hidden md:flex flex-col justify-between bg-primary text-white p-12">
-        <div className="flex items-center gap-3">
+        <Link href="/" aria-label="Về trang chủ" className="flex items-center gap-3">
           {/* Đợt 12j (21/09/2026) — đổi biểu tượng logo từ icon dấu tích sang chữ "V" đơn giản. */}
           <span className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center">
             <span className="text-white font-extrabold text-base leading-none select-none">V</span>
@@ -83,7 +95,7 @@ export default function DangNhapPage() {
           <span className="text-lg font-extrabold tracking-tight">
             ĐĂNG TUYỂN <span className="text-accent">MIỄN PHÍ</span>
           </span>
-        </div>
+        </Link>
         <div>
           <h1 className="text-3xl font-extrabold leading-snug text-balance !text-white">
             Kết nối việc làm — đúng người, đúng việc

@@ -7,11 +7,18 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { parseNaturalQuery } from '@/lib/nl-search';
 import SiteHeader from '@/components/SiteHeader';
 import { JobCard } from '@/components/JobCard';
+import { SwipeRow } from '@/components/SwipeRow';
+import Link from '@/components/SmartLink';
+import JobQuickView from '@/components/JobQuickView';
+import BulkApplyModal from '@/components/BulkApplyModal';
+import { haptic } from '@/lib/haptic';
+import { useJobNotes } from '@/components/JobNote';
 import { FilterBar } from '@/components/search/FilterBar';
 import { NearMe } from '@/components/search/NearMe';
 import { ProvinceInsights } from '@/components/search/ProvinceInsights';
 import { DistrictChips } from '@/components/search/DistrictChips';
-import { jobsApi, smartApi5, candidatesApi, applicationsApi, type JobFacets, type JobListParams, type JobListResponse, type DistrictFacet } from '@/lib/api';
+import { jobsApi, smartApi5, candidatesApi, applicationsApi, type JobFacets, type JobListParams, type JobListResponse, type DistrictFacet, type SavedJob } from '@/lib/api';
+import { detectWeakNet, isWeakNow, readSaver } from '@/lib/data-saver';
 import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth-context';
 import { formatNumber } from '@/lib/format';
@@ -21,6 +28,8 @@ import { ToggleChip } from '@/components/ToggleChip';
 import { RecentJobs } from '@/components/RecentJobs';
 import { FilterSuggestions } from '@/components/search/FilterSuggestions';
 import { readRecentJobs } from '@/lib/recent-jobs';
+import OfflineJobsPanel from '@/components/OfflineJobsPanel';
+import { cacheJob, cacheList, readCachedList, agoText } from '@/lib/offline-cache';
 
 // Đợt 10 — trang tìm việc làm nâng cao đầy đủ (claude/06-spec-tim-kiem-nang-cao.md): thanh lọc
 // FilterBar (tỉnh/thành + ngành nghề multi-select, 5 dropdown đơn, ưu tiên, doanh nghiệp yêu thích),
@@ -32,6 +41,58 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
   const searchParams = useSearchParams();
   const { me, token } = useAuth();
   const [sortMatch, setSortMatch] = useState(false);
+  // Đợt 99 — tin đã vuốt-ẩn (nhớ ở máy, tối đa 200 tin) + "Hoàn tác" tin vừa ẩn.
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    try { setHiddenIds(new Set<string>(JSON.parse(localStorage.getItem('tvl_hidden_jobs') || '[]'))); } catch { /* bỏ qua */ }
+  }, []);
+  const [lastHidden, setLastHidden] = useState<string | null>(null);
+  function hideJob(id: string) {
+    setHiddenIds((prev) => {
+      const next = new Set(prev).add(id);
+      try { localStorage.setItem('tvl_hidden_jobs', JSON.stringify(Array.from(next).slice(-200))); } catch { /* bỏ qua */ }
+      return next;
+    });
+    setLastHidden(id);
+    setTimeout(() => setLastHidden((c) => (c === id ? null : c)), 5000);
+  }
+  // Đợt 102 — "Chọn nhiều": ứng viên đã đăng nhập tick nhiều tin rồi nộp một lần (dùng lại màn nộp hàng loạt, tối đa 15 tin).
+  const myNotes = useJobNotes();
+  // Đợt 107 — "Xem nhanh": từ 1024px bấm tin = xem chi tiết rút gọn ở cột phải; mặc định BẬT trên máy cảm ứng (iPad ngang), TẮT trên máy tính chuột.
+  const [quick, setQuick] = useState(false);
+  const [sel, setSel] = useState<string | null>(null);
+  useEffect(() => {
+    try { setQuick(window.matchMedia('(pointer: coarse) and (min-width: 1024px)').matches); } catch { /* bỏ qua */ }
+  }, []);
+  const [pickMode, setPickMode] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkJobs, setBulkJobs] = useState<SavedJob[]>([]);
+  function togglePick(id: string) {
+    haptic(8);
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else if (next.size < 15) next.add(id);
+      return next;
+    });
+  }
+  // Đợt 102 — nhớ bộ lọc lần tìm trước (chỉ ở máy này) để mở lại bằng 1 chạm.
+  const [lastSearch, setLastSearch] = useState<string | null>(null);
+  useEffect(() => {
+    try { setLastSearch(localStorage.getItem('tvl_last_search')); } catch { /* bỏ qua */ }
+  }, []);
+  function undoHide() {
+    if (!lastHidden) return;
+    const id = lastHidden;
+    setHiddenIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      try { localStorage.setItem('tvl_hidden_jobs', JSON.stringify(Array.from(next))); } catch { /* bỏ qua */ }
+      return next;
+    });
+    setLastHidden(null);
+  }
   // Đợt 59 — "Chỉ hiện tin mới với tôi": ẩn tin đã xem gần đây + tin đã ứng tuyển (trong trang đang xem).
   const [onlyNew, setOnlyNewState] = useState(false);
   useEffect(() => {
@@ -45,7 +106,12 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
   const [appliedIds, setAppliedIds] = useState<Set<string>>(new Set());
   const [saveSearchState, setSaveSearchState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
-  const filters: JobListParams = parseJobFilters((k) => searchParams.get(k));
+  // Đợt 111 — mạng yếu: gom nhiều lần chọn bộ lọc, chờ ~1,2 giây rồi mới tìm MỘT lần (hoặc bấm "Áp dụng ngay").
+  const [pend, setPend] = useState<Partial<JobListParams>>({});
+  const pendRef = useRef<Partial<JobListParams>>({});
+  const pendTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const urlFilters: JobListParams = parseJobFilters((k) => searchParams.get(k));
+  const filters: JobListParams = { ...urlFilters, ...pend };
   const page = Number(searchParams.get('page') ?? '1');
 
   const [qInput, setQInput] = useState(filters.q ?? '');
@@ -66,12 +132,46 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
         .then((list) => setAppliedIds(new Set(list.map((a) => (a as unknown as { jobPostingId?: string; jobPosting?: { id: string } }).jobPostingId ?? (a as unknown as { jobPosting?: { id: string } }).jobPosting?.id ?? ''))))
         .catch(() => undefined);
   }, [me, token]);
-  const visibleItems = onlyNew ? sortedItems.filter((j) => !seenIds.has(j.id) && !appliedIds.has(j.id)) : sortedItems;
+  const visibleItems = (onlyNew ? sortedItems.filter((j) => !seenIds.has(j.id) && !appliedIds.has(j.id)) : sortedItems).filter((j) => !hiddenIds.has(j.id)).sort((a, b) => Number(!!myNotes[b.id]?.pinned) - Number(!!myNotes[a.id]?.pinned));
   const hiddenCount = sortedItems.length - visibleItems.length;
+  const router2 = router;
+  useEffect(() => {
+    if (!quick) return;
+    const on = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const ids = visibleItems.map((j) => j.id);
+      if (!ids.length) return;
+      const i = sel ? ids.indexOf(sel) : -1;
+      if (e.key === 'j' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const n = ids[Math.min(ids.length - 1, i + 1)];
+        setSel(n);
+        document.getElementById(`jc-${n}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else if (e.key === 'k' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const n = ids[Math.max(0, i - 1)];
+        setSel(n);
+        document.getElementById(`jc-${n}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else if (e.key === 'Enter' && sel) {
+        router2.push(`/viec-lam/${sel}`);
+      } else if (e.key === 'Escape') {
+        setSel(null);
+      }
+    };
+    window.addEventListener('keydown', on);
+    return () => window.removeEventListener('keydown', on);
+  });
   const facetsHit = useRef(initialFacets && initialFacets.key === searchParams.toString() ? initialFacets.data : null);
   const [facets, setFacets] = useState<JobFacets | null>(facetsHit.current);
   const [districts, setDistricts] = useState<{ province: string; items: DistrictFacet[] }[]>([]);
   const [loading, setLoading] = useState(true);
+  // Đợt 109 — mạng yếu: hiện ngay kết quả lần trước rồi cập nhật; lỗi mạng thì báo + Thử lại (không giả vờ "không có việc").
+  const [refreshing, setRefreshing] = useState(false);
+  const [listErr, setListErr] = useState<{ stale: number | null } | null>(null);
+  const [retryN, setRetryN] = useState(0);
+  const [showLocal, setShowLocal] = useState(false);
   // Đợt 12i (21/09/2026) — "Địa điểm phổ biến" chỉ hiện Top 15-20 tỉnh nhiều tin nhất kèm nút
   // "Xem thêm", tránh liệt kê tràn lan hết ~63 tỉnh (giống careerviet.vn). Sau khi sửa lỗi đếm gộp
   // "Hà Nội | Hồ Chí Minh", số mục trả về đúng bằng số tỉnh thực có tin — cần giới hạn hiển thị.
@@ -88,10 +188,18 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
   useEffect(() => {
     const pre = initialHit.current;
     initialHit.current = null; // chỉ dùng cho lần mở đầu tiên
-    setLoading(!pre);
+    const ckey = searchParams.toString();
+    const cached = pre ? null : readCachedList<JobListResponse>(ckey);
+    setListErr(null);
+    if (cached) {
+      setResult(cached.data);
+      setLoading(false);
+      setRefreshing(true);
+    } else setLoading(!pre);
     (pre ? Promise.resolve(pre) : jobsApi.list({ ...filters, page, pageSize: JOB_PAGE_SIZE }))
       .then((res) => {
         setResult(res);
+        cacheList(ckey, res);
         // Đợt 19 — ghi lượt tìm việc (từ khoá, bộ lọc, số kết quả — kể cả khi KHÔNG ra kết quả nào) cho
         // Admin "Phân tích truy cập". Chỉ tính trang 1 (lật trang không phải lượt tìm mới).
         const used = Object.entries(filters).filter(([k, v]) => k !== 'q' && v !== undefined && v !== '' && !(Array.isArray(v) && !v.length));
@@ -101,10 +209,51 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
           });
         }
       })
-      .catch(() => setResult({ items: [], total: 0, page: 1, pageSize: 8, totalPages: 1 }))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (cached) setListErr({ stale: cached.at });
+        else {
+          setListErr({ stale: null });
+          setResult({ items: [], total: 0, page: 1, pageSize: 8, totalPages: 1 });
+        }
+      })
+      .finally(() => {
+        setLoading(false);
+        setRefreshing(false);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, retryN]);
+
+  // Đợt 110 — lúc rảnh, lưu sẵn chi tiết 3 tin đầu vào máy (để đọc khi mất mạng). Bỏ qua khi mạng yếu / tiết kiệm dữ liệu.
+  useEffect(() => {
+    const items = result?.items?.slice(0, 3) ?? [];
+    if (!items.length || detectWeakNet() || readSaver()) return;
+    const w = window as unknown as { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (n: number) => void };
+    let off = false;
+    const run = () => {
+      items.forEach((j, i) =>
+        setTimeout(() => {
+          if (off || document.visibilityState !== 'visible') return;
+          jobsApi.getQuiet(j.id).then((r) => cacheJob(r.job, r.related)).catch(() => undefined);
+        }, i * 700),
+      );
+    };
+    const h = w.requestIdleCallback ? w.requestIdleCallback(run, { timeout: 4000 }) : (setTimeout(run, 2500) as unknown as number);
+    return () => {
+      off = true;
+      if (w.cancelIdleCallback) w.cancelIdleCallback(h);
+    };
+  }, [result]);
+
+  useEffect(() => {
+    if (!listErr) return;
+    const on = () => setRetryN((n) => n + 1);
+    window.addEventListener('online', on);
+    window.addEventListener('tvl-retry', on);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('tvl-retry', on);
+    };
+  }, [listErr]);
 
   useEffect(() => {
     if (facetsHit.current) {
@@ -175,7 +324,31 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
     return () => { off = true; };
   }, [filters.q, loading, result]);
 
+  function flushPending() {
+    clearTimeout(pendTimer.current);
+    const n = pendRef.current;
+    pendRef.current = {};
+    setPend({});
+    if (Object.keys(n).length) commitParams(n);
+  }
   function updateParams(next: Partial<JobListParams>) {
+    if (!isWeakNow() || 'q' in next) {
+      if (Object.keys(pendRef.current).length) {
+        const n = { ...pendRef.current, ...next };
+        pendRef.current = {};
+        clearTimeout(pendTimer.current);
+        setPend({});
+        commitParams(n);
+      } else commitParams(next);
+      return;
+    }
+    pendRef.current = { ...pendRef.current, ...next };
+    setPend(pendRef.current);
+    clearTimeout(pendTimer.current);
+    pendTimer.current = setTimeout(flushPending, 1200);
+  }
+  useEffect(() => () => clearTimeout(pendTimer.current), []);
+  function commitParams(next: Partial<JobListParams>) {
     const params = new URLSearchParams(searchParams.toString());
     const patched: Record<string, unknown> = { ...filters, ...next };
     if ('provinces' in next && !('district' in next)) patched.district = undefined; // đổi tỉnh → bỏ quận/huyện của tỉnh cũ
@@ -192,6 +365,7 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
       },
     );
     params.delete('page');
+    try { if (params.toString()) localStorage.setItem('tvl_last_search', params.toString()); } catch { /* bỏ qua */ }
     router.push(`/viec-lam?${params.toString()}`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -261,6 +435,14 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
           onSearchSubmit={handleSearchSubmit}
         />
 
+        {lastSearch && searchParams.toString() === '' && (
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-1.5 text-[13px]">
+            <Link href={`/viec-lam?${lastSearch}`} className="flex-1 min-w-0 truncate font-bold text-primary min-h-[36px] inline-flex items-center">
+              ↺ Tìm lần trước: {Array.from(new URLSearchParams(lastSearch).values()).slice(0, 3).join(' · ')}
+            </Link>
+            <button type="button" aria-label="Xoá" className="w-9 h-9 text-ink-faint" onClick={() => { try { localStorage.removeItem('tvl_last_search'); } catch { /* bỏ qua */ } setLastSearch(null); }}>✕</button>
+          </div>
+        )}
         {(filters.provinces?.length ?? 0) === 0 && <NearMe onPick={(provinces) => updateParams({ provinces })} />}
         {districts.map((g) => (
           <DistrictChips
@@ -289,11 +471,37 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
                   <h1 className="font-extrabold text-lg tvl-title">
                     {/* Đợt 13 (24/09/2026) — thiếu formatNumber() khiến số hàng nghìn hiện dính liền
                         (VD "1106" thay vì "1.106") — xem Quy tắc chung mục A. */}
-                    {loading ? 'Đang tìm...' : `${formatNumber(result?.total ?? 0)} ${heading}`}
+                    {loading ? 'Đang tìm...' : listErr && !listErr.stale ? 'Danh sách việc làm' : `${formatNumber(result?.total ?? 0)} ${heading}`}
                   </h1>
                 </div>
                 {/* Đợt 58 — "Tin vừa xem" ngay sau tiêu đề, xổ danh sách "Tiêu đề - Công ty". */}
                 <RecentJobs />
+                <button
+                  type="button"
+                  onClick={() => updateParams({ experienceLevel: filters.experienceLevel === 'Không yêu cầu kinh nghiệm' ? undefined : 'Không yêu cầu kinh nghiệm' })}
+                  aria-pressed={filters.experienceLevel === 'Không yêu cầu kinh nghiệm'}
+                  className={`h-9 px-3 rounded-full border text-[13px] font-bold ${filters.experienceLevel === 'Không yêu cầu kinh nghiệm' ? 'bg-success text-white border-success' : 'border-border-strong text-ink'}`}
+                >
+                  🌱 Không cần kinh nghiệm
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setQuick((v) => !v); setSel(null); }}
+                  aria-pressed={quick}
+                  className={`hidden lg:inline-flex items-center h-9 px-3 rounded-full border text-[13px] font-bold ${quick ? 'bg-primary text-white border-primary' : 'border-border-strong text-ink'}`}
+                >
+                  👁 Xem nhanh
+                </button>
+                {me?.role === 'candidate' && (
+                  <button
+                    type="button"
+                    onClick={() => { setPickMode((v) => !v); setPicked(new Set()); }}
+                    aria-pressed={pickMode}
+                    className={`h-9 px-3 rounded-full border text-[13px] font-bold ${pickMode ? 'bg-primary text-white border-primary' : 'border-border-strong text-ink'}`}
+                  >
+                    ☑ Chọn nhiều
+                  </button>
+                )}
                 {/* Đợt 70 — 2 bộ lọc dạng nút bật/tắt gọn, cùng 1 dòng; chữ đầy đủ nằm ở tooltip. */}
                 {/* Luôn hiện để mọi người thấy chức năng: khách → bấm sẽ đến trang đăng nhập; tài khoản không phải ứng viên → mờ kèm lời giải thích. */}
                 <ToggleChip
@@ -355,7 +563,41 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
               ) : null}
             </div>
 
-            {!loading && result?.items.length === 0 && (
+            {loading && !(result && result.items.length) && (
+              <div className="flex flex-col gap-3" aria-busy="true" aria-label="Đang tải việc làm">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="rounded-xl border border-border bg-white p-4 flex gap-3">
+                    <div className="w-14 h-14 rounded-xl bg-surface-alt animate-pulse motion-reduce:animate-none shrink-0" />
+                    <div className="flex-1 flex flex-col gap-2">
+                      <div className="h-4 w-3/4 rounded bg-surface-alt animate-pulse motion-reduce:animate-none" />
+                      <div className="h-3 w-1/2 rounded bg-surface-alt animate-pulse motion-reduce:animate-none" />
+                      <div className="h-3 w-1/3 rounded bg-surface-alt animate-pulse motion-reduce:animate-none" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {Object.keys(pend).length > 0 && (
+              <div role="status" className="rounded-xl border border-border-strong bg-white px-3 py-2 text-[13px] flex items-center gap-2 flex-wrap">
+                ⏳ Mạng yếu — đang gom bộ lọc, sẽ tìm một lần.
+                <button type="button" onClick={flushPending} className="tvl-btn-primary !w-auto px-4 !h-8 text-[12.5px]">Áp dụng ngay</button>
+              </div>
+            )}
+            {listErr && (
+              <div role="status" className="rounded-xl border border-warning bg-warning-tint px-3 py-2 text-[13px] font-semibold text-[#7A4A00] flex items-center gap-2 flex-wrap">
+                📶 {listErr.stale ? `Mạng yếu — đang hiện kết quả đã lưu (${agoText(listErr.stale)}).` : 'Chưa tải được danh sách vì mạng yếu.'}
+                <button type="button" onClick={() => setRetryN((n) => n + 1)} className="tvl-btn-primary !w-auto px-4 !h-8 text-[12.5px]">Thử lại (phím R)</button>
+              </div>
+            )}
+            {(listErr || showLocal) && <OfflineJobsPanel initialQuery={qInput} />}
+            {!listErr && (
+              <button type="button" onClick={() => setShowLocal((v) => !v)} className="self-start text-[12.5px] font-semibold text-primary hover:underline">
+                📂 {showLocal ? 'Ẩn tin trong máy' : 'Tìm trong tin đã lưu trong máy'}
+              </button>
+            )}
+            {refreshing && !listErr && <div className="text-[12px] text-ink-muted">⟳ Đang cập nhật kết quả mới…</div>}
+
+            {!loading && !(listErr && !listErr.stale) && result?.items.length === 0 && (
               <div className="rounded-xl border border-border bg-white p-8 text-center text-ink-muted text-sm">
                 Không tìm thấy tin tuyển dụng phù hợp. Thử từ khoá hoặc bộ lọc khác.
                 {didYouMean && (
@@ -374,13 +616,67 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
               {/* Đợt 24 — banner xen giữa danh sách: sau tin thứ 5 (ít hơn 5 tin thì sau tin cuối). */}
               {visibleItems.map((job, i, arr) => (
                 <Fragment key={job.id}>
+                  <div
+                    id={`jc-${job.id}`}
+                    className={quick && sel === job.id ? 'rounded-xl ring-2 ring-primary' : undefined}
+                    onClickCapture={(e) => {
+                      if (!quick || pickMode || !window.matchMedia('(min-width: 1024px)').matches) return;
+                      if ((e.target as HTMLElement).closest('button, input, select, a[href^="tel:"]')) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSel(job.id);
+                    }}
+                  >
                   <div onClickCapture={() => { const a = ab[job.id]; if (a) smartApi5.testEvent(a.testId, a.variant, 'click').catch(() => {}); }}>
-                    <JobCard job={ab[job.id] ? { ...job, title: ab[job.id].title } : job} />
+                    {pickMode ? (
+                      <div
+                        className={`rounded-xl relative ${picked.has(job.id) ? 'ring-2 ring-primary' : ''} ${appliedIds.has(job.id) ? 'opacity-50' : ''}`}
+                        onClickCapture={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!appliedIds.has(job.id)) togglePick(job.id);
+                        }}
+                      >
+                        <span className={`absolute left-2 top-2 z-10 w-6 h-6 rounded-md border-2 flex items-center justify-center text-[14px] font-extrabold ${picked.has(job.id) ? 'bg-primary border-primary text-white' : 'bg-white border-border-strong text-transparent'}`} aria-hidden>✓</span>
+                        <JobCard job={ab[job.id] ? { ...job, title: ab[job.id].title } : job} />
+                      </div>
+                    ) : (
+                      <SwipeRow jobId={job.id} onHide={hideJob}>
+                        <JobCard job={ab[job.id] ? { ...job, title: ab[job.id].title } : job} />
+                      </SwipeRow>
+                    )}
+                  </div>
                   </div>
                   {i === Math.min(4, arr.length - 1) && <AdSlot slot="jobs-inline" />}
                 </Fragment>
               ))}
             </div>
+
+            {pickMode && (
+              <div className="fixed inset-x-0 z-40 px-3" style={{ bottom: 'calc(68px + env(safe-area-inset-bottom, 0px))' }}>
+                <div className="rounded-xl bg-white border border-border-strong shadow-lg p-2 flex items-center gap-2">
+                  <div className="flex-1 text-[13.5px] font-bold pl-1">Đã chọn {picked.size}/15 tin</div>
+                  <button type="button" onClick={() => { setPickMode(false); setPicked(new Set()); }} className="h-11 px-3 rounded-lg border border-border-strong text-[13.5px] font-bold">Hủy</button>
+                  <button type="button" disabled={picked.size === 0} onClick={() => { setBulkJobs((result?.items ?? []).filter((j) => picked.has(j.id)).map((j) => ({ id: j.id, jobPostingId: j.id, createdAt: j.createdAt, jobPosting: j }))); setBulkOpen(true); }} className="h-11 px-4 rounded-lg bg-accent text-white text-[14px] font-extrabold disabled:opacity-50">⚡ Nộp {picked.size} tin</button>
+                </div>
+              </div>
+            )}
+            {bulkOpen && token && (
+              <BulkApplyModal
+                token={token}
+                savedJobs={bulkJobs}
+                appliedJobIds={appliedIds}
+                onClose={() => { setBulkOpen(false); setPickMode(false); setPicked(new Set()); }}
+                onApplied={() => undefined}
+              />
+            )}
+
+            {lastHidden && (
+              <div className="fixed left-1/2 -translate-x-1/2 z-50 rounded-full bg-ink text-white text-[13px] font-bold pl-4 pr-1.5 py-1.5 shadow-lg flex items-center gap-3" style={{ bottom: 'calc(130px + env(safe-area-inset-bottom, 0px))' }}>
+                Đã ẩn 1 tin
+                <button type="button" onClick={undoHide} className="rounded-full bg-white/20 px-3 h-8">Hoàn tác</button>
+              </div>
+            )}
 
             {/* Đợt 28 — banner cuối danh sách kết quả. */}
             <AdSlot slot="jobs-bottom" className="mt-3" />
@@ -424,7 +720,12 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
             )}
           </div>
 
-          <div className="flex flex-col gap-3.5 lg:self-stretch">
+          {quick && sel ? (
+            <div className="hidden lg:block lg:self-stretch">
+              <JobQuickView jobId={sel} onClose={() => setSel(null)} />
+            </div>
+          ) : null}
+          <div className={`flex flex-col gap-3.5 lg:self-stretch ${quick && sel ? 'lg:hidden' : ''}`}>
             <div className="rounded-xl bg-primary p-[18px] flex flex-col gap-2">
               <div className="text-white font-extrabold text-sm">Lọc việc phù hợp nhanh hơn</div>
               <div className="text-white/95 text-xs">Tạo hồ sơ để nhận gợi ý việc làm mỗi ngày</div>

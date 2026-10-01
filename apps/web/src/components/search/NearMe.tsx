@@ -6,7 +6,7 @@ import { nearestProvince, provincesNear, readHome, saveHome, distanceKm, PROVINC
 // Đợt 89 — nút "Quanh tôi": một lần bấm lọc các tỉnh trong bán kính đã chọn, gần nhất xếp trước.
 // Vị trí chỉ lưu trên trình duyệt của người xem (không gửi lên máy chủ).
 export function NearMe({ onPick }: { onPick: (provinces: string[]) => void }) {
-  const [r, setR] = useState(60);
+  const [r, setR] = useState(10);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -48,10 +48,10 @@ export function NearMe({ onPick }: { onPick: (provinces: string[]) => void }) {
         📍 Quanh tôi
       </button>
       <select id="near-radius" aria-label="Bán kính" value={r} onChange={(e) => setR(Number(e.target.value))} className="rounded-md border border-border-strong px-1.5 py-1 text-[12px]">
+        <option value={5}>5 km</option>
+        <option value={10}>10 km</option>
+        <option value={20}>20 km</option>
         <option value={30}>30 km</option>
-        <option value={60}>60 km</option>
-        <option value={100}>100 km</option>
-        <option value={150}>150 km</option>
       </select>
       {msg && <span className="text-ink-muted">{msg}</span>}
     </div>

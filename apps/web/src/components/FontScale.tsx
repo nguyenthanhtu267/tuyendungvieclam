@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useLanguage } from '@/lib/i18n';
-import { applySaver, readSaver, setSaver, useDataSaver } from '@/lib/data-saver';
+import { applySaver, applyTextOnly, readSaver, readTextOnly, setSaver, setTextOnly, useDataSaver, useSavedKb, useTextOnly } from '@/lib/data-saver';
 
 // Đợt 48 — gộp "Ngôn ngữ" + "Cỡ chữ" vào 1 nút tối giản trên header (thay cho 2 nút 🌐 VI và AA).
 // Cỡ chữ 80% → 200% (bước 10%), áp cho TOÀN website (mọi cỡ chữ/khoảng cách dùng rem).
 // Lưu ở trình duyệt; script nhỏ trong <head> (layout.tsx) áp lại ngay khi mở trang để không nhấp nháy.
 export const FONT_KEY = 'tvl_font_pct';
+export const DARK_KEY = 'tvl_dark';
 const OLD_KEY = 'tvl_font_level'; // Đợt 29: mức 0–8 (100%–140%)
 export const FONT_MIN = 80;
 export const FONT_MAX = 200;
@@ -33,12 +34,26 @@ export function FontScale({ className = '' }: { className?: string }) {
   const { lang, setLang } = useLanguage();
   const [pct, setPct] = useState(100);
   const [open, setOpen] = useState(false);
+  const [dark, setDark] = useState<'0' | '1' | 'auto'>('0');
+  useEffect(() => {
+    try { const v = localStorage.getItem(DARK_KEY); setDark(v === '1' || v === 'auto' ? v : '0'); } catch { /* bỏ qua */ }
+  }, []);
+  function chooseDark(v: '0' | '1' | 'auto') {
+    setDark(v);
+    const on = v === '1' || (v === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (on) document.documentElement.dataset.theme = 'dark';
+    else delete document.documentElement.dataset.theme;
+    try { localStorage.setItem(DARK_KEY, v); } catch { /* bỏ qua */ }
+  }
   const boxRef = useRef<HTMLDivElement>(null);
 
   const saver = useDataSaver();
+  const textOnly = useTextOnly();
+  const savedKb = useSavedKb();
   useEffect(() => {
     setPct(readPct());
     applySaver(readSaver());
+    applyTextOnly(readTextOnly());
   }, []);
 
   useEffect(() => {
@@ -130,11 +145,27 @@ export function FontScale({ className = '' }: { className?: string }) {
             </div>
           </div>
           <div className="mt-3 pt-3 border-t border-border">
+            <div className="mb-3">
+              <div className="font-extrabold text-sm text-ink">🌙 Chế độ tối (thử nghiệm)</div>
+              <div className="grid grid-cols-3 gap-1 p-1 bg-surface-alt rounded-lg text-[13px] font-semibold mt-1.5">
+                {([['0', 'Tắt'], ['1', 'Bật'], ['auto', 'Theo máy']] as const).map(([v, l]) => (
+                  <button key={v} type="button" onClick={() => chooseDark(v)} aria-pressed={dark === v} className={`py-1.5 rounded-md ${dark === v ? 'bg-white shadow text-ink' : 'text-ink-muted'}`}>{l}</button>
+                ))}
+              </div>
+            </div>
             <label className="flex items-start gap-2 cursor-pointer">
               <input id="data-saver" type="checkbox" checked={saver} onChange={(e) => setSaver(e.target.checked)} className="mt-1 w-4 h-4 accent-[#163B7A]" />
               <span>
                 <span className="font-extrabold text-sm text-ink block">Tiết kiệm dữ liệu</span>
                 <span className="text-[12.5px] text-ink-soft block">Tắt nền hình và banner quảng cáo — trang tải nhanh hơn khi mạng yếu.</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 cursor-pointer mt-3">
+              <input id="text-only" type="checkbox" checked={textOnly} onChange={(e) => setTextOnly(e.target.checked)} className="mt-1 w-4 h-4 accent-[#163B7A]" />
+              <span>
+                <span className="font-extrabold text-sm text-ink block">Chỉ chữ</span>
+                <span className="text-[12.5px] text-ink-soft block">Không tải logo và hình ảnh, chỉ giữ chữ — nhanh nhất khi WiFi yếu.</span>
+                {textOnly && savedKb > 0 && <span className="text-[12px] text-success font-semibold block">Đã tiết kiệm khoảng {savedKb} KB trong lần mở web này (ước tính).</span>}
               </span>
             </label>
           </div>

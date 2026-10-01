@@ -41,6 +41,10 @@ function CalendarButtons({ a }: { a: Application }) {
     <div className="flex flex-wrap gap-1 text-[11.5px] font-bold">
       <a href={g} target="_blank" rel="noopener noreferrer" className="rounded border border-primary text-primary px-1.5 py-0.5 hover:bg-primary-tint">📅 Google Lịch</a>
       <button type="button" onClick={ics} className="rounded border border-border text-ink px-1.5 py-0.5 hover:border-primary">Tải .ics</button>
+      {/* Đợt 101 — chỉ đường tới nơi phỏng vấn (mở Google Maps / app bản đồ của điện thoại). */}
+      {loc && (
+        <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}`} target="_blank" rel="noopener noreferrer" className="rounded border border-border text-ink px-1.5 py-0.5 hover:border-primary">🗺 Chỉ đường</a>
+      )}
     </div>
   );
 }

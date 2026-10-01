@@ -5,9 +5,14 @@ import { DraftBanner, useDraft } from '@/lib/use-draft';
 import { PopularKeywords } from '@/components/PopularKeywords';
 import { AdStack } from '@/components/ads/AdStack';
 import { Suspense, useEffect, useRef, useState } from 'react';
+import { cacheJob, readCachedJob, agoText, isPinned, togglePin } from '@/lib/offline-cache';
+import { enqueueApply, isQueued } from '@/lib/apply-queue';
+import { applyFontPct, FONT_KEY, FONT_MIN, FONT_MAX } from '@/components/FontScale';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from '@/components/SmartLink';
 import SiteHeader from '@/components/SiteHeader';
+import { haptic } from '@/lib/haptic';
+import { JobQuickActions } from '@/components/JobQuickActions';
 import { JobCard } from '@/components/JobCard';
 import { RichTextView } from '@/components/RichTextView';
 import { CompanyLogo } from '@/components/CompanyLogo';
@@ -72,6 +77,26 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
   const [job, setJob] = useState<JobPosting | null | undefined>(fromServer ? fromServer.job : undefined);
   const [related, setRelated] = useState<JobPosting[]>(fromServer ? fromServer.related : []);
   const [tab, setTab] = useState<Tab>('details');
+  const [reading, setReading] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  useEffect(() => setPinned(isPinned(params.id)), [params.id]);
+  useEffect(() => {
+    try { if (localStorage.getItem('tvl_reading') === '1') setReading(true); } catch {}
+  }, []);
+  function bumpFont(d: number) {
+    try {
+      const cur = Number(localStorage.getItem(FONT_KEY)) || 100;
+      const n = Math.min(FONT_MAX, Math.max(FONT_MIN, cur + d));
+      localStorage.setItem(FONT_KEY, String(n));
+      applyFontPct(n);
+    } catch {}
+  }
+  function toggleReading() {
+    setReading((v) => {
+      try { localStorage.setItem('tvl_reading', v ? '0' : '1'); } catch {}
+      return !v;
+    });
+  }
   const [saved, setSaved] = useState(false);
   const autoApplyTriggered = useRef(false);
 
@@ -112,24 +137,50 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
   const home = useHomePlace();
   const [companyOverview, setCompanyOverview] = useState<CompanyProfileResponse | null | undefined>(undefined);
 
+  const [fromCache, setFromCache] = useState<number | null>(null);
+  const [loadTry, setLoadTry] = useState(0);
+  const [loadFailed, setLoadFailed] = useState(false);
   useEffect(() => {
-    if (fromServer) {
+    if (fromServer && loadTry === 0) {
+      cacheJob(fromServer.job, fromServer.related);
       pushRecentJob({ id: fromServer.job.id, title: fromServer.job.title, company: fromServer.job.company?.name ?? '' });
       jobsApi.countView(params.id).catch(() => undefined);
       return;
     }
+    setLoadFailed(false);
     jobsApi
       .get(params.id)
       .then((res) => {
         setJob(res.job);
+        setFromCache(null);
+        cacheJob(res.job, res.related);
         pushRecentJob({ id: res.job.id, title: res.job.title, company: res.job.company?.name ?? '' });
         setRelated(res.related);
       })
       .catch((err) => {
-        if (err instanceof ApiError && err.status === 404) setJob(null);
-        else setJob(null);
+        if (err instanceof ApiError && err.status === 404) {
+          setJob(null);
+          return;
+        }
+        // Đợt 109 — lỗi mạng (không phải "tin không tồn tại"): cho xem bản đã lưu, hoặc báo lỗi + nút Thử lại.
+        const c = readCachedJob<JobPosting>(params.id);
+        if (c) {
+          setJob(c.job);
+          setRelated(c.related as JobPosting[]);
+          setFromCache(c.at);
+        } else setLoadFailed(true);
       });
-  }, [params.id]);
+  }, [params.id, loadTry]);
+  useEffect(() => {
+    if (fromCache == null && !loadFailed) return;
+    const on = () => setLoadTry((n) => n + 1);
+    window.addEventListener('online', on);
+    window.addEventListener('tvl-retry', on);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('tvl-retry', on);
+    };
+  }, [fromCache, loadFailed]);
 
   useEffect(() => {
     if (!token) return;
@@ -252,13 +303,42 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
       });
       track('apply_submit', { entityType: 'job', entityId: params.id, meta: { useOnlineProfile } });
       applyDraft.clear();
+      haptic([20, 40, 20]);
       setApplyState('done');
     } catch (err) {
       setApplyState('idle');
+      if (err instanceof ApiError && err.status === 0 && job) {
+        // Đợt 109 — mạng đứt/chậm: cất hồ sơ ở máy, có mạng lại sẽ tự gửi.
+        enqueueApply({
+          jobId: params.id,
+          title: job.title,
+          at: Date.now(),
+          dto: {
+            ...(sq.length ? { screeningAnswers: screenAnswers.slice(0, sq.length) } : {}),
+            ...(useOnlineProfile ? { useOnlineProfile: true } : { cvId: selectedCvId }),
+            coverLetter: (quickLetter ?? coverLetter) || undefined,
+          },
+        });
+        applyDraft.clear();
+        setApplyError('📶 Mạng đang yếu — hồ sơ đã được lưu lại và sẽ TỰ GỬI khi có mạng. Bạn không cần nộp lại.');
+        return;
+      }
       setApplyError(
         err instanceof ApiError ? err.message : 'Không thể nộp hồ sơ lúc này, vui lòng thử lại',
       );
     }
+  }
+
+  if (loadFailed && job === undefined) {
+    return (
+      <main className="min-h-screen">
+        <SiteHeader />
+        <div className="max-w-xl mx-auto px-4 py-10 text-center rounded-2xl border border-border bg-white my-6">
+          <div className="text-ink-muted text-sm mb-3">📶 Chưa tải được tin này — mạng đang yếu.</div>
+          <button type="button" onClick={() => setLoadTry((n) => n + 1)} className="tvl-btn-primary !w-auto px-5">Thử lại</button>
+        </div>
+      </main>
+    );
   }
 
   if (job === undefined) {
@@ -324,6 +404,7 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
               </Link>
               {isCompanyUnverified(job.company) && <SourcedBadge />}
             </div>
+            <JobQuickActions jobId={job.id} title={job.title} company={job.company.name} phone={job.contactPhone} />
           </div>
           </div>
           <div className="flex gap-2 items-center">
@@ -345,7 +426,7 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
 
         {isLabor && <LaborApplyPanel job={job} inviteCode={searchParams.get('nhom') ?? undefined} />}
         {applyOpen && !isLabor && (
-          <div className="mt-3 rounded-xl border border-border bg-white p-5">
+          <div id="apply-block" className="mt-3 rounded-xl border border-border bg-white p-5">
             {applyDraft.pending && <DraftBanner savedAt={applyDraft.pending.t} onRestore={applyDraft.restore} onDiscard={applyDraft.discard} label="Bạn có thư ứng tuyển viết dở cho tin này" />}
             {me?.role === 'candidate' && <SalaryNudge jobId={params.id} />}
             {me?.role === 'candidate' && <ApplyCheckNote jobId={params.id} />}
@@ -502,25 +583,49 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
           </div>
         )}
 
-        <div className="grid lg:grid-cols-[1fr_280px] gap-5 mt-5 items-start">
+        {fromCache != null && (
+          <div role="status" className="mt-4 rounded-xl border border-warning bg-warning-tint px-3 py-2 text-[13px] font-semibold text-[#7A4A00] flex items-center gap-2 flex-wrap">
+            📶 Đang xem bản đã lưu ({agoText(fromCache)}) vì mạng yếu. Thông tin có thể đã đổi.
+            <button type="button" onClick={() => setLoadTry((n) => n + 1)} className="underline">Thử tải lại</button>
+          </div>
+        )}
+        <div className={`grid gap-5 mt-5 items-start ${reading ? 'max-w-[760px] mx-auto text-[16px] leading-relaxed' : 'lg:grid-cols-[1fr_280px]'}`}>
           <div>
-            <div className="flex gap-1 border-b border-border bg-white rounded-t-xl px-2">
+            <div className="flex gap-1 border-b border-border bg-white rounded-t-xl px-2 items-center">
               {(
                 [
                   ['details', 'Chi tiết'],
-                  ['company', 'Tổng quan công ty'],
+                  ['company', 'Công ty'],
                 ] as [Tab, string][]
               ).map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setTab(key)}
-                  className={`px-4 py-2.5 text-sm font-bold border-b-2 -mb-px ${
+                  className={`px-3 sm:px-4 py-2.5 text-sm font-bold border-b-2 -mb-px whitespace-nowrap ${
                     tab === key ? 'text-primary border-primary' : 'text-ink-faint border-transparent'
                   }`}
                 >
                   {label}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setPinned(togglePin(params.id))}
+                aria-pressed={pinned}
+                title="Lưu tin này vào máy để đọc khi không có mạng"
+                className={`ml-auto my-1 px-2.5 h-9 rounded-lg text-[12.5px] whitespace-nowrap shrink-0 font-bold border ${pinned ? 'bg-primary text-white border-primary' : 'text-primary border-border-strong'}`}
+              >
+                📌 <span className="max-sm:hidden">{pinned ? 'Đã lưu offline' : 'Lưu offline'}</span>
+              </button>
+              <button type="button" onClick={toggleReading} aria-pressed={reading} className={`my-1 px-2.5 h-9 rounded-lg text-[12.5px] whitespace-nowrap shrink-0 max-sm:text-[12px] font-bold border ${reading ? 'bg-primary text-white border-primary' : 'text-primary border-border-strong'}`}>
+                📖 {reading ? 'Thoát đọc' : 'Chế độ đọc'}
+              </button>
+              {reading && (
+                <>
+                  <button type="button" aria-label="Giảm cỡ chữ" onClick={() => bumpFont(-10)} className="my-1 w-9 h-9 rounded-lg border border-border-strong font-bold text-[13px]">A−</button>
+                  <button type="button" aria-label="Tăng cỡ chữ" onClick={() => bumpFont(10)} className="my-1 w-9 h-9 rounded-lg border border-border-strong font-bold text-[16px]">A+</button>
+                </>
+              )}
             </div>
 
             <div className="rounded-b-xl border border-t-0 border-border bg-white p-5">
@@ -710,7 +815,7 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
             </div>
           </div>
 
-          <div className="flex flex-col gap-3.5 lg:self-stretch min-w-0">
+          <div className={`flex-col gap-3.5 lg:self-stretch min-w-0 ${reading ? 'hidden' : 'flex'}`}>
             {/* Đợt 49 — tab "Tổng quan công ty" đã có khung công ty + nút FOLLOW → ẩn thẻ công ty cột phải để không trùng. */}
             {tab !== 'company' && (
             <div className="rounded-xl border border-border bg-white p-4">
@@ -796,6 +901,35 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
         )}
 
         <AdSlot slot="job-bottom" className="mt-6" />
+      </div>
+      {/* Đợt 99 — thanh "Ứng tuyển nhanh" dính đáy (điện thoại), nằm trên thanh điều hướng. Đã chọn sẵn CV/hồ sơ + tin không có câu hỏi
+          sàng lọc → 1 chạm là nộp; ngược lại mở khối nộp hồ sơ rồi cuộn tới đó. */}
+      <div
+        data-no-slop
+        className="md:hidden fixed inset-x-0 z-30 px-3"
+        style={{ bottom: 'calc(60px + env(safe-area-inset-bottom, 0px))' }}
+      >
+        {applyState === 'done' ? (
+          <div className="h-12 rounded-xl bg-white/95 border border-border-strong shadow flex items-center justify-center font-bold text-[14px] text-primary">✓ Đã nộp hồ sơ</div>
+        ) : (
+          <button
+            type="button"
+            disabled={applyState === 'submitting'}
+            onClick={() => {
+              const ready = applyOpen && !isLabor && !!me && (useOnlineProfile || !!selectedCvId) && !(job.screeningQuestions ?? []).length;
+              if (ready) return void submitApply();
+              if (isLabor) return void document.getElementById('labor-apply')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              handleApplyClick().then(() => setTimeout(() => document.getElementById('apply-block')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150));
+            }}
+            className="w-full h-12 rounded-xl bg-accent text-white font-extrabold text-[15px] shadow-lg disabled:opacity-60"
+          >
+            {applyState === 'submitting'
+              ? 'Đang nộp…'
+              : applyOpen && !isLabor && !!me && (useOnlineProfile || !!selectedCvId) && !(job.screeningQuestions ?? []).length
+                ? `⚡ Xác nhận nộp ${useOnlineProfile ? 'bằng hồ sơ trực tuyến' : 'bằng CV đã chọn'}`
+                : '⚡ Ứng tuyển nhanh'}
+          </button>
+        )}
       </div>
     </main>
   );

@@ -12,6 +12,8 @@ import { RecommendedJobs } from '@/components/RecommendedJobs';
 import SearchHints from '@/components/SearchHints';
 import { rememberSearch } from '@/lib/search-hints';
 import ContinueBlock from '@/components/ContinueBlock';
+import TodayNew from '@/components/TodayNew';
+import ProfileNudge from '@/components/ProfileNudge';
 import { jobsApi, primeGet, type JobFacets, type JobPosting, type FeaturedEmployer, type HomepageStats } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { CompanyLogo } from '@/components/CompanyLogo';
@@ -243,6 +245,10 @@ export default function HomeClient({ initial }: { initial: HomeBundle | null }) 
 
         {/* Đợt 24 — banner quảng cáo (vùng home-top). */}
         <AdSlot slot="home-top" className="mt-1.5" />
+
+        <ProfileNudge />
+
+        <TodayNew />
 
         <ContinueBlock />
 

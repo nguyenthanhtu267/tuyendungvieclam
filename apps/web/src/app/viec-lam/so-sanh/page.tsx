@@ -71,11 +71,35 @@ function ComparePage() {
             Cần ít nhất 2 tin để so sánh. Bấm “⇄ So sánh” trên thẻ việc làm ở <Link href="/viec-lam" className="underline font-semibold">trang Việc làm</Link>.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-border bg-white">
+          <>
+          {/* Đợt 105 — điện thoại: mỗi tin là 1 thẻ, VUỐT NGANG để so sánh (bảng 640px khó đọc trên màn hình nhỏ). */}
+          <div className="sm:hidden">
+            <div className="text-[12.5px] text-ink-muted mb-1.5">Vuốt ngang để xem từng tin ({list.length}) →</div>
+            <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1">
+              {list.map((j) => (
+                <div key={j.id} className="snap-center shrink-0 w-[84%] rounded-xl border border-border bg-white p-3">
+                  <Link href={`/viec-lam/${j.id}`} className="font-extrabold text-[15px] text-ink hover:text-primary block">{j.title}</Link>
+                  <div className="mt-1.5 mb-2 flex gap-3 text-[13px]">
+                    <Link href={`/viec-lam/${j.id}`} className="text-primary underline min-h-[36px] inline-flex items-center">Xem & ứng tuyển</Link>
+                    <button onClick={() => remove(j.id)} className="text-ink-faint underline min-h-[36px]">Bỏ</button>
+                  </div>
+                  <dl>
+                    {rows.map((r) => (
+                      <div key={r.label} className="border-t border-border py-1.5 flex gap-2 text-[13.5px]">
+                        <dt className="w-[38%] shrink-0 font-semibold text-ink-muted">{r.label}</dt>
+                        <dd className="flex-1 min-w-0 break-words">{r.render(j)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="hidden sm:block overflow-x-auto rounded-xl border border-border bg-white">
             <table className="w-full text-[14px] text-ink min-w-[640px]">
               <thead>
                 <tr className="align-top">
-                  <th className="w-36 p-3" />
+                  <th className="w-36 p-3 sticky left-0 bg-white z-10" />
                   {list.map((j) => (
                     <th key={j.id} className="p-3 text-left font-extrabold text-[15px]">
                       <Link href={`/viec-lam/${j.id}`} className="hover:text-primary">{j.title}</Link>
@@ -90,7 +114,7 @@ function ComparePage() {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.label} className="border-t border-border align-top">
-                    <td className="p-3 font-semibold text-ink-muted">{r.label}</td>
+                    <td className="p-3 font-semibold text-ink-muted sticky left-0 bg-white z-10">{r.label}</td>
                     {list.map((j) => (
                       <td key={j.id} className="p-3">{r.render(j)}</td>
                     ))}
@@ -99,6 +123,7 @@ function ComparePage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pb-6"><AdSlot slot="tools-bottom" className="mt-2" /></div>

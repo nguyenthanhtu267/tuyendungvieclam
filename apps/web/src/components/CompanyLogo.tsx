@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { logoProxyUrl } from '@/lib/api';
+import { countLogoSaved, useTextOnly } from '@/lib/data-saver';
 
 
 // Đợt 12ab (24/09/2026) — logo công ty qua link ảnh (URL, quyết định đã chốt: chưa nối Cloudflare R2
@@ -109,7 +110,13 @@ export function CompanyLogo({
   // Đợt 91 — thử bản đã thu nhỏ trước ('proxy'); lỗi → link gốc ('raw'); lỗi nữa → icon mặc định.
   const [stage, setStage] = useState<'proxy' | 'raw' | 'failed'>('proxy');
   const proxied = logoUrl ? logoProxyUrl(logoUrl, size) : null;
-  const showImage = !!logoUrl && stage !== 'failed';
+  const textOnly = useTextOnly();
+  const [wanted, setWanted] = useState(false); // chế độ chỉ chữ: bấm vào ô logo mới tải logo đó
+  const showImage = !!logoUrl && stage !== 'failed' && (!textOnly || wanted);
+  const lazyTap = textOnly && !wanted && !!logoUrl;
+  useEffect(() => {
+    if (lazyTap && logoUrl) countLogoSaved(logoUrl);
+  }, [lazyTap, logoUrl]);
   const imgSrc = logoUrl && proxied && stage === 'proxy' ? proxied : logoUrl;
   // Đợt 67 — không còn ẩn/chừa trống: chưa có logo thì hiện icon mặc định theo tên công ty.
   void hideIfEmpty;
@@ -120,6 +127,16 @@ export function CompanyLogo({
     <div
       className={`shrink-0 rounded-xl ${bgClass} flex items-center justify-center font-bold overflow-hidden ${className}`}
       style={{ width: size, height: size, fontSize: Math.max(10, size * 0.32) }}
+      title={lazyTap ? 'Bấm để tải logo' : undefined}
+      onClickCapture={
+        lazyTap
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setWanted(true);
+            }
+          : undefined
+      }
     >
       {showImage ? (
         // eslint-disable-next-line @next/next/no-img-element -- link ảnh tự do do NTD dán, không nằm

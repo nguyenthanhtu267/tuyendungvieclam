@@ -10,7 +10,11 @@ const AnalyticsTracker = dynamic(() => import('@/components/AnalyticsTracker'), 
 const ConsentBanner = dynamic(() => import('@/components/ConsentBanner'), { ssr: false });
 const CompareTray = dynamic(() => import('@/components/CompareTray'), { ssr: false });
 const BottomNav = dynamic(() => import('@/components/BottomNav'), { ssr: false });
+const ScrollTopButton = dynamic(() => import('@/components/ScrollTopButton'), { ssr: false });
+const InstallHint = dynamic(() => import('@/components/InstallHint'), { ssr: false });
 const PwaRegister = dynamic(() => import('@/components/PwaRegister'), { ssr: false });
+const ApplyQueueFlusher = dynamic(() => import('@/components/ApplyQueueFlusher'), { ssr: false });
+const TopProgress = dynamic(() => import('@/components/TopProgress'), { ssr: false });
 const TapTargets = dynamic(() => import('@/components/TapTargets'), { ssr: false });
 const VitalsReporter = dynamic(() => import('@/components/VitalsReporter'), { ssr: false });
 
@@ -42,7 +46,11 @@ export default function DeferredWidgets() {
       <ConsentBanner />
       <CompareTray />
       <BottomNav />
+      <ScrollTopButton />
+      <InstallHint />
       <PwaRegister />
+      <ApplyQueueFlusher />
+      <TopProgress />
       <TapTargets />
     </Suspense>
   );

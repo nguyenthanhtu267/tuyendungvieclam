@@ -1,7 +1,7 @@
 /* Đợt 91 — Service worker của Tuyển Dụng Việc Làm.
  * Mục tiêu: mở lại web NHANH (tệp tĩnh lấy từ máy), không "trắng trang" khi mất mạng (hiện trang offline + việc đã lưu).
  * KHÔNG chặn/ghi nhớ lời gọi API (API ở máy chủ khác, luôn lấy dữ liệu mới). Đổi VERSION khi cần xoá sạch bộ nhớ đệm cũ. */
-const VERSION = 'v91-1';
+const VERSION = 'v111-1';
 const STATIC = 'tvl-static-' + VERSION;
 const PAGES = 'tvl-pages-' + VERSION;
 const OFFLINE_URL = '/offline.html';

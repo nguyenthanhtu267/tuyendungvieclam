@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import SearchHints from '@/components/SearchHints';
 import { rememberSearch } from '@/lib/search-hints';
 import { nearestProvince, saveHome } from '@/lib/geo';
@@ -57,6 +58,9 @@ export function FilterBar({
     !!value.featuredEmployerOnly;
 
   const showSearchField = onSearchChange !== undefined;
+  // Đợt 99 — điện thoại: 6 ô lọc phụ + "Doanh nghiệp yêu thích" gom vào ngăn kéo từ đáy (nút "Bộ lọc (n)"); máy tính giữ nguyên bố cục.
+  const [sheet, setSheet] = useState(false);
+  const extraCount = [value.salaryTier, value.level, value.postedWithin, value.employmentType, value.experienceLevel, value.urgentOnly, value.featuredEmployerOnly].filter(Boolean).length;
   const provincePins = usePins('provinces');
   const industryPins = usePins('industries');
 
@@ -126,9 +130,31 @@ export function FilterBar({
           </button>
         )}
       </form>
-      {showSearchField && <SearchHints q={searchValue ?? ''} onPick={(v) => { onSearchChange?.(v); rememberSearch(v); }} />}
+      {showSearchField && <SearchHints q={searchValue ?? ''} onPick={(v) => { onSearchChange?.(v); rememberSearch(v); }} onPickIndustry={(i) => { onSearchChange?.(''); onChange({ industries: [i], q: '' }); }} />}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+      <button
+        type="button"
+        onClick={() => setSheet(true)}
+        className="sm:hidden h-11 rounded-xl border border-border-strong text-[14px] font-bold text-ink flex items-center justify-center gap-2"
+      >
+        ⚙ Bộ lọc{extraCount > 0 && <span className="rounded-full bg-primary text-white text-[12px] px-2 min-w-[22px] text-center">{extraCount}</span>}
+      </button>
+      {sheet && <div className="sm:hidden fixed inset-0 z-[60] bg-black/40" onClick={() => setSheet(false)} aria-hidden />}
+      <div
+        className={
+          sheet
+            ? 'flex flex-col gap-3 fixed inset-x-0 bottom-0 z-[61] max-h-[80vh] overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl sm:contents'
+            : 'hidden sm:contents'
+        }
+        style={sheet ? { paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))' } : undefined}
+      >
+      {sheet && (
+        <div className="flex items-center justify-between sm:hidden">
+          <div className="font-extrabold text-[16px]">Bộ lọc</div>
+          <button type="button" onClick={() => setSheet(false)} className="h-10 px-4 rounded-full bg-primary text-white font-bold text-[14px]">Xong</button>
+        </div>
+      )}
+      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2">
         <select
           className="tvl-input text-[12.5px]"
           value={value.salaryTier ?? 0}
@@ -209,6 +235,7 @@ export function FilterBar({
             Xóa bộ lọc
           </button>
         )}
+      </div>
       </div>
     </div>
   );

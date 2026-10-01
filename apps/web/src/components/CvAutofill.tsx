@@ -9,9 +9,16 @@ export default function CvAutofill({ token, onDone }: { token: string; onDone?: 
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<CvParseResult | null>(null);
   const [msg, setMsg] = useState('');
+  const [over, setOver] = useState(false);
+  const [fname, setFname] = useState('');
 
   async function pick(f?: File | null) {
     if (!f) return;
+    if (f.size > 8 * 1024 * 1024) {
+      setMsg('File quá lớn (tối đa 8MB). Hãy chọn file nhẹ hơn.');
+      return;
+    }
+    setFname(`${f.name} · ${Math.max(1, Math.round(f.size / 1024))} KB`);
     setBusy(true);
     setMsg('');
     setRes(null);
@@ -42,17 +49,23 @@ export default function CvAutofill({ token, onDone }: { token: string; onDone?: 
   }
   const p = res?.parsed;
   return (
-    <div className="rounded-xl border border-dashed border-primary bg-[#F3F6FB] p-4">
+    <div
+      className={`rounded-xl border border-dashed border-primary p-4 ${over ? 'bg-[#DCE7F7] ring-2 ring-primary' : 'bg-[#F3F6FB]'}`}
+      onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => { e.preventDefault(); setOver(false); pick(e.dataTransfer.files?.[0]); }}
+    >
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <div className="font-extrabold text-[14px]">✨ Tự điền hồ sơ từ CV</div>
-          <div className="text-[12.5px] text-ink-muted">Tải CV có sẵn (PDF/Word), hệ thống tách thông tin để bạn xem lại rồi điền vào hồ sơ. Chỉ điền vào chỗ còn trống.</div>
+          <div className="text-[12.5px] text-ink-muted">Tải CV có sẵn (PDF/Word) — bấm chọn hoặc kéo thả file vào khung này. Hệ thống tách thông tin để bạn xem lại rồi điền vào hồ sơ. Chỉ điền vào chỗ còn trống.</div>
         </div>
         <button type="button" disabled={busy} onClick={() => ref.current?.click()} className="tvl-btn-primary !w-auto px-4 disabled:opacity-60">
           {busy ? 'Đang xử lý…' : 'Chọn file CV'}
         </button>
         <input id="cv-autofill-file" ref={ref} type="file" accept=".pdf,.doc,.docx,.txt" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
       </div>
+      {fname && <div className="mt-2 text-[12.5px] text-ink-muted">📄 {fname}</div>}
       {msg && <div className="mt-2 text-[13px] font-semibold text-ink">{msg}</div>}
       {p && (
         <div className="mt-3 rounded-lg bg-white border border-border p-3 text-[13px] flex flex-col gap-1">

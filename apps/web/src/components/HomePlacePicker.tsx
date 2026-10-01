@@ -8,7 +8,7 @@ export default function HomePlacePicker({ onNearMe }: { onNearMe: (provinces: st
   const home = useHomePlace();
   const [editing, setEditing] = useState(false);
   const [msg, setMsg] = useState('');
-  const [radius, setRadius] = useState(60);
+  const [radius, setRadius] = useState(10);
   const label = home ? (home.province ?? (home.lat != null ? `Gần ${nearestProvince(home.lat, home.lon!)}` : '')) : '';
 
   function useGps() {
@@ -61,7 +61,7 @@ export default function HomePlacePicker({ onNearMe }: { onNearMe: (provinces: st
         value={radius}
         onChange={(e) => setRadius(Number(e.target.value))}
       >
-        {[10, 25, 60, 100, 200].map((r) => (
+        {[5, 10, 20, 30].map((r) => (
           <option key={r} value={r}>
             ≤ {r} km
           </option>

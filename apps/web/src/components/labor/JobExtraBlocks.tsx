@@ -19,6 +19,8 @@ export function extraLines(kind: WorkerKind, e?: JobExtra | null): string[] {
   } else if (kind === 'student') {
     if (e.hourlyPay) out.push(`Lương: ${e.hourlyPay.toLocaleString('vi-VN')} đồng/giờ`);
     if (e.hours) out.push(`~${e.hours} giờ/tuần`);
+    // Đợt 105 — quy ra tháng để dễ so sánh với tin trả lương tháng (1 tháng ≈ 4,3 tuần).
+    if (e.hourlyPay && e.hours) out.push(`≈ ${(Math.round((e.hourlyPay * e.hours * 4.3) / 100000) / 10).toLocaleString('vi-VN')} triệu/tháng (ước tính)`);
   } else {
     if (e.ageMin || e.ageMax) out.push(`Tuổi ${e.ageMin ?? '…'}–${e.ageMax ?? '…'}`);
     if (e.experience) out.push(`Kinh nghiệm: ${EXPERIENCE_LABEL[e.experience] ?? e.experience}`);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { BrandBar } from '@/components/BrandBar';
 import { smartApi3, type SharedProfile } from '@/lib/api';
 
 // Đợt 65 — trang công khai xem hồ sơ tóm tắt (noindex qua thẻ meta robots).
@@ -19,6 +20,8 @@ export default function SharedProfilePage({ params }: { params: { token: string 
   if (err) return <div className="max-w-[720px] mx-auto p-6 text-[15px] font-bold">{err}</div>;
   if (!p) return <div className="max-w-[720px] mx-auto p-6 text-ink-muted">Đang tải...</div>;
   return (
+    <div>
+    <BrandBar className="bg-white border-b border-border" />
     <div className="max-w-[720px] mx-auto p-4 flex flex-col gap-3">
       <div className="rounded-xl border border-border bg-white p-5">
         <h1 className="text-[22px] font-extrabold">{p.fullName}</h1>
@@ -52,6 +55,7 @@ export default function SharedProfilePage({ params }: { params: { token: string 
         </div>
       )}
       <div className="text-[12px] text-ink-faint">Hồ sơ tóm tắt, không kèm thông tin liên hệ. Liên kết tự hết hạn.</div>
+    </div>
     </div>
   );
 }

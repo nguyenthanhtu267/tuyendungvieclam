@@ -41,9 +41,14 @@ export default function ReportJobButton({ jobId }: { jobId: string }) {
       {msg && <span className="ml-2 font-semibold text-ink">{msg}</span>}
       {open && (
         <div className="mt-2 rounded-lg border border-border bg-white p-3 grid gap-2 max-w-md">
-          <select id="report-reason" className="tvl-input" value={reason} onChange={(e) => setReason(e.target.value)}>
-            {REASONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
+          {/* Đợt 105 — điện thoại: chọn lý do bằng nút chạm lớn thay cho ô xổ xuống. */}
+          <div className="flex flex-col gap-1.5" role="radiogroup" aria-label="Lý do báo cáo">
+            {REASONS.map(([v, l]) => (
+              <button key={v} type="button" role="radio" aria-checked={reason === v} onClick={() => setReason(v)} className={`text-left min-h-[44px] px-3 rounded-lg border text-[13.5px] font-semibold ${reason === v ? 'border-primary bg-primary-tint text-primary' : 'border-border-strong text-ink'}`}>
+                {reason === v ? '● ' : '○ '}{l}
+              </button>
+            ))}
+          </div>
           <textarea id="report-note" className="tvl-input" rows={3} maxLength={1000} placeholder="Mô tả thêm (không bắt buộc)" value={note} onChange={(e) => setNote(e.target.value)} />
           <div className="flex gap-2">
             <button type="button" disabled={busy} onClick={send} className="tvl-btn-primary !w-auto px-4">{busy ? 'Đang gửi…' : 'Gửi báo cáo'}</button>

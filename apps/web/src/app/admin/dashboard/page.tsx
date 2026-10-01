@@ -262,7 +262,10 @@ export default function AdminDashboardPage() {
     // Xếp chồng dọc (flex-col) trên điện thoại, chỉ chia 2 cột từ md trở lên.
     <main className="min-h-screen bg-bg flex flex-col md:grid md:grid-cols-[200px_1fr]">
       <aside className="bg-primary-dark text-white p-3 flex flex-col gap-1 md:min-h-screen">
-        <div className="font-extrabold text-sm px-2 pt-1.5 pb-3.5">⚙ Admin Console</div>
+        <div className="flex items-center justify-between px-2 pt-1.5 pb-3.5">
+          <span className="font-extrabold text-sm">⚙ Admin Console</span>
+          <a href="/" className="text-[11.5px] font-bold text-white/95 border border-white/40 rounded-full px-2.5 py-1">← Trang chủ</a>
+        </div>
         {NAV_ITEMS.map((item) => (
           <button
             key={item.id}

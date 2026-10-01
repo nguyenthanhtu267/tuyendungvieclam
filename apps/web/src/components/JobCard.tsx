@@ -16,6 +16,7 @@ import { useCompare } from '@/lib/compare';
 import { distanceLabel, useHomePlace } from '@/lib/geo';
 import { FitText } from '@/components/FitText';
 import { bumpSavedCount } from '@/lib/saved-count';
+import { useJobNotes } from '@/components/JobNote';
 
 // Đợt 10 — thẻ việc làm theo mục 4 đặc tả: tiêu đề đậm + badge (MỚI) chữ đỏ trong ngoặc (không phải
 // pill), dòng lương đỏ, nhiều tỉnh ngăn bởi "|", hạn nộp/cập nhật, tag phúc lợi có icon, nút đỏ
@@ -39,6 +40,7 @@ export function JobCard({
   const dist = home ? distanceLabel(home, job.provinces ?? []) : null;
   const inCompare = compare.has(job.id);
   const [compareMsg, setCompareMsg] = useState('');
+  const myNote = useJobNotes()[job.id];
 
   const locationText = job.provinces?.length ? job.provinces.join(' | ') : job.location;
 
@@ -147,16 +149,28 @@ export function JobCard({
           {isCompanyUnverified(job.company) && <span className="shrink-0"><SourcedBadge /></span>}
         </div>
 
-        <div className="text-critical font-bold text-[12.5px] mt-1.5">
-          $ {formatSalaryTag(job.salaryMin, job.salaryMax)}
+        <div className="text-critical font-bold text-[12.5px] mt-1.5 flex items-center gap-2 flex-wrap">
+          <span>$ {formatSalaryTag(job.salaryMin, job.salaryMax)}</span>
+          {/* Đợt 104 — nhãn "đi làm được ngay": tin không đòi kinh nghiệm. */}
+          {(job.experienceLevel === 'Không yêu cầu kinh nghiệm' || job.experienceLevel === 'Chưa có kinh nghiệm') && (
+            <span className="rounded bg-success-tint text-success text-[10.5px] font-extrabold px-1.5 py-0.5 border border-success/40">🌱 Không cần kinh nghiệm</span>
+          )}
         </div>
 
         {/* Đợt 44 — địa điểm hiện ĐỦ (không cắt "Hồ..."), rồi theo trình tự thời gian: Cập nhật → Hạn nộp. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5 text-[11.5px] text-ink-faint">
           {locationText && <span className="whitespace-nowrap">📍 {locationText}</span>}
           {dist && <span className="whitespace-nowrap text-primary" title="Ước tính từ nơi ở của bạn">🚗 {dist}</span>}
-          <span className="whitespace-nowrap">Cập nhật: {formatDate(job.updatedAt ?? job.createdAt)}</span>
+          <span className="whitespace-nowrap max-sm:hidden">Cập nhật: {formatDate(job.updatedAt ?? job.createdAt)}</span>
           {job.deadline && <span className="whitespace-nowrap">Hạn nộp: {formatDate(job.deadline)}</span>}
+          {(() => {
+            // Đợt 101 — nhãn đỏ "Còn N ngày" khi tin sắp hết hạn nộp (≤ 3 ngày), để người xem biết cần nộp sớm.
+            if (!job.deadline) return null;
+            const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+            const left = Math.round((new Date(job.deadline.slice(0, 10) + 'T00:00:00').getTime() - t0.getTime()) / 86400000);
+            if (left < 0 || left > 3) return null;
+            return <span className="whitespace-nowrap rounded bg-critical text-white text-[10.5px] font-extrabold px-1.5 py-0.5">⏰ {left === 0 ? 'Hết hạn hôm nay' : `Còn ${left} ngày`}</span>;
+          })()}
           {/* Đợt 59 — "Việc tương tự": lọc cùng ngành + cấp bậc + tỉnh đầu tiên của tin này. */}
           {(job.industry || job.level) && (
             <button
@@ -171,12 +185,17 @@ export function JobCard({
                 if (pv) qs.set('provinces', pv);
                 router.push(`/viec-lam?${qs.toString()}`);
               }}
-              className="tap-slop relative whitespace-nowrap text-primary font-semibold hover:underline"
+              className="tap-slop relative whitespace-nowrap text-primary font-semibold hover:underline max-sm:hidden"
             >
               ≈ Việc tương tự
             </button>
           )}
         </div>
+
+        {myNote && (myNote.pinned || myNote.note) && <div className="mt-1.5 text-[12px] font-semibold text-ink bg-warning-tint rounded px-2 py-1">📌 {myNote.note || 'Đã ghim'}</div>}
+
+        {/* Đợt 100 — điện thoại: 1 dòng "vì sao hợp với bạn" (lý do đầu tiên của độ phù hợp) thay cho ngày cập nhật / việc tương tự. */}
+        {match?.reasons?.[0] && <div className="sm:hidden mt-1.5 text-[12px] text-primary font-semibold truncate">✔ {match.reasons[0]}</div>}
 
         {/* Đợt 15 (25/09/2026) — mục 17 danh sách lỗi: bỏ hẳn khối chip "Phúc lợi" khỏi thẻ tin (theo
             yêu cầu người dùng: "Phần phúc lợi không cần hiển thị ở đây để bảng thông tin của công ty
@@ -186,7 +205,7 @@ export function JobCard({
 
       {/* Đợt 91 — điện thoại: ♡ + ⇄ nằm CẠNH nút Ứng tuyển, mỗi nút cao 44px (đủ ngón tay, không đè lên tiêu đề → không bấm nhầm).
           Máy tính: giữ nguyên vị trí góc trên phải của thẻ. */}
-      <div className="w-full sm:w-auto shrink-0 pt-1 sm:pt-0 flex items-stretch gap-2 sm:block">
+      <div className="w-full sm:w-auto shrink-0 pt-1 sm:pt-0 sm:[@media(pointer:coarse)]:pt-8 flex items-stretch gap-2 sm:block">
         <button
           type="button"
           onClick={handleApplyNow}
@@ -205,7 +224,7 @@ export function JobCard({
           aria-pressed={inCompare}
           aria-label={inCompare ? 'Bỏ khỏi so sánh' : 'Thêm vào so sánh'}
           title={compareMsg || (inCompare ? 'Bỏ khỏi so sánh' : 'Thêm vào so sánh')}
-          className={`sm:absolute sm:top-2.5 sm:right-9 shrink-0 max-sm:h-11 max-sm:min-w-[44px] max-sm:text-base max-sm:flex max-sm:items-center max-sm:justify-center text-[11px] font-semibold rounded px-1.5 py-0.5 max-sm:border-2 border ${
+          className={`tvl-touch-big sm:absolute sm:top-2.5 sm:right-[46px] shrink-0 max-sm:h-11 max-sm:min-w-[44px] max-sm:text-base max-sm:flex max-sm:items-center max-sm:justify-center text-[11px] font-semibold rounded px-1.5 py-0.5 max-sm:border-2 border ${
             inCompare ? 'bg-primary text-white border-primary' : 'text-ink-faint border-border hover:text-primary hover:border-primary max-sm:bg-white max-sm:text-ink-muted max-sm:border-border-strong'
           }`}
         >
@@ -217,7 +236,7 @@ export function JobCard({
           onClick={handleToggleSave}
           disabled={busy}
           aria-label={isSaved ? 'Bỏ lưu việc làm' : 'Lưu việc làm'}
-          className={`sm:absolute sm:top-3 sm:right-3 shrink-0 text-base leading-none max-sm:h-11 max-sm:min-w-[44px] max-sm:text-xl max-sm:rounded max-sm:border-2 max-sm:border-border-strong max-sm:bg-white max-sm:flex max-sm:items-center max-sm:justify-center ${isSaved ? 'text-critical' : 'text-ink-faint hover:text-critical'}`}
+          className={`tvl-touch-big sm:absolute sm:top-3 sm:right-3 shrink-0 text-base leading-none max-sm:h-11 max-sm:min-w-[44px] max-sm:text-xl max-sm:rounded max-sm:border-2 max-sm:border-border-strong max-sm:bg-white max-sm:flex max-sm:items-center max-sm:justify-center ${isSaved ? 'text-critical' : 'text-ink-faint hover:text-critical'}`}
         >
           {isSaved ? '♥' : '♡'}
         </button>

@@ -6,6 +6,9 @@ import SiteHeader from '@/components/SiteHeader';
 import { RichTextEditor } from '@/components/LazyRichTextEditor';
 import { RichTextView } from '@/components/RichTextView';
 import { useAuth } from '@/lib/auth-context';
+import { compressImage } from '@/lib/image-compress';
+import { uploadWithRetry } from '@/lib/upload-retry';
+import { DraftBanner, useDraft } from '@/lib/use-draft';
 import {
   ApiError,
   profileApi,
@@ -523,6 +526,16 @@ function ProfileModals({
     setForm((f) => ({ ...f, [k]: v }));
   }
 
+  // Đợt 110 — nháp tự lưu cho từng mục hồ sơ (mất mạng/đóng nhầm vẫn còn). Chỉ lưu khi có thay đổi so với dữ liệu hiện tại; không lưu ảnh đại diện.
+  const baseJson = JSON.stringify(buildInitialForm(modal, profile));
+  const draft = useDraft<Record<string, any>>({
+    key: token ? `profile:${modal.type}:${isEdit ? initialItem.id : 'new'}` : null,
+    value: form,
+    enabled: modal.type !== 'avatar',
+    isEmpty: (v) => JSON.stringify(v) === baseJson,
+    onRestore: (v) => setForm((f) => ({ ...f, ...v })),
+  });
+
   async function save() {
     if (!token) return;
     setSaving(true);
@@ -542,7 +555,10 @@ function ProfileModals({
           await profileApi.updateCareer(token, form as any);
           break;
         case 'avatar':
-          if (form.file) await profileApi.uploadAvatar(token, form.file);
+          if (form.file) {
+            const f = await compressImage(form.file as File);
+            await uploadWithRetry(() => profileApi.uploadAvatar(token, f), () => setErr('📶 Mạng đứt — ảnh sẽ tự gửi khi có mạng (đừng đóng cửa sổ này).'));
+          }
           break;
         default: {
           const section = modal.type as SectionKey;
@@ -550,6 +566,7 @@ function ProfileModals({
           else await profileApi.addItem(token, section, form);
         }
       }
+      draft.clear();
       await onSaved();
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : 'Không lưu được, vui lòng thử lại');
@@ -561,6 +578,7 @@ function ProfileModals({
   return (
     <Modal title={modalTitle(modal)} onClose={onClose}>
       <div className="flex flex-col gap-3.5">
+        {draft.pending && <DraftBanner savedAt={draft.pending.t} onRestore={draft.restore} onDiscard={draft.discard} label="Bạn có phần sửa dở ở mục này" />}
         {err && <div className="rounded-lg bg-critical-tint px-3 py-2 text-xs text-critical">{err}</div>}
         {renderFields(modal, form, set)}
         <div className="mt-2 flex justify-end gap-2 border-t border-border pt-3.5">

@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import Link from '@/components/SmartLink';
+import { BrandBar } from '@/components/BrandBar';
 import { useRouter } from 'next/navigation';
 import { authApi, ApiError } from '@/lib/api';
 import { track } from '@/lib/analytics';
@@ -53,6 +54,7 @@ export default function DangKyNtdPage() {
 
   return (
     <main className="min-h-screen grid md:grid-cols-2">
+      <BrandBar className="md:hidden col-span-full border-b border-border bg-white" />
       <div className="hidden md:flex flex-col justify-between bg-primary text-white p-12">
         <Link href="/" className="flex items-center gap-3">
           {/* Đợt 12j (21/09/2026) — đổi biểu tượng logo từ icon dấu tích sang chữ "V" đơn giản. */}

@@ -405,7 +405,7 @@ export function WorkerForm({ initialKind }: { initialKind: WorkerKind }) {
             <div className="flex flex-wrap gap-1.5">
               <button type="button" className={chip(f.radiusKm == null)} onClick={() => set({ radiusKm: null })}>Không chọn</button>
               {RADII.map((r) => (
-                <button key={r} type="button" className={chip(f.radiusKm === r)} onClick={() => set({ radiusKm: r })}>Từ {r} km</button>
+                <button key={r} type="button" className={chip(f.radiusKm === r)} onClick={() => set({ radiusKm: r })}>Trong {r} km</button>
               ))}
             </div>
             <div className="flex flex-wrap items-center gap-2 font-normal">
