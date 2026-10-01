@@ -64,9 +64,34 @@ export default function EmployerFunnelPanel() {
               </li>
             ))}
           </ul>
+          <BudgetSim items={budget!.items} avg={budget!.avgApplicationsPerJob} />
           {warns.length > 0 && <Link href="/nha-tuyen-dung/don-hang" className="inline-block mt-2 rounded-lg bg-primary text-white font-bold text-[13px] px-3 py-1.5">Mua / gia hạn gói</Link>}
         </section>
       )}
+    </div>
+  );
+}
+
+// Đợt 89 — mô phỏng: "nếu mua thêm N lượt thì ước tính nhận thêm bao nhiêu hồ sơ". Tỉ lệ lấy từ chính lịch sử của nhà tuyển dụng.
+function BudgetSim({ items, avg }: { items: BudgetItem[]; avg: number | null }) {
+  const [extra, setExtra] = useState(5);
+  const withRate = items.find((b) => b.remaining > 0 && b.estApplications != null);
+  const rate = withRate ? (withRate.estApplications as number) / withRate.remaining : avg;
+  if (rate == null || rate <= 0) return null;
+  const est = Math.round(extra * rate);
+  return (
+    <div className="mt-3 rounded-lg bg-surface-alt border border-border p-2.5 text-[13px]">
+      <label htmlFor="budget-extra" className="font-bold">Thử tính: nếu mua thêm</label>{' '}
+      <input
+        id="budget-extra"
+        type="number"
+        min={1}
+        max={500}
+        value={extra}
+        onChange={(e) => setExtra(Math.max(1, Math.min(500, Number(e.target.value) || 1)))}
+        className="tvl-input !w-20 inline-block mx-1"
+      />{' '}
+      lượt → ước tính thêm khoảng <b>{est} hồ sơ</b> <span className="text-ink-faint">(dựa trên mức nhận hồ sơ trước đây của bạn, chỉ mang tính tham khảo)</span>.
     </div>
   );
 }

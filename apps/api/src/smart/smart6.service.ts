@@ -189,4 +189,5 @@ export class Smart6Service {
     ];
     return { items, warnCount: items.filter((i) => i.level === 'warn').length };
   }
+
 }

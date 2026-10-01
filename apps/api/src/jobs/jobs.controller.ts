@@ -45,6 +45,12 @@ export class JobsController {
     return this.jobsService.districtFacets(province, query);
   }
 
+  // Đợt 89 — gợi ý chi tiết theo tỉnh đang chọn (khu công nghiệp, ngành nổi bật, lương trung vị, quận/huyện).
+  @Get('province-insights')
+  provinceInsights(@Query('province') province: string, @Query() query: ListJobsDto) {
+    return this.jobsService.provinceInsights(province, query);
+  }
+
   @Get('featured-employers')
   featuredEmployers() {
     return this.jobsService.featuredEmployers();

@@ -1,5 +1,6 @@
 'use client';
 
+import { ReplyTemplates } from '@/components/ReplyTemplates';
 import InterviewScheduler from '@/components/InterviewScheduler';
 import ApplicantBulkTools from '@/components/ApplicantBulkTools';
 import { Suspense, useEffect, useState, useCallback } from 'react';
@@ -663,6 +664,14 @@ function UngVienPageInner() {
                                   )}
                                 </div>
                               </>
+                            )}
+                            {view === 'active' && (
+                              <ReplyTemplates
+                                name={app.cv.candidateProfile?.fullName ?? app.cv.guestFullName ?? ''}
+                                job={jobs.find((j) => j.id === jobId)?.title ?? ''}
+                                company={jobs.find((j) => j.id === jobId)?.company?.name ?? ''}
+                                email={app.cv.guestEmail}
+                              />
                             )}
                             {view === 'active' && flagInfo?.flags[app.id] && (
                               <div className="mt-1 flex flex-col gap-0.5">

@@ -1,3 +1,4 @@
+import { normalizeSalaryFields, assertDistrictInProvinces } from '../common/job-normalize';
 import { LABOR_GROUPS, PERKS, SLOTS, slotsFor, LaborKind } from '../workers/labor-groups';
 import { cleanJobExtra } from '../workers/labor-extra';
 import { resolveWorkPlace } from '../workers/vn-geo';
@@ -335,6 +336,8 @@ export class EmployerService {
   // tạm thời tự động duyệt ở đợt 4. Tin sẽ hiển thị công khai trong tìm kiếm việc làm sau khi
   // Admin bấm Duyệt ở trang /admin/dashboard.
   async createJob(userId: string, dto: CreateJobDto) {
+    normalizeSalaryFields(dto);
+    assertDistrictInProvinces(dto.district, dto.provinces);
     const companyId = await this.getCompanyIdForUser(userId);
     const job = this.jobRepo.create({
       companyId,
@@ -405,6 +408,7 @@ export class EmployerService {
   // duyệt) dùng lại đúng 1 danh sách, không lệch nhau khi có trường mới.
   async updateJob(userId: string, jobId: string, dto: UpdateJobDto) {
     const job = await this.getOwnedJob(userId, jobId);
+    normalizeSalaryFields(dto);
     for (const key of JOB_EDITABLE_FIELDS) {
       if (Object.prototype.hasOwnProperty.call(dto, key)) {
         const value = (JOB_RICH_TEXT_FIELDS as readonly string[]).includes(key)
@@ -418,6 +422,7 @@ export class EmployerService {
       Object.assign(job, sanitizeChannel(dto));
       job.filledAt = null;
     }
+    if ('district' in dto || 'provinces' in dto) assertDistrictInProvinces(job.district, job.provinces as unknown as string[]);
     job.approvalStatus = JobApprovalStatus.PENDING;
     return this.jobRepo.save(job);
   }

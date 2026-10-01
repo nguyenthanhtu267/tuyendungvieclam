@@ -284,6 +284,11 @@ export const jobsApi = {
     const sep = qs ? '&' : '';
     return request<DistrictFacet[]>(`/jobs/district-facets?province=${encodeURIComponent(province)}${sep}${qs}`);
   },
+  // Đợt 89 — gợi ý chi tiết theo tỉnh: khu công nghiệp, ngành nổi bật, lương trung vị, quận/huyện.
+  provinceInsights: (province: string, params: JobListParams = {}) => {
+    const qs = buildJobQuery({ ...params, provinces: undefined, district: undefined } as JobListParams);
+    return request<ProvinceInsights | null>(`/jobs/province-insights?province=${encodeURIComponent(province)}${qs ? '&' + qs : ''}`);
+  },
   featuredEmployers: () => request<FeaturedEmployer[]>('/jobs/featured-employers'),
   // Đợt 12ab (24/09/2026) — "Đánh giá mức độ tương thích" (radar chart), chỉ ứng viên đã đăng nhập.
   getCompatibility: (token: string, id: string) =>
@@ -2923,3 +2928,12 @@ export const smartApi7 = {
   myReports: (token: string) => request<{ items: MyReport[] }>('/me/reports', { headers: authHeaders(token) }),
   health: (token: string) => request<{ items: WebHealthItem[]; warnCount: number }>('/admin/quality/health', { headers: authHeaders(token) }),
 };
+
+export interface ProvinceInsights {
+  province: string;
+  total: number;
+  medianSalary: number | null;
+  industries: { industry: string; count: number }[];
+  zones: { name: string; count: number; q: string }[];
+  districts: DistrictFacet[];
+}

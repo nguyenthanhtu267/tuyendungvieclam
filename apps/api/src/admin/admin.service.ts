@@ -1,3 +1,4 @@
+import { normalizeSalaryFields, assertDistrictInProvinces } from '../common/job-normalize';
 import { assessJobRisk, RISK_THRESHOLD } from './job-risk';
 import {
   BadRequestException,
@@ -521,6 +522,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   async adminUpdateJob(admin: AdminActor, id: string, dto: UpdateJobDto) {
     const job = await this.jobRepo.findOne({ where: { id } });
     if (!job) throw new NotFoundException('Không tìm thấy tin tuyển dụng');
+    normalizeSalaryFields(dto);
     for (const key of JOB_EDITABLE_FIELDS) {
       if (Object.prototype.hasOwnProperty.call(dto, key)) {
         const value = (JOB_RICH_TEXT_FIELDS as readonly string[]).includes(key)
@@ -1041,6 +1043,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       where: { id: companyId },
     });
     if (!company) throw new NotFoundException('Không tìm thấy công ty');
+    normalizeSalaryFields(dto);
+    assertDistrictInProvinces(dto.district, dto.provinces);
     const job = this.jobRepo.create({
       companyId,
       title: dto.title,

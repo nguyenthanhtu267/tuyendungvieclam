@@ -7,6 +7,8 @@ import { parseNaturalQuery } from '@/lib/nl-search';
 import SiteHeader from '@/components/SiteHeader';
 import { JobCard } from '@/components/JobCard';
 import { FilterBar } from '@/components/search/FilterBar';
+import { NearMe } from '@/components/search/NearMe';
+import { ProvinceInsights } from '@/components/search/ProvinceInsights';
 import { DistrictChips } from '@/components/search/DistrictChips';
 import { jobsApi, smartApi5, candidatesApi, applicationsApi, type JobFacets, type JobListParams, type JobListResponse, type DistrictFacet } from '@/lib/api';
 import { track } from '@/lib/analytics';
@@ -82,7 +84,7 @@ function JobSearchPage() {
   const visibleItems = onlyNew ? sortedItems.filter((j) => !seenIds.has(j.id) && !appliedIds.has(j.id)) : sortedItems;
   const hiddenCount = sortedItems.length - visibleItems.length;
   const [facets, setFacets] = useState<JobFacets | null>(null);
-  const [districts, setDistricts] = useState<DistrictFacet[]>([]);
+  const [districts, setDistricts] = useState<{ province: string; items: DistrictFacet[] }[]>([]);
   const [loading, setLoading] = useState(true);
   // Đợt 12i (21/09/2026) — "Địa điểm phổ biến" chỉ hiện Top 15-20 tỉnh nhiều tin nhất kèm nút
   // "Xem thêm", tránh liệt kê tràn lan hết ~63 tỉnh (giống careerviet.vn). Sau khi sửa lỗi đếm gộp
@@ -126,15 +128,24 @@ function JobSearchPage() {
   }, [searchParams]);
 
   useEffect(() => {
+    // Đợt 89 — chọn 1–3 tỉnh: mỗi tỉnh một hàng quận/huyện riêng (quá 3 tỉnh thì ẩn cho gọn).
     const provinces = filters.provinces;
-    if (!provinces || provinces.length !== 1) {
+    if (!provinces || provinces.length < 1 || provinces.length > 3) {
       setDistricts([]);
       return;
     }
-    jobsApi
-      .districtFacets(provinces[0], filters)
-      .then(setDistricts)
-      .catch(() => setDistricts([]));
+    let off = false;
+    Promise.all(
+      provinces.map((p) =>
+        jobsApi
+          .districtFacets(p, filters)
+          .then((items) => ({ province: p, items }))
+          .catch(() => ({ province: p, items: [] as DistrictFacet[] })),
+      ),
+    ).then((r) => !off && setDistricts(r.filter((x) => x.items.length > 0)));
+    return () => {
+      off = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
@@ -259,11 +270,22 @@ function JobSearchPage() {
           onSearchSubmit={handleSearchSubmit}
         />
 
-        {districts.length > 0 && (
+        {(filters.provinces?.length ?? 0) === 0 && <NearMe onPick={(provinces) => updateParams({ provinces })} />}
+        {districts.map((g) => (
           <DistrictChips
-            districts={districts}
+            key={g.province}
+            label={districts.length > 1 || (filters.provinces?.length ?? 0) > 1 ? g.province : undefined}
+            districts={g.items}
             selected={filters.district}
             onSelect={(d) => updateParams({ district: d })}
+          />
+        ))}
+        {filters.provinces?.length === 1 && (
+          <ProvinceInsights
+            province={filters.provinces[0]}
+            filters={filters}
+            onPickQuery={(q) => updateParams({ q })}
+            onPickIndustry={(i) => updateParams({ industries: [i] })}
           />
         )}
 

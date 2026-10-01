@@ -14,6 +14,8 @@
 // nằm trong file này — mỗi trang gọi nó (`nha-tuyen-dung/dang-tin`, `admin/sua-tin/[id]`,
 // `admin/dashboard` AddJobForm) tự quản lý state `form`/`step`, tự viết `onSubmit`, tự truyền chữ
 // hiển thị (`submitLabel`, `previewNote`...) — file này chỉ là phần GIAO DIỆN dùng chung.
+import { useEffect, useState } from 'react';
+import { workersApi } from '@/lib/api';
 import { lintJob } from '@/lib/job-lint';
 import JobQualityPanel from './JobQualityPanel';
 import JobForecastPanel from '@/components/JobForecastPanel';
@@ -46,7 +48,6 @@ const PROVINCE_GROUPS = [
 ];
 const INDUSTRY_GROUPS = [{ label: undefined, options: INDUSTRIES }];
 // Quận/huyện hiện chỉ có dữ liệu mẫu cho Hà Nội/Hồ Chí Minh — chỉ hiện ô nhập quận khi chọn tỉnh có hỗ trợ.
-const DISTRICT_SUPPORTED_PROVINCES = ['Hồ Chí Minh', 'Hà Nội'];
 const BENEFIT_SUGGESTIONS = ['Bảo hiểm sức khỏe', 'Thưởng KPI', 'Laptop', 'Du lịch hằng năm', 'Tăng lương định kỳ', 'Đào tạo chuyên môn'];
 
 function appendRichTextSuggestion(current: string, suggestion: string): string {
@@ -185,6 +186,21 @@ export function JobWizardSteps({
   onPickSavedLocation,
   rejectionInfo,
 }: JobWizardStepsProps) {
+  // Đợt 89 — danh sách quận/huyện của tỉnh đang chọn (gợi ý khi gõ + cảnh báo nếu nhập quận của tỉnh khác).
+  const [distOptions, setDistOptions] = useState<string[]>([]);
+  const prov1 = form.provinces.length === 1 ? form.provinces[0] : '';
+  useEffect(() => {
+    if (!prov1) {
+      setDistOptions([]);
+      return;
+    }
+    let off = false;
+    workersApi.districts(prov1).then((r) => !off && setDistOptions(r.items)).catch(() => !off && setDistOptions([]));
+    return () => {
+      off = true;
+    };
+  }, [prov1]);
+
   function canProceed(): boolean {
     if (step === 0) return form.title.trim().length > 0 && (form.channel === 'office' || !!form.laborGroup);
     return true;
@@ -380,14 +396,25 @@ export function JobWizardSteps({
                 </div>
               </Field>
             </div>
-            {form.provinces.length === 1 && DISTRICT_SUPPORTED_PROVINCES.includes(form.provinces[0]) && (
-              <Field label="Quận / Huyện" hint="không bắt buộc">
+            {form.provinces.length === 1 && (
+              <Field label="Quận / Huyện" hint="chọn đúng quận/huyện của tỉnh">
                 <input
                   className="tvl-input"
+                  list="job-district-list"
                   value={form.district}
                   onChange={(e) => setForm({ ...form, district: e.target.value })}
                   placeholder="VD: Quận 1"
                 />
+                <datalist id="job-district-list">
+                  {distOptions.map((d) => (
+                    <option key={d} value={d} />
+                  ))}
+                </datalist>
+                {form.district && distOptions.length > 0 && !distOptions.some((d) => d.toLowerCase() === form.district.trim().toLowerCase()) && (
+                  <div className="text-[12px] font-bold text-critical mt-1">
+                    “{form.district}” không thuộc {form.provinces[0]} — hãy chọn quận/huyện trong danh sách gợi ý.
+                  </div>
+                )}
               </Field>
             )}
             <Field label="Địa chỉ chi tiết" hint="không bắt buộc">
@@ -581,6 +608,11 @@ export function JobWizardSteps({
                     {issues.map((i, k) => (
                       <li key={k} className={`text-[12.5px] leading-snug ${i.level === 'high' ? 'text-critical font-bold' : 'text-[#7A4A00]'}`}>
                         {i.level === 'high' ? 'Nên sửa: ' : 'Gợi ý: '}{i.text}
+                        {i.fix && (
+                          <button type="button" onClick={() => setForm({ ...form, ...i.fix!(form) })} className="ml-2 rounded border border-primary text-primary font-bold px-1.5 py-0.5 text-[11.5px] hover:bg-primary-tint">
+                            {i.fixLabel ?? 'Áp dụng gợi ý'}
+                          </button>
+                        )}
                       </li>
                     ))}
                   </ul>

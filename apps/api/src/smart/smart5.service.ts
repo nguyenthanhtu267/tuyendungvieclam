@@ -1,3 +1,4 @@
+import { SQL_MILLIONS } from '../common/job-normalize';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -6,7 +7,7 @@ import { CandidateProfile } from '../database/entities/candidate-profile.entity'
 import { fold } from '../admin/job-risk';
 
 const FREE_MAIL = new Set(['gmail.com', 'yahoo.com', 'yahoo.com.vn', 'hotmail.com', 'outlook.com', 'live.com', 'icloud.com']);
-const MID = `(COALESCE(salary_min, salary_max) + salary_max)/2.0`;
+const MID = `(COALESCE(${SQL_MILLIONS('salary_min')}, ${SQL_MILLIONS('salary_max')}) + ${SQL_MILLIONS('salary_max')})/2.0`;
 
 // Đợt 78 — thông minh bằng quy tắc: kỹ năng đáng học, bản tin tuần, so sánh hồ sơ, cờ spam, tài khoản bất thường.
 @Injectable()

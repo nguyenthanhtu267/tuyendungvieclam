@@ -1,3 +1,5 @@
+import { SQL_MILLIONS, toMillions } from '../common/job-normalize';
+import { PROVINCE_ZONES } from '../common/province-info';
 import { oldDistricts } from '../workers/vn-geo';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -359,6 +361,57 @@ export class JobsService {
       .sort((a, b) => b.count - a.count || a.district.localeCompare(b.district, 'vi'));
   }
 
+  // Đợt 89 — "gợi ý chi tiết của tỉnh": khu công nghiệp / quận huyện / ngành nổi bật / lương trung vị của riêng tỉnh đang chọn.
+  async provinceInsights(province: string, query: ListJobsDto = {}) {
+    if (!province) return null;
+    const base = () => this.applyFilters(this.baseQuery(), { ...query, provinces: [province], district: undefined });
+    const cnt = async (qb: ReturnType<typeof base>) => Number((await qb.select('COUNT(*)', 'c').orderBy().getRawOne())?.c ?? 0);
+    const [total, inds, rows, districts] = await Promise.all([
+      cnt(base()),
+      base()
+        .select('job.industry', 'industry')
+        .addSelect('COUNT(*)', 'count')
+        .andWhere("job.industry IS NOT NULL AND job.industry <> ''")
+        .groupBy('job.industry')
+        .orderBy('count', 'DESC')
+        .limit(5)
+        .getRawMany(),
+      base()
+        .select('job.salaryMin', 'salaryMin')
+        .addSelect('job.salaryMax', 'salaryMax')
+        .andWhere('(job.salaryMin > 0 OR job.salaryMax > 0)')
+        .orderBy()
+        .limit(3000)
+        .getRawMany<{ salaryMin: number | null; salaryMax: number | null }>(),
+      this.districtFacets(province, query),
+    ]);
+    const mids = rows
+      .map((j) => {
+        const a = toMillions(j.salaryMin ?? j.salaryMax!)!;
+        const b = toMillions(j.salaryMax ?? j.salaryMin!)!;
+        return (a + b) / 2;
+      })
+      .filter((m) => m > 0 && m < 150)
+      .sort((x, y) => x - y);
+    const median = mids.length ? Math.round(mids[Math.floor(mids.length / 2)] * 10) / 10 : null;
+    const zones: { name: string; count: number; q: string }[] = [];
+    for (const z of PROVINCE_ZONES[province] ?? []) {
+      const conds = z.keys.map((_, i) => `(job.address ILIKE :zk${i} OR job.location ILIKE :zk${i} OR job.title ILIKE :zk${i})`).join(' OR ');
+      const params = Object.fromEntries(z.keys.map((k, i) => [`zk${i}`, `%${k}%`]));
+      const count = await cnt(base().andWhere(`(${conds})`, params));
+      zones.push({ name: z.name, count, q: z.keys[0] });
+    }
+    zones.sort((a, b) => b.count - a.count);
+    return {
+      province,
+      total,
+      medianSalary: median,
+      industries: inds.map((r) => ({ industry: r.industry as string, count: Number(r.count) })),
+      zones,
+      districts: districts.slice(0, 12),
+    };
+  }
+
   async featuredEmployers() {
     const companies = await this.companyRepo.find({
       where: { isFeaturedEmployer: true },
@@ -472,8 +525,8 @@ export class JobsService {
     const mids = (list: typeof rows) =>
       list
         .map((j) => {
-          const a = j.salaryMin ?? j.salaryMax!;
-          const b = j.salaryMax ?? j.salaryMin!;
+          const a = toMillions(j.salaryMin ?? j.salaryMax!)!;
+          const b = toMillions(j.salaryMax ?? j.salaryMin!)!;
           return (a + b) / 2;
         })
         .filter((v) => v > 0)
@@ -802,7 +855,7 @@ export class JobsService {
       this.jobRepo.query(
         `SELECT CASE WHEN m < 7 THEN 0 WHEN m < 10 THEN 1 WHEN m < 15 THEN 2 WHEN m < 25 THEN 3 WHEN m < 40 THEN 4 ELSE 5 END AS b,
                 COUNT(*)::int AS n
-           FROM (SELECT (COALESCE(salary_min, salary_max) + COALESCE(salary_max, salary_min)) / 2.0 AS m FROM job_postings
+           FROM (SELECT (COALESCE(${SQL_MILLIONS('salary_min')}, ${SQL_MILLIONS('salary_max')}) + COALESCE(${SQL_MILLIONS('salary_max')}, ${SQL_MILLIONS('salary_min')})) / 2.0 AS m FROM job_postings
                   WHERE approval_status = 'approved' AND is_paused = false AND COALESCE(salary_min, salary_max) > 0) t
           GROUP BY 1`,
       ),

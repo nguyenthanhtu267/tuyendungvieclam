@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { smartApi7, type WorthScore } from '@/lib/api';
 import { grossToNet } from '@/lib/salary-calc';
+import { toTrieu } from '@/lib/format';
 import { regionOfProvince } from '@/lib/region';
 
 const tone = { good: 'text-success border-success', fair: 'text-ink border-warning', poor: 'text-critical border-critical' } as const;
@@ -20,8 +21,19 @@ export default function JobWorthPanel({ jobId, salaryMin, salaryMax, province }:
     } catch { /* bỏ qua */ }
   }, [jobId]);
   const region = regionOfProvince(province);
-  const lo = salaryMin ? grossToNet({ gross: salaryMin * 1e6, dependents: dep, region }) : null;
-  const hi = salaryMax ? grossToNet({ gross: salaryMax * 1e6, dependents: dep, region }) : null;
+  const mn = toTrieu(salaryMin) ?? null;
+  const mx = toTrieu(salaryMax) ?? null;
+  const lo = mn ? grossToNet({ gross: mn * 1e6, dependents: dep, region }) : null;
+  const hi = mx ? grossToNet({ gross: mx * 1e6, dependents: dep, region }) : null;
+  // Đợt 89 — gợi ý mức lương nên xin: 3 mốc trong khung (mở đầu / mục tiêu / sàn chấp nhận) + lương thực nhận tương ứng.
+  const half = (v: number) => Math.round(v * 2) / 2;
+  const ask = (() => {
+    if (mn && mx && mx > mn) return { open: mx, target: half(mn + 0.65 * (mx - mn)), floor: half(mn + 0.3 * (mx - mn)) };
+    if (mx) return { open: mx, target: half(mx * 0.9), floor: half(mx * 0.8) };
+    if (mn) return { open: half(mn * 1.25), target: half(mn * 1.15), floor: mn };
+    return null;
+  })();
+  const askNet = (g: number) => fmt(grossToNet({ gross: g * 1e6, dependents: dep, region }).net);
   if (!w && !lo && !hi) return null;
   return (
     <div className="rounded-xl border border-border bg-white p-4 flex flex-col gap-2.5">
@@ -73,6 +85,17 @@ export default function JobWorthPanel({ jobId, salaryMin, salaryMax, province }:
               {[0, 1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
           </label>
+        </div>
+      )}
+      {ask && (
+        <div className="rounded-lg bg-surface-alt border border-border p-2.5 text-[12.5px]">
+          <div className="font-extrabold text-[12.5px] mb-1">Nên xin mức lương nào?</div>
+          <ul className="flex flex-col gap-0.5">
+            <li>Mở đầu thương lượng: <b>{ask.open} triệu</b> <span className="text-ink-muted">(thực nhận ~{askNet(ask.open)})</span></li>
+            <li>Mục tiêu hợp lý: <b>{ask.target} triệu</b> <span className="text-ink-muted">(thực nhận ~{askNet(ask.target)})</span></li>
+            <li>Sàn nên chấp nhận: <b>{ask.floor} triệu</b> <span className="text-ink-muted">(thực nhận ~{askNet(ask.floor)})</span></li>
+          </ul>
+          <div className="text-ink-faint mt-1">Gợi ý theo khung lương tin đăng; có kinh nghiệm/kỹ năng nổi bật thì nghiêng về mốc cao. Chỉ mang tính tham khảo.</div>
         </div>
       )}
     </div>

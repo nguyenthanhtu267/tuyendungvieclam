@@ -3,7 +3,13 @@
 export interface LintIssue {
   level: 'high' | 'warn';
   text: string;
+  // Đợt 89 — nút "Áp dụng gợi ý": trả về các trường cần đổi (người đăng vẫn xem lại được trước khi lưu).
+  fixLabel?: string;
+  fix?: (f: LintForm) => Partial<LintForm>;
 }
+const titleCase = (t: string) => t.toLowerCase().replace(/(^|\s)(\S)/g, (_m, a, b) => a + b.toUpperCase());
+const PHONE_RE = /(\+?84|0)\s?\d{2,3}[\s.]?\d{3}[\s.]?\d{3,4}/g;
+const BENEFIT_TEMPLATE = '<ul><li>Lương thưởng theo năng lực, xét tăng lương định kỳ</li><li>Đóng BHXH, BHYT, BHTN đầy đủ theo quy định</li><li>Môi trường làm việc thân thiện, được đào tạo và phát triển</li></ul>';
 const strip = (h: string) => (h || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
 export interface LintForm {
@@ -25,13 +31,13 @@ export function lintJob(f: LintForm): LintIssue[] {
   if (/thu nhập\s*(lên tới|trên)?\s*\d+\s*(tr|triệu)?\s*\/?\s*(ngày|tuần)|việc nhẹ lương cao|không cần kinh nghiệm.*lương\s*(cao|\d{2})/i.test(all))
     out.push({ level: 'warn', text: 'Cách nói "việc nhẹ lương cao" thường khiến ứng viên nghi ngờ. Hãy nêu rõ mức lương thật và điều kiện nhận.' });
   const letters = title.replace(/[^A-Za-zÀ-ỹ]/g, '');
-  if (letters.length > 6 && title === title.toUpperCase()) out.push({ level: 'warn', text: 'Chức danh viết HOA toàn bộ, nên viết thường để dễ đọc và không bị coi là spam.' });
-  if (/[!]{2,}|[$]{2,}|🔥{2,}/.test(title)) out.push({ level: 'warn', text: 'Chức danh có nhiều dấu chấm than/ký hiệu, nên bỏ.' });
+  if (letters.length > 6 && title === title.toUpperCase()) out.push({ level: 'warn', text: 'Chức danh viết HOA toàn bộ, nên viết thường để dễ đọc và không bị coi là spam.', fixLabel: 'Đổi sang Viết Hoa Chữ Đầu', fix: (x) => ({ title: titleCase(x.title) }) });
+  if (/[!]{2,}|[$]{2,}|🔥{2,}/.test(title)) out.push({ level: 'warn', text: 'Chức danh có nhiều dấu chấm than/ký hiệu, nên bỏ.', fixLabel: 'Bỏ ký hiệu thừa', fix: (x) => ({ title: x.title.replace(/[!$🔥]+/g, '').replace(/\\s+/g, ' ').trim() }) });
   if (strip(f.description).length < 80) out.push({ level: 'warn', text: 'Mô tả công việc còn ngắn (dưới 80 ký tự), ứng viên khó hình dung công việc.' });
   if (strip(f.requirements).length < 40) out.push({ level: 'warn', text: 'Yêu cầu ứng viên còn ngắn hoặc để trống.' });
   if (/(\+?84|0)\s?\d{2,3}[\s.]?\d{3}[\s.]?\d{3,4}/.test(strip(f.description)) || /\bzalo\b|@\w+\.\w+/i.test(strip(f.description)))
-    out.push({ level: 'warn', text: 'Mô tả đang chứa số điện thoại/email/Zalo. Hãy điền vào mục "Thông tin liên hệ" để không trùng và dễ ẩn/hiện.' });
-  if (strip(f.benefits).length < 20) out.push({ level: 'warn', text: 'Chưa có quyền lợi rõ ràng, tin có quyền lợi thường nhận nhiều đơn hơn.' });
+    out.push({ level: 'warn', text: 'Mô tả đang chứa số điện thoại/email/Zalo. Hãy điền vào mục "Thông tin liên hệ" để không trùng và dễ ẩn/hiện.', fixLabel: 'Xoá số điện thoại khỏi mô tả', fix: (x) => ({ description: x.description.replace(PHONE_RE, '').replace(/\\s{2,}/g, ' ') }) });
+  if (strip(f.benefits).length < 20) out.push({ level: 'warn', text: 'Chưa có quyền lợi rõ ràng, tin có quyền lợi thường nhận nhiều đơn hơn.', fixLabel: 'Thêm quyền lợi mẫu (sửa lại cho đúng thực tế)', fix: (x) => ({ benefits: (x.benefits || '') + BENEFIT_TEMPLATE }) });
   // Đợt 87 — kiểm tra mâu thuẫn giữa các trường (chỉ với tin văn phòng/chuyên môn)
   if (!f.channel || f.channel === 'office') {
     const lvl = f.level ?? '';
@@ -42,8 +48,8 @@ export function lintJob(f: LintForm): LintIssue[] {
     if (/không (cần|yêu cầu) kinh nghiệm|chưa có kinh nghiệm cũng/i.test(all) && HIGH_EXP.includes(exp)) out.push({ level: 'warn', text: 'Mô tả nói “không cần kinh nghiệm” nhưng mục Kinh nghiệm lại yêu cầu nhiều năm.' });
     const mn = Number(f.salaryMin) || 0;
     const mx = Number(f.salaryMax) || 0;
-    if (!f.negotiable && mn && mx && mn > mx) out.push({ level: 'high', text: 'Lương tối thiểu đang lớn hơn lương tối đa.' });
-    if (!f.negotiable && mn && mx && mx / mn > 3) out.push({ level: 'warn', text: `Khung lương quá rộng (${mn}–${mx} triệu), ứng viên khó tin — nên thu hẹp.` });
+    if (!f.negotiable && mn && mx && mn > mx) out.push({ level: 'high', text: 'Lương tối thiểu đang lớn hơn lương tối đa.', fixLabel: 'Đổi chỗ hai số', fix: (x) => ({ salaryMin: x.salaryMax, salaryMax: x.salaryMin }) });
+    if (!f.negotiable && mn && mx && mx / mn > 3) out.push({ level: 'warn', text: `Khung lương quá rộng (${mn}–${mx} triệu), ứng viên khó tin — nên thu hẹp.`, fixLabel: `Thu hẹp còn ${Math.ceil(mx / 2)}–${mx} triệu`, fix: () => ({ salaryMin: String(Math.ceil(mx / 2)) }) });
     if (!f.negotiable && (mx || mn) && isMgr && (mx || mn) < 12) out.push({ level: 'warn', text: 'Mức lương khá thấp so với cấp bậc quản lý — dễ ít người nộp.' });
     if (f.negotiable && /quản lý|điều hành/i.test(lvl) === false && !mn && !mx) out.push({ level: 'warn', text: 'Chọn “Thoả thuận” — tin ghi rõ lương thường nhận nhiều đơn hơn.' });
   }

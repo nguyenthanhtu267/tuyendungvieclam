@@ -7,10 +7,12 @@ export function DistrictChips({
   districts,
   selected,
   onSelect,
+  label,
 }: {
   districts: { district: string; count: number }[];
   selected?: string;
   onSelect: (district: string | undefined) => void;
+  label?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -22,6 +24,7 @@ export function DistrictChips({
 
   return (
     <div className="flex items-center gap-1.5 mt-2.5">
+      {label && <span className="shrink-0 text-[11.5px] font-extrabold text-primary">{label}:</span>}
       <div ref={scrollRef} className="flex gap-1.5 overflow-x-auto scroll-smooth py-0.5 flex-1 no-scrollbar">
         {districts.map((d) => (
           <button

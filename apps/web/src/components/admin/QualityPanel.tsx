@@ -130,6 +130,33 @@ export function QualityPanel({ token }: { token: string }) {
             <div className="font-extrabold text-[13.5px] mb-1">Nhận xét tự động</div>
             <ul className="list-disc pl-5 text-[13px] leading-relaxed">{weekly.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>
           </div>
+          {health.some((h) => h.level === 'warn') && (
+            <div className="rounded-xl bg-warning-tint border border-warning p-3">
+              <div className="font-extrabold text-[13.5px] mb-1">Việc cần xử lý tuần này</div>
+              <ul className="list-disc pl-5 text-[13px] leading-relaxed">
+                {health.filter((h) => h.level === 'warn').map((h) => <li key={h.key}><b>{h.n}</b> — {h.label}. <span className="text-ink-muted">{h.hint}</span></li>)}
+              </ul>
+            </div>
+          )}
+          <button
+            type="button"
+            className="self-start rounded-lg border border-primary text-primary font-bold text-[13px] px-3 py-1.5 hover:bg-primary-tint"
+            onClick={() => {
+              const txt = [
+                `BÁO CÁO TUẦN — ${new Date().toLocaleDateString('vi-VN')}`,
+                ...weekly.metrics.map((m) => `• ${m.label}: ${m.cur} (${m.changePct >= 0 ? '+' : ''}${m.changePct}% so với tuần trước, ${m.prev})`),
+                '',
+                'Nhận xét:',
+                ...weekly.notes.map((n) => `- ${n}`),
+                '',
+                'Việc cần xử lý:',
+                ...health.filter((h) => h.level === 'warn').map((h) => `- ${h.n} — ${h.label}`),
+              ].join('\n');
+              navigator.clipboard?.writeText(txt).then(() => alert('Đã sao chép báo cáo tuần — dán vào email/Zalo để gửi.')).catch(() => undefined);
+            }}
+          >
+            📋 Sao chép báo cáo để gửi
+          </button>
         </div>
       )}
       {sub === 'ads' && (

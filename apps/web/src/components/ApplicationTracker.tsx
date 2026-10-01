@@ -91,6 +91,12 @@ export default function ApplicationTracker({ applications }: { applications: App
                     </div>
                   </Link>
                     {a.interviewAt && new Date(a.interviewAt).getTime() > Date.now() && <CalendarButtons a={a} />}
+                    {a.status === 'new' && !a.viewedAt && days >= 7 && (
+                      <div className="rounded border border-warning bg-warning-tint text-[11.5px] text-[#7A4A00] px-1.5 py-1">
+                        Sau {days} ngày nhà tuyển dụng chưa xem. Đừng chờ một nơi —{' '}
+                        <Link href={`/viec-lam?q=${encodeURIComponent(a.jobPosting.title)}`} className="font-bold underline">nộp thêm tin tương tự</Link>.
+                      </div>
+                    )}
                   </div>
                 );
               })}

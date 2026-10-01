@@ -35,6 +35,13 @@ import { AdSlot } from '@/components/ads/AdSlot';
 
 // Đợt 12m (21/09/2026) — hiển thị lại tiêu chí "Tìm kiếm đã lưu" và dựng lại URL /viec-lam tương
 // ứng (đối xứng với cách viec-lam/page.tsx đọc query params thành filters).
+// Đợt 89 — số ngày còn lại tới hạn nộp (âm = đã hết hạn; null = không có hạn).
+function daysLeft(deadline?: string | null): number | null {
+  if (!deadline) return null;
+  const end = new Date(deadline.slice(0, 10) + 'T23:59:59').getTime();
+  return Math.floor((end - Date.now()) / 86400000);
+}
+
 function describeSavedSearch(criteria: Record<string, unknown>): string {
   const q = typeof criteria.q === 'string' ? criteria.q : '';
   const industries = Array.isArray(criteria.industries) ? (criteria.industries as string[]) : [];
@@ -336,7 +343,18 @@ export default function MyCenterPage() {
                   <div className="text-[12.5px] text-ink-muted py-4">Bạn chưa lưu việc làm nào.</div>
                 ) : (
                   <div className="flex flex-col">
-                    {savedJobs.map((sj) => (
+                    {(() => {
+                      const n = savedJobs.filter((x) => { const d = daysLeft(x.jobPosting.deadline); return d !== null && d <= 3; }).length;
+                      return n > 0 ? (
+                        <div className="rounded-md bg-warning-tint border border-warning text-[12px] font-bold text-[#7A4A00] px-2.5 py-1.5 mb-1">
+                          ⏰ {n} việc đã lưu sắp hết hạn (≤ 3 ngày) hoặc đã hết hạn — nộp sớm hoặc xem việc tương tự.
+                        </div>
+                      ) : null;
+                    })()}
+                    {savedJobs.map((sj) => {
+                      const dl = daysLeft(sj.jobPosting.deadline);
+                      const urgent = dl !== null && dl <= 3;
+                      return (
                       <div
                         key={sj.id}
                         className="flex items-center justify-between gap-2 py-2.5 border-b border-border last:border-0"
@@ -346,6 +364,13 @@ export default function MyCenterPage() {
                             {sj.jobPosting.title}
                           </Link>
                           <div className="text-ink-faint text-[11.3px] truncate">{sj.jobPosting.company.name}</div>
+                          {urgent && (
+                            <div className="text-[11.5px] font-bold text-critical">
+                              {dl! < 0 ? 'Đã hết hạn' : dl === 0 ? 'Hết hạn hôm nay' : `Còn ${dl} ngày`}
+                              {' · '}
+                              <Link href={`/viec-lam?q=${encodeURIComponent(sj.jobPosting.title)}`} className="text-primary hover:underline">Xem việc tương tự</Link>
+                            </div>
+                          )}
                         </div>
                         <button
                           onClick={async () => {
@@ -357,7 +382,8 @@ export default function MyCenterPage() {
                           Bỏ lưu
                         </button>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
