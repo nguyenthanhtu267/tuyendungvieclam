@@ -3,7 +3,10 @@
 import { DAYS, DAY_LABEL, PARTS, PART_LABEL } from '@/lib/labor';
 
 // Đợt 80 — lưới thứ × buổi: lịch rảnh của sinh viên / ca cần người của tin sinh viên.
-export function ScheduleGrid({ value, onChange, idPrefix }: { value: string[]; onChange: (v: string[]) => void; idPrefix: string }) {
+/** `allowed`: chỉ cho chọn các ô này (thực tập sinh: giờ hành chính, không có buổi tối/Chủ nhật). */
+export function ScheduleGrid({ value, onChange, idPrefix, allowed }: { value: string[]; onChange: (v: string[]) => void; idPrefix: string; allowed?: string[] }) {
+  const days = allowed ? DAYS.filter((d) => allowed.some((s) => s.startsWith(`${d}-`))) : DAYS;
+  const parts = allowed ? PARTS.filter((p) => allowed.some((s) => s.endsWith(`-${p}`))) : PARTS;
   const toggle = (s: string) => onChange(value.includes(s) ? value.filter((x) => x !== s) : [...value, s]);
   return (
     <div className="overflow-x-auto">
@@ -11,17 +14,18 @@ export function ScheduleGrid({ value, onChange, idPrefix }: { value: string[]; o
         <thead>
           <tr>
             <th />
-            {DAYS.map((d) => (
+            {days.map((d) => (
               <th key={d} className="font-bold text-ink px-1">{DAY_LABEL[d]}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {PARTS.map((p) => (
+          {parts.map((p) => (
             <tr key={p}>
               <th className="font-bold text-ink text-left pr-1">{PART_LABEL[p]}</th>
-              {DAYS.map((d) => {
+              {days.map((d) => {
                 const s = `${d}-${p}`;
+                if (allowed && !allowed.includes(s)) return <td key={s}><div className="w-9 h-8 rounded-md bg-surface-alt" aria-hidden /></td>;
                 const on = value.includes(s);
                 return (
                   <td key={s}>

@@ -41,3 +41,23 @@ export function estimateIncome(pay?: { base: number; otHours?: number; nightHour
   const r = (v: number) => Math.round(v * 10) / 10;
   return { base: r(pay.base), ot: r(ot), night: r(night), allowance: r(allowance), gross: r(gross), insurance: r(insurance), net: r(gross - insurance), otHours: pay.otHours ?? 0, nightHours: pay.nightHours ?? 0 };
 }
+
+// ---------- Đợt 84 — quy tắc riêng từng nhóm ----------
+export type LaborKind = 'worker' | 'student' | 'intern';
+/** Ca làm "có thể đi": sinh viên chỉ có ca cuối tuần/linh hoạt (buổi tối đã nằm trong lưới lịch); thực tập sinh dùng "thời gian thực tập" thay vì ca. */
+export const SHIFTS_BY_KIND: Record<LaborKind, string[]> = { worker: SHIFTS, student: ['Cuối tuần', 'Theo giờ linh hoạt'], intern: [] };
+/** Ô lịch được phép theo nhóm: thực tập sinh làm giờ hành chính — T2–T6 sáng/chiều + T7 sáng, không có buổi tối và Chủ nhật. */
+export const INTERN_SLOTS = [...['t2', 't3', 't4', 't5', 't6'].flatMap((d) => [`${d}-sang`, `${d}-chieu`]), 't7-sang'];
+export const slotsFor = (kind: LaborKind): string[] => (kind === 'intern' ? INTERN_SLOTS : kind === 'student' ? SLOTS : []);
+export const CERTS = ['a1', 'b2', 'c', 'forklift', 'welding'];
+export const EXPERIENCE = ['none', 'lt1', 'gte1'];
+/** Việc nặng nhọc/độc hại/nguy hiểm — người chưa đủ 18 tuổi không được làm (Bộ luật Lao động 2019). */
+export const MINOR_HEAVY_GROUPS = ['Xây dựng', 'Cơ khí - Hàn - Tiện', 'Bảo vệ', 'Kho vận - Bốc xếp', 'Chế biến thực phẩm', 'Lái xe - Giao hàng', 'Giao hàng'];
+export function minorUnsafeReason(j: { laborGroup?: string | null; title?: string | null; description?: string | null; payInfo?: { nightHours?: number } | null }): string | null {
+  if (j.laborGroup && MINOR_HEAVY_GROUPS.includes(j.laborGroup)) return `Nhóm việc “${j.laborGroup}” có thể nặng nhọc/nguy hiểm — không dành cho người chưa đủ 18 tuổi`;
+  if ((j.payInfo?.nightHours ?? 0) > 0) return 'Có làm đêm — người chưa đủ 18 tuổi không được làm đêm';
+  const t = `${j.title ?? ''} ${(j.description ?? '').replace(/<[^>]*>/g, ' ')}`.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
+  if (/ca dem|lam dem|nang nhoc|doc hai|bốc vác|boc vac/.test(t)) return 'Tin nêu ca đêm/việc nặng nhọc — người chưa đủ 18 tuổi không được làm';
+  return null;
+}
+export const ageOf = (birth: string | Date) => Math.floor((Date.now() - new Date(birth).getTime()) / (365.25 * 864e5));

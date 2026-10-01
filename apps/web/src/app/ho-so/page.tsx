@@ -1021,7 +1021,7 @@ function SettingsSection({
               [
                 ['locked', '🔒 Khoá', 'NTD không tìm thấy hồ sơ'],
                 ['public', '🌐 Công khai', 'NTD tìm thấy hồ sơ bình thường'],
-                ['urgent', '⚡ URGENT', 'Ưu tiên hiện trước trong kết quả tìm kiếm NTD'],
+                ['urgent', '⚡ Khẩn cấp', 'Ưu tiên hiện trước trong kết quả tìm kiếm NTD'],
               ] as [CandidateProfile['visibility'], string, string][]
             ).map(([value, label, desc]) => (
               <button

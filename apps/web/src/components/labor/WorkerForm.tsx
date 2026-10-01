@@ -3,14 +3,16 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { workersApi, type WorkerInput, type WorkerJobCard, type WorkerKind, type WorkerProfileView } from '@/lib/api';
-import { GENDER_LABEL, KIND_LABEL, KIND_SELF, KIND_SLUG, LABOR_GROUPS, RADII, SHIFTS, ago, fmtDateTime, guessGroups, normalizePhone, placeText, slotText } from '@/lib/labor';
+import { workersApi, type ProfileExtra, type WorkerInput, type WorkerJobCard, type WorkerKind, type WorkerProfileView } from '@/lib/api';
+import { GENDER_LABEL, KIND_LABEL, KIND_SELF, KIND_SLUG, LABOR_GROUPS, RADII, ago, fmtDateTime, guessGroups, normalizePhone, placeText, slotText } from '@/lib/labor';
 import { AddressPicker, EMPTY_ADDRESS, type AddressValue } from './AddressPicker';
 import { DateSelect, isFullDate } from './DateSelect';
 import { LaborJobList } from './LaborJobList';
 import { rememberWorker, snapOf, snapParams } from './WorkerCreds';
 import { ScheduleGrid } from './ScheduleGrid';
 import { markWorker } from './RefreshReminder';
+import { KindFields } from './KindFields';
+import { profileWarnings } from '@/lib/labor-extra';
 
 interface FormState {
   kind: WorkerKind;
@@ -31,18 +33,19 @@ interface FormState {
   major: string;
   needsHousing: boolean;
   needsShuttle: boolean;
+  extra: ProfileExtra;
   isSeeking: boolean;
   consent: boolean;
 }
 const blank = (kind: WorkerKind): FormState => ({
   kind, fullName: '', phone: '', relativePhone: '', gender: '', birthDate: '', address: EMPTY_ADDRESS, addressDetail: '', radiusKm: null,
-  lat: null, lon: null, desiredJobs: [], shifts: [], availability: [], school: '', major: '', needsHousing: false, needsShuttle: false, isSeeking: true, consent: false,
+  lat: null, lon: null, desiredJobs: [], shifts: [], availability: [], school: '', major: '', needsHousing: false, needsShuttle: false, extra: {}, isSeeking: true, consent: false,
 });
 const fromProfile = (p: WorkerProfileView): FormState => ({
   kind: p.kind, fullName: p.fullName, phone: p.phone, relativePhone: p.relativePhone ?? '', gender: p.gender, birthDate: p.birthDate,
   address: { province: p.province, addressMode: p.addressMode, oldDistrict: p.oldDistrict ?? '', oldWard: p.oldWard ?? '', newWardCode: p.addressMode === 'new' ? p.newWardCode ?? '' : '', newWardName: p.addressMode === 'new' ? p.newWard ?? '' : '' },
   addressDetail: p.addressDetail ?? '', radiusKm: p.radiusKm, lat: p.lat, lon: p.lon, desiredJobs: p.desiredJobs, shifts: p.shifts, availability: p.availability ?? [], school: p.school ?? '',
-  major: p.major ?? '', needsHousing: p.needsHousing, needsShuttle: p.needsShuttle, isSeeking: p.isSeeking, consent: true,
+  major: p.major ?? '', needsHousing: p.needsHousing, needsShuttle: p.needsShuttle, extra: p.extra ?? {}, isSeeking: p.isSeeking, consent: true,
 });
 
 /** Đợt 81 — độ đầy đủ hồ sơ + gợi ý bổ sung để được nhà tuyển dụng gọi nhiều hơn. */
@@ -211,7 +214,7 @@ export function WorkerForm({ initialKind }: { initialKind: WorkerKind }) {
       province: f.address.province, addressMode: f.address.addressMode, oldDistrict: f.address.oldDistrict || undefined, oldWard: f.address.oldWard || undefined,
       newWardCode: f.address.newWardCode || undefined, addressDetail: f.addressDetail.trim() || undefined, lat: f.lat, lon: f.lon, radiusKm: f.radiusKm,
       desiredJobs: f.desiredJobs, shifts: f.shifts, availability: f.kind === 'worker' ? [] : f.availability, school: f.school.trim() || undefined, major: f.major.trim() || undefined, needsHousing: f.needsHousing,
-      needsShuttle: f.needsShuttle, isSeeking: f.isSeeking, consent: f.consent, verifyBirthDate: old ? verifyBirth || old.birthDate : undefined,
+      needsShuttle: f.needsShuttle, extra: f.extra, isSeeking: f.isSeeking, consent: f.consent, verifyBirthDate: old ? verifyBirth || old.birthDate : undefined,
     };
     setBusy(true);
     try {
@@ -280,6 +283,7 @@ export function WorkerForm({ initialKind }: { initialKind: WorkerKind }) {
   }
 
   const groups = LABOR_GROUPS[f.kind];
+  const warnings = profileWarnings(f.kind, f.birthDate, f.extra, f.availability);
   const showRest = phoneStatus !== 'exists' && !(phoneStatus === 'verified' && !editing);
   const lbl = 'flex flex-col gap-1 text-[14px] font-bold text-ink';
   const chip = (on: boolean) => `rounded-full border px-3 py-1.5 text-[13.5px] font-bold ${on ? 'border-primary bg-primary text-white' : 'border-border-strong bg-white text-ink'}`;
@@ -446,37 +450,7 @@ export function WorkerForm({ initialKind }: { initialKind: WorkerKind }) {
             </div>
           </div>
 
-          <div className={lbl}>
-            Ca làm có thể đi <span className="font-normal text-[12.5px] text-ink-muted">(không bắt buộc)</span>
-            <div className="flex flex-wrap gap-1.5">
-              {SHIFTS.map((s) => {
-                const on = f.shifts.includes(s);
-                return (
-                  <button key={s} type="button" className={chip(on)} onClick={() => set({ shifts: on ? f.shifts.filter((x) => x !== s) : [...f.shifts, s] })}>{s}</button>
-                );
-              })}
-            </div>
-          </div>
-
-          {f.kind !== 'worker' && (
-            <div className={lbl}>
-              Lịch rảnh trong tuần <span className="font-normal text-[12.5px] text-ink-muted">(không bắt buộc — để gợi ý việc hợp lịch học)</span>
-              <ScheduleGrid value={f.availability} onChange={(v) => set({ availability: v })} idPrefix="wk-avail" />
-              {f.availability.length > 0 && <span className="font-normal text-[12.5px] text-ink-muted">{slotText(f.availability)}</span>}
-            </div>
-          )}
-          {f.kind !== 'worker' && (
-            <div className="grid sm:grid-cols-2 gap-3">
-              <label className={lbl} htmlFor="wk-school">
-                Trường đang học (không bắt buộc)
-                <input id="wk-school" className="tvl-input font-normal" value={f.school} onChange={(e) => set({ school: e.target.value })} />
-              </label>
-              <label className={lbl} htmlFor="wk-major">
-                Ngành học (không bắt buộc)
-                <input id="wk-major" className="tvl-input font-normal" value={f.major} onChange={(e) => set({ major: e.target.value })} />
-              </label>
-            </div>
-          )}
+          <KindFields v={{ kind: f.kind, shifts: f.shifts, availability: f.availability, school: f.school, major: f.major, extra: f.extra }} onChange={(p) => set(p as Partial<FormState>)} />
 
           <div className="flex flex-wrap gap-x-5 gap-y-2 text-[14px] text-ink">
             <label className="flex items-center gap-2" htmlFor="wk-house"><input id="wk-house" type="checkbox" className="w-4 h-4" checked={f.needsHousing} onChange={(e) => set({ needsHousing: e.target.checked })} />Cần chỗ ở / ký túc xá</label>
@@ -493,6 +467,12 @@ export function WorkerForm({ initialKind }: { initialKind: WorkerKind }) {
             </label>
           )}
 
+          {warnings.length > 0 && (
+            <div className="rounded-lg border border-warning bg-white p-2.5 text-[13.5px] text-ink" role="status">
+              <b>Bạn kiểm tra lại giúp nhé</b> (vẫn lưu được):
+              <ul className="list-disc pl-5">{warnings.map((w) => <li key={w}>{w}</li>)}</ul>
+            </div>
+          )}
           <Completeness f={f} />
           {err && <div className="rounded-lg border border-critical bg-white p-2 text-[14px] text-critical font-bold">{err}</div>}
           <button type="submit" disabled={busy || phoneStatus === 'checking'} className="tvl-btn-accent !text-[16px] !py-3">

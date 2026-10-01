@@ -127,6 +127,9 @@ export class CreateJobDto {
   @IsArray()
   laborSchedule?: string[] | null;
 
+  @IsOptional()
+  laborExtra?: Record<string, unknown> | null;
+
   // Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc), theo mẫu careerviet.vn.
   @IsOptional()
   @IsString()

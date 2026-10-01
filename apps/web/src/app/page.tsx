@@ -12,7 +12,6 @@ import { RecommendedJobs } from '@/components/RecommendedJobs';
 import ContinueBlock from '@/components/ContinueBlock';
 import { jobsApi, type JobFacets, type JobPosting, type FeaturedEmployer, type HomepageStats } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { PINNED_PROVINCES } from '@/lib/catalogs';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { formatNumber } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
@@ -137,7 +136,7 @@ export default function Home() {
               </div>
               <div className="flex items-center gap-2 flex-wrap text-[11.5px]">
                 <span className="text-ink-faint">{t('home.featured')}</span>
-                {PINNED_PROVINCES.map((p) => (
+                {['Hà Nội', 'Bắc Ninh', 'Đà Nẵng', 'Hồ Chí Minh'].map((p) => (
                   <button
                     key={p}
                     type="button"
@@ -153,6 +152,14 @@ export default function Home() {
                   className="font-semibold px-2.5 py-1 rounded-full border border-critical/40 text-critical hover:border-critical transition-colors"
                 >
                   {t('home.urgentJobs')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push('/viec-lam?salaryTier=50')}
+                  title="Việc làm lương từ 50 triệu trở lên"
+                  className="font-semibold px-2.5 py-1 rounded-full border border-[#C99A00] bg-[#FFD84D] text-[#5A3A00] hover:brightness-95 transition-colors"
+                >
+                  ★ Cao cấp
                 </button>
               </div>
               {/* Đợt 79 — 3 lối vào kênh lao động phổ thông (không bắt buộc đăng nhập) */}

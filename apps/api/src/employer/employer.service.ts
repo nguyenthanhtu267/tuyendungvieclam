@@ -1,4 +1,5 @@
-import { LABOR_GROUPS, PERKS, SLOTS } from '../workers/labor-groups';
+import { LABOR_GROUPS, PERKS, SLOTS, slotsFor, LaborKind } from '../workers/labor-groups';
+import { cleanJobExtra } from '../workers/labor-extra';
 import { resolveWorkPlace } from '../workers/vn-geo';
 import { applyCompanyProfileFields } from '../common/company-profile-fields';
 import {
@@ -52,12 +53,12 @@ const LEGAL_DOC_MAX_BYTES = 3 * 1024 * 1024; // 3MB — theo Mục 9 SRS
 
 // Đợt 78 — chuẩn hoá câu hỏi sàng lọc: tối đa 3 câu, 5–150 ký tự, đáp án mong muốn yes/no/any.
 // Đợt 79/80 — kênh tin + các trường riêng của tin lao động phổ thông (chỉ giữ khi kênh khác "office").
-export function sanitizeChannel(dto: { channel?: string; laborGroup?: string | null; workPlace?: unknown; laborPerks?: unknown; payInfo?: unknown; laborSchedule?: unknown }) {
+export function sanitizeChannel(dto: { channel?: string; laborGroup?: string | null; workPlace?: unknown; laborPerks?: unknown; payInfo?: unknown; laborSchedule?: unknown; laborExtra?: unknown }) {
   const ch = ['worker', 'student', 'intern'].includes(String(dto.channel)) ? String(dto.channel) : 'office';
-  if (ch === 'office') return { channel: 'office', laborGroup: null, workPlace: null, laborPerks: null, payInfo: null, laborSchedule: null };
+  if (ch === 'office') return { channel: 'office', laborGroup: null, workPlace: null, laborPerks: null, payInfo: null, laborSchedule: null, laborExtra: null };
   const groups = LABOR_GROUPS[ch as 'worker'];
   const perks = Array.isArray(dto.laborPerks) ? dto.laborPerks.filter((x) => PERKS.includes(String(x))).map(String) : [];
-  const sched = Array.isArray(dto.laborSchedule) ? dto.laborSchedule.filter((x) => SLOTS.includes(String(x))).map(String) : [];
+  const sched = Array.isArray(dto.laborSchedule) ? dto.laborSchedule.filter((x) => (ch === 'intern' ? slotsFor('intern') : SLOTS).includes(String(x))).map(String) : [];
   const pi = (dto.payInfo ?? null) as Record<string, unknown> | null;
   const n = (v: unknown, max: number) => {
     const x = Number(v);
@@ -71,6 +72,7 @@ export function sanitizeChannel(dto: { channel?: string; laborGroup?: string | n
     laborPerks: perks.length ? perks : null,
     payInfo,
     laborSchedule: sched.length ? sched : null,
+    laborExtra: cleanJobExtra(ch as LaborKind, dto.laborExtra),
   };
 }
 
@@ -317,6 +319,7 @@ export class EmployerService {
       laborPerks: job.laborPerks,
       payInfo: job.payInfo,
       laborSchedule: job.laborSchedule,
+      laborExtra: job.laborExtra,
       contactName: job.contactName,
       contactEmail: job.contactEmail,
       contactPhone: job.contactPhone,

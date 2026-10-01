@@ -143,3 +143,14 @@ export function guessGroups(text: string, kind?: WorkerKind): string[] {
 }
 
 export const fmtM = (v: number) => `${v.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} triệu`;
+
+// ---------------- Đợt 84 — quy tắc riêng từng nhóm (khớp apps/api/src/workers/labor-groups.ts) ----------------
+export const SHIFTS_BY_KIND: Record<WorkerKind, string[]> = { worker: SHIFTS, student: ['Cuối tuần', 'Theo giờ linh hoạt'], intern: [] };
+/** Thực tập sinh làm giờ hành chính: T2–T6 sáng/chiều + T7 sáng, không có buổi tối và Chủ nhật. */
+export const INTERN_SLOTS = [...['t2', 't3', 't4', 't5', 't6'].flatMap((d) => [`${d}-sang`, `${d}-chieu`]), 't7-sang'];
+export const CERT_LABEL: Record<string, string> = { a1: 'Bằng A1', b2: 'Bằng B2', c: 'Bằng C', forklift: 'Chứng chỉ xe nâng', welding: 'Chứng chỉ hàn' };
+export const EXPERIENCE_LABEL: Record<string, string> = { none: 'Chưa có kinh nghiệm', lt1: 'Dưới 1 năm', gte1: 'Từ 1 năm trở lên' };
+export const HOURS_LABEL: Record<string, string> = { lt15: 'Dưới 15 giờ/tuần', '15-25': '15–25 giờ/tuần', gt25: 'Trên 25 giờ/tuần' };
+export const MONTHS_OPTIONS = [1, 2, 3, 6];
+export const MINOR_HEAVY_GROUPS = ['Xây dựng', 'Cơ khí - Hàn - Tiện', 'Bảo vệ', 'Kho vận - Bốc xếp', 'Chế biến thực phẩm', 'Lái xe - Giao hàng', 'Giao hàng'];
+export const ageOfBirth = (bd: string) => Math.floor((Date.now() - new Date(bd).getTime()) / (365.25 * 864e5));

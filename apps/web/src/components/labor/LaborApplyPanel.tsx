@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { workersApi, type ApplyResult, type JobPosting, type LaborIncome, type WorkerKind } from '@/lib/api';
+import { workersApi, type WorkerJobCard, type ApplyResult, type JobPosting, type LaborIncome, type WorkerKind } from '@/lib/api';
 import { KIND_LABEL, KIND_SLUG, PERK_LABEL, fmtM, slotText } from '@/lib/labor';
 import { ShareButtons } from './ShareButtons';
 import { GroupInvite } from './GroupInvite';
 import { WorkerCredsBox, useWorkerApply, whoOf } from './WorkerCreds';
-import { introText } from './LaborJobList';
+import { LaborJobList, TrustBadge, introText } from './LaborJobList';
+import { interviewChecklist } from '@/lib/labor-extra';
 import { useSavedJobs } from './saved';
 import { RefreshReminder } from './RefreshReminder';
+import { AnswerTips, FitBox, extraLines } from './JobExtraBlocks';
 
 // Đợt 79/80 — tin kênh phổ thông: ứng tuyển nhanh bằng SĐT, nơi làm việc, quyền lợi, thu nhập ước tính,
 // tiến độ đủ người, rủ bạn đi làm cùng (?nhom=MÃ), chia sẻ.
@@ -19,6 +21,8 @@ export function LaborApplyPanel({ job, inviteCode }: { job: JobPosting; inviteCo
   const [res, setRes] = useState<ApplyResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [prog, setProg] = useState<{ headcount: number; hired: number; filled: boolean; income: LaborIncome | null } | null>(null);
+  const [card, setCard] = useState<WorkerJobCard | null>(null);
+  const [similar, setSimilar] = useState<WorkerJobCard[]>([]);
   const saved = useSavedJobs();
   const [copied, setCopied] = useState(false);
   const [rep, setRep] = useState<{ open: boolean; reason: string; note: string; done: boolean; err: string }>({ open: false, reason: 'scam', note: '', done: false, err: '' });
@@ -26,6 +30,7 @@ export function LaborApplyPanel({ job, inviteCode }: { job: JobPosting; inviteCo
 
   useEffect(() => {
     workersApi.progress(job.id).then(setProg).catch(() => undefined);
+    workersApi.cards([job.id]).then((r) => setCard(r.items[0] ?? null)).catch(() => undefined);
     if (inviteCode) workersApi.groupInfo(job.id, inviteCode).then(setInvite).catch(() => undefined);
   }, [job.id, inviteCode]);
 
@@ -69,6 +74,10 @@ export function LaborApplyPanel({ job, inviteCode }: { job: JobPosting; inviteCo
       setRep((r) => ({ ...r, err: (e as Error).message }));
     }
   }
+  useEffect(() => {
+    if (prog?.filled) workersApi.similar(job.id).then((r) => setSimilar(r.items)).catch(() => undefined);
+  }, [prog?.filled, job.id]);
+  const wageWarn = (card?.warnings ?? []).filter((x) => /lương tối thiểu/i.test(x));
   const wp = job.workPlace;
   const place = wp ? [wp.mode === 'new' ? wp.newWard : wp.oldWard, wp.mode === 'old' ? wp.oldDistrict : null, wp.province].filter(Boolean).join(', ') : null;
   const inc = prog?.income;
@@ -81,6 +90,12 @@ export function LaborApplyPanel({ job, inviteCode }: { job: JobPosting; inviteCo
         <span className="rounded-full bg-[#FFD84D] text-[#C8102E] font-extrabold text-[12.5px] px-2.5 py-1 uppercase">Tin tuyển {KIND_LABEL[channel].toLowerCase()}</span>
       </div>
 
+      {card?.trust && <div><TrustBadge t={card.trust} /></div>}
+      {wageWarn.length > 0 && (
+        <div role="alert" className="rounded-lg border border-critical bg-critical-tint px-3 py-2 text-[13.5px] font-bold text-critical">
+          Cảnh báo lương: {wageWarn.join('; ')}. Mức thấp hơn lương tối thiểu là trái luật — hãy hỏi rõ nhà tuyển dụng hoặc báo cáo tin.
+        </div>
+      )}
       <div className="grid md:grid-cols-2 gap-2 text-[14px] text-ink">
         {place && <div><b>Nơi làm việc:</b> {place}</div>}
         {prog && prog.headcount > 1 && (
@@ -91,6 +106,8 @@ export function LaborApplyPanel({ job, inviteCode }: { job: JobPosting; inviteCo
             )}
           </div>
         )}
+        {extraLines(channel, job.laborExtra).length > 0 && <div className="md:col-span-2"><b>{channel === 'intern' ? 'Thông tin thực tập' : 'Yêu cầu & điều kiện'}:</b> {extraLines(channel, job.laborExtra).join(' · ')}</div>}
+        {card?.hourly?.monthEstimate ? <div className="md:col-span-2"><b>Ước tính thu nhập:</b> <span className="font-extrabold text-success">~{(card.hourly.monthEstimate / 1e6).toLocaleString('vi-VN', { maximumFractionDigits: 2 })} triệu/tháng</span> nếu làm đủ số giờ</div> : null}
         {(job.laborSchedule ?? []).length > 0 && <div><b>Ca cần người:</b> {slotText(job.laborSchedule ?? [])}</div>}
         {(job.laborPerks ?? []).length > 0 && (
           <div className="flex flex-wrap gap-1 md:col-span-2">
@@ -125,6 +142,7 @@ export function LaborApplyPanel({ job, inviteCode }: { job: JobPosting; inviteCo
       )}
 
       {!filled && <WorkerCredsBox w={w} slug={KIND_SLUG[channel]} />}
+      {!filled && <FitBox jobId={job.id} w={w} />}
       <div className="flex flex-wrap items-center gap-2">
         {filled ? (
           <span className="rounded-lg bg-surface-alt border border-border-strong font-extrabold text-ink px-4 py-2">Tin đã tuyển đủ người</span>
@@ -139,6 +157,20 @@ export function LaborApplyPanel({ job, inviteCode }: { job: JobPosting; inviteCo
         <ShareButtons jobId={job.id} title={job.title} />
       </div>
       {msg && <div className={`text-[14px] font-bold ${res ? 'text-success' : 'text-critical'}`}>{msg}</div>}
+      {res && !res.already && (res.missing ?? []).length > 0 && <div className="text-[13.5px] text-ink">Lưu ý khi được gọi: {(res.missing ?? []).join('; ')}.</div>}
+      <details className="rounded-lg border border-border bg-white">
+        <summary className="cursor-pointer px-3 py-2 text-[14px] font-extrabold text-ink">Chuẩn bị đi phỏng vấn — mang gì, hỏi gì</summary>
+        <ul className="list-disc pl-8 pr-3 pb-3 text-[13.5px] text-ink flex flex-col gap-0.5">
+          {interviewChecklist(channel, job.laborGroup).map((x) => (<li key={x}>{x}</li>))}
+        </ul>
+      </details>
+      <AnswerTips kind={channel} />
+      {filled && (
+        <div className="flex flex-col gap-1.5">
+          <div className="font-extrabold text-[15px] text-ink">Tin này đã đủ người — các tin tương tự còn nhận</div>
+          {similar.length === 0 ? <div className="text-[13.5px] text-ink-muted">Đang tìm tin tương tự…</div> : <LaborJobList jobs={similar} compare={false} who={who} onApply={(id) => w.apply(id)} />}
+        </div>
+      )}
       {who && (
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={copyIntro} className="rounded-lg border border-primary bg-white text-primary font-bold text-[13.5px] px-3 py-1.5">

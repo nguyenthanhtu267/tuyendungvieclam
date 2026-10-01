@@ -70,6 +70,19 @@ export class WorkersPublicController {
   salary(@Query('kind') kind: string, @Query('group') group?: string, @Query('province') province?: string) {
     return this.svc.salaryStats({ kind, group, province });
   }
+  @Get('min-wage')
+  minWage(@Query('province') province?: string) {
+    return this.svc.minWage(province);
+  }
+  @Get('jobs/:id/similar')
+  similar(@Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.similar(id);
+  }
+  @Throttle(STRICT)
+  @Post('exam')
+  exam(@Body() b: { phone: string; birthDate: string; mode?: string; until?: string }) {
+    return this.svc.setExamGuest(b?.phone, b?.birthDate, String(b?.mode ?? 'off'), b?.until);
+  }
   @Get('jobs-by-ids')
   byIds(@Query('ids') ids: string) {
     return this.svc.cards(ids);
@@ -78,6 +91,16 @@ export class WorkersPublicController {
   @Post('applications')
   myApps(@Body() b: { phone: string; birthDate: string }) {
     return this.svc.myApplications(b?.phone, b?.birthDate);
+  }
+  @Throttle(STRICT)
+  @Post('jobs/:id/fit')
+  fit(@Param('id', ParseUUIDPipe) id: string, @Body() b: { phone: string; birthDate: string }) {
+    return this.svc.fitCheckGuest(id, b?.phone, b?.birthDate);
+  }
+  @Throttle(STRICT)
+  @Post('applications/:id/cert')
+  cert(@Param('id', ParseUUIDPipe) id: string, @Body() b: { phone: string; birthDate: string }) {
+    return this.svc.requestCertGuest(b?.phone, b?.birthDate, id);
   }
   @Throttle(STRICT)
   @Post('seeking')
@@ -136,6 +159,21 @@ export class WorkersController {
   seekingMine(@CurrentUser() u: U, @Body() b: { seeking?: boolean }) {
     return this.svc.setSeekingMine(u.userId, b?.seeking !== false);
   }
+  @Patch('me/worker-profile/exam')
+  @Roles(UserRole.CANDIDATE)
+  examMine(@CurrentUser() u: U, @Body() b: { mode?: string; until?: string }) {
+    return this.svc.setExamMine(u.userId, String(b?.mode ?? 'off'), b?.until);
+  }
+  @Get('me/worker-fit/:id')
+  @Roles(UserRole.CANDIDATE)
+  fitMine(@CurrentUser() u: U, @Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.fitCheckMine(id, u.userId);
+  }
+  @Post('me/worker-applications/:id/cert')
+  @Roles(UserRole.CANDIDATE)
+  certMine(@CurrentUser() u: U, @Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.requestCertMine(u.userId, id);
+  }
   @Post('me/worker-apply/:id')
   @Roles(UserRole.CANDIDATE)
   applyMine(@CurrentUser() u: U, @Param('id', ParseUUIDPipe) id: string, @Body() b: { group?: string }) {
@@ -167,6 +205,16 @@ export class WorkersController {
   @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB)
   filled(@CurrentUser() u: U, @Param('id', ParseUUIDPipe) id: string, @Body() b: { filled?: boolean }) {
     return this.svc.setFilled(u.userId, id, b?.filled !== false);
+  }
+  @Patch('employer/worker-applications/interview')
+  @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB)
+  interview(@CurrentUser() u: U, @Body() b: { ids?: string[]; at?: string; place?: string }) {
+    return this.svc.setInterview(u.userId, b?.ids ?? [], String(b?.at ?? ''), b?.place);
+  }
+  @Patch('employer/worker-applications/:id/attendance')
+  @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB)
+  attendance(@CurrentUser() u: U, @Param('id', ParseUUIDPipe) id: string, @Body() b: { attended?: boolean }) {
+    return this.svc.markStart(u.userId, id, b?.attended !== false);
   }
   @Patch('employer/jobs/:id/extend')
   @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB)
@@ -209,6 +257,16 @@ export class WorkersController {
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   suspicious() {
     return this.svc.adminSuspicious();
+  }
+  @Get('admin/workers/duplicate-jobs')
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  dupJobs() {
+    return this.svc.adminDuplicateJobs();
+  }
+  @Get('admin/workers/todo')
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  todo() {
+    return this.svc.adminTodo();
   }
   @Patch('admin/workers/:id/hide')
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)

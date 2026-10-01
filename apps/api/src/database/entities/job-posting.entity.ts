@@ -171,6 +171,10 @@ export class JobPosting {
   @Column({ name: 'labor_schedule', type: 'simple-array', nullable: true })
   laborSchedule?: string[] | null;
 
+  // Đợt 84 — yêu cầu/điều kiện riêng theo nhóm: worker {minAge,maxAge,needsBike,needsHealth,certs}, student {hourlyPay,hoursPerWeek}, intern {internMonths,internDays,stipend,minYear,major,forSchool}
+  @Column({ name: 'labor_extra', type: 'jsonb', nullable: true })
+  laborExtra?: import('../../workers/labor-extra').JobExtra | null;
+
   // Tuyển đủ số lượng ⇒ ngừng nhận ứng tuyển nhanh
   @Column({ name: 'filled_at', type: 'timestamp', nullable: true })
   filledAt?: Date | null;

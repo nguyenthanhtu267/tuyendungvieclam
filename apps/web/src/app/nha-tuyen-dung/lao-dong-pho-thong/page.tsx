@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import EmployerHeader from '@/components/EmployerHeader';
 import { AddressPicker, EMPTY_ADDRESS, type AddressValue } from '@/components/labor/AddressPicker';
 import { useAuth } from '@/lib/auth-context';
-import { workersApi, type DropoutRow, type EmployerLaborJob, type SupplyRow, type WorkerAppRow, type WorkerKind, type WorkerSearchItem } from '@/lib/api';
+import { workersApi, type TrustInfo, type DropoutRow, type EmployerLaborJob, type SupplyRow, type WorkerAppRow, type WorkerKind, type WorkerSearchItem } from '@/lib/api';
 import Link from 'next/link';
-import { CALL_LABEL, CALL_STATUS, GENDER_LABEL, KIND_LABEL, LABOR_GROUPS, ago, fmtDateTime, placeText, slotText } from '@/lib/labor';
+import { TrustBadge } from '@/components/labor/LaborJobList';
+import { callScript } from '@/lib/labor-extra';
+import { CERT_LABEL, EXPERIENCE_LABEL, HOURS_LABEL, ageOfBirth, CALL_LABEL, CALL_STATUS, GENDER_LABEL, KIND_LABEL, LABOR_GROUPS, ago, fmtDateTime, placeText, slotText } from '@/lib/labor';
 
 const ORIGIN_KEY = 'tvl_emp_origin';
 interface Origin { addr: AddressValue; lat: number | null; lon: number | null }
@@ -36,6 +38,9 @@ export default function EmployerLaborPage() {
   const [sort, setSort] = useState<'near' | 'recent' | 'match'>('near');
   const [jobId, setJobId] = useState('');
   const [today, setToday] = useState(false);
+  // Đợt 84 — bộ lọc riêng từng nhóm
+  const [ef, setEf] = useState({ exp: '', bike: false, health: false, hours: '', months: '', year: '', major: '', ready: false });
+  const setE = (p: Partial<typeof ef>) => { setEf((s) => ({ ...s, ...p })); setPage(1); };
   const [includeNot, setIncludeNot] = useState(false);
   const [page, setPage] = useState(1);
   const [provinces, setProvinces] = useState<string[]>([]);
@@ -44,6 +49,11 @@ export default function EmployerLaborPage() {
   const [data, setData] = useState<{ items: WorkerSearchItem[]; total: number; totalPages: number } | null>(null);
   const [apps, setApps] = useState<WorkerAppRow[] | null>(null);
   const [err, setErr] = useState('');
+  const [sel, setSel] = useState<string[]>([]);
+  const [iv, setIv] = useState({ at: '', place: '' });
+  const [ivMsg, setIvMsg] = useState('');
+  const [showList, setShowList] = useState(false);
+  const [myTrust, setMyTrust] = useState<TrustInfo | null>(null);
 
   useEffect(() => {
     if (me === null) router.replace('/dang-nhap?next=/nha-tuyen-dung/lao-dong-pho-thong');
@@ -79,6 +89,7 @@ export default function EmployerLaborPage() {
       .search(token, {
         kind: kind || undefined, province: province || undefined, group: group || undefined, q: q.trim() || undefined, sort,
         includeNotSeeking: includeNot ? '1' : undefined, page: String(page), callStatus: callStatus || undefined, needs: needs || undefined, jobId: jobId || undefined, today: today ? '1' : undefined,
+        exp: ef.exp || undefined, bike: ef.bike ? '1' : undefined, health: ef.health ? '1' : undefined, hours: ef.hours || undefined, months: ef.months || undefined, year: ef.year || undefined, major: ef.major.trim() || undefined, ready: ef.ready ? '1' : undefined,
         originProvince: a.province || undefined, originMode: a.addressMode, originDistrict: a.oldDistrict || undefined, originWard: a.oldWard || undefined,
         originNewWard: a.newWardCode || undefined, originLat: origin.lat != null ? String(origin.lat) : undefined, originLon: origin.lon != null ? String(origin.lon) : undefined,
       })
@@ -87,7 +98,7 @@ export default function EmployerLaborPage() {
         setErr((e as Error).message);
         setData({ items: [], total: 0, totalPages: 1 });
       });
-  }, [token, kind, province, group, q, sort, includeNot, page, origin, callStatus, needs, jobId, today]);
+  }, [token, kind, province, group, q, sort, includeNot, page, origin, callStatus, needs, jobId, today, ef]);
   useEffect(() => {
     if (tab === 'search') load();
   }, [load, tab]);
@@ -98,6 +109,7 @@ export default function EmployerLaborPage() {
       .then((r) => {
         setApps(r.items);
         setLaborJobs(r.jobs);
+        setMyTrust(r.trust ?? null);
       })
       .catch(() => setApps([]));
   }, [token]);
@@ -114,6 +126,23 @@ export default function EmployerLaborPage() {
       .catch(() => setSupply({ districts: [], provinces: [], origin: null }));
   }, [tab, token, kind, group, origin]);
 
+  async function bookInterview() {
+    if (!token || !sel.length) return;
+    setIvMsg('');
+    try {
+      const r = await workersApi.setInterview(token, sel, new Date(iv.at).toISOString(), iv.place.trim() || undefined);
+      setIvMsg(`Đã hẹn phỏng vấn cho ${r.updated} người.`);
+      setShowList(true);
+      loadApps();
+    } catch (e) {
+      setIvMsg((e as Error).message);
+    }
+  }
+  async function attend(id: string, attended: boolean) {
+    if (!token) return;
+    await workersApi.attendance(token, id, attended).catch((e) => setErr((e as Error).message));
+    loadApps();
+  }
   async function setCall(item: WorkerSearchItem, status: string, jobId?: string | null) {
     if (!token) return;
     try {
@@ -210,6 +239,42 @@ export default function EmployerLaborPage() {
               </label>
             </div>
 
+            <div className="flex flex-wrap items-center gap-2" aria-label="Bộ lọc theo nhóm">
+              <button type="button" aria-pressed={ef.ready} onClick={() => setE({ ready: !ef.ready })} className={`rounded-lg border px-3 py-2 text-[13.5px] font-extrabold ${ef.ready ? 'border-success bg-success text-white' : 'border-border-strong bg-white text-ink'}`}>Đi làm được ngay</button>
+              {(kind === 'worker' || kind === '') && (
+                <>
+                  <select id="ef-exp" aria-label="Kinh nghiệm" className="tvl-input !w-auto !py-2" value={ef.exp} onChange={(e) => setE({ exp: e.target.value })}>
+                    <option value="">Kinh nghiệm: tất cả</option>
+                    <option value="has">Đã có kinh nghiệm</option>
+                    <option value="gte1">Từ 1 năm trở lên</option>
+                  </select>
+                  <label className="flex items-center gap-1.5 text-[13.5px] text-ink" htmlFor="ef-bike"><input id="ef-bike" type="checkbox" className="w-4 h-4" checked={ef.bike} onChange={(e) => setE({ bike: e.target.checked })} />Có xe máy</label>
+                  <label className="flex items-center gap-1.5 text-[13.5px] text-ink" htmlFor="ef-health"><input id="ef-health" type="checkbox" className="w-4 h-4" checked={ef.health} onChange={(e) => setE({ health: e.target.checked })} />Có giấy khám sức khoẻ</label>
+                </>
+              )}
+              {kind === 'student' && (
+                <select id="ef-hours" aria-label="Số giờ mỗi tuần" className="tvl-input !w-auto !py-2" value={ef.hours} onChange={(e) => setE({ hours: e.target.value })}>
+                  <option value="">Giờ/tuần: tất cả</option>
+                  {Object.entries(HOURS_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                </select>
+              )}
+              {kind === 'intern' && (
+                <>
+                  <select id="ef-months" aria-label="Thời gian thực tập" className="tvl-input !w-auto !py-2" value={ef.months} onChange={(e) => setE({ months: e.target.value })}>
+                    <option value="">Thực tập: tất cả</option>
+                    {[1, 2, 3, 6].map((m) => <option key={m} value={m}>Từ {m} tháng</option>)}
+                  </select>
+                  <select id="ef-year" aria-label="Năm học" className="tvl-input !w-auto !py-2" value={ef.year} onChange={(e) => setE({ year: e.target.value })}>
+                    <option value="">Năm học: tất cả</option>
+                    {[2, 3, 4, 5].map((y) => <option key={y} value={y}>Từ năm {y}</option>)}
+                  </select>
+                </>
+              )}
+              {(kind === 'student' || kind === 'intern') && (
+                <input id="ef-major" aria-label="Ngành học" className="tvl-input !w-40 !py-2" placeholder="Ngành học" value={ef.major} onChange={(e) => setEf({ ...ef, major: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && setPage(1)} />
+              )}
+            </div>
+
             <div className="rounded-xl border border-border bg-white p-2.5 flex flex-col gap-2">
               <div className="flex flex-wrap items-center gap-2 text-[14px] text-ink">
                 <span>Vị trí công ty để tính gần/xa: <b>{originText}</b>{origin.lat != null && ' · đã có toạ độ GPS (tính km thật)'}</span>
@@ -260,13 +325,20 @@ export default function EmployerLaborPage() {
 
         {tab === 'apps' && laborJobs.length > 0 && (
           <div className="rounded-xl border border-border bg-white p-3 flex flex-col gap-2">
-            <div className="font-extrabold text-[15px] text-ink">Tiến độ tuyển đủ số lượng</div>
+            <div className="flex flex-wrap items-center gap-2"><div className="font-extrabold text-[15px] text-ink">Tiến độ tuyển đủ số lượng</div>{myTrust && <><span className="text-[13px] text-ink">Điểm uy tín của công ty bạn (ứng viên thấy):</span><TrustBadge t={myTrust} /></>}</div>
+            {myTrust && myTrust.score != null && myTrust.score < 75 && <div className="text-[12.5px] text-ink">Muốn tăng điểm: gọi lại ứng viên mới trong 24 giờ và cập nhật trạng thái (đã gọi, hẹn phỏng vấn…) cho mọi đơn ứng tuyển.</div>}
             {laborJobs.map((j) => (
               <div key={j.id} className="grid sm:grid-cols-[1fr_220px_auto] gap-2 items-center text-[14px]">
                 <Link href={`/viec-lam/${j.id}`} className="font-bold text-ink hover:text-primary truncate">{j.title}</Link>
                 <div>
                   <div className="h-2.5 rounded-full bg-surface-alt overflow-hidden"><div className={`h-full ${j.filled ? 'bg-critical' : 'bg-success'}`} style={{ width: `${Math.min(100, (j.hired / Math.max(1, j.headcount)) * 100)}%` }} /></div>
                   <div className="text-[12.5px] text-ink">Đã nhận {j.hired}/{j.headcount}{j.filled ? ' — đã tự đóng vì đủ người' : ''}{j.ageDays != null && ` · đăng ${j.ageDays} ngày`}</div>
+                  {j.forecast && (
+                    <div className="mt-1 text-[12.5px] text-ink">
+                      Dự báo: tin {j.forecast.scope === 'cùng loại tin' ? 'cùng loại' : `nhóm “${j.forecast.scope}”`} thường tuyển đủ sau <b>~{j.forecast.days} ngày</b> ({j.forecast.samples} tin đã đủ).
+                      {(j.ageDays ?? 0) > j.forecast.days * 1.2 && <b className="text-critical"> Tin của bạn đã chậm hơn mức này — thử tăng lương/phụ cấp, thêm KTX hoặc xe đưa đón, hoặc làm mới tin.</b>}
+                    </div>
+                  )}
                   {j.needExtend && (
                     <div className="mt-1 rounded border border-warning bg-warning-tint px-2 py-1 text-[12.5px] text-ink">
                       Tin đã hơn 30 ngày mà chưa đủ người{j.deadline ? ` (hạn ${j.deadline})` : ''}. Gia hạn thêm 30 ngày và xem lại mức lương/quyền lợi để dễ tuyển hơn.{' '}
@@ -282,6 +354,42 @@ export default function EmployerLaborPage() {
             <div className="text-[12.5px] text-ink-muted">Đánh dấu &quot;Đã nhận việc&quot; ở bảng dưới hoặc trong sổ gọi điện — đủ số lượng thì tin tự đóng (&quot;Đã tuyển đủ&quot;) và ngừng nhận ứng tuyển; chưa đủ sau 30 ngày thì hệ thống nhắc gia hạn.</div>
           </div>
         )}
+        {tab === 'apps' && apps && apps.length > 0 && (
+          <div className="rounded-xl border border-border bg-white p-3 flex flex-col gap-2">
+            <div className="font-extrabold text-[15px] text-ink">Hẹn phỏng vấn (một hoặc nhiều người cùng lúc)</div>
+            <div className="text-[13px] text-ink">Tích chọn ứng viên ở bảng bên dưới, chọn ngày giờ và địa điểm. Ứng viên thấy lịch này trong “Lịch sử ứng tuyển” và tải được vào lịch điện thoại.</div>
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="text-[13px] font-bold text-ink flex flex-col gap-1" htmlFor="iv-at">Ngày giờ<input id="iv-at" type="datetime-local" className="tvl-input !py-1.5" value={iv.at} onChange={(e) => setIv({ ...iv, at: e.target.value })} /></label>
+              <label className="text-[13px] font-bold text-ink flex flex-col gap-1 flex-1 min-w-[200px]" htmlFor="iv-place">Địa điểm<input id="iv-place" className="tvl-input !py-1.5" maxLength={200} placeholder="vd: Cổng 2, KCN Sóng Thần — gặp chị Lan" value={iv.place} onChange={(e) => setIv({ ...iv, place: e.target.value })} /></label>
+              <button type="button" disabled={!sel.length || !iv.at} onClick={bookInterview} className="rounded-lg bg-accent text-white font-extrabold text-[13.5px] px-3 py-2 disabled:bg-ink-faint">Hẹn {sel.length || ''} người</button>
+              <button type="button" disabled={!sel.length} onClick={() => setShowList(true)} className="rounded-lg border border-border-strong bg-white text-ink font-bold text-[13.5px] px-3 py-2 disabled:text-ink-faint">Xem / in danh sách điểm danh</button>
+            </div>
+            {ivMsg && <div className="text-[13.5px] font-bold text-success">{ivMsg}</div>}
+          </div>
+        )}
+        {tab === 'apps' && showList && apps && (
+          <div className="rounded-xl border-2 border-primary bg-white p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+              <div className="font-extrabold text-[15px] text-ink">Danh sách điểm danh phỏng vấn</div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => window.print()} className="rounded-lg bg-primary text-white font-bold text-[13.5px] px-3 py-1.5">In danh sách</button>
+                <button type="button" onClick={() => setShowList(false)} className="rounded-lg border border-border-strong bg-white font-bold text-[13.5px] px-3 py-1.5 text-ink">Đóng</button>
+              </div>
+            </div>
+            <div id="print-area" className="mt-2 text-ink">
+              <h2 className="font-extrabold text-[18px] uppercase">Danh sách điểm danh phỏng vấn</h2>
+              <div className="text-[13.5px]">{iv.at ? `Thời gian: ${fmtDateTime(new Date(iv.at).toISOString())}` : ''}{iv.place ? ` · Địa điểm: ${iv.place}` : ''}</div>
+              <table className="w-full border-collapse text-[14px] mt-2">
+                <thead><tr><th className="border border-border-strong p-1.5 w-10">STT</th><th className="border border-border-strong p-1.5 text-left">Họ và tên</th><th className="border border-border-strong p-1.5 text-left">Điện thoại</th><th className="border border-border-strong p-1.5 text-left">Vị trí</th><th className="border border-border-strong p-1.5 w-24">Có mặt</th><th className="border border-border-strong p-1.5 w-40">Ghi chú</th></tr></thead>
+                <tbody>
+                  {apps.filter((a) => sel.includes(a.id)).map((a, i) => (
+                    <tr key={a.id}><td className="border border-border-strong p-1.5 text-center">{i + 1}</td><td className="border border-border-strong p-1.5">{a.fullName}</td><td className="border border-border-strong p-1.5">{a.phone}</td><td className="border border-border-strong p-1.5">{a.jobTitle}</td><td className="border border-border-strong p-1.5" /><td className="border border-border-strong p-1.5" /></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
         {tab === 'apps' && (
           <div className="rounded-xl border border-border bg-white overflow-x-auto">
             {apps === null ? (
@@ -292,12 +400,13 @@ export default function EmployerLaborPage() {
               <table className="w-full text-[14px]">
                 <thead>
                   <tr className="text-left text-ink-muted border-b border-border">
-                    <th className="p-2">Thời gian</th><th className="p-2">Tin tuyển</th><th className="p-2">Ứng viên</th><th className="p-2">Điện thoại</th><th className="p-2">Khu vực</th><th className="p-2">Trạng thái</th>
+                    <th className="p-2 w-8"><input type="checkbox" aria-label="Chọn tất cả" className="w-4 h-4" checked={sel.length > 0 && sel.length === apps.length} onChange={(e) => setSel(e.target.checked ? apps.map((a) => a.id) : [])} /></th><th className="p-2">Thời gian</th><th className="p-2">Tin tuyển</th><th className="p-2">Ứng viên</th><th className="p-2">Điện thoại</th><th className="p-2">Khu vực</th><th className="p-2">Trạng thái</th>
                   </tr>
                 </thead>
                 <tbody>
                   {apps.map((a) => (
                     <tr key={a.id} className={`border-b border-border ${a.seenAt ? '' : 'font-bold'}`}>
+                      <td className="p-2"><input type="checkbox" aria-label={`Chọn ${a.fullName}`} className="w-4 h-4" checked={sel.includes(a.id)} onChange={(e) => setSel((l) => (e.target.checked ? [...l, a.id] : l.filter((x) => x !== a.id)))} /></td>
                       <td className="p-2 whitespace-nowrap">{fmtDateTime(a.createdAt)}</td>
                       <td className="p-2">{a.jobTitle}</td>
                       <td className="p-2">
@@ -316,6 +425,22 @@ export default function EmployerLaborPage() {
                           <option value="new">Mới</option>
                           {CALL_STATUS.map((c) => (<option key={c.v} value={c.v}>{c.l}</option>))}
                         </select>
+                        {a.interviewAt && <div className="text-[12.5px] font-normal text-ink mt-1">Hẹn {fmtDateTime(a.interviewAt)}{a.interviewPlace ? ` · ${a.interviewPlace}` : ''}</div>}
+                        {(a.status === 'hired' || a.status === 'interview') && !a.startedAt && (
+                          <div className="flex gap-1 mt-1">
+                            <button type="button" onClick={() => attend(a.id, true)} className="rounded border border-success bg-success-tint text-success font-bold text-[12px] px-1.5 py-0.5">Có đi làm</button>
+                            <button type="button" onClick={() => attend(a.id, false)} className="rounded border border-critical bg-critical-tint text-critical font-bold text-[12px] px-1.5 py-0.5">Vắng</button>
+                          </div>
+                        )}
+                        {a.startedAt && <div className="text-[12.5px] font-normal text-success mt-1">Đã đi làm từ {fmtDateTime(a.startedAt)}</div>}
+                        {a.kind === 'intern' && a.certRequestedAt && (
+                          <div className="mt-1 text-[12.5px] font-normal text-ink">
+                            <span className="rounded bg-warning-tint border border-warning font-bold px-1.5 py-0.5">Xin xác nhận thực tập</span>{' '}
+                            <Link href="/nha-tuyen-dung/phieu-nhan-xet-thuc-tap" className="font-bold text-primary underline">Mở phiếu nhận xét</Link>
+                          </div>
+                        )}
+                        {a.extra?.ready === 'now' && <div className="mt-1"><span className="rounded bg-success text-white font-bold text-[12px] px-1.5 py-0.5">Đi làm được ngay</span></div>}
+                        {a.birthDate && ageOfBirth(a.birthDate) < 18 && <div className="mt-1 text-[12.5px] font-bold text-critical">Chưa đủ 18 tuổi — không giao ca đêm/việc nặng</div>}
                       </td>
                     </tr>
                   ))}
@@ -444,6 +569,29 @@ function WorkerCard({
           {w.needsShuttle && <span className="rounded bg-primary-tint px-1.5 py-0.5 text-[12.5px] font-bold text-primary">Cần xe đưa đón</span>}
         </div>
       )}
+      {(w.readyNow || w.minor) && (
+        <div className="flex flex-wrap gap-1">
+          {w.readyNow && <span className="rounded bg-success text-white font-bold text-[12.5px] px-1.5 py-0.5">Đi làm được ngay</span>}
+          {w.minor && <span className="rounded border border-critical bg-critical-tint text-critical font-bold text-[12.5px] px-1.5 py-0.5">Chưa đủ 18 tuổi — không giao ca đêm/việc nặng</span>}
+        </div>
+      )}
+      {w.extra && (
+        <div className="text-[13.5px] text-ink">
+          {[
+            w.extra.experience ? EXPERIENCE_LABEL[w.extra.experience] : null,
+            w.extra.hasBike ? 'Có xe máy' : null,
+            w.extra.hasHealth ? 'Có giấy khám sức khoẻ' : null,
+            ...(w.extra.certs ?? []).map((c) => CERT_LABEL[c]),
+            w.extra.hours ? HOURS_LABEL[w.extra.hours] : null,
+            w.extra.year ? `Năm ${w.extra.year}` : null,
+            w.extra.months ? `Thực tập ${w.extra.months} tháng` : null,
+            w.extra.sessions ? `${w.extra.sessions} buổi/tuần` : null,
+            w.extra.startDate ? `Bắt đầu từ ${new Date(w.extra.startDate).toLocaleDateString('vi-VN')}` : null,
+            w.extra.mandatory === 'school' ? 'Thực tập bắt buộc theo trường' : w.extra.mandatory === 'free' ? 'Tự tìm thực tập' : null,
+            w.extra.ready && w.extra.ready !== 'now' ? `Đi làm từ ${new Date(w.extra.ready).toLocaleDateString('vi-VN')}` : null,
+          ].filter(Boolean).join(' · ')}
+        </div>
+      )}
       {(w.school || w.major) && <div className="text-[13.5px] text-ink">{[w.school, w.major].filter(Boolean).join(' · ')}</div>}
       <div className="flex flex-wrap items-center gap-2">
         <a href={`tel:${w.phone}`} className="rounded-lg bg-accent text-white font-extrabold text-[14px] px-3 py-1.5">Gọi {w.phone}</a>
@@ -455,6 +603,15 @@ function WorkerCard({
         Cập nhật {ago(w.refreshedAt)} ({fmtDateTime(w.refreshedAt)})
         {w.stale && <span className="ml-1 font-bold text-critical">· Lâu chưa cập nhật (trên 45 ngày) — có thể đã có việc</span>}
       </div>
+      {w.examMode && w.examUntil && new Date(w.examUntil) >= new Date(new Date().toDateString()) && (
+        <div className="rounded border border-warning bg-warning-tint px-2 py-1 text-[12.5px] font-bold text-ink">{w.examMode === 'pause' ? 'Đang mùa thi' : 'Mùa thi: chỉ nhận ca T7, CN'} đến {new Date(w.examUntil).toLocaleDateString('vi-VN')}</div>
+      )}
+      <details className="rounded-lg border border-border bg-white">
+        <summary className="cursor-pointer px-2 py-1 text-[13px] font-bold text-ink">Kịch bản gọi điện gợi ý</summary>
+        <ol className="list-decimal pl-6 pr-2 pb-2 text-[12.5px] text-ink flex flex-col gap-0.5">
+          {callScript(w.kind, w.desiredJobs[0], w.fullName).map((x) => (<li key={x}>{x}</li>))}
+        </ol>
+      </details>
       {w.competition > 0 && (
         <div className="text-[12.5px] font-bold text-ink">
           <span className="rounded bg-warning-tint border border-warning px-1.5 py-0.5">Đã được {w.competition} nhà tuyển dụng khác liên hệ trong 7 ngày</span> — nên gọi sớm.

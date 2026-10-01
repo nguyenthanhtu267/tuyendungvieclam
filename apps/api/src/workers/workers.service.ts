@@ -5,9 +5,11 @@ import { WorkerApplication, WorkerContact, WorkerNote, WorkerProfile, WorkerKind
 import { JobApprovalStatus, JobPosting } from '../database/entities/job-posting.entity';
 import { CompanyUser } from '../database/entities/company-user.entity';
 import { Company } from '../database/entities/company.entity';
-import { LABOR_GROUPS, PERKS, RADII, SHIFTS, SLOTS, estimateIncome } from './labor-groups';
+import { LABOR_GROUPS, PERKS, RADII, SHIFTS, SHIFTS_BY_KIND, SLOTS, estimateIncome, minorUnsafeReason, slotsFor, ageOf, LaborKind } from './labor-groups';
+import { cleanProfileExtra, fitOf, hourlyInfo, profileSanity, ProfileExtra } from './labor-extra';
 import { JobReport } from '../database/entities/job-report.entity';
 import { assessJobRisk, fold, RiskJob } from '../admin/job-risk';
+import { minWageOf, wageWarning } from './min-wage';
 import { districtLabel, guessProvince, haversineKm, Loc, provinceCentroid, proximity, resolvePlace } from './vn-geo';
 
 const CALL_STATUSES = ['no_answer', 'callback', 'interview', 'hired', 'rejected', 'no_show'];
@@ -38,6 +40,7 @@ export interface WorkerInput {
   major?: string;
   needsHousing?: boolean;
   needsShuttle?: boolean;
+  extra?: Record<string, unknown> | null;
   isSeeking?: boolean;
   consent?: boolean;
   /** Ngày sinh đã lưu — bắt buộc khi sửa hồ sơ đã có (khách không đăng nhập) */
@@ -63,6 +66,14 @@ export interface EmployerSearch {
   needs?: string;
   jobId?: string;
   today?: string;
+  exp?: string;
+  bike?: string;
+  health?: string;
+  hours?: string;
+  months?: string;
+  year?: string;
+  major?: string;
+  ready?: string;
 }
 
 export function normalizePhone(v?: string | null): string | null {
@@ -174,8 +185,9 @@ export class WorkersService {
     p.lon = okCoord(b.lon, 102, 110) ? b.lon : null;
     p.radiusKm = RADII.includes(Number(b.radiusKm)) ? Number(b.radiusKm) : null;
     p.desiredJobs = desired;
-    p.shifts = (b.shifts ?? []).filter((s) => SHIFTS.includes(s));
-    p.availability = kind === 'worker' ? null : (b.availability ?? []).filter((s) => SLOTS.includes(s));
+    p.shifts = (b.shifts ?? []).filter((s) => SHIFTS_BY_KIND[kind].includes(s));
+    p.availability = kind === 'worker' ? null : (b.availability ?? []).filter((s) => slotsFor(kind).includes(s));
+    p.extra = cleanProfileExtra(kind, b.extra);
     p.school = kind === 'worker' ? null : clip(b.school, 150);
     p.major = kind === 'worker' ? null : clip(b.major, 150);
     p.needsHousing = !!b.needsHousing;
@@ -246,6 +258,9 @@ export class WorkersService {
       lat: p.lat ?? null, lon: p.lon ?? null, radiusKm: p.radiusKm ?? null, desiredJobs: p.desiredJobs ?? [], shifts: p.shifts ?? [],
       availability: p.availability ?? [], school: p.school ?? null, major: p.major ?? null, needsHousing: p.needsHousing, needsShuttle: p.needsShuttle,
       isSeeking: p.isSeeking, refreshedAt: p.refreshedAt, createdAt: p.createdAt,
+      examUntil: p.examUntil ? String(p.examUntil).slice(0, 10) : null, examMode: p.examMode ?? null,
+      extra: (p.extra ?? null) as ProfileExtra | null,
+      warnings: profileSanity(p.kind as LaborKind, String(p.birthDate).slice(0, 10), p.extra ?? null, p.availability ?? null, p.shifts ?? null),
     };
   }
 
@@ -274,7 +289,7 @@ export class WorkersService {
     if (!full && job.filledAt) await this.jobs.update({ id: jobId }, { filledAt: null });
   }
 
-  private jobCard(j: JobPosting, extra: { distance?: ReturnType<typeof proximity> | null; hired?: number; scheduleFit?: boolean | null; score?: number } = {}) {
+  private jobCard(j: JobPosting, extra: { distance?: ReturnType<typeof proximity> | null; hired?: number; scheduleFit?: boolean | null; score?: number; trust?: ReturnType<WorkersService['trustOf']>; minor?: boolean; fit?: ReturnType<typeof fitOf> | null } = {}) {
     const wp = j.workPlace;
     return {
       id: j.id, title: j.title, laborGroup: j.laborGroup ?? null, channel: j.channel, provinces: j.provinces ?? [],
@@ -291,7 +306,48 @@ export class WorkersService {
       scheduleFit: extra.scheduleFit ?? null,
       matched: (extra.score ?? 0) >= 3,
       warnings: this.warningsOf(j),
+      trust: extra.trust ?? null,
       ageDays: Math.floor((Date.now() - +new Date(j.createdAt)) / 864e5),
+      laborExtra: j.laborExtra ?? null,
+      hourly: j.channel === 'student' ? hourlyInfo(j.workPlace?.province ?? j.provinces?.[0], j.laborExtra?.hourlyPay, j.laborExtra?.hours) : null,
+      minorUnsafe: minorUnsafeReason(j),
+      minorBlocked: !!extra.minor,
+      fit: extra.fit ?? null,
+    };
+  }
+
+  /** Đợt 83 — điểm uy tín nhà tuyển dụng: tỷ lệ gọi lại, tốc độ phản hồi, số báo cáo. Cần ≥3 đơn ứng tuyển mới chấm. */
+  async trustMap(companyIds: string[]) {
+    const m = new Map<string, ReturnType<WorkersService['trustOf']>>();
+    const ids = Array.from(new Set(companyIds.filter(Boolean)));
+    if (!ids.length) return m;
+    const rows: { cid: string; n: number; called: number; hrs: number | null }[] = await this.repo.manager.query(
+      `SELECT j.company_id AS cid, COUNT(*)::int AS n, SUM((a.status <> 'new')::int)::int AS called,
+              AVG(EXTRACT(EPOCH FROM (a.seen_at - a.created_at)) / 3600) FILTER (WHERE a.seen_at IS NOT NULL)::float AS hrs
+       FROM worker_applications a JOIN job_postings j ON j.id = a.job_posting_id
+       WHERE j.company_id = ANY($1) GROUP BY j.company_id`,
+      [ids],
+    );
+    const reps: { cid: string; n: number }[] = await this.repo.manager.query(
+      `SELECT j.company_id AS cid, COUNT(*)::int AS n FROM job_reports r JOIN job_postings j ON j.id = r.job_posting_id
+       WHERE j.company_id = ANY($1) AND (r.status = 'open' OR r.category = 'scam') GROUP BY j.company_id`,
+      [ids],
+    );
+    const repBy = new Map(reps.map((r) => [r.cid, r.n]));
+    for (const id of ids) {
+      const r = rows.find((x) => x.cid === id);
+      m.set(id, this.trustOf(r?.n ?? 0, r?.called ?? 0, r?.hrs ?? null, repBy.get(id) ?? 0));
+    }
+    return m;
+  }
+  trustOf(n: number, called: number, hrs: number | null, reports: number) {
+    if (n < 3) return { score: null as number | null, label: 'Nhà tuyển dụng mới', callRate: null as number | null, avgHours: null as number | null, reports, applications: n };
+    const callRate = called / n;
+    const speed = hrs == null ? 0 : hrs <= 24 ? 1 : hrs <= 72 ? 0.5 : 0;
+    const score = Math.max(0, Math.round(callRate * 50 + speed * 30 + 20 - Math.min(20, reports * 10)));
+    return {
+      score, callRate: Math.round(callRate * 100), avgHours: hrs == null ? null : Math.round(hrs * 10) / 10, reports, applications: n,
+      label: score >= 75 ? 'Phản hồi tốt' : score >= 50 ? 'Phản hồi trung bình' : 'Phản hồi chậm',
     };
   }
 
@@ -300,7 +356,17 @@ export class WorkersService {
     try {
       const r = assessJobRisk(j as unknown as RiskJob, { others: [] });
       const rs = r.reasons.filter((x) => !/thông tin liên hệ|quá ngắn/i.test(x));
-      return r.score >= 25 ? rs.slice(0, 3) : [];
+      const out = r.score >= 25 ? rs.slice(0, 3) : [];
+      // Đợt 83 — lương công nhân thấp hơn lương tối thiểu vùng (tính theo tỉnh nơi làm việc)
+      if (j.channel === 'worker') {
+        const w = wageWarning(j.workPlace?.province ?? j.provinces?.[0], j.payInfo?.base ?? j.salaryMin ?? null);
+        if (w) out.push(w);
+      }
+      if (j.channel === 'student' && j.laborExtra?.hourlyPay) {
+        const h = hourlyInfo(j.workPlace?.province ?? j.provinces?.[0], j.laborExtra.hourlyPay, j.laborExtra.hours);
+        if (h?.belowMin) out.push(`Lương ${h.hourly.toLocaleString('vi-VN')} đ/giờ thấp hơn mức tối thiểu giờ vùng ${h.region} (${h.min.toLocaleString('vi-VN')} đ/giờ, từ 01/2026)`);
+      }
+      return out;
     } catch {
       return [];
     }
@@ -312,9 +378,10 @@ export class WorkersService {
     if (!ids.length) return { items: [] };
     const rows = await this.jobs.find({ where: { id: In(ids) }, relations: { company: true } });
     const hired = await this.hiredCounts(rows.map((r) => r.id));
+    const trust = await this.trustMap(rows.map((r) => r.companyId));
     return {
       items: rows.map((j) => ({
-        ...this.jobCard(j, { hired: hired.get(j.id) ?? 0 }),
+        ...this.jobCard(j, { hired: hired.get(j.id) ?? 0, trust: trust.get(j.companyId) }),
         closed: j.approvalStatus !== JobApprovalStatus.APPROVED || j.isPaused || (!!j.deadline && j.deadline < new Date().toISOString().slice(0, 10)),
       })),
     };
@@ -337,7 +404,11 @@ export class WorkersService {
     if (q.hideFilled === '1') qb.andWhere('job.filledAt IS NULL');
     const rows0 = await qb.orderBy('job.createdAt', 'DESC').take(800).getMany();
     // Đợt 81 — sinh viên: chỉ tin có ca ngoài giờ học (buổi tối hoặc T7/CN)
-    const rows = q.flex === '1' ? rows0.filter((j) => (j.laborSchedule ?? []).length > 0 && (j.laborSchedule ?? []).every((x) => x.endsWith('-toi') || x.startsWith('t7') || x.startsWith('cn'))) : rows0;
+    const rows1 = q.flex === '1' ? rows0.filter((j) => (j.laborSchedule ?? []).length > 0 && (j.laborSchedule ?? []).every((x) => x.endsWith('-toi') || x.startsWith('t7') || x.startsWith('cn'))) : rows0;
+    // Đợt 84 — người chưa đủ 18 tuổi: ẩn tin ca đêm/nặng nhọc; sinh viên: lọc theo số giờ/tuần
+    const isMinor = q.minor === '1';
+    const maxH = Number(q.hours) || 0;
+    const rows = rows1.filter((j) => (!isMinor || !minorUnsafeReason(j)) && (!maxH || !j.laborExtra?.hours || j.laborExtra.hours <= maxH));
 
     // Vị trí người tìm việc (từ hồ sơ của họ trên trình duyệt) để tính gần/xa
     let origin: Loc | null = null;
@@ -350,6 +421,7 @@ export class WorkersService {
     const groups = (q.groups ?? '').split('|').filter(Boolean);
     const avail = new Set((q.avail ?? '').split(',').filter((x) => SLOTS.includes(x)));
     const needs = (q.needs ?? '').split(',');
+    const myFit = q.fit === '1' ? { kind, birthDate: q.bd || '2000-01-01', extra: this.parseExtra(q.ex, kind), availability: [...avail], major: q.major ?? null } : null;
     const hired = await this.hiredCounts(rows.map((r) => r.id));
     const scored = rows.map((j) => {
       const wp = j.workPlace;
@@ -365,7 +437,9 @@ export class WorkersService {
       if (scheduleFit) score += 2;
       if (j.isUrgent) score += 0.5;
       if (j.filledAt) score -= 10;
-      return { j, distance, scheduleFit, score };
+      const fit = myFit ? fitOf(j, myFit) : null;
+      if (fit && fit.missing.length === 0 && fit.ok.length) score += 1;
+      return { j, distance, scheduleFit, score, fit };
     });
     const sort = q.sort ?? (origin ? 'near' : 'new');
     if (sort === 'near' && origin) scored.sort((a, b) => (!!a.j.filledAt === !!b.j.filledAt ? 0 : a.j.filledAt ? 1 : -1) || (a.distance!.km - b.distance!.km) || (b.score - a.score));
@@ -373,8 +447,34 @@ export class WorkersService {
     else scored.sort((a, b) => (!!a.j.filledAt === !!b.j.filledAt ? 0 : a.j.filledAt ? 1 : -1) || +b.j.createdAt - +a.j.createdAt);
     const size = Math.min(40, Math.max(1, Number(q.pageSize) || 20));
     const page = Math.max(1, Number(q.page) || 1);
-    const items = scored.slice((page - 1) * size, page * size).map((x) => this.jobCard(x.j, { distance: x.distance, hired: hired.get(x.j.id) ?? 0, scheduleFit: x.scheduleFit, score: x.score }));
+    const pageRows = scored.slice((page - 1) * size, page * size);
+    const trust = await this.trustMap(pageRows.map((x) => x.j.companyId));
+    const items = pageRows.map((x) => this.jobCard(x.j, { distance: x.distance, hired: hired.get(x.j.id) ?? 0, scheduleFit: x.scheduleFit, score: x.score, trust: trust.get(x.j.companyId), fit: x.fit }));
     return { items, total: scored.length, page, totalPages: Math.max(1, Math.ceil(scored.length / size)) };
+  }
+
+  private parseExtra(raw: string | undefined, kind: string): ProfileExtra | null {
+    if (!raw) return null;
+    try {
+      return cleanProfileExtra(kind as LaborKind, JSON.parse(raw));
+    } catch {
+      return null;
+    }
+  }
+
+  /** Đợt 84 — đối chiếu yêu cầu của tin với hồ sơ (khách: SĐT + ngày sinh; đã đăng nhập: hồ sơ gắn tài khoản). */
+  async fitCheck(jobId: string, p: WorkerProfile) {
+    const job = await this.jobs.findOne({ where: { id: jobId } });
+    if (!job || job.channel === 'office') throw new NotFoundException('Không tìm thấy tin');
+    return { ...fitOf(job, p), minorUnsafe: ageOf(p.birthDate) < 18 ? minorUnsafeReason(job) : null };
+  }
+  async fitCheckGuest(jobId: string, phone: string, birthDate: string) {
+    return this.fitCheck(jobId, await this.verified(phone, birthDate));
+  }
+  async fitCheckMine(jobId: string, userId: string) {
+    const p = await this.repo.findOne({ where: { userId } });
+    if (!p) throw new BadRequestException('Bạn chưa có hồ sơ.');
+    return this.fitCheck(jobId, p);
   }
 
   async jobProgress(jobId: string) {
@@ -432,6 +532,10 @@ export class WorkersService {
     const exist = await this.apps.findOne({ where: { profileId: p.id, jobPostingId: jobId } });
     if (exist) return { ok: true, already: true, groupCode: exist.groupCode ?? null, groupSize: await this.groupSize(jobId, exist.groupCode) };
     if (job.filledAt) throw new BadRequestException('Tin này đã tuyển đủ người — bạn xem các tin khác nhé.');
+    if (ageOf(p.birthDate) < 18) {
+      const why = minorUnsafeReason(job);
+      if (why) throw new BadRequestException(`${why}.`);
+    }
     // Rủ bạn: mã nhóm phải đã có trong tin này (của người rủ), nhóm tối đa 5 người
     let code: string | null = null;
     const g = (group ?? '').trim().toUpperCase();
@@ -444,7 +548,8 @@ export class WorkersService {
     p.refreshedAt = new Date();
     p.isSeeking = true;
     await this.repo.save(p);
-    return { ok: true, already: false, groupCode: code, groupSize: await this.groupSize(jobId, code), joinedGroup: !!g && code === g };
+    const fit = fitOf(job, p);
+    return { ok: true, already: false, missing: fit.missing, groupCode: code, groupSize: await this.groupSize(jobId, code), joinedGroup: !!g && code === g };
   }
   private async groupSize(jobId: string, code?: string | null) {
     if (!code) return 0;
@@ -496,8 +601,22 @@ export class WorkersService {
     if (kind) qb.andWhere('w.kind = :kind', { kind });
     if (q.province) qb.andWhere('w.province = :p', { p: q.province });
     if (q.group) qb.andWhere("(',' || w.desired_jobs || ',') LIKE :g", { g: `%,${q.group},%` });
-    if (q.includeNotSeeking !== '1') qb.andWhere('w.isSeeking = true');
+    if (q.includeNotSeeking !== '1') {
+      qb.andWhere('w.isSeeking = true');
+      // Đợt 83 — mùa thi: ẩn khỏi tìm kiếm đến hết ngày đã chọn
+      qb.andWhere("(w.exam_mode IS DISTINCT FROM 'pause' OR w.exam_until IS NULL OR w.exam_until < CURRENT_DATE)");
+    }
     if (q.q?.trim()) qb.andWhere('(w.fullName ILIKE :t OR w.phone LIKE :t2)', { t: `%${q.q.trim()}%`, t2: `%${q.q.replace(/\D/g, '')}%` });
+    // Đợt 84 — bộ lọc riêng từng nhóm (đọc từ profile_extra)
+    if (q.exp === 'has') qb.andWhere("w.profile_extra ->> 'experience' IN ('lt1','gte1')");
+    if (q.exp === 'gte1') qb.andWhere("w.profile_extra ->> 'experience' = 'gte1'");
+    if (q.bike === '1') qb.andWhere("w.profile_extra ->> 'hasBike' = 'true'");
+    if (q.health === '1') qb.andWhere("w.profile_extra ->> 'hasHealth' = 'true'");
+    if (['lt15', '15-25', 'gt25'].includes(String(q.hours))) qb.andWhere("w.profile_extra ->> 'hours' = :hrs", { hrs: q.hours });
+    if (Number(q.months) > 0) qb.andWhere("COALESCE((w.profile_extra ->> 'months')::int, 0) >= :mo", { mo: Number(q.months) });
+    if (Number(q.year) > 0) qb.andWhere("COALESCE((w.profile_extra ->> 'year')::int, 0) >= :yr", { yr: Number(q.year) });
+    if (q.major?.trim()) qb.andWhere('w.major ILIKE :mj', { mj: `%${q.major.trim()}%` });
+    if (q.ready === '1') qb.andWhere("(w.profile_extra ->> 'ready' = 'now' OR w.profile_extra ->> 'ready' <= to_char(CURRENT_DATE, 'YYYY-MM-DD'))");
     if (q.needs === 'housing') qb.andWhere('w.needsHousing = true');
     if (q.needs === 'shuttle') qb.andWhere('w.needsShuttle = true');
     // Sổ gọi điện: lọc theo trạng thái của chính công ty mình
@@ -550,6 +669,12 @@ export class WorkersService {
       const perks = job.laborPerks ?? [];
       if (w.needsHousing && perks.includes('housing')) { sc += 10; why.push('Cần chỗ ở — tin có KTX'); }
       if (w.needsShuttle && perks.includes('shuttle')) { sc += 10; why.push('Cần xe đưa đón — tin có xe'); }
+      const fit = fitOf(job, w, true);
+      sc += Math.min(20, fit.ok.length * 5);
+      for (const m of fit.missing) { sc -= 8; why.push(`Thiếu: ${m.replace(/^Cần /, '').replace(/^Tin ưu tiên /, 'Tin ưu tiên — ')}`); }
+      for (const o of fit.ok.slice(0, 2)) why.push(o);
+      if (ageOf(w.birthDate) < 18 && minorUnsafeReason(job)) { sc -= 60; why.push('Chưa đủ 18 tuổi — tin có ca đêm/việc nặng nhọc, không được nhận'); }
+      if (job.isUrgent && this.readyNow(w)) { sc += 10; why.push('Đi làm được ngay — tin đang ưu tiên'); }
       const days = (Date.now() - +new Date(w.refreshedAt)) / 864e5;
       if (days <= 7) { sc += 10; why.push('Mới làm mới hồ sơ'); }
       if (stale) sc -= 20;
@@ -580,6 +705,8 @@ export class WorkersService {
       return {
         ...this.view(w),
         age: Math.floor((Date.now() - new Date(w.birthDate).getTime()) / (365.25 * 864e5)),
+        minor: ageOf(w.birthDate) < 18,
+        readyNow: this.readyNow(w),
         distance: prox,
         outOfRadius: !!(prox && w.radiusKm && prox.km > w.radiusKm),
         stale,
@@ -591,6 +718,11 @@ export class WorkersService {
       };
     });
     return { items, total: withDist.length, page, totalPages: Math.max(1, Math.ceil(withDist.length / size)), origin, jobId: job?.id ?? null };
+  }
+
+  private readyNow(w: WorkerProfile) {
+    const r = w.extra?.ready;
+    return !!r && (r === 'now' || r <= new Date().toISOString().slice(0, 10));
   }
 
   /** Sổ gọi điện: cập nhật trạng thái liên hệ của công ty với một ứng viên. */
@@ -645,7 +777,7 @@ export class WorkersService {
       .innerJoin(JobPosting, 'j', 'j.id = a.job_posting_id')
       .innerJoin(WorkerProfile, 'w', 'w.id = a.profile_id')
       .where('j.company_id = :companyId', { companyId })
-      .select(['a.id AS id', 'a.created_at AS "createdAt"', 'a.seen_at AS "seenAt"', 'a.status AS status', 'a.group_code AS "groupCode"', 'j.id AS "jobId"', 'j.title AS "jobTitle"', 'w.id AS "profileId"', 'w.full_name AS "fullName"', 'w.phone AS phone', 'w.province AS province', 'w.new_ward AS "newWard"', 'w.old_district AS "oldDistrict"', 'w.kind AS kind', 'w.desired_jobs AS "desiredJobs"'])
+      .select(['a.id AS id', 'a.created_at AS "createdAt"', 'a.seen_at AS "seenAt"', 'a.status AS status', 'a.group_code AS "groupCode"', 'a.interview_at AS "interviewAt"', 'a.interview_place AS "interviewPlace"', 'a.started_at AS "startedAt"', 'a.cert_requested_at AS "certRequestedAt"', 'j.id AS "jobId"', 'j.title AS "jobTitle"', 'w.id AS "profileId"', 'w.full_name AS "fullName"', 'w.phone AS phone', 'w.province AS province', 'w.new_ward AS "newWard"', 'w.old_district AS "oldDistrict"', 'w.kind AS kind', 'w.desired_jobs AS "desiredJobs"', 'w.birth_date AS "birthDate"', 'w.profile_extra AS extra'])
       .orderBy('a.created_at', 'DESC')
       .limit(500)
       .getRawMany<{ groupCode: string | null; jobId: string }>();
@@ -656,12 +788,15 @@ export class WorkersService {
     const jobs = await this.jobs.find({ where: { companyId }, order: { createdAt: 'DESC' }, take: 200 });
     const labor = jobs.filter((j) => j.channel !== 'office');
     const hired = await this.hiredCounts(labor.map((j) => j.id));
+    const fc = await this.forecastTable();
+    const trust = (await this.trustMap([companyId])).get(companyId) ?? null;
     return {
+      trust,
       items,
       jobs: labor.map((j) => {
         const ageDays = Math.floor((Date.now() - +new Date(j.createdAt)) / 864e5);
         const filled = !!j.filledAt;
-        return { id: j.id, title: j.title, headcount: j.headcount ?? 1, hired: hired.get(j.id) ?? 0, filled, channel: j.channel, ageDays, deadline: j.deadline ?? null, needExtend: !filled && ageDays >= 30 };
+        return { id: j.id, title: j.title, headcount: j.headcount ?? 1, hired: hired.get(j.id) ?? 0, filled, channel: j.channel, ageDays, deadline: j.deadline ?? null, needExtend: !filled && ageDays >= 30, forecast: filled ? null : fc.get(j.laborGroup ?? '') ?? fc.get(`#${j.channel}`) ?? null };
       }),
     };
   }
@@ -784,9 +919,12 @@ export class WorkersService {
     const byId = new Map(jobs.map((j) => [j.id, j]));
     return {
       isSeeking: p.isSeeking,
+      examMode: p.examMode ?? null,
+      examUntil: p.examUntil ? String(p.examUntil).slice(0, 10) : null,
+      kind: p.kind,
       items: rows.map((r) => {
         const j = byId.get(r.jobPostingId);
-        return { id: r.id, jobId: r.jobPostingId, title: j?.title ?? 'Tin đã gỡ', company: j?.company?.name ?? null, createdAt: r.createdAt, status: r.status ?? 'new', seen: !!r.seenAt, filled: !!j?.filledAt, groupCode: r.groupCode ?? null };
+        return { id: r.id, jobId: r.jobPostingId, title: j?.title ?? 'Tin đã gỡ', company: j?.company?.name ?? null, createdAt: r.createdAt, status: r.status ?? 'new', seen: !!r.seenAt, filled: !!j?.filledAt, groupCode: r.groupCode ?? null, interviewAt: r.interviewAt ?? null, interviewPlace: r.interviewPlace ?? null, startedAt: r.startedAt ?? null, certRequestedAt: r.certRequestedAt ?? null, workPlace: j?.workPlace ? [j.workPlace.oldWard ?? j.workPlace.newWard, j.workPlace.oldDistrict, j.workPlace.province].filter(Boolean).join(', ') : null, laborGroup: j?.laborGroup ?? null, channel: j?.channel ?? null };
       }),
     };
   }
@@ -798,6 +936,25 @@ export class WorkersService {
     if (!p) return { isSeeking: false, items: [] };
     return this.applicationsOf(p);
   }
+  /** Đợt 84 — thực tập sinh xin xác nhận thực tập (chỉ khi đã nhận việc/đi làm). */
+  private async requestCert(p: WorkerProfile, appId: string) {
+    const a = await this.apps.findOne({ where: { id: appId, profileId: p.id } });
+    if (!a) throw new NotFoundException('Không tìm thấy đơn ứng tuyển');
+    if (p.kind !== 'intern') throw new BadRequestException('Chỉ dành cho thực tập sinh.');
+    if (a.status !== 'hired' && !a.startedAt) throw new BadRequestException('Bạn chỉ xin xác nhận được sau khi đã nhận việc / đi làm.');
+    a.certRequestedAt = new Date();
+    await this.apps.save(a);
+    return { ok: true, certRequestedAt: a.certRequestedAt };
+  }
+  async requestCertGuest(phone: string, birthDate: string, appId: string) {
+    return this.requestCert(await this.verified(phone, birthDate), appId);
+  }
+  async requestCertMine(userId: string, appId: string) {
+    const p = await this.repo.findOne({ where: { userId } });
+    if (!p) throw new NotFoundException('Chưa có hồ sơ.');
+    return this.requestCert(p, appId);
+  }
+
   async setSeeking(p: WorkerProfile, seeking: boolean) {
     p.isSeeking = seeking;
     if (seeking) p.refreshedAt = new Date();
@@ -826,6 +983,101 @@ export class WorkersService {
     const open = await this.reports.count({ where: { jobPostingId: jobId, status: 'open' } });
     await this.reports.save(this.reports.create({ jobPostingId: jobId, reporterUserId: null, reason: r, note: (note ?? '').slice(0, 1000) || null, category, priority: category === 'scam' || open >= 2 ? 'high' : 'normal' }));
     return { ok: true };
+  }
+
+  // ---------- Đợt 83 ----------
+  /** Số ngày trung bình để tin được tuyển đủ, theo nhóm việc (≥3 mẫu) hoặc theo loại kênh. */
+  private async forecastTable() {
+    const m = new Map<string, { days: number; samples: number; scope: string }>();
+    const rows: { g: string | null; ch: string; d: number; n: number }[] = await this.repo.manager.query(
+      `SELECT labor_group AS g, channel AS ch, AVG(EXTRACT(EPOCH FROM (filled_at - created_at)) / 86400)::float AS d, COUNT(*)::int AS n
+       FROM job_postings WHERE channel <> 'office' AND filled_at IS NOT NULL GROUP BY labor_group, channel`,
+    );
+    const byCh = new Map<string, { sum: number; n: number }>();
+    for (const r of rows) {
+      if (r.g && r.n >= 3) m.set(r.g, { days: Math.max(1, Math.round(r.d)), samples: r.n, scope: r.g });
+      const e = byCh.get(r.ch) ?? { sum: 0, n: 0 };
+      e.sum += r.d * r.n;
+      e.n += r.n;
+      byCh.set(r.ch, e);
+    }
+    for (const [ch, e] of byCh) if (e.n >= 3) m.set(`#${ch}`, { days: Math.max(1, Math.round(e.sum / e.n)), samples: e.n, scope: 'cùng loại tin' });
+    return m;
+  }
+
+  minWage(province?: string) {
+    return minWageOf(province);
+  }
+
+  /** Tin tương tự khi tin đã đủ người / đã đóng. */
+  async similar(jobId: string) {
+    const j = await this.jobs.findOne({ where: { id: jobId } });
+    if (!j || j.channel === 'office') return { items: [] };
+    const prov = j.workPlace?.province ?? j.provinces?.[0];
+    const params: Record<string, string | undefined> = { kind: j.channel, hideFilled: '1', pageSize: '8', sort: 'new', province: prov, group: j.laborGroup ?? undefined };
+    if (j.workPlace?.province) Object.assign(params, { oProvince: j.workPlace.province, oDistrict: j.workPlace.oldDistrict ?? undefined, oWard: j.workPlace.newWardCode ?? undefined, sort: 'near' });
+    let r = await this.browse(params);
+    if (r.items.filter((x) => x.id !== jobId).length < 3) r = await this.browse({ ...params, group: undefined });
+    return { items: r.items.filter((x) => x.id !== jobId).slice(0, 4) };
+  }
+
+  /** Mùa thi: pause (ẩn tới ngày) | weekend (chỉ nhận ca cuối tuần) | off. */
+  private async setExam(p: WorkerProfile, mode: string, until?: string) {
+    if (mode === 'off' || !mode) {
+      p.examMode = null;
+      p.examUntil = null;
+    } else {
+      if (!['pause', 'weekend'].includes(mode)) throw new BadRequestException('Chế độ không hợp lệ');
+      const d = String(until ?? '').slice(0, 10);
+      const t = new Date(d).getTime();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !(t > Date.now() - 864e5) || t > Date.now() + 120 * 864e5) throw new BadRequestException('Ngày kết thúc mùa thi phải trong 120 ngày tới.');
+      p.examMode = mode;
+      p.examUntil = d;
+      if (mode === 'weekend') p.availability = (p.availability ?? []).filter((x) => x.startsWith('t7') || x.startsWith('cn'));
+    }
+    await this.repo.save(p);
+    return { ok: true, examMode: p.examMode ?? null, examUntil: p.examUntil ?? null };
+  }
+  async setExamGuest(phone: string, birthDate: string, mode: string, until?: string) {
+    return this.setExam(await this.verified(phone, birthDate), mode, until);
+  }
+  async setExamMine(userId: string, mode: string, until?: string) {
+    const p = await this.repo.findOne({ where: { userId } });
+    if (!p) throw new BadRequestException('Bạn chưa có hồ sơ lao động phổ thông.');
+    return this.setExam(p, mode, until);
+  }
+
+  /** Hẹn phỏng vấn cho một hoặc nhiều đơn ứng tuyển (phỏng vấn nhóm). */
+  async setInterview(userId: string, appIds: string[], at: string, place?: string) {
+    const when = new Date(at);
+    if (!appIds?.length || Number.isNaN(+when)) throw new BadRequestException('Vui lòng chọn ngày giờ phỏng vấn hợp lệ.');
+    if (+when < Date.now() - 3600e3) throw new BadRequestException('Thời gian phỏng vấn phải ở tương lai.');
+    let n = 0;
+    for (const id of appIds.slice(0, 100)) {
+      const a = await this.ownedApp(userId, id).catch(() => null);
+      if (!a) continue;
+      a.status = 'interview';
+      a.interviewAt = when;
+      a.interviewPlace = clip(place, 200);
+      a.seenAt = a.seenAt ?? new Date();
+      await this.apps.save(a);
+      n++;
+    }
+    return { ok: true, updated: n };
+  }
+  /** Điểm danh ngày đầu: có đi làm → đã nhận việc; vắng → ghi "nhận việc nhưng không đi làm". */
+  async markStart(userId: string, appId: string, attended: boolean) {
+    const a = await this.ownedApp(userId, appId);
+    if (attended) {
+      a.status = 'hired';
+      a.startedAt = new Date();
+    } else {
+      a.status = 'no_show';
+      a.startedAt = null;
+    }
+    await this.apps.save(a);
+    await this.recomputeFill(a.jobPostingId);
+    return { ok: true, status: a.status };
   }
 
   // ---------- admin ----------
@@ -875,6 +1127,41 @@ export class WorkersService {
       })
       .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap))
       .slice(0, 30);
+  }
+  /** Đợt 83 — tin lặp: cùng SĐT liên hệ ở nhiều công ty, hoặc cùng nội dung đăng ở nhiều tỉnh/công ty (nghi môi giới). */
+  async adminDuplicateJobs() {
+    const rows = await this.jobs.find({ where: { channel: In(['worker', 'student', 'intern']) }, relations: { company: true }, order: { createdAt: 'DESC' }, take: 3000 });
+    const mk = (j: JobPosting) => ({ id: j.id, title: j.title, company: j.company?.name ?? null, province: j.workPlace?.province ?? j.provinces?.[0] ?? null, createdAt: j.createdAt, status: j.approvalStatus });
+    const groups: { key: string; reason: string; jobs: ReturnType<typeof mk>[] }[] = [];
+    const byPhone = new Map<string, JobPosting[]>();
+    const byText = new Map<string, JobPosting[]>();
+    for (const j of rows) {
+      const ph = (j.contactPhone ?? '').replace(/\D/g, '');
+      if (ph.length >= 9) byPhone.set(ph, [...(byPhone.get(ph) ?? []), j]);
+      const t = fold(`${j.title} ${(j.description ?? '').replace(/<[^>]*>/g, ' ')}`).slice(0, 220);
+      if (t.length > 40) byText.set(t, [...(byText.get(t) ?? []), j]);
+    }
+    for (const [ph, l] of byPhone) if (new Set(l.map((x) => x.companyId)).size >= 2) groups.push({ key: `p:${ph}`, reason: `Cùng số liên hệ ${ph} xuất hiện ở ${new Set(l.map((x) => x.companyId)).size} công ty khác nhau`, jobs: l.slice(0, 8).map(mk) });
+    for (const [k, l] of byText) {
+      const comps = new Set(l.map((x) => x.companyId)).size;
+      const provs = new Set(l.map((x) => x.workPlace?.province ?? x.provinces?.[0] ?? '')).size;
+      if (l.length >= 2 && (comps >= 2 || provs >= 3)) groups.push({ key: `t:${k.slice(0, 30)}`, reason: comps >= 2 ? `Nội dung giống hệt ở ${comps} công ty khác nhau` : `Cùng một tin đăng lặp ở ${provs} tỉnh`, jobs: l.slice(0, 8).map(mk) });
+    }
+    return { items: groups.slice(0, 50) };
+  }
+
+  /** Đợt 83 — gom việc cần admin xử lý trong ngày. */
+  async adminTodo() {
+    const [rep]: { n: number }[] = await this.repo.manager.query(`SELECT COUNT(DISTINCT job_posting_id)::int AS n FROM job_reports WHERE status = 'open'`);
+    const sus = await this.adminSuspicious();
+    const dup = await this.adminDuplicateJobs();
+    const pending = await this.jobs.find({ where: { channel: In(['worker', 'student', 'intern']), approvalStatus: JobApprovalStatus.PENDING }, order: { createdAt: 'DESC' }, take: 100 });
+    const risky = pending
+      .map((j) => ({ j, r: assessJobRisk(j as unknown as RiskJob, { others: [] }) }))
+      .filter((x) => x.r.score >= 40)
+      .map((x) => ({ id: x.j.id, title: x.j.title, score: x.r.score, reasons: x.r.reasons.slice(0, 3) }));
+    const bal = (await this.provinceBalance()).filter((x) => Math.abs(x.gap) >= 5).slice(0, 3);
+    return { openReports: rep?.n ?? 0, suspicious: sus.items.length, duplicates: dup.items.length, pendingTotal: pending.length, riskyPending: risky, imbalance: bal };
   }
   async adminHide(id: string, hidden: boolean) {
     await this.repo.update({ id }, { isHidden: hidden });

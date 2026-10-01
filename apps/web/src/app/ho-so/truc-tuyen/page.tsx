@@ -55,7 +55,7 @@ const SKILL_LEVEL_LABEL: Record<string, string> = {
   advanced: 'Thành thạo',
   expert: 'Chuyên gia',
 };
-const VISIBILITY_LABEL: Record<string, string> = { locked: 'Khóa', public: 'Công khai', urgent: 'URGENT' };
+const VISIBILITY_LABEL: Record<string, string> = { locked: 'Khóa', public: 'Công khai', urgent: 'Khẩn cấp' };
 
 const TOC = [
   { id: 'muc-1', key: 'profileTitle', label: 'Tiêu đề hồ sơ' },

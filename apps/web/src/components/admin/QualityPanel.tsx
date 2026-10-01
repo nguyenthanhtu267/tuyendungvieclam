@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { adminApi, smartApi, smartApi2, smartApi3, smartApi6, workersApi, type ProvinceBalance, type SuspiciousAccount, type SuspiciousWorkerGroup, type QualityOverview, type SystemHealth, type ReportGroup, type WeeklyReport, type AdTargeting } from '@/lib/api';
+import { adminApi, smartApi, smartApi2, smartApi3, smartApi6, workersApi, type AdminTodo, type DupJobGroup, type ProvinceBalance, type SuspiciousAccount, type SuspiciousWorkerGroup, type QualityOverview, type SystemHealth, type ReportGroup, type WeeklyReport, type AdTargeting } from '@/lib/api';
 
 type Sub = 'reports' | 'weekly' | 'ads' | 'system' | 'duplicates' | 'suspicious' | 'lowQuality' | 'spam' | 'accounts' | 'workers';
 
@@ -17,6 +17,8 @@ export function QualityPanel({ token }: { token: string }) {
   const [accts, setAccts] = useState<SuspiciousAccount[]>([]);
   const [wg, setWg] = useState<SuspiciousWorkerGroup[]>([]);
   const [wstats, setWstats] = useState<{ items: { kind: string; n: number; fresh: number; hidden: number }[]; apps: number; contacts: number; provinces?: ProvinceBalance[] } | null>(null);
+  const [todo, setTodo] = useState<AdminTodo | null>(null);
+  const [dups, setDups] = useState<DupJobGroup[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
   const load = useCallback(() => {
@@ -28,6 +30,8 @@ export function QualityPanel({ token }: { token: string }) {
     smartApi6.suspicious(token).then((r) => setAccts(r.items)).catch(() => setAccts([]));
     workersApi.adminSuspicious(token).then((r) => setWg(r.items)).catch(() => setWg([]));
     workersApi.adminStats(token).then(setWstats).catch(() => undefined);
+    workersApi.adminTodo(token).then(setTodo).catch(() => undefined);
+    workersApi.adminDuplicateJobs(token).then((r) => setDups(r.items)).catch(() => setDups([]));
     smartApi3.adTargeting(token).then(setAds).catch(() => undefined);
   }, [token]);
   useEffect(load, [load]);
@@ -97,7 +101,7 @@ export function QualityPanel({ token }: { token: string }) {
           {!reports && <div className="p-4 text-ink-faint text-sm">Đang tải…</div>}
           {reports?.length === 0 && <div className="p-4 text-ink-faint text-sm">Chưa có báo cáo nào đang mở.</div>}
           {reports?.map((r) => (
-            <Row key={r.jobId} id={r.jobId} title={r.title} company={r.company} badge={`${r.count} báo cáo${r.priority === 'high' ? ' · URGENT' : ''}`} note={`${r.categories.join(', ')}${r.notes[0] ? ` — “${r.notes[0]}”` : ''}`}>
+            <Row key={r.jobId} id={r.jobId} title={r.title} company={r.company} badge={`${r.count} báo cáo${r.priority === 'high' ? ' · khẩn cấp' : ''}`} note={`${r.categories.join(', ')}${r.notes[0] ? ` — “${r.notes[0]}”` : ''}`}>
               <div className="flex gap-2 shrink-0">
                 <button type="button" disabled={busy === r.jobId} onClick={() => resolve(r.jobId)} className="rounded-lg border border-border text-[12.5px] font-bold px-2.5 py-1 disabled:opacity-50">Đã xử lý</button>
                 <Btn busy={busy === r.jobId} onClick={() => hide(r.jobId, 'Người dùng báo cáo vi phạm').then(() => resolve(r.jobId))} />
@@ -201,6 +205,33 @@ export function QualityPanel({ token }: { token: string }) {
       )}
       {sub === 'workers' && (
         <div className="flex flex-col gap-2">
+          {todo && (
+            <div className="rounded-xl border-2 border-primary bg-white p-3 text-[13.5px] text-ink flex flex-col gap-1.5">
+              <div className="font-extrabold text-[15px]">Việc cần xử lý hôm nay (kênh lao động phổ thông)</div>
+              <ul className="list-disc pl-5">
+                <li><b>{todo.openReports}</b> tin đang bị người dùng báo cáo — xem tab “Người dùng báo cáo”.</li>
+                <li><b>{todo.suspicious}</b> nhóm hồ sơ nghi ảo/môi giới — xem danh sách bên dưới.</li>
+                <li><b>{todo.duplicates}</b> nhóm tin lặp / trùng nội dung — xem “Tin lặp” bên dưới.</li>
+                <li><b>{todo.riskyPending.length}</b> tin đang chờ duyệt có điểm rủi ro cao (trên tổng {todo.pendingTotal} tin chờ duyệt).</li>
+              </ul>
+              {todo.riskyPending.map((j) => (
+                <div key={j.id} className="rounded border border-critical bg-critical-tint px-2 py-1"><a href={`/admin/sua-tin/${j.id}`} className="font-bold text-critical underline">{j.title}</a> — điểm {j.score}: {j.reasons.join('; ')}</div>
+              ))}
+              {todo.imbalance.length > 0 && <div>Lệch cung–cầu lớn nhất: {todo.imbalance.map((p) => `${p.province} (${p.seekers} người / ${p.slots} chỗ)`).join(' · ')}.</div>}
+              {todo.openReports + todo.suspicious + todo.duplicates + todo.riskyPending.length === 0 && <div className="font-bold text-success">Không có việc tồn đọng.</div>}
+            </div>
+          )}
+          {dups.length > 0 && (
+            <div className="rounded-xl border border-border bg-white p-3 text-[13.5px] text-ink flex flex-col gap-2">
+              <div className="font-extrabold text-[14px]">Tin lặp / nghi môi giới ({dups.length})</div>
+              {dups.map((g) => (
+                <div key={g.key} className="rounded-lg border border-border p-2">
+                  <div className="font-bold">{g.reason}</div>
+                  <ul className="mt-0.5">{g.jobs.map((j) => (<li key={j.id}><a href={`/admin/sua-tin/${j.id}`} className="text-primary underline">{j.title}</a> — {j.company ?? '—'} · {j.province ?? '—'}</li>))}</ul>
+                </div>
+              ))}
+            </div>
+          )}
           {wstats && (
             <div className="rounded-xl border border-border bg-white p-3 text-[13.5px] text-ink flex flex-wrap gap-x-5 gap-y-1">
               {wstats.items.map((r) => (

@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { workersApi, type ApplyResult, type WorkerKind, type WorkerProfileView } from '@/lib/api';
-import { KIND_LABEL, normalizePhone, slotText } from '@/lib/labor';
+import { workersApi, type ProfileExtra, type ApplyResult, type WorkerKind, type WorkerProfileView } from '@/lib/api';
+import { KIND_LABEL, ageOfBirth, normalizePhone, slotText } from '@/lib/labor';
 import { DateSelect, isFullDate } from './DateSelect';
 import { markWorker } from './RefreshReminder';
 
@@ -13,12 +13,14 @@ const KEY = 'tvl_worker_creds';
 export interface WorkerSnap {
   kind: WorkerKind; province: string; oldDistrict: string | null; newWardCode: string | null; lat: number | null; lon: number | null;
   desiredJobs: string[]; availability: string[]; needsHousing: boolean; needsShuttle: boolean; radiusKm: number | null;
+  birthDate?: string; extra?: ProfileExtra | null; major?: string | null;
 }
 interface Creds { phone: string; birthDate: string; name: string; snap?: WorkerSnap }
 
 export const snapOf = (p: WorkerProfileView): WorkerSnap => ({
   kind: p.kind, province: p.province, oldDistrict: p.oldDistrict, newWardCode: p.newWardCode, lat: p.lat, lon: p.lon, desiredJobs: p.desiredJobs,
   availability: p.availability ?? [], needsHousing: p.needsHousing, needsShuttle: p.needsShuttle, radiusKm: p.radiusKm,
+  birthDate: p.birthDate, extra: p.extra ?? null, major: p.major,
 });
 /** Tham số gửi API browse/jobs từ ảnh chụp hồ sơ. */
 export function snapParams(s?: WorkerSnap | null): Record<string, string | undefined> {
@@ -27,6 +29,10 @@ export function snapParams(s?: WorkerSnap | null): Record<string, string | undef
     oProvince: s.province, oDistrict: s.oldDistrict ?? undefined, oWard: s.newWardCode ?? undefined,
     oLat: s.lat != null ? String(s.lat) : undefined, oLon: s.lon != null ? String(s.lon) : undefined,
     groups: s.desiredJobs.join('|'), avail: s.availability.join(','), needs: [s.needsHousing ? 'housing' : '', s.needsShuttle ? 'shuttle' : ''].filter(Boolean).join(','),
+    // Đợt 84 — người chưa đủ 18 tuổi: ẩn việc ca đêm/nặng; sinh viên: lọc theo số giờ/tuần; đối chiếu yêu cầu của tin
+    minor: s.birthDate && ageOfBirth(s.birthDate) < 18 ? '1' : undefined,
+    hours: s.extra?.hours === 'lt15' ? '14' : s.extra?.hours === '15-25' ? '25' : undefined,
+    fit: s.birthDate ? '1' : undefined, bd: s.birthDate, ex: s.extra ? JSON.stringify(s.extra) : undefined, major: s.major ?? undefined,
   };
 }
 

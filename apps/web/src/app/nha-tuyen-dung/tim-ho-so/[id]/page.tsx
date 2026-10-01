@@ -154,7 +154,7 @@ export default function CandidateDetailPage() {
                 <h1 className="text-lg font-extrabold text-ink">{detail.fullName}</h1>
                 {detail.isAdminSourced && <SourcedCandidateBadge />}
                 {detail.visibility === 'urgent' && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-critical-tint text-critical">URGENT</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-critical-tint text-critical">Khẩn cấp</span>
                 )}
                 {detail.unlocked && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-success-tint text-success">Đã mở</span>

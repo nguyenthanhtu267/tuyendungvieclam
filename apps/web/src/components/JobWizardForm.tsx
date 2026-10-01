@@ -117,7 +117,7 @@ export const JOB_WIZARD_INITIAL: JobWizardFormState = {
   screening: [],
   channel: 'office',
   laborGroup: '',
-  labor: { workPlace: EMPTY_ADDRESS, perks: [], payBase: '', payOt: '', payNight: '', payAllowance: '', schedule: [] },
+  labor: { workPlace: EMPTY_ADDRESS, perks: [], payBase: '', payOt: '', payNight: '', payAllowance: '', schedule: [], extra: {} },
   contactName: '',
   contactEmail: '',
   contactPhone: '',
@@ -233,7 +233,12 @@ export function JobWizardSteps({
             {/* Đợt 79 — kênh tin: tin công nhân / SV / thực tập hiển thị ở kênh riêng, không lẫn việc văn phòng */}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Loại tin">
-                <select id="jw-channel" className="tvl-input" value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value, laborGroup: '' })}>
+                <select id="jw-channel" className="tvl-input" value={form.channel} onChange={(e) => {
+                  const ch = e.target.value;
+                  // Đợt 84 — tin phổ thông không dùng "Cấp bậc/Kinh nghiệm" của việc văn phòng: đặt giá trị phù hợp từng nhóm
+                  const d = ch === 'intern' ? { employmentType: 'Thực tập', experienceLevel: EXPERIENCE_LEVELS[0], level: LEVELS[0] } : ch === 'student' ? { employmentType: 'Thời vụ - Nghề tự do', experienceLevel: EXPERIENCE_LEVELS[0], level: LEVELS[0] } : ch === 'worker' ? { employmentType: EMPLOYMENT_TYPES[0], experienceLevel: EXPERIENCE_LEVELS[0], level: LEVELS[2] } : {};
+                  setForm({ ...form, ...d, channel: ch, laborGroup: '', labor: { ...form.labor, extra: {}, schedule: [] } });
+                }}>
                   {CHANNEL_OPTIONS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
                 </select>
               </Field>
@@ -302,6 +307,8 @@ export function JobWizardSteps({
                 emptyText="Vui lòng chọn ngành nghề"
               />
             </Field>
+            {form.channel === 'office' && (
+              <>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Cấp bậc">
                 <select className="tvl-input" value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })}>
@@ -314,16 +321,20 @@ export function JobWizardSteps({
                 </select>
               </Field>
             </div>
+              </>
+            )}
             <div className="grid grid-cols-2 gap-3">
+              {form.channel === 'office' && (
               <Field label="Kinh nghiệm làm việc">
                 <select className="tvl-input" value={form.experienceLevel} onChange={(e) => setForm({ ...form, experienceLevel: e.target.value })}>
                   {EXPERIENCE_LEVELS.map((o) => <option key={o}>{o}</option>)}
                 </select>
               </Field>
-              <Field label="Việc làm URGENT">
+              )}
+              <Field label="Việc làm khẩn cấp">
                 <div className="flex items-center h-[42px]">
                   <Chip active={form.isUrgent} onClick={() => setForm({ ...form, isUrgent: !form.isUrgent })}>
-                    {form.isUrgent ? '🔥 URGENT' : 'Đánh dấu URGENT'}
+                    {form.isUrgent ? '🔥 Khẩn cấp' : 'Đánh dấu khẩn cấp'}
                   </Chip>
                 </div>
               </Field>

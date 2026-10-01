@@ -365,7 +365,7 @@ export default function TimHoSoPage() {
                   checked={filters.urgentOnly ?? false}
                   onChange={(e) => setFilters((f) => ({ ...f, urgentOnly: e.target.checked }))}
                 />
-                Chỉ hồ sơ URGENT
+                Chỉ hồ sơ khẩn cấp
               </label>
               <label className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
                 <input
@@ -548,7 +548,7 @@ function CandidateCard({
             {item.isAdminSourced && <SourcedCandidateBadge />}
             {item.visibility === 'urgent' && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-critical-tint text-critical">
-                URGENT
+                Khẩn cấp
               </span>
             )}
             {item.unlocked && (

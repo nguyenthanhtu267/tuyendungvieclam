@@ -148,6 +148,20 @@ export function JobCard({
               ⚡ URGENT
             </span>
           )}
+          {Math.max(job.salaryMin ?? 0, job.salaryMax ?? 0) >= 50 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                router.push('/viec-lam?salaryTier=50');
+              }}
+              title="Xem các tin có lương từ 50 triệu trở lên"
+              className="inline-flex items-center ml-1.5 align-middle text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-[#FFD84D] text-[#5A3A00] border border-[#C99A00] tracking-wide hover:brightness-95"
+            >
+              ★ CAO CẤP
+            </button>
+          )}
         </div>
         <div className="text-xs text-ink-muted mt-0.5 truncate flex items-center gap-1.5">
           <span className="min-w-0 flex-1 max-w-full">

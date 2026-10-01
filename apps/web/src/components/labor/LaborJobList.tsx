@@ -4,9 +4,25 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { formatSalary } from '@/lib/format';
-import type { ApplyResult, WorkerJobCard } from '@/lib/api';
+import type { ApplyResult, WorkerJobCard, WorkerKind } from '@/lib/api';
+import { extraLines } from './JobExtraBlocks';
 import { PERK_LABEL, PERK_SHORT, fmtM, slotText } from '@/lib/labor';
+import { travelCostMonth } from '@/lib/labor-extra';
 import { useSavedJobs } from './saved';
+import type { TrustInfo } from '@/lib/api';
+
+/** Đợt 83 — nhãn uy tín nhà tuyển dụng (phản hồi ứng viên). */
+export function TrustBadge({ t }: { t?: TrustInfo | null }) {
+  if (!t) return null;
+  if (t.score == null) return <span className="rounded bg-surface-alt border border-border text-ink text-[12px] font-bold px-1.5 py-0.5">Nhà tuyển dụng mới</span>;
+  const good = t.score >= 75;
+  const mid = t.score >= 50;
+  return (
+    <span title={`Gọi lại ${t.callRate}% ứng viên · phản hồi trung bình ${t.avgHours ?? '—'} giờ · ${t.reports} báo cáo`} className={`rounded border text-[12px] font-bold px-1.5 py-0.5 ${good ? 'border-success bg-success-tint text-success' : mid ? 'border-warning bg-warning-tint text-ink' : 'border-critical bg-critical-tint text-critical'}`}>
+      Uy tín {t.score}/100 — {t.label}
+    </span>
+  );
+}
 import { ShareButtons } from './ShareButtons';
 import { GroupInvite } from './GroupInvite';
 
@@ -77,6 +93,7 @@ export function LaborJobList({
                 {j.distance && <span className="shrink-0 rounded-lg bg-success-tint text-success font-extrabold text-[12.5px] px-2 py-0.5">{j.distance.label}</span>}
               </div>
               <div className="text-[13px] font-bold text-ink uppercase truncate">{j.company?.name}</div>
+              {j.trust && <div><TrustBadge t={j.trust} /></div>}
               {(j.warnings ?? []).length > 0 && (
                 <div role="alert" className="rounded-lg border border-critical bg-critical-tint px-2 py-1 text-[12.5px] font-bold text-critical">
                   Cẩn trọng: {(j.warnings ?? []).join('; ')}. Không nộp tiền hay giao giấy tờ gốc trước khi đến công ty xác minh.
@@ -93,6 +110,11 @@ export function LaborJobList({
                   {j.income.otHours > 0 && <> (gồm {j.income.otHours} giờ tăng ca)</>}
                 </div>
               )}
+              {j.income && travelCostMonth(j) != null && (
+                <div className="text-[12.5px] text-ink">
+                  {travelCostMonth(j) === 0 ? <>Có xe đưa đón — không tốn tiền đi lại.</> : <>Đi lại ước tính ~{fmtM(travelCostMonth(j)!)}/tháng → còn lại <b className="text-success">~{fmtM(Math.max(0, Math.round((j.income.net - travelCostMonth(j)!) * 10) / 10))}</b> sau chi phí đi lại.</>}
+                </div>
+              )}
               {(perks.length > 0 || j.perks?.includes('no_fee') || j.scheduleFit) && (
                 <div className="flex flex-wrap gap-1">
                   {perks.map((p) => (
@@ -100,6 +122,17 @@ export function LaborJobList({
                   ))}
                   {j.perks?.includes('no_fee') && <span className="rounded bg-success-tint text-success font-bold text-[12px] px-1.5 py-0.5">Không thu phí</span>}
                   {j.scheduleFit && <span className="rounded bg-success text-white font-bold text-[12px] px-1.5 py-0.5">Hợp lịch học của bạn</span>}
+                </div>
+              )}
+              {(j.hourly || extraLines(j.channel as WorkerKind, j.laborExtra).length > 0) && (
+                <div className="text-[12.5px] text-ink">
+                  {j.hourly?.monthEstimate ? <>Làm đủ giờ ước tính <b className="text-success">~{(j.hourly.monthEstimate / 1e6).toLocaleString('vi-VN', { maximumFractionDigits: 2 })} triệu/tháng</b>. </> : null}
+                  {extraLines(j.channel as WorkerKind, j.laborExtra).join(' · ')}
+                </div>
+              )}
+              {j.fit && (j.fit.missing.length > 0 || j.fit.ok.length > 0) && (
+                <div className={`text-[12.5px] font-bold ${j.fit.missing.length ? 'text-critical' : 'text-success'}`}>
+                  {j.fit.missing.length ? `Còn thiếu: ${j.fit.missing.slice(0, 2).join('; ')}${j.fit.missing.length > 2 ? '…' : ''}` : 'Khớp yêu cầu của tin'}
                 </div>
               )}
               {j.matched && <div className="text-[12.5px] font-bold text-success">Đúng công việc bạn mong muốn</div>}
@@ -176,6 +209,8 @@ function CompareModal({ jobs, onClose }: { jobs: WorkerJobCard[]; onClose: () =>
     { label: 'Công ty', cell: (j) => j.company?.name ?? '—' },
     { label: 'Lương đăng', cell: (j) => formatSalary(j.salaryMin ?? undefined, j.salaryMax ?? undefined) },
     { label: 'Thực nhận ước tính', cell: (j) => (j.income ? `~${fmtM(j.income.net)}/tháng` : 'Chưa có'), win: best((j) => j.income?.net ?? null) },
+    { label: 'Còn lại sau tiền đi lại', cell: (j) => { const t = travelCostMonth(j); return j.income && t != null ? `~${fmtM(Math.max(0, Math.round((j.income.net - t) * 10) / 10))}/tháng` : 'Chưa rõ'; }, win: best((j) => { const t = travelCostMonth(j); return j.income && t != null ? j.income.net - t : null; }) },
+    { label: 'Uy tín nhà tuyển dụng', cell: (j) => (j.trust ? (j.trust.score == null ? 'Nhà tuyển dụng mới' : `${j.trust.score}/100 — ${j.trust.label}`) : '—'), win: best((j) => j.trust?.score ?? null) },
     { label: 'Khoảng cách', cell: (j) => j.distance?.label ?? 'Chưa rõ (điền hồ sơ để tính)', win: best((j) => j.distance?.km ?? null, true) },
     { label: 'Nơi làm việc', cell: (j) => j.workPlaceText ?? j.provinces.join(', ') },
     { label: 'Quyền lợi', cell: (j) => ((j.perks ?? []).map((p) => PERK_LABEL[p] ?? p).join('; ') || 'Không nêu'), win: best((j) => (j.perks ?? []).length) },

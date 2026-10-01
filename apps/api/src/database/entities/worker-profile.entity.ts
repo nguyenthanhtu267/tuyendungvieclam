@@ -84,6 +84,17 @@ export class WorkerProfile {
   @Column({ name: 'needs_shuttle', default: false })
   needsShuttle: boolean;
 
+  // Đợt 83 — chế độ mùa thi: pause (ẩn tới ngày) | weekend (chỉ nhận ca cuối tuần)
+  @Column({ name: 'exam_until', type: 'date', nullable: true })
+  examUntil?: string | null;
+
+  @Column({ name: 'exam_mode', type: 'varchar', length: 10, nullable: true })
+  examMode?: string | null;
+
+  // Đợt 84 — thông tin riêng theo nhóm: readyNow, availableFrom, experience, hasBike, hasHealthCert, certs, hoursPerWeek, internMonths, internDays, internMode, year
+  @Column({ name: 'profile_extra', type: 'jsonb', nullable: true })
+  extra?: import('../../workers/labor-extra').ProfileExtra | null;
+
   // Ứng viên tự bật/tắt "đang tìm việc"
   @Column({ name: 'is_seeking', default: true })
   isSeeking: boolean;
@@ -155,6 +166,20 @@ export class WorkerApplication {
   // Đợt 80 — "rủ bạn đi làm cùng": cùng mã nhóm = cùng một nhóm ứng tuyển
   @Column({ name: 'group_code', type: 'varchar', length: 10, nullable: true })
   groupCode?: string | null;
+
+  // Đợt 83 — hẹn phỏng vấn (đơn lẻ hoặc theo nhóm) và điểm danh ngày đầu đi làm
+  @Column({ name: 'interview_at', type: 'timestamp', nullable: true })
+  interviewAt?: Date | null;
+
+  @Column({ name: 'interview_place', type: 'varchar', length: 200, nullable: true })
+  interviewPlace?: string | null;
+
+  @Column({ name: 'started_at', type: 'timestamp', nullable: true })
+  startedAt?: Date | null;
+
+  // Đợt 84 — thực tập sinh xin nhà tuyển dụng xác nhận / phiếu nhận xét
+  @Column({ name: 'cert_requested_at', type: 'timestamp', nullable: true })
+  certRequestedAt?: Date | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
