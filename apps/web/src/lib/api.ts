@@ -200,6 +200,7 @@ export interface Company {
   id: string;
   name: string;
   taxCode: string;
+  createdAt?: string;
   size?: string;
   industry?: string;
   website?: string;

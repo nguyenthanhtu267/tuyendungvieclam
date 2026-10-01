@@ -184,6 +184,18 @@ export class AdminController {
     return this.adminService.deleteJob(admin, id);
   }
 
+  // Đợt 113 — danh sách theo trạng thái: ?status=pending|approved|rejected
+  @Get('companies/by-status')
+  listCompaniesByStatus(@Query('status') status?: string, @Query('q') q?: string) {
+    const st =
+      status === 'approved'
+        ? CompanyApprovalStatus.APPROVED
+        : status === 'rejected'
+          ? CompanyApprovalStatus.REJECTED
+          : CompanyApprovalStatus.PENDING;
+    return this.adminService.listCompaniesByStatus(st, q);
+  }
+
   @Get('companies/pending')
   listPendingCompanies() {
     return this.adminService.listPendingCompanies();
@@ -269,6 +281,30 @@ export class AdminController {
     return this.adminService.searchCompanies(q);
   }
 
+  // Đợt 114 — danh bạ công ty (tab DN yêu thích & Logo) + đánh dấu yêu thích hàng loạt.
+  @Get('companies/directory')
+  companyDirectory(
+    @Query('q') q?: string,
+    @Query('status') status?: string,
+    @Query('featured') featured?: string,
+    @Query('noLogo') noLogo?: string,
+  ) {
+    return this.adminService.companyDirectory({
+      q,
+      status,
+      featured: featured === '1',
+      noLogo: noLogo === '1',
+    });
+  }
+
+  @Patch('companies/bulk-featured')
+  bulkFeatured(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Body() body: { ids: string[]; featured: boolean },
+  ) {
+    return this.adminService.bulkSetFeatured(admin, body?.ids ?? [], !!body?.featured);
+  }
+
   @Patch('companies/:id/toggle-featured')
   toggleFeaturedEmployer(
     @CurrentUser() admin: { userId: string; email: string },
@@ -296,6 +332,19 @@ export class AdminController {
       admin,
       id,
       CompanyApprovalStatus.APPROVED,
+    );
+  }
+
+  // Đợt 113 — "Thu hồi": đưa công ty đã duyệt về hàng chờ.
+  @Patch('companies/:id/revoke')
+  revokeCompany(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Param('id') id: string,
+  ) {
+    return this.adminService.setCompanyStatus(
+      admin,
+      id,
+      CompanyApprovalStatus.PENDING,
     );
   }
 

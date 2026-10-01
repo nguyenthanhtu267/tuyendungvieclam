@@ -577,32 +577,58 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   async setCompanyStatus(
     admin: AdminActor,
     id: string,
-    status: CompanyApprovalStatus.APPROVED | CompanyApprovalStatus.REJECTED,
+    status:
+      | CompanyApprovalStatus.APPROVED
+      | CompanyApprovalStatus.REJECTED
+      | CompanyApprovalStatus.PENDING,
   ) {
     const company = await this.companyRepo.findOne({ where: { id } });
     if (!company) throw new NotFoundException('Không tìm thấy công ty');
     company.approvalStatus = status;
     const saved = await this.companyRepo.save(company);
 
-    await this.notifyCompanyUsers(
-      company.id,
+    // Đợt 113 — PENDING = "thu hồi" (đưa công ty đã duyệt về hàng chờ để xem xét lại).
+    const kind =
       status === CompanyApprovalStatus.APPROVED
         ? 'company_approved'
-        : 'company_rejected',
+        : status === CompanyApprovalStatus.REJECTED
+          ? 'company_rejected'
+          : 'company_revoked';
+    await this.notifyCompanyUsers(
+      company.id,
+      kind,
       status === CompanyApprovalStatus.APPROVED
         ? `Hồ sơ công ty "${company.name}" đã được duyệt.`
-        : `Hồ sơ công ty "${company.name}" bị từ chối. Vui lòng cập nhật giấy tờ pháp lý và gửi lại.`,
+        : status === CompanyApprovalStatus.REJECTED
+          ? `Hồ sơ công ty "${company.name}" bị từ chối. Vui lòng cập nhật giấy tờ pháp lý và gửi lại.`
+          : `Hồ sơ công ty "${company.name}" được chuyển về trạng thái chờ duyệt để xem xét lại.`,
     );
     await this.logAction(
       admin,
       status === CompanyApprovalStatus.APPROVED
         ? 'company.approve'
-        : 'company.reject',
+        : status === CompanyApprovalStatus.REJECTED
+          ? 'company.reject'
+          : 'company.revoke',
       'company',
       company.id,
       company.name,
     );
     return saved;
+  }
+
+  // Đợt 113 — danh sách công ty theo trạng thái (mới đăng ký nhất trước). Bỏ qua công ty "Nguồn ngoài" do Admin tạo (tự duyệt sẵn).
+  async listCompaniesByStatus(status: CompanyApprovalStatus, q?: string) {
+    const qb = this.companyRepo
+      .createQueryBuilder('company')
+      .where('company.approvalStatus = :status', { status })
+      .andWhere('company.isAdminSourced = false')
+      .orderBy('company.createdAt', 'DESC');
+    if (q?.trim()) {
+      qb.andWhere('(company.name ILIKE :q OR company.taxCode ILIKE :q)', { q: `%${q.trim()}%` });
+    }
+    const [items, total] = await qb.take(300).getManyAndCount();
+    return { items, total };
   }
 
   async bulkSetCompanyStatus(
@@ -644,6 +670,48 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       qb.where('company.name ILIKE :q', { q: `%${q.trim()}%` });
     }
     return qb.take(30).getMany();
+  }
+
+  // Đợt 114 — danh bạ công ty cho tab "DN yêu thích & Logo": lọc theo từ khoá/trạng thái duyệt/yêu thích/chưa có logo, mới nhất trước.
+  async companyDirectory(opts: { q?: string; status?: string; featured?: boolean; noLogo?: boolean }) {
+    const qb = this.companyRepo.createQueryBuilder('company').orderBy('company.createdAt', 'DESC');
+    if (opts.q?.trim()) {
+      qb.andWhere('(company.name ILIKE :q OR company.taxCode ILIKE :q)', { q: `%${opts.q.trim()}%` });
+    }
+    if (opts.status && (Object.values(CompanyApprovalStatus) as string[]).includes(opts.status)) {
+      qb.andWhere('company.approvalStatus = :st', { st: opts.status });
+    }
+    if (opts.featured) qb.andWhere('company.isFeaturedEmployer = true');
+    if (opts.noLogo) qb.andWhere("(company.logoUrl IS NULL OR company.logoUrl = '')");
+    const [items, total] = await qb.take(300).getManyAndCount();
+    const [featuredTotal, noLogoTotal, all] = await Promise.all([
+      this.companyRepo.count({ where: { isFeaturedEmployer: true } }),
+      this.companyRepo
+        .createQueryBuilder('c')
+        .where("(c.logoUrl IS NULL OR c.logoUrl = '')")
+        .getCount(),
+      this.companyRepo.count(),
+    ]);
+    return { items, total, featuredTotal, noLogoTotal, all };
+  }
+
+  async bulkSetFeatured(admin: AdminActor, ids: string[], featured: boolean) {
+    const list = (ids ?? []).filter((x) => typeof x === 'string').slice(0, 300);
+    if (!list.length) return { updated: 0 };
+    const res = await this.companyRepo
+      .createQueryBuilder()
+      .update()
+      .set({ isFeaturedEmployer: featured })
+      .whereInIds(list)
+      .execute();
+    await this.logAction(
+      admin,
+      featured ? 'company.bulk_feature' : 'company.bulk_unfeature',
+      'company',
+      undefined,
+      `${res.affected ?? list.length} công ty → ${featured ? 'Đánh dấu' : 'Bỏ đánh dấu'} Doanh nghiệp yêu thích`,
+    );
+    return { updated: res.affected ?? list.length };
   }
 
   async toggleFeaturedEmployer(admin: AdminActor, id: string) {

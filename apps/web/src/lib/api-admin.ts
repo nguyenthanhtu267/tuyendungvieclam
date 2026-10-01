@@ -66,6 +66,10 @@ export const adminApi = {
     }),
   listPendingCompanies: (token: string) =>
     request<Company[]>('/admin/companies/pending', { headers: authHeaders(token) }),
+  listCompaniesByStatus: (token: string, status: 'pending' | 'approved' | 'rejected', q = '') =>
+    request<{ items: Company[]; total: number }>(`/admin/companies/by-status?status=${status}${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ''}`, { headers: authHeaders(token) }),
+  revokeCompany: (token: string, id: string) =>
+    request<Company>(`/admin/companies/${id}/revoke`, { method: 'PATCH', headers: authHeaders(token) }),
   approveCompany: (token: string, id: string) =>
     request<Company>(`/admin/companies/${id}/approve`, { method: 'PATCH', headers: authHeaders(token) }),
   rejectCompany: (token: string, id: string) =>
@@ -114,6 +118,16 @@ export const adminApi = {
     }),
 
   // Đợt 12q (21/09/2026) — Batch 5 mục #1: tìm công ty + bật/tắt "Doanh nghiệp yêu thích".
+  companyDirectory: (token: string, o: { q?: string; status?: string; featured?: boolean; noLogo?: boolean }) => {
+    const qs = new URLSearchParams();
+    if (o.q?.trim()) qs.set('q', o.q.trim());
+    if (o.status) qs.set('status', o.status);
+    if (o.featured) qs.set('featured', '1');
+    if (o.noLogo) qs.set('noLogo', '1');
+    return request<{ items: Company[]; total: number; featuredTotal: number; noLogoTotal: number; all: number }>(`/admin/companies/directory?${qs.toString()}`, { headers: authHeaders(token) });
+  },
+  bulkSetFeatured: (token: string, ids: string[], featured: boolean) =>
+    request<{ updated: number }>('/admin/companies/bulk-featured', { method: 'PATCH', headers: authHeaders(token), body: JSON.stringify({ ids, featured }) }),
   searchCompanies: (token: string, q: string) =>
     request<Company[]>(`/admin/companies?q=${encodeURIComponent(q)}`, { headers: authHeaders(token) }),
   toggleFeaturedEmployer: (token: string, id: string) =>

@@ -82,6 +82,73 @@ export default function AdminDashboardPage() {
   const [pendingJobs, setPendingJobs] = useState<JobPosting[]>([]);
   const [verifyId, setVerifyId] = useState<string | null>(null);
   const [pendingCompanies, setPendingCompanies] = useState<Company[]>([]);
+  // Đợt 112 — hàng chờ duyệt công ty: tìm kiếm, lọc ngành/thời gian, sắp xếp (mặc định MỚI NHẤT trên cùng).
+  const [cq, setCq] = useState('');
+  const [cStatus, setCStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  const [statusLists, setStatusLists] = useState<{ approved: { items: Company[]; total: number }; rejected: { items: Company[]; total: number } } | null>(null);
+  const loadStatusLists = useCallback(async () => {
+    if (!token) return;
+    try {
+      const [a, r] = await Promise.all([adminApi.listCompaniesByStatus(token, 'approved'), adminApi.listCompaniesByStatus(token, 'rejected')]);
+      setStatusLists({ approved: a, rejected: r });
+    } catch {
+      /* lỗi mạng tạm thời — bỏ qua */
+    }
+  }, [token]);
+  useEffect(() => {
+    if (tab === 'companies' && !statusLists) loadStatusLists();
+  }, [tab, statusLists, loadStatusLists]);
+  // Tab Đã duyệt/Từ chối có thể rất nhiều (chỉ tải 300 mới nhất) → khi gõ tìm, hỏi máy chủ để tìm trên TOÀN BỘ.
+  const [remote, setRemote] = useState<{ status: string; q: string; items: Company[] } | null>(null);
+  useEffect(() => {
+    const q = cq.trim();
+    if (cStatus === 'pending' || q.length < 2 || !token) { setRemote(null); return; }
+    const t = setTimeout(() => {
+      adminApi.listCompaniesByStatus(token, cStatus, q).then((r) => setRemote({ status: cStatus, q, items: r.items })).catch(() => undefined);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [cq, cStatus, token]);
+  const remoteHit = remote && remote.status === cStatus && remote.q === cq.trim() ? remote.items : null;
+  const baseRows: Company[] = cStatus === 'pending' ? pendingCompanies : remoteHit ?? statusLists?.[cStatus].items ?? [];
+  const statusTotal = cStatus === 'pending' ? pendingCompanies.length : statusLists?.[cStatus].total ?? 0;
+  const [cIndustry, setCIndustry] = useState('');
+  const [cRange, setCRange] = useState<'all' | 'today' | '7d'>('all');
+  const [cSort, setCSort] = useState<{ key: 'date' | 'name' | 'tax'; dir: 'asc' | 'desc' }>({ key: 'date', dir: 'desc' });
+  const [cLimit, setCLimit] = useState(50);
+  const [cOnlyDoc, setCOnlyDoc] = useState(false);
+  const foldC = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase();
+  const tsOf = (c: Company) => (c.createdAt ? new Date(c.createdAt).getTime() : 0);
+  const todayStart = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })();
+  const taxCount = new Map<string, number>();
+  baseRows.forEach((c) => taxCount.set(c.taxCode, (taxCount.get(c.taxCode) ?? 0) + 1));
+  const companyIndustries = Array.from(new Set(baseRows.map((c) => c.industry).filter((x): x is string => !!x))).sort((a, b) => a.localeCompare(b, 'vi'));
+  const shownCompanies = (() => {
+    const q = foldC(cq.trim());
+    const from = cRange === 'today' ? todayStart : cRange === '7d' ? Date.now() - 7 * 86400000 : 0;
+    const rows = baseRows.filter(
+      (c) =>
+        (!q || foldC(`${c.name} ${c.taxCode} ${c.industry ?? ''} ${c.contactPerson ?? ''}`).includes(q)) &&
+        (!cIndustry || c.industry === cIndustry) &&
+        (!from || tsOf(c) >= from) &&
+        (!cOnlyDoc || !!(c.legalDocUrl || c.legalDocExternalLink)),
+    );
+    const m = cSort.dir === 'asc' ? 1 : -1;
+    return rows.sort((a, b) =>
+      cSort.key === 'date' ? (tsOf(a) - tsOf(b)) * m : cSort.key === 'tax' ? a.taxCode.localeCompare(b.taxCode) * m : a.name.localeCompare(b.name, 'vi') * m,
+    );
+  })();
+  const newTodayCount = baseRows.filter((c) => tsOf(c) >= todayStart).length;
+  function sortBy(key: 'date' | 'name' | 'tax') {
+    setCSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'date' ? 'desc' : 'asc' }));
+  }
+  const sortMark = (key: 'date' | 'name' | 'tax') => (cSort.key === key ? (cSort.dir === 'asc' ? ' ▲' : ' ▼') : '');
+  function ageText(iso?: string) {
+    if (!iso) return '';
+    const h = Math.floor((Date.now() - new Date(iso).getTime()) / 3600000);
+    if (h < 1) return 'vừa xong';
+    if (h < 24) return `${h} giờ trước`;
+    return `${Math.floor(h / 24)} ngày trước`;
+  }
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -178,13 +245,38 @@ export default function AdminDashboardPage() {
     }
   }
 
-  async function handleCompanyDecision(id: string, decision: 'approve' | 'reject') {
+  // Đợt 113 — sửa logo / bật-tắt "DN yêu thích" ngay trên dòng (dùng chung cho cả 3 tab).
+  function patchCompanyRow(updated: Company) {
+    const m = (list: Company[]) => list.map((c) => (c.id === updated.id ? { ...c, ...updated } : c));
+    setPendingCompanies(m);
+    setStatusLists((p) => (p ? { approved: { ...p.approved, items: m(p.approved.items) }, rejected: { ...p.rejected, items: m(p.rejected.items) } } : p));
+  }
+  async function handleRowLogo(id: string, url: string) {
+    if (!token) return;
+    setBusyId(id);
+    try {
+      patchCompanyRow(await adminApi.updateCompanyLogo(token, id, url));
+    } finally {
+      setBusyId(null);
+    }
+  }
+  async function handleRowFeatured(id: string) {
+    if (!token) return;
+    setBusyId(id);
+    try {
+      patchCompanyRow(await adminApi.toggleFeaturedEmployer(token, id));
+    } finally {
+      setBusyId(null);
+    }
+  }
+  async function handleCompanyDecision(id: string, decision: 'approve' | 'reject' | 'revoke') {
     if (!token) return;
     setBusyId(id);
     try {
       if (decision === 'approve') await adminApi.approveCompany(token, id);
-      else await adminApi.rejectCompany(token, id);
-      await loadAll();
+      else if (decision === 'reject') await adminApi.rejectCompany(token, id);
+      else await adminApi.revokeCompany(token, id);
+      await Promise.all([loadAll(), loadStatusLists()]);
     } finally {
       setBusyId(null);
     }
@@ -225,8 +317,9 @@ export default function AdminDashboardPage() {
     });
   }
   function toggleAllCompaniesSelected() {
+    // Chọn tất cả = tất cả công ty ĐANG HIỆN theo bộ lọc/tìm kiếm (không chọn những dòng đang bị ẩn).
     setSelectedCompanyIds((prev) =>
-      prev.size === pendingCompanies.length ? new Set() : new Set(pendingCompanies.map((c) => c.id)),
+      shownCompanies.length > 0 && shownCompanies.every((c) => prev.has(c.id)) ? new Set() : new Set(shownCompanies.map((c) => c.id)),
     );
   }
   async function handleBulkCompanyDecision(decision: 'approve' | 'reject') {
@@ -237,7 +330,7 @@ export default function AdminDashboardPage() {
       if (decision === 'approve') await adminApi.bulkApproveCompanies(token, ids);
       else await adminApi.bulkRejectCompanies(token, ids);
       setSelectedCompanyIds(new Set());
-      await loadAll();
+      await Promise.all([loadAll(), loadStatusLists()]);
     } finally {
       setBulkBusy(false);
     }
@@ -386,6 +479,7 @@ export default function AdminDashboardPage() {
                       <tr className="text-left text-ink-faint bg-surface-alt">
                         <th className="py-2.5 px-3 w-8">
                           <input
+                            hidden={cStatus === 'approved'}
                             type="checkbox"
                             checked={selectedJobIds.size > 0 && selectedJobIds.size === pendingJobs.length}
                             onChange={toggleAllJobsSelected}
@@ -526,8 +620,8 @@ export default function AdminDashboardPage() {
         ) : tab === 'companies' ? (
           <>
             <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-              <h1 className="font-bold text-base">Hàng chờ duyệt công ty</h1>
-              {selectedCompanyIds.size > 0 && (
+              <h1 className="font-bold text-base">Duyệt công ty</h1>
+              {selectedCompanyIds.size > 0 && cStatus !== 'approved' && (
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-ink-faint font-semibold">Đã chọn {selectedCompanyIds.size}</span>
                   <button
@@ -535,21 +629,71 @@ export default function AdminDashboardPage() {
                     onClick={() => handleBulkCompanyDecision('approve')}
                     className="font-bold rounded-md bg-success-tint text-success px-2.5 py-1.5 disabled:opacity-50"
                   >
-                    Duyệt tất cả đã chọn
+                    {cStatus === 'rejected' ? 'Duyệt lại tất cả đã chọn' : 'Duyệt tất cả đã chọn'}
                   </button>
-                  <button
-                    disabled={bulkBusy}
-                    onClick={() => handleBulkCompanyDecision('reject')}
-                    className="font-bold rounded-md bg-critical-tint text-critical px-2.5 py-1.5 disabled:opacity-50"
-                  >
-                    Từ chối tất cả đã chọn
-                  </button>
+                  {cStatus === 'pending' && (
+                    <button
+                      disabled={bulkBusy}
+                      onClick={() => handleBulkCompanyDecision('reject')}
+                      className="font-bold rounded-md bg-critical-tint text-critical px-2.5 py-1.5 disabled:opacity-50"
+                    >
+                      Từ chối tất cả đã chọn
+                    </button>
+                  )}
                 </div>
               )}
             </div>
-            {pendingCompanies.length === 0 ? (
-              <div className="text-center text-ink-faint text-sm py-16">Không có công ty nào đang chờ duyệt 🎉</div>
+            <div className="flex gap-1 mb-3 border-b border-border text-sm font-bold" role="tablist">
+              {([
+                ['pending', `⏳ Chờ duyệt (${pendingCompanies.length})`],
+                ['approved', `✅ Đã duyệt${statusLists ? ` (${statusLists.approved.total})` : ''}`],
+                ['rejected', `⛔ Từ chối${statusLists ? ` (${statusLists.rejected.total})` : ''}`],
+              ] as const).map(([k, l]) => (
+                <button
+                  key={k}
+                  type="button"
+                  role="tab"
+                  aria-selected={cStatus === k}
+                  onClick={() => { setCStatus(k); setSelectedCompanyIds(new Set()); setCLimit(50); setVerifyId(null); }}
+                  className={`px-4 py-2.5 border-b-2 -mb-px ${cStatus === k ? 'text-primary border-primary' : 'text-ink-faint border-transparent'}`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+            {statusTotal === 0 ? (
+              <div className="text-center text-ink-faint text-sm py-16">
+                {cStatus === 'pending' ? 'Không có công ty nào đang chờ duyệt 🎉' : cStatus === 'approved' ? 'Chưa có công ty nào được duyệt.' : 'Chưa có công ty nào bị từ chối.'}
+              </div>
             ) : (
+              <>
+              <div className="flex items-center gap-2 flex-wrap mb-3 text-xs">
+                <input
+                  id="cq"
+                  value={cq}
+                  onChange={(e) => { setCq(e.target.value); setCLimit(50); }}
+                  placeholder="🔎 Tìm tên, mã số thuế, ngành…"
+                  className="tvl-input !w-[320px] max-w-full"
+                />
+                <select id="c-industry" value={cIndustry} onChange={(e) => { setCIndustry(e.target.value); setCLimit(50); }} className="tvl-input !w-auto">
+                  <option value="">Tất cả ngành</option>
+                  {companyIndustries.map((i) => (
+                    <option key={i} value={i}>{i}</option>
+                  ))}
+                </select>
+                <div className="inline-flex rounded-lg border border-border-strong overflow-hidden font-semibold">
+                  {([['all', 'Tất cả'], ['today', `Hôm nay (${newTodayCount})`], ['7d', '7 ngày']] as const).map(([k, l]) => (
+                    <button key={k} type="button" onClick={() => { setCRange(k); setCLimit(50); }} aria-pressed={cRange === k} className={`px-3 py-2 ${cRange === k ? 'bg-primary text-white' : 'bg-white text-ink-muted'}`}>{l}</button>
+                  ))}
+                </div>
+                <label className="inline-flex items-center gap-1.5 font-semibold text-ink-muted cursor-pointer">
+                  <input type="checkbox" checked={cOnlyDoc} onChange={(e) => setCOnlyDoc(e.target.checked)} /> Có giấy tờ pháp lý
+                </label>
+                {(cq || cIndustry || cRange !== 'all' || cOnlyDoc) && (
+                  <button type="button" onClick={() => { setCq(''); setCIndustry(''); setCRange('all'); setCOnlyDoc(false); }} className="font-bold text-primary underline">Xóa lọc</button>
+                )}
+                <span className="ml-auto text-ink-faint font-semibold">Hiển thị {Math.min(shownCompanies.length, cLimit)}/{shownCompanies.length} · tổng {cStatus !== 'pending' && !remoteHit ? statusTotal : baseRows.length} công ty{cStatus !== 'pending' && !remoteHit && statusTotal > baseRows.length ? ' (đang tải 300 mới nhất — gõ tìm để tìm trên toàn bộ)' : ''}</span>
+              </div>
               <div className="rounded-xl bg-white border border-border overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
@@ -558,30 +702,48 @@ export default function AdminDashboardPage() {
                         <th className="py-2.5 px-3 w-8">
                           <input
                             type="checkbox"
-                            checked={selectedCompanyIds.size > 0 && selectedCompanyIds.size === pendingCompanies.length}
+                            checked={shownCompanies.length > 0 && shownCompanies.every((c) => selectedCompanyIds.has(c.id))}
                             onChange={toggleAllCompaniesSelected}
                           />
                         </th>
-                        <th className="py-2.5 px-4 font-semibold">Tên công ty</th>
-                        <th className="py-2.5 px-3 font-semibold">Mã số thuế</th>
+                        <th className="py-2.5 px-3 font-semibold">Logo</th>
+                        <th className="py-2.5 px-4 font-semibold"><button type="button" onClick={() => sortBy('name')}>Tên công ty{sortMark('name')}</button></th>
+                        <th className="py-2.5 px-3 font-semibold"><button type="button" onClick={() => sortBy('tax')}>Mã số thuế{sortMark('tax')}</button></th>
                         <th className="py-2.5 px-3 font-semibold">Ngành nghề</th>
+                        <th className="py-2.5 px-3 font-semibold whitespace-nowrap"><button type="button" onClick={() => sortBy('date')}>Ngày đăng ký{sortMark('date')}</button></th>
                         <th className="py-2.5 px-4 font-semibold text-right">Thao tác</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {pendingCompanies.map((c) => (
+                      {shownCompanies.length === 0 && (
+                        <tr><td colSpan={8} className="py-10 text-center text-ink-faint">Không có công ty nào khớp bộ lọc.</td></tr>
+                      )}
+                      {shownCompanies.slice(0, cLimit).map((c) => (
                         <Fragment key={c.id}>
                         <tr className="border-t border-border">
                           <td className="py-3 px-3">
                             <input
+                              hidden={cStatus === 'approved'}
                               type="checkbox"
                               checked={selectedCompanyIds.has(c.id)}
                               onChange={() => toggleCompanySelected(c.id)}
                             />
                           </td>
-                          <td className="py-3 px-4 font-bold">{c.name}</td>
+                          <td className="py-3 px-3 align-top">
+                            <CompanyLogoEditor company={c} busy={busyId === c.id} onSave={(url) => handleRowLogo(c.id, url)} />
+                          </td>
+                          <td className="py-3 px-4 font-bold">
+                            {c.name}
+                            {tsOf(c) >= Date.now() - 86400000 && <span className="ml-2 rounded bg-primary text-white text-[10px] px-1.5 py-0.5 align-middle">MỚI</span>}
+                            {(c.legalDocUrl || c.legalDocExternalLink) && <span title="Đã gửi giấy tờ pháp lý" className="ml-1.5 text-[11px] font-semibold text-success align-middle">📎</span>}
+                            {(taxCount.get(c.taxCode) ?? 0) > 1 && <span title="Có công ty khác cùng mã số thuế trong hàng chờ" className="ml-1.5 rounded bg-warning-tint text-[#7A4A00] text-[10px] px-1.5 py-0.5 align-middle">Trùng MST</span>}
+                          </td>
                           <td className="py-3 px-3 tabular-nums">{c.taxCode}</td>
                           <td className="py-3 px-3 text-ink-faint">{c.industry ?? '—'}</td>
+                          <td className="py-3 px-3 whitespace-nowrap tabular-nums" title={c.createdAt ? formatDateTime(c.createdAt) : ''}>
+                            {c.createdAt ? formatDate(c.createdAt) : '—'}
+                            <div className="text-[10.5px] text-ink-faint">{ageText(c.createdAt)}</div>
+                          </td>
                           <td className="py-3 px-4 text-right whitespace-nowrap">
                             <button
                               type="button"
@@ -590,31 +752,57 @@ export default function AdminDashboardPage() {
                             >
                               🔍 Kiểm tra nhanh
                             </button>
+                            {cStatus !== 'approved' && (
+                              <button
+                                disabled={busyId === c.id}
+                                onClick={() => handleCompanyDecision(c.id, 'approve')}
+                                className="text-[11px] font-bold rounded-md bg-success-tint text-success px-2.5 py-1.5 mr-1.5 disabled:opacity-50"
+                              >
+                                {cStatus === 'rejected' ? 'Duyệt lại' : 'Duyệt'}
+                              </button>
+                            )}
+                            {cStatus === 'pending' && (
+                              <button
+                                disabled={busyId === c.id}
+                                onClick={() => handleCompanyDecision(c.id, 'reject')}
+                                className="text-[11px] font-bold rounded-md bg-critical-tint text-critical px-2.5 py-1.5 mr-1.5 disabled:opacity-50"
+                              >
+                                Từ chối
+                              </button>
+                            )}
+                            {cStatus === 'approved' && (
+                              <button
+                                disabled={busyId === c.id}
+                                onClick={() => { if (window.confirm(`Thu hồi duyệt công ty "${c.name}"? Công ty sẽ quay về hàng chờ duyệt.`)) handleCompanyDecision(c.id, 'revoke'); }}
+                                className="text-[11px] font-bold rounded-md bg-warning-tint text-[#7A4A00] px-2.5 py-1.5 mr-1.5 disabled:opacity-50"
+                              >
+                                Thu hồi
+                              </button>
+                            )}
                             <button
                               disabled={busyId === c.id}
-                              onClick={() => handleCompanyDecision(c.id, 'approve')}
-                              className="text-[11px] font-bold rounded-md bg-success-tint text-success px-2.5 py-1.5 mr-1.5 disabled:opacity-50"
+                              onClick={() => handleRowFeatured(c.id)}
+                              className={`text-[11px] font-bold rounded-md px-2.5 py-1.5 disabled:opacity-50 ${c.isFeaturedEmployer ? 'bg-critical-tint text-critical' : 'bg-primary-tint text-primary'}`}
                             >
-                              Duyệt
-                            </button>
-                            <button
-                              disabled={busyId === c.id}
-                              onClick={() => handleCompanyDecision(c.id, 'reject')}
-                              className="text-[11px] font-bold rounded-md bg-critical-tint text-critical px-2.5 py-1.5 disabled:opacity-50"
-                            >
-                              Từ chối
+                              {c.isFeaturedEmployer ? 'Bỏ yêu thích' : '⭐ Yêu thích'}
                             </button>
                           </td>
                         </tr>
                         {verifyId === c.id && (
-                          <tr className="bg-surface-alt"><td colSpan={5} className="px-4 py-3"><CompanyVerifyBox token={token} companyId={c.id} /></td></tr>
+                          <tr className="bg-surface-alt"><td colSpan={8} className="px-4 py-3"><CompanyVerifyBox token={token} companyId={c.id} /></td></tr>
                         )}
                         </Fragment>
                       ))}
                     </tbody>
                   </table>
                 </div>
+                {shownCompanies.length > cLimit && (
+                  <div className="p-3 text-center border-t border-border">
+                    <button type="button" onClick={() => setCLimit((n) => n + 50)} className="tvl-btn-ghost !w-auto px-5">Xem thêm {Math.min(50, shownCompanies.length - cLimit)} công ty</button>
+                  </div>
+                )}
               </div>
+              </>
             )}
           </>
         ) : tab === 'featured' ? (
@@ -749,79 +937,131 @@ function StatTile({ value, label }: { value: number; label: string }) {
 // isFeaturedEmployer chỉ sửa được thẳng trong CSDL. Tìm công ty theo tên (mọi trạng thái duyệt) rồi
 // bật/tắt — cờ này quyết định huy hiệu + bộ lọc "Nhà tuyển dụng nổi bật" ở trang tìm việc công khai.
 function FeaturedEmployersCard({ token }: { token: string }) {
+  // Đợt 114 — làm giống tab "Duyệt công ty": tab lọc có số đếm, tìm kiếm, cột ngày, sắp xếp, chọn nhiều, "Xem thêm".
+  type View = 'all' | 'featured' | 'nologo';
+  const [view, setView] = useState<View>('all');
   const [q, setQ] = useState('');
-  const [companies, setCompanies] = useState<Company[] | null>(null);
+  const [status, setStatus] = useState('');
+  const [data, setData] = useState<{ items: Company[]; total: number; featuredTotal: number; noLogoTotal: number; all: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [sort, setSort] = useState<{ key: 'date' | 'name'; dir: 'asc' | 'desc' }>({ key: 'date', dir: 'desc' });
+  const [limit, setLimit] = useState(50);
+  const companies = data?.items ?? null;
 
-  const search = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const rows = await adminApi.searchCompanies(token, q);
-      setCompanies(rows);
+      setData(await adminApi.companyDirectory(token, { q, status, featured: view === 'featured', noLogo: view === 'nologo' }));
     } finally {
       setLoading(false);
     }
-  }, [token, q]);
+  }, [token, q, status, view]);
 
+  // Tải lại khi đổi tab/trạng thái; gõ tìm thì chờ 0,4 giây.
   useEffect(() => {
-    search();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const t = setTimeout(load, q ? 400 : 0);
+    setLimit(50);
+    setSel(new Set());
+    return () => clearTimeout(t);
+  }, [load, q]);
 
+  function patchRow(updated: Company) {
+    setData((p) => (p ? { ...p, items: p.items.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)) } : p));
+  }
   async function handleToggle(id: string) {
     setBusyId(id);
     try {
-      const updated = await adminApi.toggleFeaturedEmployer(token, id);
-      setCompanies((prev) => prev?.map((c) => (c.id === id ? updated : c)) ?? prev);
+      patchRow(await adminApi.toggleFeaturedEmployer(token, id));
+      load();
     } finally {
       setBusyId(null);
     }
   }
-
-  // Đợt 16 (25/09/2026) — mục 22b danh sách lỗi: dùng chung màn hình tìm công ty theo tên (đã có sẵn
-  // cho việc bật/tắt "Doanh nghiệp yêu thích") để thêm công cụ "tìm & gán logo" thủ công — theo yêu
-  // cầu người dùng ("tìm theo tên công ty giúp tôi nếu tìm ra được logo của công ty đó thì thêm vào
-  // luôn"). Công ty chưa dán logoUrl thủ công đang tự động hiện favicon theo website (mục 22a) —
-  // dùng ô này để thay bằng logo thật đẹp hơn khi cần.
+  // Đợt 16 (25/09/2026) — mục 22b: gán logo thủ công (Admin tự tìm ảnh trên Google Images rồi dán URL).
   async function handleSaveLogo(id: string, logoUrl: string) {
     setBusyId(id);
     try {
-      const updated = await adminApi.updateCompanyLogo(token, id, logoUrl);
-      setCompanies((prev) => prev?.map((c) => (c.id === id ? updated : c)) ?? prev);
+      patchRow(await adminApi.updateCompanyLogo(token, id, logoUrl));
+      load();
     } finally {
       setBusyId(null);
     }
   }
+  async function bulk(featured: boolean) {
+    if (!sel.size) return;
+    setBulkBusy(true);
+    try {
+      await adminApi.bulkSetFeatured(token, Array.from(sel), featured);
+      setSel(new Set());
+      await load();
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  const rows = (() => {
+    const m = sort.dir === 'asc' ? 1 : -1;
+    return [...(companies ?? [])].sort((a, b) =>
+      sort.key === 'date' ? ((a.createdAt ? +new Date(a.createdAt) : 0) - (b.createdAt ? +new Date(b.createdAt) : 0)) * m : a.name.localeCompare(b.name, 'vi') * m,
+    );
+  })();
+  const shown = rows.slice(0, limit);
+  const mark = (k: 'date' | 'name') => (sort.key === k ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '');
+  const sortBy = (k: 'date' | 'name') => setSort((s) => (s.key === k ? { key: k, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: k, dir: k === 'date' ? 'desc' : 'asc' }));
+  const allSel = shown.length > 0 && shown.every((c) => sel.has(c.id));
+  const STATUS_VI: Record<string, { t: string; cls: string }> = {
+    approved: { t: 'Đã duyệt', cls: 'bg-success-tint text-success' },
+    pending: { t: 'Chờ duyệt', cls: 'bg-warning-tint text-[#7A4A00]' },
+    rejected: { t: 'Từ chối', cls: 'bg-critical-tint text-critical' },
+  };
+  const isNew = (c: Company) => !!c.createdAt && Date.now() - new Date(c.createdAt).getTime() < 86400000;
 
   return (
     <>
-      <h1 className="font-bold text-base mb-1">Doanh nghiệp yêu thích &amp; Logo công ty</h1>
-      <div className="text-xs text-ink-faint mb-4 max-w-2xl">
-        Công ty được đánh dấu &ldquo;yêu thích&rdquo; sẽ hiện huy hiệu &ldquo;Nhà tuyển dụng nổi bật&rdquo; và xuất
-        hiện trong bộ lọc cùng tên ở trang tìm việc công khai. Công ty chưa có logo sẽ tự động hiện favicon theo
-        website đã lưu (nếu có) — dùng nút &ldquo;Tìm ảnh&rdquo; bên dưới để mở tìm logo thật trên Google Images
-        rồi dán URL vào ô, bấm Lưu để thay bằng logo đẹp hơn.
+      <div className="flex items-center justify-between mb-1 gap-3 flex-wrap">
+        <h1 className="font-bold text-base">Doanh nghiệp yêu thích &amp; Logo công ty</h1>
+        {sel.size > 0 && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-ink-faint font-semibold">Đã chọn {sel.size}</span>
+            <button disabled={bulkBusy} onClick={() => bulk(true)} className="font-bold rounded-md bg-success-tint text-success px-2.5 py-1.5 disabled:opacity-50">⭐ Đánh dấu yêu thích tất cả đã chọn</button>
+            <button disabled={bulkBusy} onClick={() => bulk(false)} className="font-bold rounded-md bg-critical-tint text-critical px-2.5 py-1.5 disabled:opacity-50">Bỏ đánh dấu tất cả đã chọn</button>
+          </div>
+        )}
       </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          search();
-        }}
-        className="flex gap-2 mb-4 max-w-md"
-      >
-        <input
-          type="text"
-          placeholder="Tìm theo tên công ty…"
-          className="tvl-input text-sm"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-        <button type="submit" disabled={loading} className="tvl-btn-primary !w-auto px-4 whitespace-nowrap">
-          Tìm
-        </button>
-      </form>
-      {loading ? (
+      <div className="text-xs text-ink-faint mb-3 max-w-2xl">
+        Công ty &ldquo;yêu thích&rdquo; hiện huy hiệu &ldquo;Nhà tuyển dụng nổi bật&rdquo; và có trong bộ lọc cùng tên ở trang tìm việc. Công ty chưa có logo riêng sẽ tự hiện favicon theo website (nếu có) — dùng &ldquo;Tìm ảnh&rdquo; để mở Google Images rồi dán URL logo thật vào ô, bấm Lưu.
+      </div>
+      <div className="flex gap-1 mb-3 border-b border-border text-sm font-bold" role="tablist">
+        {([
+          ['all', `Tất cả${data ? ` (${data.all})` : ''}`],
+          ['featured', `⭐ Yêu thích${data ? ` (${data.featuredTotal})` : ''}`],
+          ['nologo', `🖼 Chưa có logo riêng${data ? ` (${data.noLogoTotal})` : ''}`],
+        ] as const).map(([k, l]) => (
+          <button key={k} type="button" role="tab" aria-selected={view === k} onClick={() => setView(k)} className={`px-4 py-2.5 border-b-2 -mb-px ${view === k ? 'text-primary border-primary' : 'text-ink-faint border-transparent'}`}>
+            {l}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-2 flex-wrap mb-3 text-xs">
+        <input id="fq" value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔎 Tìm tên công ty, mã số thuế…" className="tvl-input !w-[300px] max-w-full" />
+        <select id="f-status" value={status} onChange={(e) => setStatus(e.target.value)} className="tvl-input !w-auto">
+          <option value="">Mọi trạng thái duyệt</option>
+          <option value="approved">Đã duyệt</option>
+          <option value="pending">Chờ duyệt</option>
+          <option value="rejected">Từ chối</option>
+        </select>
+        {(q || status) && (
+          <button type="button" onClick={() => { setQ(''); setStatus(''); }} className="font-bold text-primary underline">Xóa lọc</button>
+        )}
+        <span className="ml-auto text-ink-faint font-semibold">
+          Hiển thị {Math.min(shown.length, limit)}/{rows.length}
+          {data && data.total > rows.length ? ` (đang tải ${rows.length} mới nhất / ${data.total} — gõ tìm để thu hẹp)` : ''}
+        </span>
+      </div>
+      {loading && !data ? (
         <div className="text-center text-ink-faint py-10 text-sm">Đang tải…</div>
       ) : !companies || companies.length === 0 ? (
         <div className="text-center text-ink-faint text-sm py-10">Không tìm thấy công ty nào.</div>
@@ -831,40 +1071,51 @@ function FeaturedEmployersCard({ token }: { token: string }) {
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-ink-faint bg-surface-alt">
-                  <th className="py-2.5 px-4 font-semibold">Tên công ty</th>
+                  <th className="py-2.5 px-3 w-8">
+                    <input type="checkbox" checked={allSel} onChange={() => setSel(allSel ? new Set() : new Set(shown.map((c) => c.id)))} />
+                  </th>
+                  <th className="py-2.5 px-3 font-semibold">Logo</th>
+                  <th className="py-2.5 px-4 font-semibold"><button type="button" onClick={() => sortBy('name')}>Tên công ty{mark('name')}</button></th>
+                  <th className="py-2.5 px-3 font-semibold">Mã số thuế</th>
                   <th className="py-2.5 px-3 font-semibold">Ngành nghề</th>
                   <th className="py-2.5 px-3 font-semibold">Trạng thái duyệt</th>
-                  <th className="py-2.5 px-3 font-semibold">Logo</th>
+                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap"><button type="button" onClick={() => sortBy('date')}>Ngày đăng ký{mark('date')}</button></th>
                   <th className="py-2.5 px-4 font-semibold text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
-                {companies.map((c) => (
+                {shown.map((c) => (
                   <tr key={c.id} className="border-t border-border align-top">
+                    <td className="py-3 px-3">
+                      <input type="checkbox" checked={sel.has(c.id)} onChange={() => setSel((p) => { const n = new Set(p); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); return n; })} />
+                    </td>
+                    <td className="py-3 px-3">
+                      <CompanyLogoEditor company={c} busy={busyId === c.id} onSave={(url) => handleSaveLogo(c.id, url)} />
+                    </td>
                     <td className="py-3 px-4 font-bold">
                       {c.name}
-                      {c.isFeaturedEmployer && (
-                        <span className="ml-2 text-[10px] font-bold rounded-full bg-warning-tint text-warning px-2 py-0.5">
-                          🌟 Yêu thích
-                        </span>
-                      )}
+                      {c.isFeaturedEmployer && <span className="ml-2 text-[10px] font-bold rounded-full bg-warning-tint text-warning px-2 py-0.5">🌟 Yêu thích</span>}
+                      {isNew(c) && <span className="ml-2 rounded bg-primary text-white text-[10px] px-1.5 py-0.5 align-middle">MỚI</span>}
+                      {c.isAdminSourced && <span className="ml-1.5 rounded bg-surface-alt text-ink-muted text-[10px] px-1.5 py-0.5 align-middle">Nguồn ngoài</span>}
+                      <div>
+                        <a href={`/cong-ty/${c.id}`} target="_blank" rel="noopener noreferrer" className="text-[10.5px] font-semibold text-primary hover:underline">↗ Xem trang công ty</a>
+                      </div>
                     </td>
+                    <td className="py-3 px-3 tabular-nums">{c.taxCode}</td>
                     <td className="py-3 px-3 text-ink-faint">{c.industry ?? '—'}</td>
-                    <td className="py-3 px-3 text-ink-faint">{c.approvalStatus ?? '—'}</td>
                     <td className="py-3 px-3">
-                      <CompanyLogoEditor
-                        company={c}
-                        busy={busyId === c.id}
-                        onSave={(url) => handleSaveLogo(c.id, url)}
-                      />
+                      <span className={`text-[10.5px] font-bold rounded-full px-2 py-0.5 ${STATUS_VI[c.approvalStatus ?? '']?.cls ?? 'bg-surface-alt text-ink-muted'}`}>
+                        {STATUS_VI[c.approvalStatus ?? '']?.t ?? '—'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 whitespace-nowrap tabular-nums" title={c.createdAt ? formatDateTime(c.createdAt) : ''}>
+                      {c.createdAt ? formatDate(c.createdAt) : '—'}
                     </td>
                     <td className="py-3 px-4 text-right whitespace-nowrap">
                       <button
                         disabled={busyId === c.id}
                         onClick={() => handleToggle(c.id)}
-                        className={`text-[11px] font-bold rounded-md px-2.5 py-1.5 disabled:opacity-50 ${
-                          c.isFeaturedEmployer ? 'bg-critical-tint text-critical' : 'bg-success-tint text-success'
-                        }`}
+                        className={`text-[11px] font-bold rounded-md px-2.5 py-1.5 disabled:opacity-50 ${c.isFeaturedEmployer ? 'bg-critical-tint text-critical' : 'bg-success-tint text-success'}`}
                       >
                         {c.isFeaturedEmployer ? 'Bỏ đánh dấu' : 'Đánh dấu yêu thích'}
                       </button>
@@ -874,6 +1125,11 @@ function FeaturedEmployersCard({ token }: { token: string }) {
               </tbody>
             </table>
           </div>
+          {rows.length > limit && (
+            <div className="p-3 text-center border-t border-border">
+              <button type="button" onClick={() => setLimit((n) => n + 50)} className="tvl-btn-ghost !w-auto px-5">Xem thêm {Math.min(50, rows.length - limit)} công ty</button>
+            </div>
+          )}
         </div>
       )}
     </>
