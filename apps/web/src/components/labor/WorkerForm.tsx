@@ -45,9 +45,35 @@ const fromProfile = (p: WorkerProfileView): FormState => ({
   major: p.major ?? '', needsHousing: p.needsHousing, needsShuttle: p.needsShuttle, isSeeking: p.isSeeking, consent: true,
 });
 
+/** Đợt 81 — độ đầy đủ hồ sơ + gợi ý bổ sung để được nhà tuyển dụng gọi nhiều hơn. */
+function Completeness({ f }: { f: FormState }) {
+  const items: { ok: boolean; w: number; tip: string }[] = [
+    { ok: f.fullName.trim().length >= 2 && !!f.phone && !!f.relativePhone && !!f.gender && !!f.birthDate, w: 30, tip: 'điền đủ họ tên, số điện thoại, người thân, giới tính, ngày sinh' },
+    { ok: !!f.address.province && (!!f.address.oldWard || !!f.address.newWardCode), w: 20, tip: 'chọn đủ tỉnh, quận/huyện, phường/xã' },
+    { ok: f.desiredJobs.length > 0, w: 15, tip: 'chọn công việc mong muốn (1–3)' },
+    { ok: f.kind === 'worker' ? f.shifts.length > 0 : f.availability.length > 0, w: 15, tip: f.kind === 'worker' ? 'chọn ca làm bạn đi được' : 'chọn các buổi rảnh trong tuần để gợi ý ca hợp lịch' },
+    { ok: f.lat != null, w: 8, tip: 'bấm “Dùng vị trí hiện tại” để tính km chính xác hơn' },
+    { ok: f.radiusKm != null, w: 5, tip: 'chọn khoảng cách muốn đi làm' },
+    { ok: !!f.addressDetail.trim(), w: 4, tip: 'ghi số nhà/tên đường hoặc khu trọ' },
+    { ok: f.kind === 'worker' ? true : !!f.school.trim() && !!f.major.trim(), w: 3, tip: 'ghi trường và ngành học' },
+  ];
+  const pct = Math.min(100, items.filter((i) => i.ok).reduce((a, i) => a + i.w, 0));
+  const tips = items.filter((i) => !i.ok).slice(0, 2);
+  return (
+    <div className="rounded-lg border border-border bg-white p-2.5" aria-live="polite">
+      <div className="flex items-center justify-between text-[13.5px] font-bold text-ink">
+        <span>Độ đầy đủ hồ sơ</span>
+        <span className={pct >= 80 ? 'text-success' : 'text-critical'}>{pct}%</span>
+      </div>
+      <div className="mt-1 h-2.5 rounded-full bg-surface-alt overflow-hidden"><div className={`h-full ${pct >= 80 ? 'bg-success' : 'bg-warning'}`} style={{ width: `${pct}%` }} /></div>
+      {tips.length > 0 && <div className="mt-1 text-[12.5px] text-ink">Để được nhà tuyển dụng gọi nhiều hơn: {tips.map((t) => t.tip).join('; ')}.</div>}
+    </div>
+  );
+}
+
 type PhoneStatus = 'idle' | 'checking' | 'new' | 'exists' | 'verified';
 
-// Đợt 79 — form "Dành riêng tuyển công nhân / Sinh viên làm thêm / Thực tập sinh" (không bắt buộc đăng nhập).
+// Đợt 79 — form "Dành riêng tuyển công nhân / Sinh viên / Thực tập sinh" (không bắt buộc đăng nhập).
 export function WorkerForm({ initialKind }: { initialKind: WorkerKind }) {
   const { me, token } = useAuth();
   const isCandidate = me?.role === 'candidate' && !!token;
@@ -245,6 +271,7 @@ export function WorkerForm({ initialKind }: { initialKind: WorkerKind }) {
         ) : (
           <LaborJobList
             jobs={jobs}
+            who={{ name: saved.fullName, phone: saved.phone, kindLabel: KIND_LABEL[saved.kind], place: [saved.oldDistrict, saved.province].filter(Boolean).join(', '), slots: (saved.availability ?? []).length ? slotText(saved.availability ?? []) : undefined }}
             onApply={(id) => (isCandidate ? workersApi.applyMine(token!, id) : workersApi.quickApply(id, saved.phone, birth))}
           />
         )}
@@ -466,6 +493,7 @@ export function WorkerForm({ initialKind }: { initialKind: WorkerKind }) {
             </label>
           )}
 
+          <Completeness f={f} />
           {err && <div className="rounded-lg border border-critical bg-white p-2 text-[14px] text-critical font-bold">{err}</div>}
           <button type="submit" disabled={busy || phoneStatus === 'checking'} className="tvl-btn-accent !text-[16px] !py-3">
             {busy ? 'Đang lưu…' : old ? 'Lưu thay đổi' : 'Lưu thông tin & tìm việc phù hợp'}

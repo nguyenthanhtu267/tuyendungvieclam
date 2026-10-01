@@ -20,14 +20,14 @@ export const LABOR_GROUPS: Record<WorkerKind, string[]> = {
 export const SHIFTS = ['Hành chính', 'Xoay ca', 'Ca đêm', 'Cuối tuần', 'Theo giờ linh hoạt'];
 export const RADII = [5, 10, 20, 30];
 
-export const KIND_LABEL: Record<WorkerKind, string> = { worker: 'Công nhân', student: 'Sinh viên làm thêm', intern: 'Thực tập sinh' };
+export const KIND_LABEL: Record<WorkerKind, string> = { worker: 'Công nhân', student: 'Sinh viên', intern: 'Thực tập sinh' };
 export const KIND_SELF: Record<WorkerKind, string> = { worker: 'Bạn là công nhân', student: 'Bạn là sinh viên', intern: 'Bạn là thực tập sinh' };
 export const KIND_SLUG: Record<WorkerKind, string> = { worker: 'cong-nhan', student: 'sinh-vien', intern: 'thuc-tap-sinh' };
 export const SLUG_KIND: Record<string, WorkerKind> = { 'cong-nhan': 'worker', 'sinh-vien': 'student', 'thuc-tap-sinh': 'intern' };
 export const CHANNEL_OPTIONS = [
   { v: 'office', l: 'Việc làm văn phòng / chuyên môn (mặc định)' },
   { v: 'worker', l: 'Tuyển công nhân' },
-  { v: 'student', l: 'Sinh viên làm thêm' },
+  { v: 'student', l: 'Sinh viên' },
   { v: 'intern', l: 'Thực tập sinh' },
 ];
 export const GENDER_LABEL: Record<string, string> = { male: 'Nam', female: 'Nữ', other: 'Khác' };
@@ -65,12 +65,14 @@ export const PERK_LABEL: Record<string, string> = {
   meals: 'Bao cơm',
   no_fee: 'Cam kết không thu phí',
   intern_cert: 'Có xác nhận & phiếu nhận xét thực tập',
+  allowance: 'Có trợ cấp / hỗ trợ thực tập',
+  convert: 'Có cơ hội nhận chính thức sau thực tập',
 };
-export const PERK_SHORT: Record<string, string> = { housing: 'Có KTX', shuttle: 'Xe đưa đón', meals: 'Bao cơm', no_fee: 'Không thu phí', intern_cert: 'Có phiếu nhận xét' };
+export const PERK_SHORT: Record<string, string> = { housing: 'Có KTX', shuttle: 'Xe đưa đón', meals: 'Bao cơm', no_fee: 'Không thu phí', intern_cert: 'Có phiếu nhận xét', allowance: 'Có trợ cấp', convert: 'Cơ hội lên chính thức' };
 export const PERKS_BY_KIND: Record<WorkerKind, string[]> = {
   worker: ['housing', 'shuttle', 'meals', 'no_fee'],
   student: ['meals', 'no_fee'],
-  intern: ['intern_cert', 'meals', 'no_fee'],
+  intern: ['allowance', 'convert', 'intern_cert', 'meals', 'no_fee'],
 };
 export const DAYS = ['t2', 't3', 't4', 't5', 't6', 't7', 'cn'];
 export const DAY_LABEL: Record<string, string> = { t2: 'T2', t3: 'T3', t4: 'T4', t5: 'T5', t6: 'T6', t7: 'T7', cn: 'CN' };
@@ -87,6 +89,7 @@ export const CALL_STATUS: { v: string; l: string; cls: string }[] = [
   { v: 'interview', l: 'Hẹn phỏng vấn', cls: 'bg-primary text-white border-primary' },
   { v: 'hired', l: 'Đã nhận việc', cls: 'bg-success text-white border-success' },
   { v: 'rejected', l: 'Không phù hợp', cls: 'bg-surface-alt text-ink-muted border-border-strong' },
+  { v: 'no_show', l: 'Nhận việc nhưng không đi làm', cls: 'bg-critical-tint text-critical border-critical' },
 ];
 export const CALL_LABEL: Record<string, string> = Object.fromEntries([['new', 'Mới'], ...CALL_STATUS.map((c) => [c.v, c.l])]);
 

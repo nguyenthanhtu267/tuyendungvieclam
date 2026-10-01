@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { workersApi, type ApplyResult, type WorkerKind, type WorkerProfileView } from '@/lib/api';
-import { KIND_LABEL, normalizePhone } from '@/lib/labor';
+import { KIND_LABEL, normalizePhone, slotText } from '@/lib/labor';
 import { DateSelect, isFullDate } from './DateSelect';
 import { markWorker } from './RefreshReminder';
 
@@ -81,7 +81,22 @@ export function useWorkerApply() {
     },
     [isCandidate, mine, token, creds],
   );
-  return { isCandidate, creds, mine, save, ready, apply, snap };
+  return { isCandidate, creds, mine, save, ready, apply, snap, token };
+}
+
+/** Thông tin để soạn tin nhắn tự giới thiệu (Đợt 81). */
+export function whoOf(w: ReturnType<typeof useWorkerApply>) {
+  const name = w.isCandidate ? w.mine?.fullName : w.creds?.name;
+  if (!name) return null;
+  const phone = w.isCandidate ? w.mine?.phone : w.creds?.phone;
+  const s = w.snap;
+  return {
+    name,
+    phone,
+    kindLabel: s ? KIND_LABEL[s.kind] : 'công nhân',
+    place: s ? [s.oldDistrict, s.province].filter(Boolean).join(', ') : undefined,
+    slots: s && s.availability.length ? slotText(s.availability) : undefined,
+  };
 }
 
 export function WorkerCredsBox({ w, slug }: { w: ReturnType<typeof useWorkerApply>; slug: string }) {

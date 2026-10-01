@@ -1,0 +1,86 @@
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { workersApi, type MyApplication } from '@/lib/api';
+import { CALL_LABEL, ago } from '@/lib/labor';
+import type { useWorkerApply } from './WorkerCreds';
+
+const STATUS_NOTE: Record<string, string> = {
+  new: 'Đã gửi — chờ nhà tuyển dụng gọi',
+  no_answer: 'Nhà tuyển dụng gọi chưa được — hãy nghe máy nhé',
+  callback: 'Nhà tuyển dụng hẹn gọi lại',
+  interview: 'Đã hẹn phỏng vấn',
+  hired: 'Đã nhận việc',
+  rejected: 'Chưa phù hợp',
+  no_show: 'Đã ghi nhận không đi làm',
+};
+
+// Đợt 81 — lịch sử ứng tuyển của người lao động + nút "tôi đã có việc / tìm lại".
+export function ApplicationHistory({ w }: { w: ReturnType<typeof useWorkerApply> }) {
+  const [data, setData] = useState<{ isSeeking: boolean; items: MyApplication[] } | null>(null);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const hasId = w.isCandidate ? !!w.mine : !!w.creds;
+  if (!hasId) return null;
+
+  async function load() {
+    setErr('');
+    try {
+      const r = w.isCandidate ? await workersApi.myApplicationsMine(authToken(w)) : await workersApi.myApplications(w.creds!.phone, w.creds!.birthDate);
+      setData(r);
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  }
+  async function toggleSeeking() {
+    if (!data) return;
+    setBusy(true);
+    try {
+      const next = !data.isSeeking;
+      if (w.isCandidate) await workersApi.setSeekingMine(authToken(w), next);
+      else await workersApi.setSeeking(w.creds!.phone, w.creds!.birthDate, next);
+      setData({ ...data, isSeeking: next });
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <details className="rounded-xl border border-border bg-white" open={open} onToggle={(e) => { const o = (e.target as HTMLDetailsElement).open; setOpen(o); if (o && !data) void load(); }}>
+      <summary className="cursor-pointer px-3 py-2 text-[14.5px] font-extrabold text-ink">Lịch sử ứng tuyển của tôi</summary>
+      <div className="px-3 pb-3 flex flex-col gap-2">
+        {err && <div className="text-[13px] font-bold text-critical">{err}</div>}
+        {!data && !err && <div className="text-[13.5px] text-ink-muted">Đang tải…</div>}
+        {data && (
+          <>
+            <div className={`rounded-lg border px-2.5 py-2 text-[13.5px] text-ink flex flex-wrap items-center gap-2 ${data.isSeeking ? 'border-border bg-white' : 'border-warning bg-warning-tint'}`}>
+              {data.isSeeking ? <>Hồ sơ của bạn đang hiện cho nhà tuyển dụng.</> : <b>Hồ sơ đang tạm ẩn — nhà tuyển dụng không thấy bạn.</b>}
+              <button type="button" disabled={busy} onClick={toggleSeeking} className="rounded-lg border border-primary bg-white text-primary font-bold text-[13px] px-2.5 py-1">
+                {data.isSeeking ? 'Tôi đã có việc — tạm ngừng tìm' : 'Tìm việc lại'}
+              </button>
+            </div>
+            {data.items.length === 0 ? (
+              <div className="text-[13.5px] text-ink-muted">Bạn chưa ứng tuyển tin nào.</div>
+            ) : (
+              <ul className="flex flex-col gap-1.5">
+                {data.items.map((a) => (
+                  <li key={a.id} className="rounded-lg border border-border bg-white px-2.5 py-2 text-[13.5px] text-ink">
+                    <Link href={`/viec-lam/${a.jobId}`} className="font-extrabold text-primary hover:underline">{a.title}</Link>
+                    <span className="uppercase font-bold"> — {a.company}</span>
+                    <div className="text-ink-muted">{ago(a.createdAt)} · <b className="text-ink">{CALL_LABEL[a.status] ?? a.status}</b> · {STATUS_NOTE[a.status] ?? ''}{a.filled && a.status !== 'hired' ? ' · Tin đã đủ người' : ''}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </div>
+    </details>
+  );
+}
+function authToken(w: ReturnType<typeof useWorkerApply>) {
+  return w.token ?? '';
+}

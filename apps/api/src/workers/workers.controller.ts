@@ -70,6 +70,25 @@ export class WorkersPublicController {
   salary(@Query('kind') kind: string, @Query('group') group?: string, @Query('province') province?: string) {
     return this.svc.salaryStats({ kind, group, province });
   }
+  @Get('jobs-by-ids')
+  byIds(@Query('ids') ids: string) {
+    return this.svc.cards(ids);
+  }
+  @Throttle(STRICT)
+  @Post('applications')
+  myApps(@Body() b: { phone: string; birthDate: string }) {
+    return this.svc.myApplications(b?.phone, b?.birthDate);
+  }
+  @Throttle(STRICT)
+  @Post('seeking')
+  seeking(@Body() b: { phone: string; birthDate: string; seeking?: boolean }) {
+    return this.svc.setSeekingGuest(b?.phone, b?.birthDate, b?.seeking !== false);
+  }
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  @Post('jobs/:id/report')
+  report(@Param('id', ParseUUIDPipe) id: string, @Body() b: { reason?: string; note?: string }) {
+    return this.svc.reportJob(id, String(b?.reason ?? 'other'), b?.note);
+  }
   @Get('jobs/:id/progress')
   progress(@Param('id', ParseUUIDPipe) id: string) {
     return this.svc.jobProgress(id);
@@ -107,6 +126,16 @@ export class WorkersController {
   refreshMine(@CurrentUser() u: U) {
     return this.svc.refreshMine(u.userId);
   }
+  @Get('me/worker-applications')
+  @Roles(UserRole.CANDIDATE)
+  myAppsMine(@CurrentUser() u: U) {
+    return this.svc.myApplicationsMine(u.userId);
+  }
+  @Patch('me/worker-profile/seeking')
+  @Roles(UserRole.CANDIDATE)
+  seekingMine(@CurrentUser() u: U, @Body() b: { seeking?: boolean }) {
+    return this.svc.setSeekingMine(u.userId, b?.seeking !== false);
+  }
   @Post('me/worker-apply/:id')
   @Roles(UserRole.CANDIDATE)
   applyMine(@CurrentUser() u: U, @Param('id', ParseUUIDPipe) id: string, @Body() b: { group?: string }) {
@@ -138,6 +167,11 @@ export class WorkersController {
   @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB)
   filled(@CurrentUser() u: U, @Param('id', ParseUUIDPipe) id: string, @Body() b: { filled?: boolean }) {
     return this.svc.setFilled(u.userId, id, b?.filled !== false);
+  }
+  @Patch('employer/jobs/:id/extend')
+  @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB)
+  extend(@CurrentUser() u: U, @Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.extendJob(u.userId, id);
   }
   @Get('employer/workers/origin')
   @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB, UserRole.ADMIN)

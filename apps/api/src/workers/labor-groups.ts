@@ -22,7 +22,7 @@ export const RADII = [5, 10, 20, 30];
 export const CHANNELS = ['office', 'worker', 'student', 'intern'] as const;
 
 // Đợt 80 — quyền lợi đặc thù tin phổ thông
-export const PERKS = ['housing', 'shuttle', 'meals', 'no_fee', 'intern_cert'];
+export const PERKS = ['housing', 'shuttle', 'meals', 'no_fee', 'intern_cert', 'allowance', 'convert'];
 // Đợt 80 — ô lịch (thứ × buổi) dùng cho lịch rảnh SV và ca cần người của tin
 export const DAYS = ['t2', 't3', 't4', 't5', 't6', 't7', 'cn'];
 export const PARTS = ['sang', 'chieu', 'toi'];

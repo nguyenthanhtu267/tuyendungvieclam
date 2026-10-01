@@ -63,7 +63,7 @@ export const JOBS_MEGA_MENU: { columns: NavMenuGroup[][] } = {
         title: 'Lao Động Phổ Thông',
         items: [
           { label: 'Việc làm công nhân', href: '/lao-dong-pho-thong/viec-lam?loai=cong-nhan' },
-          { label: 'Sinh viên làm thêm', href: '/lao-dong-pho-thong/viec-lam?loai=sinh-vien' },
+          { label: 'Sinh viên', href: '/lao-dong-pho-thong/viec-lam?loai=sinh-vien' },
           { label: 'Thực tập sinh', href: '/lao-dong-pho-thong/viec-lam?loai=thuc-tap-sinh' },
         ],
       },

@@ -2,7 +2,7 @@
 
 import { DAYS, DAY_LABEL, PARTS, PART_LABEL } from '@/lib/labor';
 
-// Đợt 80 — lưới thứ × buổi: lịch rảnh của sinh viên / ca cần người của tin làm thêm.
+// Đợt 80 — lưới thứ × buổi: lịch rảnh của sinh viên / ca cần người của tin sinh viên.
 export function ScheduleGrid({ value, onChange, idPrefix }: { value: string[]; onChange: (v: string[]) => void; idPrefix: string }) {
   const toggle = (s: string) => onChange(value.includes(s) ? value.filter((x) => x !== s) : [...value, s]);
   return (

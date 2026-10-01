@@ -146,7 +146,7 @@ export class JobPosting {
   @Column({ name: 'screening_questions', type: 'jsonb', nullable: true })
   screeningQuestions?: { q: string; expect: 'yes' | 'no' | 'any' }[] | null;
 
-  // Đợt 79 — kênh tin: office (văn phòng, mặc định) | worker (công nhân) | student (SV làm thêm) | intern (thực tập sinh).
+  // Đợt 79 — kênh tin: office (văn phòng, mặc định) | worker (công nhân) | student (sinh viên) | intern (thực tập sinh).
   // Tin kênh lao động phổ thông KHÔNG hiện trong danh sách việc làm văn phòng.
   @Column({ type: 'varchar', length: 10, default: 'office' })
   channel: string;
@@ -167,7 +167,7 @@ export class JobPosting {
   @Column({ name: 'pay_info', type: 'jsonb', nullable: true })
   payInfo?: { base: number; otHours?: number; nightHours?: number; allowance?: number } | null;
 
-  // Ca cần người (SV làm thêm): mã "t2-sang", "cn-toi"...
+  // Ca cần người (sinh viên): mã "t2-sang", "cn-toi"...
   @Column({ name: 'labor_schedule', type: 'simple-array', nullable: true })
   laborSchedule?: string[] | null;
 

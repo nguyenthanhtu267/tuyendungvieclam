@@ -5,7 +5,9 @@ import { workersApi, type ApplyResult, type JobPosting, type LaborIncome, type W
 import { KIND_LABEL, KIND_SLUG, PERK_LABEL, fmtM, slotText } from '@/lib/labor';
 import { ShareButtons } from './ShareButtons';
 import { GroupInvite } from './GroupInvite';
-import { WorkerCredsBox, useWorkerApply } from './WorkerCreds';
+import { WorkerCredsBox, useWorkerApply, whoOf } from './WorkerCreds';
+import { introText } from './LaborJobList';
+import { useSavedJobs } from './saved';
 import { RefreshReminder } from './RefreshReminder';
 
 // Đợt 79/80 — tin kênh phổ thông: ứng tuyển nhanh bằng SĐT, nơi làm việc, quyền lợi, thu nhập ước tính,
@@ -17,6 +19,9 @@ export function LaborApplyPanel({ job, inviteCode }: { job: JobPosting; inviteCo
   const [res, setRes] = useState<ApplyResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [prog, setProg] = useState<{ headcount: number; hired: number; filled: boolean; income: LaborIncome | null } | null>(null);
+  const saved = useSavedJobs();
+  const [copied, setCopied] = useState(false);
+  const [rep, setRep] = useState<{ open: boolean; reason: string; note: string; done: boolean; err: string }>({ open: false, reason: 'scam', note: '', done: false, err: '' });
   const [invite, setInvite] = useState<{ valid: boolean; size: number; leader: string | null } | null>(null);
 
   useEffect(() => {
@@ -41,6 +46,27 @@ export function LaborApplyPanel({ job, inviteCode }: { job: JobPosting; inviteCo
       setMsg((e as Error).message);
     } finally {
       setBusy(false);
+    }
+  }
+  const who = whoOf(w);
+  async function copyIntro() {
+    if (!who) return;
+    const text = introText({ title: job.title, company: job.company ? { id: job.company.id, name: job.company.name, logoUrl: null } : null }, who);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      window.prompt('Chép tin nhắn này:', text);
+    }
+  }
+  async function sendReport() {
+    setRep((r) => ({ ...r, err: '' }));
+    try {
+      await workersApi.reportJob(job.id, rep.reason, rep.note.trim() || undefined);
+      setRep((r) => ({ ...r, done: true }));
+    } catch (e) {
+      setRep((r) => ({ ...r, err: (e as Error).message }));
     }
   }
   const wp = job.workPlace;
@@ -107,10 +133,45 @@ export function LaborApplyPanel({ job, inviteCode }: { job: JobPosting; inviteCo
             {res ? 'Đã ứng tuyển ✓' : busy ? 'Đang gửi…' : 'Ứng tuyển ngay'}
           </button>
         )}
+        <button type="button" aria-pressed={saved.has(job.id)} onClick={() => saved.toggle(job.id)} className={`rounded-lg border font-bold text-[14px] px-3 py-2 ${saved.has(job.id) ? 'border-critical bg-critical-tint text-critical' : 'border-border-strong bg-white text-ink'}`}>
+          {saved.has(job.id) ? '♥ Đã lưu tin' : '♡ Lưu tin'}
+        </button>
         <ShareButtons jobId={job.id} title={job.title} />
       </div>
       {msg && <div className={`text-[14px] font-bold ${res ? 'text-success' : 'text-critical'}`}>{msg}</div>}
+      {who && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={copyIntro} className="rounded-lg border border-primary bg-white text-primary font-bold text-[13.5px] px-3 py-1.5">
+            {copied ? 'Đã chép — dán vào Zalo/tin nhắn' : 'Chép tin nhắn tự giới thiệu gửi nhà tuyển dụng'}
+          </button>
+        </div>
+      )}
       {res?.groupCode && <GroupInvite jobId={job.id} title={job.title} code={res.groupCode} size={res.groupSize ?? 1} />}
+      <div className="border-t border-border pt-2">
+        {!rep.open ? (
+          <button type="button" onClick={() => setRep({ ...rep, open: true })} className="text-[13px] font-bold text-ink underline">Báo cáo tin này (thu phí, giữ giấy tờ, sai sự thật…)</button>
+        ) : rep.done ? (
+          <div className="text-[13.5px] font-bold text-success">Cảm ơn bạn. Quản trị viên sẽ kiểm tra tin này.</div>
+        ) : (
+          <div className="flex flex-col gap-1.5 rounded-lg border border-border-strong bg-white p-2.5">
+            <label className="text-[13px] font-bold text-ink flex flex-col gap-1" htmlFor="lr-reason">Lý do
+              <select id="lr-reason" className="tvl-input" value={rep.reason} onChange={(e) => setRep({ ...rep, reason: e.target.value })}>
+                <option value="scam">Có dấu hiệu lừa đảo / thu phí / giữ giấy tờ</option>
+                <option value="wrong_info">Thông tin sai sự thật (lương, nơi làm…)</option>
+                <option value="expired">Đã tuyển đủ / không còn tuyển</option>
+                <option value="duplicate">Tin trùng lặp</option>
+                <option value="other">Lý do khác</option>
+              </select>
+            </label>
+            <textarea id="lr-note" aria-label="Ghi chú" className="tvl-input" rows={2} maxLength={500} placeholder="Mô tả ngắn (không bắt buộc)" value={rep.note} onChange={(e) => setRep({ ...rep, note: e.target.value })} />
+            {rep.err && <div className="text-[13px] font-bold text-critical">{rep.err}</div>}
+            <div className="flex gap-2">
+              <button type="button" onClick={sendReport} className="rounded-lg bg-critical text-white font-extrabold text-[13px] px-3 py-1.5">Gửi báo cáo</button>
+              <button type="button" onClick={() => setRep({ ...rep, open: false })} className="rounded-lg border border-border-strong bg-white font-bold text-[13px] px-3 py-1.5 text-ink">Huỷ</button>
+            </div>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

@@ -164,7 +164,7 @@ export default function Home() {
                   Dành riêng tuyển công nhân
                 </a>
                 <a href="/lao-dong-pho-thong?loai=sinh-vien" className="rounded-lg border-2 border-border-strong bg-white text-ink font-extrabold uppercase text-[13px] text-center px-1.5 py-2 hover:border-primary hover:text-primary leading-tight">
-                  Sinh viên làm thêm
+                  Sinh viên
                 </a>
                 <a href="/lao-dong-pho-thong?loai=thuc-tap-sinh" className="rounded-lg border-2 border-border-strong bg-white text-ink font-extrabold uppercase text-[13px] text-center px-1.5 py-2 hover:border-primary hover:text-primary leading-tight">
                   Thực tập sinh

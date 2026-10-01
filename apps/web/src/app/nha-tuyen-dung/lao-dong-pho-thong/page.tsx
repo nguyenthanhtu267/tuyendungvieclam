@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import EmployerHeader from '@/components/EmployerHeader';
 import { AddressPicker, EMPTY_ADDRESS, type AddressValue } from '@/components/labor/AddressPicker';
 import { useAuth } from '@/lib/auth-context';
-import { workersApi, type SupplyRow, type WorkerAppRow, type WorkerKind, type WorkerSearchItem } from '@/lib/api';
+import { workersApi, type DropoutRow, type EmployerLaborJob, type SupplyRow, type WorkerAppRow, type WorkerKind, type WorkerSearchItem } from '@/lib/api';
 import Link from 'next/link';
 import { CALL_LABEL, CALL_STATUS, GENDER_LABEL, KIND_LABEL, LABOR_GROUPS, ago, fmtDateTime, placeText, slotText } from '@/lib/labor';
 
@@ -19,7 +19,7 @@ function readOrigin(): Origin | null {
   }
 }
 
-// Đợt 79 — NTD (bắt buộc đăng nhập) tìm công nhân / SV làm thêm / thực tập sinh; xếp theo gần công ty
+// Đợt 79 — NTD (bắt buộc đăng nhập) tìm công nhân / sinh viên / thực tập sinh; xếp theo gần công ty
 // hoặc mới cập nhật; ghi chú "đã có việc làm" hiện cho NTD khác (chỉ thời gian, không lộ công ty).
 export default function EmployerLaborPage() {
   const { me, token } = useAuth();
@@ -27,13 +27,15 @@ export default function EmployerLaborPage() {
   const [tab, setTab] = useState<'search' | 'apps' | 'supply'>('search');
   const [callStatus, setCallStatus] = useState('');
   const [needs, setNeeds] = useState('');
-  const [laborJobs, setLaborJobs] = useState<{ id: string; title: string; headcount: number; hired: number; filled: boolean; channel: string }[]>([]);
-  const [supply, setSupply] = useState<{ totalInProvince?: number; districts: SupplyRow[]; provinces: { province: string; total: number; km: number }[]; origin: { province: string } | null } | null>(null);
+  const [laborJobs, setLaborJobs] = useState<EmployerLaborJob[]>([]);
+  const [supply, setSupply] = useState<{ totalInProvince?: number; districts: SupplyRow[]; provinces: { province: string; total: number; km: number }[]; origin: { province: string } | null; hours?: number[]; bestHours?: { h: number; n: number }[]; dropout?: DropoutRow[] } | null>(null);
   const [kind, setKind] = useState<'' | WorkerKind>('');
   const [province, setProvince] = useState('');
   const [group, setGroup] = useState('');
   const [q, setQ] = useState('');
-  const [sort, setSort] = useState<'near' | 'recent'>('near');
+  const [sort, setSort] = useState<'near' | 'recent' | 'match'>('near');
+  const [jobId, setJobId] = useState('');
+  const [today, setToday] = useState(false);
   const [includeNot, setIncludeNot] = useState(false);
   const [page, setPage] = useState(1);
   const [provinces, setProvinces] = useState<string[]>([]);
@@ -76,7 +78,7 @@ export default function EmployerLaborPage() {
     workersApi
       .search(token, {
         kind: kind || undefined, province: province || undefined, group: group || undefined, q: q.trim() || undefined, sort,
-        includeNotSeeking: includeNot ? '1' : undefined, page: String(page), callStatus: callStatus || undefined, needs: needs || undefined,
+        includeNotSeeking: includeNot ? '1' : undefined, page: String(page), callStatus: callStatus || undefined, needs: needs || undefined, jobId: jobId || undefined, today: today ? '1' : undefined,
         originProvince: a.province || undefined, originMode: a.addressMode, originDistrict: a.oldDistrict || undefined, originWard: a.oldWard || undefined,
         originNewWard: a.newWardCode || undefined, originLat: origin.lat != null ? String(origin.lat) : undefined, originLon: origin.lon != null ? String(origin.lon) : undefined,
       })
@@ -85,7 +87,7 @@ export default function EmployerLaborPage() {
         setErr((e as Error).message);
         setData({ items: [], total: 0, totalPages: 1 });
       });
-  }, [token, kind, province, group, q, sort, includeNot, page, origin, callStatus, needs]);
+  }, [token, kind, province, group, q, sort, includeNot, page, origin, callStatus, needs, jobId, today]);
   useEffect(() => {
     if (tab === 'search') load();
   }, [load, tab]);
@@ -156,7 +158,7 @@ export default function EmployerLaborPage() {
       <EmployerHeader />
       <div className="max-w-6xl mx-3 sm:mx-auto my-3 flex flex-col gap-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h1 className="tvl-title font-extrabold text-[20px] text-ink">Tìm công nhân, sinh viên làm thêm, thực tập sinh</h1>
+          <h1 className="tvl-title font-extrabold text-[20px] text-ink">Tìm công nhân, sinh viên, thực tập sinh</h1>
           <Link href="/nha-tuyen-dung/phieu-nhan-xet-thuc-tap" className="rounded-lg border border-border-strong bg-white font-bold text-[13px] px-2.5 py-1.5 text-ink">Phiếu nhận xét thực tập (in)</Link>
           <div role="tablist" className="flex gap-1.5">
             {([['search', 'Tìm ứng viên'], ['apps', `Ứng tuyển vào tin của bạn${apps?.some((a) => !a.seenAt) ? ` (${apps.filter((a) => !a.seenAt).length} mới)` : ''}`], ['supply', 'Nguồn lao động quanh công ty']] as const).map(([k, l]) => (
@@ -183,8 +185,13 @@ export default function EmployerLaborPage() {
                 {groups.map((g) => (<option key={g} value={g}>{g}</option>))}
               </select>
               <input id="el-q" aria-label="Tên hoặc số điện thoại" className="tvl-input !w-44 !py-2" placeholder="Tên hoặc SĐT" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (setPage(1), load())} />
+              <select id="el-job" aria-label="Xếp hạng theo tin" className="tvl-input !w-auto !py-2 max-w-[240px]" value={jobId} onChange={(e) => { setJobId(e.target.value); setSort(e.target.value ? 'match' : 'near'); setPage(1); }}>
+                <option value="">Xếp hạng theo tin: không</option>
+                {laborJobs.filter((j) => !j.filled).map((j) => (<option key={j.id} value={j.id}>{j.title}</option>))}
+              </select>
+              <button type="button" aria-pressed={today} onClick={() => { setToday(!today); setPage(1); }} className={`rounded-lg border px-3 py-2 text-[13.5px] font-extrabold ${today ? 'border-accent bg-accent text-white' : 'border-border-strong bg-white text-ink'}`}>Hôm nay nên gọi</button>
               <div role="radiogroup" aria-label="Sắp xếp" className="flex rounded-lg border border-border-strong overflow-hidden">
-                {([['near', 'Gần công ty'], ['recent', 'Mới cập nhật']] as const).map(([k, l]) => (
+                {([...(jobId ? ([['match', 'Hợp tin nhất']] as const) : []), ['near', 'Gần công ty'], ['recent', 'Mới cập nhật']] as const).map(([k, l]) => (
                   <button key={k} type="button" role="radio" aria-checked={sort === k} onClick={() => { setSort(k); setPage(1); }} className={`px-3 py-2 text-[13.5px] font-bold ${sort === k ? 'bg-primary text-white' : 'bg-white text-ink'}`}>{l}</button>
                 ))}
               </div>
@@ -220,6 +227,8 @@ export default function EmployerLaborPage() {
               <div className="text-[12.5px] text-ink-muted">Khoảng cách ước tính theo phường/xã, quận/huyện và tỉnh; chỉ chính xác theo km khi cả công ty và ứng viên đều dùng vị trí GPS.</div>
             </div>
 
+            {today && <div className="rounded-xl border border-accent bg-white px-3 py-2 text-[13.5px] text-ink"><b>Danh sách gọi hôm nay:</b> hồ sơ làm mới trong 14 ngày, chưa phỏng vấn/nhận/loại; người “chưa nghe máy” hoặc “hẹn gọi lại” chỉ nhắc lại sau 1 ngày. Cập nhật Sổ gọi sau mỗi cuộc để danh sách tự rút gọn.</div>}
+            {jobId && <div className="rounded-xl border border-primary bg-white px-3 py-2 text-[13.5px] text-ink"><b>Đang xếp hạng theo tin đã chọn:</b> điểm dựa trên nhóm việc, khoảng cách tới nơi làm việc của tin, ca rảnh, nhu cầu chỗ ở/xe và mức mới của hồ sơ.</div>}
             <div className="rounded-xl border border-warning bg-warning-tint px-3 py-2 text-[13.5px] text-ink">
               <b>Lưu ý:</b> ghi chú &quot;Đã có việc làm&quot; do nhà tuyển dụng khác để lại (không hiện tên công ty) chỉ để tham khảo — <b>bạn vẫn có thể liên hệ thêm</b> để xác nhận.
             </div>
@@ -257,14 +266,20 @@ export default function EmployerLaborPage() {
                 <Link href={`/viec-lam/${j.id}`} className="font-bold text-ink hover:text-primary truncate">{j.title}</Link>
                 <div>
                   <div className="h-2.5 rounded-full bg-surface-alt overflow-hidden"><div className={`h-full ${j.filled ? 'bg-critical' : 'bg-success'}`} style={{ width: `${Math.min(100, (j.hired / Math.max(1, j.headcount)) * 100)}%` }} /></div>
-                  <div className="text-[12.5px] text-ink">Đã nhận {j.hired}/{j.headcount}{j.filled ? ' — đã ngừng nhận ứng tuyển' : ''}</div>
+                  <div className="text-[12.5px] text-ink">Đã nhận {j.hired}/{j.headcount}{j.filled ? ' — đã tự đóng vì đủ người' : ''}{j.ageDays != null && ` · đăng ${j.ageDays} ngày`}</div>
+                  {j.needExtend && (
+                    <div className="mt-1 rounded border border-warning bg-warning-tint px-2 py-1 text-[12.5px] text-ink">
+                      Tin đã hơn 30 ngày mà chưa đủ người{j.deadline ? ` (hạn ${j.deadline})` : ''}. Gia hạn thêm 30 ngày và xem lại mức lương/quyền lợi để dễ tuyển hơn.{' '}
+                      <button type="button" onClick={() => token && workersApi.extendJob(token, j.id).then(loadApps)} className="font-extrabold text-primary underline">Gia hạn 30 ngày</button>
+                    </div>
+                  )}
                 </div>
                 <button type="button" onClick={() => token && workersApi.setFilled(token, j.id, !j.filled).then(loadApps)} className="rounded-lg border border-border-strong bg-white font-bold text-[13px] px-2.5 py-1 text-ink">
                   {j.filled ? 'Mở lại nhận ứng tuyển' : 'Đóng: đã đủ người'}
                 </button>
               </div>
             ))}
-            <div className="text-[12.5px] text-ink-muted">Đánh dấu &quot;Đã nhận việc&quot; ở bảng dưới hoặc trong sổ gọi điện — đủ số lượng thì tin tự chuyển &quot;Đã tuyển đủ&quot; và ngừng nhận ứng tuyển.</div>
+            <div className="text-[12.5px] text-ink-muted">Đánh dấu &quot;Đã nhận việc&quot; ở bảng dưới hoặc trong sổ gọi điện — đủ số lượng thì tin tự đóng (&quot;Đã tuyển đủ&quot;) và ngừng nhận ứng tuyển; chưa đủ sau 30 ngày thì hệ thống nhắc gia hạn.</div>
           </div>
         )}
         {tab === 'apps' && (
@@ -272,7 +287,7 @@ export default function EmployerLaborPage() {
             {apps === null ? (
               <div className="p-4 text-[14px] text-ink-muted">Đang tải…</div>
             ) : apps.length === 0 ? (
-              <div className="p-4 text-[14px] text-ink-muted">Chưa có ai ứng tuyển nhanh. Khi đăng tin, chọn &quot;Loại tin&quot; là Tuyển công nhân / Sinh viên làm thêm / Thực tập sinh để nhận ứng tuyển bằng số điện thoại.</div>
+              <div className="p-4 text-[14px] text-ink-muted">Chưa có ai ứng tuyển nhanh. Khi đăng tin, chọn &quot;Loại tin&quot; là Tuyển công nhân / Sinh viên / Thực tập sinh để nhận ứng tuyển bằng số điện thoại.</div>
             ) : (
               <table className="w-full text-[14px]">
                 <thead>
@@ -346,6 +361,36 @@ export default function EmployerLaborPage() {
                 </table>
               </div>
             )}
+            {supply && supply.hours && supply.hours.some((n) => n > 0) && (
+              <div className="rounded-xl border border-border bg-white p-3 text-[14px] text-ink">
+                <div className="font-extrabold">Giờ vàng đăng tin và gọi điện</div>
+                <div className="text-[13.5px]">
+                  Ứng viên hay vào làm mới hồ sơ nhất lúc: <b>{(supply.bestHours ?? []).map((b) => `${b.h}h–${b.h + 1}h`).join(', ')}</b>. Nên đăng/làm mới tin và gọi điện vào các khung giờ này.
+                </div>
+                <div className="mt-2 flex items-end gap-0.5 h-20" role="img" aria-label="Số lượt làm mới hồ sơ theo giờ trong ngày">
+                  {supply.hours.map((n, h) => {
+                    const mx = Math.max(...supply.hours!);
+                    const best = (supply.bestHours ?? []).some((b) => b.h === h);
+                    return <div key={h} title={`${h}h: ${n}`} className={`flex-1 rounded-t ${best ? 'bg-accent' : 'bg-primary'}`} style={{ height: `${Math.max(3, (n / mx) * 100)}%` }} />;
+                  })}
+                </div>
+                <div className="flex justify-between text-[11px] text-ink-muted"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>23h</span></div>
+              </div>
+            )}
+            {supply && supply.dropout && supply.dropout.length > 0 && (
+              <div className="rounded-xl border border-border bg-white p-3 text-[14px] text-ink overflow-x-auto">
+                <div className="font-extrabold">Tỷ lệ nhận việc nhưng không đi làm (toàn hệ thống, ẩn danh)</div>
+                <table className="w-full text-[13.5px] mt-1">
+                  <thead><tr className="text-left text-ink-muted"><th className="p-1.5">Nhóm việc</th><th className="p-1.5">Đi làm</th><th className="p-1.5">Không đi làm</th><th className="p-1.5">Tỷ lệ bỏ</th><th className="p-1.5">Nên tuyển dư</th></tr></thead>
+                  <tbody>
+                    {supply.dropout.map((d) => (
+                      <tr key={d.group} className="border-t border-border"><td className="p-1.5 font-bold">{d.group}</td><td className="p-1.5 tabular-nums">{d.hired}</td><td className="p-1.5 tabular-nums">{d.noShow}</td><td className={`p-1.5 tabular-nums font-bold ${d.rate >= 30 ? 'text-critical' : ''}`}>{d.rate}%</td><td className="p-1.5 tabular-nums">+{d.extraPct}%</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="text-[12.5px] text-ink-muted mt-1">Dữ liệu từ trạng thái “Đã nhận việc” / “Nhận việc nhưng không đi làm” trong Sổ gọi điện. Chỉ hiện nhóm có từ 3 trường hợp trở lên.</div>
+              </div>
+            )}
             {supply && supply.provinces.length > 0 && (
               <div className="rounded-xl border border-border bg-white p-3 text-[14px] text-ink">
                 <b>Tỉnh lân cận:</b> {supply.provinces.map((p) => `${p.province} ${p.total} người (~${p.km} km)`).join(' · ')}
@@ -383,6 +428,12 @@ function WorkerCard({
           </div>
         )}
       </div>
+      {w.match && (
+        <div className="rounded-lg border border-primary bg-white px-2 py-1 text-[13px] text-ink">
+          <b className={w.match.score >= 60 ? 'text-success' : 'text-ink'}>Hợp tin: {w.match.score}/100</b>
+          {w.match.reasons.length > 0 && <> — {w.match.reasons.join(' · ')}</>}
+        </div>
+      )}
       <div className="text-[14px] text-ink">{placeText(w)}{w.addressDetail ? ` · ${w.addressDetail}` : ''}</div>
       {w.outOfRadius && <div className="text-[12.5px] text-ink">Ứng viên muốn làm trong khoảng {w.radiusKm} km — có thể xa hơn mong muốn.</div>}
       <div className="text-[14px] text-ink"><b>Muốn làm:</b> {w.desiredJobs.join(', ')}{w.radiusKm && !w.outOfRadius ? ` · trong ${w.radiusKm} km` : ''}</div>

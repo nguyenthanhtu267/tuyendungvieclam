@@ -35,6 +35,22 @@ export function AddressPicker({
   const [typed, setTyped] = useState(value.newWardName);
   const [open, setOpen] = useState(false);
   const set = (p: Partial<AddressValue>) => onChange({ ...value, ...p });
+  const [hint, setHint] = useState(false);
+  // Chưa chọn tỉnh: không cho mở danh sách mà dẫn người dùng về ô Tỉnh/Thành (thay vì ô mờ khó hiểu)
+  const needProvince = (e: { preventDefault: () => void }) => {
+    if (value.province) return;
+    e.preventDefault();
+    setHint(true);
+    const el = document.getElementById(`${idPrefix}-prov`) as HTMLSelectElement | null;
+    el?.focus();
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+  useEffect(() => { if (value.province) setHint(false); }, [value.province]);
+  const needDistrict = (e: { preventDefault: () => void }) => {
+    if (value.oldDistrict) return;
+    e.preventDefault();
+    (document.getElementById(`${idPrefix}-dist`) as HTMLSelectElement | null)?.focus();
+  };
 
   useEffect(() => {
     setDistricts([]);
@@ -63,7 +79,7 @@ export function AddressPicker({
         Tỉnh / Thành phố{req}
         <select
           id={`${idPrefix}-prov`}
-          className="tvl-input font-normal"
+          className={`tvl-input font-normal ${hint ? '!border-critical !ring-2 !ring-critical' : ''}`}
           value={value.province}
           onChange={(e) => onChange({ ...EMPTY_ADDRESS, addressMode: value.addressMode, province: e.target.value })}
         >
@@ -72,6 +88,7 @@ export function AddressPicker({
             <option key={p} value={p}>{p}</option>
           ))}
         </select>
+        {hint && <span className="text-[13px] font-bold text-critical">Vui lòng chọn Tỉnh / Thành phố trước, rồi mới chọn được Quận/huyện và Phường/xã.</span>}
       </label>
 
       <div role="radiogroup" aria-label="Cách chọn phường/xã" className="grid grid-cols-2 gap-1.5">
@@ -96,8 +113,8 @@ export function AddressPicker({
         <div className="grid sm:grid-cols-2 gap-2">
           <label className="flex flex-col gap-1 text-[14px] font-bold text-ink" htmlFor={`${idPrefix}-dist`}>
             Quận / Huyện (cũ){req}
-            <select id={`${idPrefix}-dist`} className="tvl-input font-normal" disabled={!value.province} value={value.oldDistrict} onChange={(e) => set({ oldDistrict: e.target.value, oldWard: '' })}>
-              <option value="">— Chọn quận/huyện —</option>
+            <select id={`${idPrefix}-dist`} className="tvl-input font-normal" onMouseDown={needProvince} onKeyDown={(e) => { if (!value.province && e.key !== 'Tab') needProvince(e); }} value={value.oldDistrict} onChange={(e) => set({ oldDistrict: e.target.value, oldWard: '' })}>
+              <option value="">{value.province ? '— Chọn quận/huyện —' : '— Chọn tỉnh/thành trước —'}</option>
               {districts.map((d) => (
                 <option key={d} value={d}>{d}</option>
               ))}
@@ -105,8 +122,8 @@ export function AddressPicker({
           </label>
           <label className="flex flex-col gap-1 text-[14px] font-bold text-ink" htmlFor={`${idPrefix}-ward`}>
             Phường / Xã (cũ){req}
-            <select id={`${idPrefix}-ward`} className="tvl-input font-normal" disabled={!value.oldDistrict} value={value.oldWard} onChange={(e) => set({ oldWard: e.target.value })}>
-              <option value="">— Chọn phường/xã —</option>
+            <select id={`${idPrefix}-ward`} className="tvl-input font-normal" onMouseDown={(e) => (value.province ? needDistrict(e) : needProvince(e))} onKeyDown={(e) => { if (!value.oldDistrict && e.key !== 'Tab') (value.province ? needDistrict(e) : needProvince(e)); }} value={value.oldWard} onChange={(e) => set({ oldWard: e.target.value })}>
+              <option value="">{value.oldDistrict ? '— Chọn phường/xã —' : '— Chọn quận/huyện trước —'}</option>
               {wards.map((w) => (
                 <option key={w} value={w}>{w}</option>
               ))}
@@ -120,7 +137,8 @@ export function AddressPicker({
             <input
               id={`${idPrefix}-new`}
               className="tvl-input font-normal"
-              disabled={!value.province}
+              onMouseDown={needProvince}
+              readOnly={!value.province}
               placeholder={value.province ? 'Gõ tên phường/xã, vd: Dĩ An' : 'Chọn tỉnh/thành trước'}
               value={typed}
               autoComplete="off"

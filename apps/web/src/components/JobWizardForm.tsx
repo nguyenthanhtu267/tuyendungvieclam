@@ -25,6 +25,7 @@ import { richTextListItems } from '@/lib/richtext';
 import { formatSalary } from '@/lib/format';
 import type { WorkLocation } from '@/lib/api';
 import { CHANNEL_OPTIONS, LABOR_GROUPS } from '@/lib/labor';
+import { laborTemplate } from '@/lib/labor-templates';
 import { LaborJobFields, type LaborFieldsValue } from '@/components/labor/LaborJobFields';
 import { EMPTY_ADDRESS } from '@/components/labor/AddressPicker';
 import {
@@ -244,15 +245,41 @@ export function JobWizardSteps({
                   </select>
                 </Field>
               ) : (
-                <div className="text-[12.5px] text-ink-muted self-end pb-2">Tuyển công nhân, sinh viên làm thêm hay thực tập sinh? Chọn loại tin tương ứng — ứng viên ứng tuyển nhanh bằng số điện thoại, không cần CV.</div>
+                <div className="text-[12.5px] text-ink-muted self-end pb-2">Tuyển công nhân, sinh viên hay thực tập sinh? Chọn loại tin tương ứng — ứng viên ứng tuyển nhanh bằng số điện thoại, không cần CV.</div>
               )}
             </div>
+            {form.channel !== 'office' && form.laborGroup && (
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary bg-white p-2.5">
+                <button
+                  type="button"
+                  className="rounded-lg bg-primary text-white font-extrabold text-[13.5px] px-3 py-1.5"
+                  onClick={() => {
+                    const t = laborTemplate(form.channel as 'worker' | 'student' | 'intern', form.laborGroup);
+                    const empty = (h: string) => !h.replace(/<[^>]*>/g, '').trim();
+                    setForm((f) => ({
+                      ...f,
+                      title: f.title.trim() ? f.title : t.title,
+                      headcount: f.headcount && f.headcount !== '1' ? f.headcount : t.headcount,
+                      salaryMin: f.salaryMin || (t.payBase ? t.payBase.replace(',', '.') : ''),
+                      salaryMax: f.salaryMax || (t.payBase ? String(Math.round((Number(t.payBase.replace(',', '.')) + 2) * 10) / 10) : ''),
+                      description: empty(f.description) ? t.description : f.description,
+                      requirements: empty(f.requirements) ? t.requirements : f.requirements,
+                      benefits: empty(f.benefits) ? t.benefits : f.benefits,
+                      labor: { ...f.labor, perks: f.labor.perks.length ? f.labor.perks : t.perks, payBase: f.labor.payBase || t.payBase, payOt: f.labor.payOt || t.payOt },
+                    }));
+                  }}
+                >
+                  Dùng mẫu tin “{form.laborGroup}”
+                </button>
+                <span className="text-[12.5px] text-ink">Điền sẵn chức danh, mô tả, yêu cầu, quyền lợi, lương gợi ý — chỉ điền vào ô còn trống. Bạn nên chỉnh lại cho đúng thực tế (đặc biệt lương).</span>
+              </div>
+            )}
             {form.channel !== 'office' && (
               <LaborJobFields
                 kind={form.channel as 'worker' | 'student' | 'intern'}
                 group={form.laborGroup}
                 value={form.labor}
-                onChange={(v) => setForm({ ...form, labor: v })}
+                onChange={(v) => setForm({ ...form, labor: v, provinces: v.workPlace.province && (!form.provinces.length || form.provinces.length === 1) ? [v.workPlace.province] : form.provinces })}
                 salaryMin={form.salaryMin}
                 salaryMax={form.salaryMax}
               />

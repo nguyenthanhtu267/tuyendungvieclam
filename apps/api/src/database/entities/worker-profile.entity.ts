@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
-// Đợt 79 — hồ sơ lao động phổ thông (công nhân / sinh viên làm thêm / thực tập sinh). Không bắt buộc
+// Đợt 79 — hồ sơ lao động phổ thông (công nhân / sinh viên / thực tập sinh). Không bắt buộc
 // tài khoản: khoá theo SĐT cá nhân, xác minh bằng ngày sinh khi xem/sửa/làm mới hồ sơ cũ.
 export type WorkerKind = 'worker' | 'student' | 'intern';
 

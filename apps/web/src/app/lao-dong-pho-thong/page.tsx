@@ -3,15 +3,15 @@ import { WorkerForm } from '@/components/labor/WorkerForm';
 import { SLUG_KIND } from '@/lib/labor';
 import Link from 'next/link';
 
-export const metadata = { title: 'Tìm việc công nhân, sinh viên làm thêm, thực tập sinh' };
+export const metadata = { title: 'Tìm việc công nhân, sinh viên, thực tập sinh' };
 
 const HEAD: Record<string, { t: string; d: string }> = {
   worker: { t: 'DÀNH RIÊNG TUYỂN CÔNG NHÂN', d: 'Không cần CV, không cần tài khoản. Điền thông tin một lần — nhà tuyển dụng gần nơi bạn ở sẽ gọi điện trực tiếp.' },
-  student: { t: 'SINH VIÊN LÀM THÊM', d: 'Việc bán thời gian, ca linh hoạt gần trường, gần nhà. Điền một lần — nhà tuyển dụng tự liên hệ bạn.' },
+  student: { t: 'SINH VIÊN', d: 'Việc bán thời gian, ca linh hoạt gần trường, gần nhà. Điền một lần — nhà tuyển dụng tự liên hệ bạn.' },
   intern: { t: 'THỰC TẬP SINH', d: 'Tìm nơi thực tập đúng ngành học. Điền một lần — doanh nghiệp cần thực tập sinh sẽ liên hệ bạn.' },
 };
 
-// Đợt 79 — trang đăng ký tìm việc lao động phổ thông (công nhân / SV làm thêm / thực tập sinh), không bắt buộc đăng nhập.
+// Đợt 79 — trang đăng ký tìm việc lao động phổ thông (công nhân / sinh viên / thực tập sinh), không bắt buộc đăng nhập.
 export default function LaborRegisterPage({ searchParams }: { searchParams: { loai?: string } }) {
   const kind = SLUG_KIND[searchParams.loai ?? ''] ?? 'worker';
   const h = HEAD[kind];

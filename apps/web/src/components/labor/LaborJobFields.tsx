@@ -28,7 +28,7 @@ export function previewIncome(v: LaborFieldsValue) {
 }
 
 // Đợt 80 — phần riêng của tin lao động phổ thông trong form đăng tin: nơi làm việc chi tiết, quyền lợi,
-// thu nhập ước tính + lương gợi ý theo thị trường, ca cần người (SV làm thêm).
+// thu nhập ước tính + lương gợi ý theo thị trường, ca cần người (sinh viên).
 export function LaborJobFields({
   kind,
   group,
@@ -66,7 +66,7 @@ export function LaborJobFields({
   const lbl = 'flex flex-col gap-1 text-[13px] font-semibold text-ink';
   return (
     <div className="rounded-xl border-2 border-warning bg-white p-3 flex flex-col gap-3">
-      <div className="font-extrabold text-[14px] text-ink">Thông tin riêng cho tin tuyển {kind === 'worker' ? 'công nhân' : kind === 'student' ? 'sinh viên làm thêm' : 'thực tập sinh'}</div>
+      <div className="font-extrabold text-[14px] text-ink">Thông tin riêng cho tin tuyển {kind === 'worker' ? 'công nhân' : kind === 'student' ? 'sinh viên' : 'thực tập sinh'}</div>
       <div>
         <div className="text-[13px] font-semibold text-ink mb-1">Nơi làm việc (để ứng viên ở gần thấy tin trước)</div>
         <AddressPicker value={value.workPlace} onChange={(a) => set({ workPlace: a })} provinces={provinces} idPrefix="jw-wp" requireWard={false} />

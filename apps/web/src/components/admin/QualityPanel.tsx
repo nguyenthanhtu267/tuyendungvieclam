@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { adminApi, smartApi, smartApi2, smartApi3, smartApi6, workersApi, type SuspiciousAccount, type SuspiciousWorkerGroup, type QualityOverview, type SystemHealth, type ReportGroup, type WeeklyReport, type AdTargeting } from '@/lib/api';
+import { adminApi, smartApi, smartApi2, smartApi3, smartApi6, workersApi, type ProvinceBalance, type SuspiciousAccount, type SuspiciousWorkerGroup, type QualityOverview, type SystemHealth, type ReportGroup, type WeeklyReport, type AdTargeting } from '@/lib/api';
 
 type Sub = 'reports' | 'weekly' | 'ads' | 'system' | 'duplicates' | 'suspicious' | 'lowQuality' | 'spam' | 'accounts' | 'workers';
 
@@ -16,7 +16,7 @@ export function QualityPanel({ token }: { token: string }) {
   const [ads, setAds] = useState<AdTargeting | null>(null);
   const [accts, setAccts] = useState<SuspiciousAccount[]>([]);
   const [wg, setWg] = useState<SuspiciousWorkerGroup[]>([]);
-  const [wstats, setWstats] = useState<{ items: { kind: string; n: number; fresh: number; hidden: number }[]; apps: number; contacts: number } | null>(null);
+  const [wstats, setWstats] = useState<{ items: { kind: string; n: number; fresh: number; hidden: number }[]; apps: number; contacts: number; provinces?: ProvinceBalance[] } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
   const load = useCallback(() => {
@@ -208,6 +208,25 @@ export function QualityPanel({ token }: { token: string }) {
               ))}
               <span><b>Ứng tuyển nhanh:</b> {wstats.apps}</span>
               <span><b>Lượt NTD ghi sổ gọi:</b> {wstats.contacts}</span>
+            </div>
+          )}
+          {wstats?.provinces && wstats.provinces.length > 0 && (
+            <div className="rounded-xl border border-border bg-white p-3 overflow-x-auto">
+              <div className="font-extrabold text-[14px] text-ink">Cung – cầu theo tỉnh (người đang tìm việc 45 ngày so với chỗ còn trống ở tin đang mở)</div>
+              <table className="w-full text-[13.5px] text-ink mt-1">
+                <thead><tr className="text-left text-ink-muted"><th className="p-1.5">Tỉnh/thành</th><th className="p-1.5">Người tìm việc</th><th className="p-1.5">Chỗ trống</th><th className="p-1.5">Số tin</th><th className="p-1.5">Nhận định</th></tr></thead>
+                <tbody>
+                  {wstats.provinces.map((p) => (
+                    <tr key={p.province} className="border-t border-border">
+                      <td className="p-1.5 font-bold">{p.province}</td>
+                      <td className="p-1.5 tabular-nums">{p.seekers}</td>
+                      <td className="p-1.5 tabular-nums">{p.slots}</td>
+                      <td className="p-1.5 tabular-nums">{p.jobs}</td>
+                      <td className={`p-1.5 font-bold ${p.label.startsWith('Chỗ trống') ? 'text-critical' : p.label.startsWith('Người') ? 'text-primary' : ''}`}>{p.label}{p.label.startsWith('Chỗ trống') ? ' → cần kêu gọi thêm ứng viên' : p.label.startsWith('Người') ? ' → cần mời thêm nhà tuyển dụng' : ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
           <div className="rounded-xl border border-border bg-white divide-y divide-border">
