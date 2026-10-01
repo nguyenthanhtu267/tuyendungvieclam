@@ -3,7 +3,7 @@
 import { AdStack } from '@/components/ads/AdStack';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import SiteHeader from '@/components/SiteHeader';
 import CompanyOverview from '@/components/CompanyOverview';
 import { isCompanyUnverified } from '@/components/SourcedBadge';

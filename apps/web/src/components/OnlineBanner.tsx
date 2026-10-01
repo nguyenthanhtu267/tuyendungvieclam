@@ -17,6 +17,8 @@ function genSessionId(): string {
 
 export default function OnlineBanner() {
   const [count, setCount] = useState<number | null>(null);
+  // Đợt 91 — lỗi API → thu gọn hẳn; đang tải → GIỮ CHỖ đúng chiều cao để toàn trang không bị đẩy xuống khi số về.
+  const [failed, setFailed] = useState(false);
   const sessionIdRef = useRef<string>('');
 
   useEffect(() => {
@@ -31,8 +33,11 @@ export default function OnlineBanner() {
     function refreshCount() {
       presenceApi
         .getCount()
-        .then((res) => setCount(res.displayed))
-        .catch(() => {});
+        .then((res) => {
+          setCount(res.displayed);
+          setFailed(false);
+        })
+        .catch(() => setFailed(true));
     }
 
     function beat() {
@@ -50,17 +55,19 @@ export default function OnlineBanner() {
     };
   }, []);
 
-  // Chưa có số (đang tải hoặc API lỗi) — ẩn hẳn banner thay vì hiện số 0 trông giả/lỗi.
-  if (count == null) return null;
+  // Lỗi API (và chưa từng có số) → ẩn hẳn thay vì hiện số 0 trông giả/lỗi.
+  if (failed && count == null) return null;
 
   return (
-    <div className="bg-[#E9F7F2] border-b border-success/20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-0.5 flex items-center justify-center gap-2 text-[12px] leading-tight font-semibold text-success">
+    <div aria-hidden={count == null} className="bg-[#E9F7F2] border-b border-success/20 h-[26px] overflow-hidden">
+      <div
+        className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 h-full flex items-center justify-center gap-2 text-[12px] leading-tight font-semibold text-success transition-opacity ${count == null ? 'opacity-0' : 'opacity-100'}`}
+      >
         <span className="relative flex h-2 w-2" aria-hidden>
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
           <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
         </span>
-        {count.toLocaleString('vi-VN')} người đang truy cập Tuyển Dụng Việc Làm
+        {(count ?? 0).toLocaleString('vi-VN')} người đang truy cập Tuyển Dụng Việc Làm
       </div>
     </div>
   );

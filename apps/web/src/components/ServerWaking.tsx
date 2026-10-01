@@ -22,7 +22,7 @@ export default function ServerWaking() {
   }, []);
   if (!slow && !offline) return null;
   return (
-    <div role="status" aria-live="polite" className="fixed bottom-3 left-1/2 -translate-x-1/2 z-[60] rounded-full bg-ink text-white text-[13px] font-semibold px-4 py-2 shadow-lg flex items-center gap-2 max-w-[calc(100vw-32px)]">
+    <div role="status" aria-live="polite" className="tvl-above-bnav fixed bottom-3 left-1/2 -translate-x-1/2 z-[60] rounded-full bg-ink text-white text-[13px] font-semibold px-4 py-2 shadow-lg flex items-center gap-2 max-w-[calc(100vw-32px)]">
       {offline ? (
         <>📶 Mất kết nối mạng — trang sẽ tự cập nhật khi có mạng lại</>
       ) : (

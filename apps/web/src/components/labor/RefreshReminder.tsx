@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { useEffect, useState } from 'react';
 import { KIND_SLUG } from '@/lib/labor';
 import type { WorkerKind } from '@/lib/api';

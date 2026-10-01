@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { useAuth } from '@/lib/auth-context';
 import { jobsApi, type JobPosting } from '@/lib/api';
 import { JobCard } from '@/components/JobCard';

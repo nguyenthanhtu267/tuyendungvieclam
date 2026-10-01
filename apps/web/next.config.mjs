@@ -9,6 +9,15 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // Đợt 91 — bộ nhớ đệm trình duyệt: font Inter (đổi tên khi đổi nội dung → cache 1 năm), biểu tượng ứng dụng 7 ngày;
+  // sw.js (service worker) KHÔNG được cache lâu để bản cập nhật tới người dùng ngay.
+  async headers() {
+    return [
+      { source: '/fonts/:path*', headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }] },
+      { source: '/icons/:path*', headers: [{ key: 'Cache-Control', value: 'public, max-age=604800' }] },
+      { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache' }, { key: 'Service-Worker-Allowed', value: '/' }] },
+    ];
+  },
 };
 
 export default nextConfig;

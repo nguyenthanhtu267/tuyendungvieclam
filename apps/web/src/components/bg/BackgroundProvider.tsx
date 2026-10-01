@@ -5,6 +5,7 @@ import { publicSettingsApi } from '@/lib/api';
 import { BG_THEMES, DEFAULT_BG_SETTING, currentBgTheme, nextBgChange, type BgSetting, type BgTheme } from '@/lib/bg-themes';
 import { ArtScene } from './ArtScene';
 import { useDataSaver } from '@/lib/data-saver';
+import { whenPageReady } from '@/lib/page-ready';
 
 // Đợt 29 (30/09/2026) — nền vector TOÀN website. Admin chọn 1 mẫu cố định hoặc "tự động đổi mỗi N giờ (mặc định 2 giờ)":
 // mẫu đang hiển thị được tính từ giờ hiện tại nên MỌI người xem cùng thấy 1 mẫu, tới mốc giờ thì tự chuyển (mờ dần) —
@@ -22,22 +23,28 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
   const saver = useDataSaver();
 
   useEffect(() => {
-    setMounted(true);
-    setNow(Date.now());
     let alive = true;
-    const load = () =>
-      publicSettingsApi
-        .background()
-        .then((s) => {
-          cached = s;
-          if (alive) setSetting(s);
-        })
-        .catch(() => undefined);
-    load();
-    const t = setInterval(load, 10 * 60 * 1000);
+    let t: ReturnType<typeof setInterval> | undefined;
+    // Đợt 91 — chờ trang hydrate xong rồi mới đổi nền (xem lib/page-ready.ts); điểm chờ chỉ ảnh hưởng lần mở đầu.
+    const cancel = whenPageReady(() => {
+      setMounted(true);
+      setNow(Date.now());
+      const load = () =>
+        publicSettingsApi
+          .background()
+          .then((s) => {
+            cached = s;
+            if (alive) setSetting(s);
+          })
+          .catch(() => undefined);
+      load();
+      // Đợt 91 — chỉ làm mới cài đặt nền khi tab đang mở.
+      t = setInterval(() => document.visibilityState === 'visible' && load(), 10 * 60 * 1000);
+    });
     return () => {
       alive = false;
-      clearInterval(t);
+      cancel();
+      if (t) clearInterval(t);
     };
   }, []);
 

@@ -156,6 +156,18 @@ const entities = [
           configService.get<string>('DATABASE_SSL') === 'true'
             ? { rejectUnauthorized: false }
             : false,
+        // Đợt 91 — vòng đời kết nối hợp với CSDL miễn phí (Supabase giới hạn số kết nối đồng thời):
+        //  · max: tối đa kết nối mở cùng lúc (mặc định 10; đổi bằng DB_POOL_MAX nếu dùng gói lớn hơn / bộ gom kết nối).
+        //  · connectionTimeoutMillis: chờ lấy kết nối tối đa 10 giây rồi báo lỗi (trước đây có thể treo vô hạn khi hết kết nối).
+        //  · idleTimeoutMillis: trả kết nối nhàn rỗi sau 30 giây, keepAlive giữ kết nối không bị cắt ngầm.
+        //  · statement_timeout: một câu truy vấn chạy quá 30 giây thì bị huỷ (không để 1 truy vấn nặng làm nghẽn cả hồ kết nối).
+        extra: {
+          max: Number(configService.get<string>('DB_POOL_MAX') ?? 10),
+          connectionTimeoutMillis: 10_000,
+          idleTimeoutMillis: 30_000,
+          keepAlive: true,
+          statement_timeout: Number(configService.get<string>('DB_STATEMENT_TIMEOUT_MS') ?? 30_000),
+        },
       }),
     }),
     // Bảo mật (đợt 12a, 20/09/2026): giới hạn số request mặc định 100 lần/60s theo IP cho toàn bộ

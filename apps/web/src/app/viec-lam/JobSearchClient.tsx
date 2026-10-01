@@ -279,11 +279,14 @@ function JobSearchPage({ initial }: { initial: { key: string; data: JobListRespo
           <div>
             <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
               <div className="flex items-center gap-x-3 gap-y-1 flex-wrap min-w-0 flex-1">
-                <h1 className="font-extrabold text-lg tvl-title">
-                  {/* Đợt 13 (24/09/2026) — thiếu formatNumber() khiến số hàng nghìn hiện dính liền
-                      (VD "1106" thay vì "1.106") — xem Quy tắc chung mục A. */}
-                  {loading ? 'Đang tìm...' : `${formatNumber(result?.total ?? 0)} ${heading}`}
-                </h1>
+                {/* Đợt 91 — tiêu đề luôn chiếm riêng 1 dòng trên điện thoại: trước đây chữ tiêu đề đổi ("Đang tìm..." → "1.286 Tất cả việc làm") làm 2 nút lọc bên cạnh nhảy xuống dòng dưới → giật bố cục. */}
+                <div className="max-sm:basis-full min-w-0">
+                  <h1 className="font-extrabold text-lg tvl-title">
+                    {/* Đợt 13 (24/09/2026) — thiếu formatNumber() khiến số hàng nghìn hiện dính liền
+                        (VD "1106" thay vì "1.106") — xem Quy tắc chung mục A. */}
+                    {loading ? 'Đang tìm...' : `${formatNumber(result?.total ?? 0)} ${heading}`}
+                  </h1>
+                </div>
                 {/* Đợt 58 — "Tin vừa xem" ngay sau tiêu đề, xổ danh sách "Tiêu đề - Công ty". */}
                 <RecentJobs />
                 {/* Đợt 70 — 2 bộ lọc dạng nút bật/tắt gọn, cùng 1 dòng; chữ đầy đủ nằm ở tooltip. */}

@@ -1,10 +1,12 @@
 'use client';
 
+import { bumpSavedCount } from '@/lib/saved-count';
+import { DraftBanner, useDraft } from '@/lib/use-draft';
 import { PopularKeywords } from '@/components/PopularKeywords';
 import { AdStack } from '@/components/ads/AdStack';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import SiteHeader from '@/components/SiteHeader';
 import { JobCard } from '@/components/JobCard';
 import { RichTextView } from '@/components/RichTextView';
@@ -81,6 +83,17 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
   const [drafting, setDrafting] = useState(false);
   const [applyState, setApplyState] = useState<'idle' | 'submitting' | 'done'>('idle');
   const [applyError, setApplyError] = useState<string | null>(null);
+  // Đợt 91 — nháp thư giới thiệu + câu trả lời sàng lọc (nộp thành công → xoá).
+  const applyDraft = useDraft<{ coverLetter: string; screenAnswers: string[] }>({
+    key: me?.id ? `apply:${me.id}:${params.id}` : null,
+    value: { coverLetter, screenAnswers },
+    enabled: applyOpen && !!me && applyState !== 'done',
+    isEmpty: (v) => !v.coverLetter.trim() && !v.screenAnswers.some(Boolean),
+    onRestore: (v) => {
+      setCoverLetter(v.coverLetter);
+      setScreenAnswers(v.screenAnswers);
+    },
+  });
   // Đợt 21 (27/09/2026) — 2 cách chia sẻ hồ sơ khi ứng tuyển: chọn 1 CV file/link có sẵn, HOẶC dùng
   // thẳng "Hồ sơ trực tuyến" đã điền (không cần file) nếu đã đủ 3 mục bắt buộc (100%).
   const [onlineProfilePercent, setOnlineProfilePercent] = useState<number | null>(null);
@@ -161,6 +174,7 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
     try {
       if (next) await candidatesApi.saveJob(token, params.id);
       else await candidatesApi.unsaveJob(token, params.id);
+      bumpSavedCount(next ? 1 : -1);
     } catch {
       setSaved(!next);
     }
@@ -237,6 +251,7 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
         coverLetter: (quickLetter ?? coverLetter) || undefined,
       });
       track('apply_submit', { entityType: 'job', entityId: params.id, meta: { useOnlineProfile } });
+      applyDraft.clear();
       setApplyState('done');
     } catch (err) {
       setApplyState('idle');
@@ -331,6 +346,7 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
         {isLabor && <LaborApplyPanel job={job} inviteCode={searchParams.get('nhom') ?? undefined} />}
         {applyOpen && !isLabor && (
           <div className="mt-3 rounded-xl border border-border bg-white p-5">
+            {applyDraft.pending && <DraftBanner savedAt={applyDraft.pending.t} onRestore={applyDraft.restore} onDiscard={applyDraft.discard} label="Bạn có thư ứng tuyển viết dở cho tin này" />}
             {me?.role === 'candidate' && <SalaryNudge jobId={params.id} />}
             {me?.role === 'candidate' && <ApplyCheckNote jobId={params.id} />}
             {!me ? (

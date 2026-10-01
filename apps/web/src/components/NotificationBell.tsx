@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { notificationsApi, type AppNotification } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 
@@ -24,17 +24,21 @@ const TYPE_ICON: Record<string, string> = {
 
 // variant "dark" — dùng trên nền primary (EmployerHeader); "light" (mặc định) — dùng trên nền
 // trắng (SiteHeader).
-export function NotificationBell({ token, variant = 'light' }: { token: string; variant?: 'light' | 'dark' }) {
+// Đợt 91 — variant "tab": nút trong thanh điều hướng dưới của điện thoại (BottomNav); bảng thông báo bật LÊN trên thanh.
+export function NotificationBell({ token, variant = 'light' }: { token: string; variant?: 'light' | 'dark' | 'tab' }) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<AppNotification[] | null>(null);
   const [unread, setUnread] = useState(0);
 
   const loadUnread = useCallback(() => {
+    // Đợt 91 — chuông ở thanh trên bị ẩn (CSS) khi dùng điện thoại → không gọi API thừa (đã có chuông ở thanh dưới).
+    if (variant !== 'tab' && rootRef.current && rootRef.current.offsetParent === null) return;
     notificationsApi
       .unreadCount(token)
       .then(setUnread)
       .catch(() => {});
-  }, [token]);
+  }, [token, variant]);
 
   useEffect(() => {
     // Đợt 90 — chỉ hỏi số thông báo mới khi tab đang mở; quay lại tab thì cập nhật ngay.
@@ -94,26 +98,51 @@ export function NotificationBell({ token, variant = 'light' }: { token: string; 
   }
 
   return (
-    <div className="relative" data-notif-bell>
+    <div ref={rootRef} className={variant === 'tab' ? 'h-full' : 'relative'} data-notif-bell>
       <button
         type="button"
         onClick={handleToggle}
         className={
-          variant === 'dark'
+          variant === 'tab'
+            ? 'relative w-full h-full flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold text-ink-muted'
+            : variant === 'dark'
             ? 'relative w-9 h-9 rounded-full border border-white/25 bg-white/10 flex items-center justify-center text-sm hover:bg-white/20 transition-colors'
             : 'relative w-9 h-9 rounded-full border border-border-strong flex items-center justify-center text-sm hover:bg-surface-alt transition-colors'
         }
         aria-label="Thông báo"
       >
-        🔔
-        {unread > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-critical text-white text-[9.5px] font-bold flex items-center justify-center leading-none">
-            {unread > 9 ? '9+' : unread}
-          </span>
+        {variant === 'tab' ? (
+          <>
+            <span className="relative text-[20px] leading-none">
+              🔔
+              {unread > 0 && (
+                <span className="absolute -top-1.5 -right-3 min-w-[16px] h-4 px-1 rounded-full bg-critical text-white text-[9.5px] font-bold flex items-center justify-center leading-none">
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
+            </span>
+            <span>Thông báo</span>
+          </>
+        ) : (
+          <>
+            🔔
+            {unread > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-critical text-white text-[9.5px] font-bold flex items-center justify-center leading-none">
+                {unread > 9 ? '9+' : unread}
+              </span>
+            )}
+          </>
         )}
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-80 rounded-xl border border-border bg-white shadow-lg overflow-hidden text-sm z-40">
+        <div
+          className={
+            variant === 'tab'
+              ? 'fixed inset-x-2 rounded-xl border border-border bg-white shadow-lg overflow-hidden text-sm z-50'
+              : 'absolute right-0 mt-2 w-80 rounded-xl border border-border bg-white shadow-lg overflow-hidden text-sm z-40'
+          }
+          style={variant === 'tab' ? { bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))' } : undefined}
+        >
           <div className="px-4 py-3 font-bold border-b border-border flex items-center justify-between">
             <span>Thông báo</span>
             {!!items?.some((n) => !n.isRead) && (
@@ -122,7 +151,7 @@ export function NotificationBell({ token, variant = 'light' }: { token: string; 
               </button>
             )}
           </div>
-          <div className="max-h-80 overflow-y-auto">
+          <div className={variant === 'tab' ? 'max-h-[55vh] overflow-y-auto' : 'max-h-80 overflow-y-auto'}>
             {items === null ? (
               <div className="px-4 py-6 text-center text-ink-faint text-xs">Đang tải...</div>
             ) : items.length === 0 ? (

@@ -1,6 +1,12 @@
 import type { BgImage, BgSetting } from './bg-themes';
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
+// Đợt 91 — logo công ty: nhờ API thu nhỏ (WebP ≤192px) thay vì tải ảnh gốc to. Bỏ qua ảnh đã nhỏ sẵn (favicon Google, data:).
+export function logoProxyUrl(src: string, boxPx: number): string | null {
+  if (!/^https?:\/\//i.test(src) || src.includes('google.com/s2/favicons') || src.startsWith(API_URL)) return null;
+  return `${API_URL}/public/logo?s=${Math.round(boxPx * 2)}&u=${encodeURIComponent(src)}`;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,

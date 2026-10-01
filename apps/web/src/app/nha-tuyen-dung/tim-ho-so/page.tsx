@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { SourcedCandidateBadge } from '@/components/SourcedBadge';
 import EmployerHeader from '@/components/EmployerHeader';
 import { useAuth } from '@/lib/auth-context';

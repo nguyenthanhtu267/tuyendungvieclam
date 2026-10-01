@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 
 // Đợt 12a (20/09/2026) — trang 404 riêng theo thương hiệu, thay cho trang mặc định của Next.js.
 export default function NotFound() {

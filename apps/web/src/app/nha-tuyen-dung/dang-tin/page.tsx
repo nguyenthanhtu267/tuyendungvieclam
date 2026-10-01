@@ -9,7 +9,7 @@
 import { laborFromJob, laborToPayload } from '@/components/labor/labor-form';
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import SuggestedCandidates from '@/components/SuggestedCandidates';
 import EmployerHeader from '@/components/EmployerHeader';
 import { useAuth } from '@/lib/auth-context';
@@ -18,6 +18,7 @@ import { normalizeSalaryAmount } from '@/lib/format';
 import { isRichTextEmpty } from '@/lib/richtext';
 import { JobWizardSteps, JOB_WIZARD_INITIAL, type JobWizardFormState } from '@/components/JobWizardForm';
 import { EMPLOYMENT_TYPES, EXPERIENCE_LEVELS, GENDER_OPTIONS, LEVELS } from '@/lib/catalogs';
+import { DraftBanner, useDraft } from '@/lib/use-draft';
 
 // Đợt 12l (21/09/2026) — dùng chung wizard này cho cả "Đăng tin mới" và "Sửa tin" (nút Sửa ở trang
 // Quản lý tin đăng dẫn tới đây kèm ?edit=<id>): khi có editId, nạp sẵn dữ liệu tin cũ vào form, đổi
@@ -40,6 +41,18 @@ function DangTinInner() {
   const [rejectionInfo, setRejectionInfo] = useState<{ reasons: string[]; note?: string } | null>(null);
   // Đợt 12ac (24/09/2026) — "chọn từ địa điểm đã lưu" để autofill tỉnh/thành + quận/huyện + địa chỉ.
   const [savedLocations, setSavedLocations] = useState<WorkLocation[]>([]);
+
+  // Đợt 91 — nháp tin đang soạn (chỉ khi ĐĂNG TIN MỚI; sửa tin có sẵn dữ liệu từ máy chủ nên không cần). Nộp thành công → xoá.
+  const draft = useDraft<{ form: JobWizardFormState; step: number }>({
+    key: me?.id ? `job-wizard:${me.id}` : null,
+    value: { form, step },
+    enabled: !editId && !!me && !success,
+    isEmpty: (v) => !v.form.title.trim() && !v.form.description.trim() && !v.form.requirements.trim() && !v.form.benefits.trim() && !v.form.provinces.length && !v.form.industries.length && !v.form.contactName.trim(),
+    onRestore: (v) => {
+      setForm({ ...JOB_WIZARD_INITIAL, ...v.form });
+      setStep(Math.min(Math.max(0, v.step || 0), 3));
+    },
+  });
 
   useEffect(() => {
     if (me === null) router.replace('/dang-nhap');
@@ -152,6 +165,7 @@ function DangTinInner() {
         const created = await employerApi.createJob(token, payload);
         setCreatedId(created?.id ?? null);
       }
+      draft.clear();
       setSuccess(true);
     } catch (err) {
       setError(
@@ -216,6 +230,7 @@ function DangTinInner() {
     <main className="min-h-screen">
       <EmployerHeader />
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+        {draft.pending && <DraftBanner savedAt={draft.pending.t} onRestore={draft.restore} onDiscard={draft.discard} label="Bạn có tin tuyển dụng đang soạn dở" />}
         <JobWizardSteps
           form={form}
           setForm={setForm}

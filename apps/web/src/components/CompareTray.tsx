@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { usePathname } from 'next/navigation';
 import { useCompare } from '@/lib/compare';
 
@@ -11,7 +11,7 @@ export default function CompareTray() {
   if (items.length === 0 || path?.startsWith('/viec-lam/so-sanh') || path?.startsWith('/admin')) return null;
   return (
     <div
-      className="fixed z-40 left-1/2 -translate-x-1/2 w-[min(760px,calc(100%-24px))] rounded-xl bg-ink text-white shadow-lg px-3 py-2 flex items-center gap-2 flex-wrap text-[13.5px]"
+      className="tvl-above-bnav fixed z-40 left-1/2 -translate-x-1/2 w-[min(760px,calc(100%-24px))] rounded-xl bg-ink text-white shadow-lg px-3 py-2 flex items-center gap-2 flex-wrap text-[13.5px]"
       style={{ bottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}
     >
       <span className="font-bold">So sánh ({items.length}/3):</span>

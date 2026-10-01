@@ -10,7 +10,7 @@ import ProfileSmartCards from '@/components/ProfileSmartCards';
 import ApplicationStepper from '@/components/ApplicationStepper';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import SiteHeader from '@/components/SiteHeader';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -29,9 +29,10 @@ import {
   type FollowedCompany,
 } from '@/lib/api';
 import { CompanyLogo } from '@/components/CompanyLogo';
-import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatSalary } from '@/lib/format';
+import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatSalary, formatSalaryTag } from '@/lib/format';
 import ChangePasswordCard from '@/components/ChangePasswordCard';
 import { AdSlot } from '@/components/ads/AdSlot';
+import { setSavedCount } from '@/lib/saved-count';
 
 // Đợt 12m (21/09/2026) — hiển thị lại tiêu chí "Tìm kiếm đã lưu" và dựng lại URL /viec-lam tương
 // ứng (đối xứng với cách viec-lam/page.tsx đọc query params thành filters).
@@ -79,6 +80,27 @@ export default function MyCenterPage() {
 
   const [profile, setProfile] = useState<CandidateProfile | null>(null);
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
+  // Đợt 91 — đồng bộ số việc đã lưu cho thanh điều hướng dưới (điện thoại).
+  useEffect(() => {
+    if (savedJobs.length || me) setSavedCount(savedJobs.length);
+    // Bản sao nhỏ để xem được khi mất mạng (public/offline.html đọc khoá này).
+    try {
+      localStorage.setItem(
+        'tvl_saved_cache',
+        JSON.stringify(
+          savedJobs.slice(0, 50).map((x) => ({
+            title: x.jobPosting?.title,
+            company: x.jobPosting?.company?.name,
+            location: x.jobPosting?.provinces?.join(' | ') || x.jobPosting?.location,
+            salary: x.jobPosting ? formatSalaryTag(x.jobPosting.salaryMin, x.jobPosting.salaryMax) : '',
+            deadline: x.jobPosting?.deadline ? formatDate(x.jobPosting.deadline) : '',
+          })),
+        ),
+      );
+    } catch {
+      /* bỏ qua */
+    }
+  }, [savedJobs, me]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [appView, setAppView] = useState<'board' | 'table'>('board');
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -327,7 +349,7 @@ export default function MyCenterPage() {
                 )}
               </div>
 
-              <div className="rounded-xl border border-border bg-white p-[18px]">
+              <div id="saved" className="rounded-xl border border-border bg-white p-[18px] scroll-mt-20">
                 <div className="flex items-center justify-between mb-2">
                   <h2 className="font-extrabold text-[15px]">Việc làm đã lưu</h2>
                   <span className="flex items-center gap-2">

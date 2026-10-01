@@ -15,7 +15,8 @@ type Rec = {
 };
 
 export function VoiceSearchButton({ onText, className = '' }: { onText: (text: string) => void; className?: string }) {
-  const [supported, setSupported] = useState(false);
+  // Đợt 91 — null = chưa biết (giữ chỗ đúng kích thước nút → ô nhập không bị đẩy/giật khi trình duyệt xác định xong).
+  const [supported, setSupported] = useState<boolean | null>(null);
   const [listening, setListening] = useState(false);
   const rec = useRef<Rec | null>(null);
 
@@ -24,6 +25,7 @@ export function VoiceSearchButton({ onText, className = '' }: { onText: (text: s
     setSupported(!!(w.SpeechRecognition || w.webkitSpeechRecognition));
   }, []);
 
+  if (supported === null) return <span aria-hidden className="shrink-0 h-11 w-11 sm:h-10 sm:w-10" />;
   if (!supported) return null;
 
   function toggle() {
@@ -55,7 +57,7 @@ export function VoiceSearchButton({ onText, className = '' }: { onText: (text: s
       onClick={toggle}
       aria-label={listening ? 'Đang nghe, bấm để dừng' : 'Tìm bằng giọng nói'}
       title="Tìm bằng giọng nói"
-      className={`shrink-0 h-10 w-10 rounded-lg border border-border-strong bg-white hover:border-primary flex items-center justify-center text-[17px] ${listening ? 'ring-2 ring-accent animate-pulse' : ''} ${className}`}
+      className={`shrink-0 h-11 w-11 sm:h-10 sm:w-10 rounded-lg border border-border-strong bg-white hover:border-primary flex items-center justify-center text-[17px] ${listening ? 'ring-2 ring-accent animate-pulse' : ''} ${className}`}
     >
       🎤
     </button>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { workersApi, type MyApplication } from '@/lib/api';
 import { CALL_LABEL, ago, fmtDateTime } from '@/lib/labor';
 import { downloadIcs, interviewChecklist } from '@/lib/labor-extra';

@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { useEffect, useState } from 'react';
 import { smartApi7, type BudgetItem, type FunnelJob } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';

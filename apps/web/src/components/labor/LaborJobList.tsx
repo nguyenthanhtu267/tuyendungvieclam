@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { useState } from 'react';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { formatSalary } from '@/lib/format';

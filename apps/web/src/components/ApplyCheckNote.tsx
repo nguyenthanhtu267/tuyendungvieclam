@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { smartApi4 } from '@/lib/api';

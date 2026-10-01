@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { useSearchParams } from 'next/navigation';
 import SiteHeader from '@/components/SiteHeader';
 import { jobsApi, type JobPosting } from '@/lib/api';

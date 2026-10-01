@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { whenPageReady } from './page-ready';
 
 // Đợt 13 (24/09/2026) — "Chuyển đổi Tiếng Việt / Tiếng Anh" (mục 12 danh sách lỗi). Theo lựa chọn
 // của người dùng: CHỈ dịch khung giao diện (menu, nút, nhãn cố định trong code) — nội dung do NTD/
@@ -113,12 +114,15 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>('vi');
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored === 'vi' || stored === 'en') setLangState(stored);
-    } catch {
-      // localStorage có thể chặn (chế độ ẩn danh...) — mặc định tiếng Việt, không chặn trang render.
-    }
+    // Đợt 91 — chờ trang hydrate xong (xem lib/page-ready.ts) rồi mới áp ngôn ngữ đã chọn.
+    return whenPageReady(() => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored === 'vi' || stored === 'en') setLangState(stored);
+      } catch {
+        // localStorage có thể chặn (chế độ ẩn danh...) — mặc định tiếng Việt, không chặn trang render.
+      }
+    });
   }, []);
 
   const setLang = useCallback((next: Lang) => {

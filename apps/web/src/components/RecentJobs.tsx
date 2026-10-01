@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { clearRecentJobs, readRecentJobs, type RecentJob } from '@/lib/recent-jobs';
 
 // Đợt 52/58 — "Tin vừa xem": nút nhỏ cạnh tiêu đề danh sách, bấm xổ danh sách "Tiêu đề vị trí - Tên công ty" (tiết kiệm diện tích).

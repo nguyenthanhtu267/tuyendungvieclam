@@ -6,7 +6,7 @@ import EmployerHeader from '@/components/EmployerHeader';
 import { AddressPicker, EMPTY_ADDRESS, type AddressValue } from '@/components/labor/AddressPicker';
 import { useAuth } from '@/lib/auth-context';
 import { workersApi, type TrustInfo, type DropoutRow, type EmployerLaborJob, type SupplyRow, type WorkerAppRow, type WorkerKind, type WorkerSearchItem } from '@/lib/api';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { TrustBadge } from '@/components/labor/LaborJobList';
 import { callScript } from '@/lib/labor-extra';
 import { CERT_LABEL, EXPERIENCE_LABEL, HOURS_LABEL, ageOfBirth, CALL_LABEL, CALL_STATUS, GENDER_LABEL, KIND_LABEL, LABOR_GROUPS, ago, fmtDateTime, placeText, slotText } from '@/lib/labor';

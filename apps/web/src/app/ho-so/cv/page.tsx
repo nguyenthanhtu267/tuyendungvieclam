@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import SiteHeader from '@/components/SiteHeader';
 import { RichTextView } from '@/components/RichTextView';
 import { useAuth } from '@/lib/auth-context';

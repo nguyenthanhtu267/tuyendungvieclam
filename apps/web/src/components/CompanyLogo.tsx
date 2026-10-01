@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { logoProxyUrl } from '@/lib/api';
 
 
 // Đợt 12ab (24/09/2026) — logo công ty qua link ảnh (URL, quyết định đã chốt: chưa nối Cloudflare R2
@@ -105,8 +106,11 @@ export function CompanyLogo({
   // Đợt 60 — chưa có logo thì vẫn chừa 1 khoảng trống đúng kích thước (không vẽ chữ viết tắt) để các thẻ thẳng hàng.
   reserveSpace?: boolean;
 }) {
-  const [failed, setFailed] = useState(false);
-  const showImage = !!logoUrl && !failed;
+  // Đợt 91 — thử bản đã thu nhỏ trước ('proxy'); lỗi → link gốc ('raw'); lỗi nữa → icon mặc định.
+  const [stage, setStage] = useState<'proxy' | 'raw' | 'failed'>('proxy');
+  const proxied = logoUrl ? logoProxyUrl(logoUrl, size) : null;
+  const showImage = !!logoUrl && stage !== 'failed';
+  const imgSrc = logoUrl && proxied && stage === 'proxy' ? proxied : logoUrl;
   // Đợt 67 — không còn ẩn/chừa trống: chưa có logo thì hiện icon mặc định theo tên công ty.
   void hideIfEmpty;
   void reserveSpace;
@@ -121,10 +125,15 @@ export function CompanyLogo({
         // eslint-disable-next-line @next/next/no-img-element -- link ảnh tự do do NTD dán, không nằm
         // trong domain nội bộ nên next/image (yêu cầu whitelist domain) không phù hợp ở đây.
         <img
-          src={logoUrl}
+          src={imgSrc ?? undefined}
           alt={name}
+          width={size}
+          height={size}
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
           className="w-full h-full object-contain p-1"
-          onError={() => setFailed(true)}
+          onError={() => setStage((s) => (s === 'proxy' && proxied ? 'raw' : 'failed'))}
         />
       ) : (
         <CompanyDefaultIcon name={name} size={size} />

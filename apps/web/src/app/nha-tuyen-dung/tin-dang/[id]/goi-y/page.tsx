@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import EmployerHeader from '@/components/EmployerHeader';
 import SuggestedCandidates from '@/components/SuggestedCandidates';
 

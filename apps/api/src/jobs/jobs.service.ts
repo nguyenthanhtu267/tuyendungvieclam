@@ -1,4 +1,5 @@
 import { SQL_MILLIONS, toMillions } from '../common/job-normalize';
+import { countByColumn } from '../common/count-by';
 import { PROVINCE_ZONES } from '../common/province-info';
 import { oldDistricts } from '../workers/vn-geo';
 import { Injectable, NotFoundException } from '@nestjs/common';
@@ -425,22 +426,23 @@ export class JobsService {
       order: { name: 'ASC' },
       take: 12,
     });
-    const withJobCount = await Promise.all(
-      companies.map(async (c) => ({
-        id: c.id,
-        name: c.name,
-        industry: c.industry,
-        size: c.size,
-        logoUrl: resolveCompanyLogoUrl(c),
-        jobCount: await this.jobRepo.count({
-          where: {
-            companyId: c.id,
-            approvalStatus: JobApprovalStatus.APPROVED,
-          },
+    const counts = await countByColumn(
+      this.jobRepo,
+      'companyId',
+      companies.map((c) => c.id),
+      (qb) =>
+        qb.andWhere('t.approvalStatus = :ap', {
+          ap: JobApprovalStatus.APPROVED,
         }),
-      })),
     );
-    return withJobCount;
+    return companies.map((c) => ({
+      id: c.id,
+      name: c.name,
+      industry: c.industry,
+      size: c.size,
+      logoUrl: resolveCompanyLogoUrl(c),
+      jobCount: counts.get(c.id) ?? 0,
+    }));
   }
 
   // ===== Đợt 12ab (24/09/2026) — "Đánh giá mức độ tương thích" (radar chart, theo mẫu careerviet.vn) =====

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { useRouter } from 'next/navigation';
 import { authApi, ApiError } from '@/lib/api';
 import { track } from '@/lib/analytics';

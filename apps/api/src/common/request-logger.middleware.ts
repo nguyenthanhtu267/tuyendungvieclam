@@ -15,7 +15,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
     if (res.statusCode >= 500) logger.error(line);
     else if (res.statusCode >= 400) logger.warn(line);
     // Đợt 19 — bỏ log các lô ghi truy cập thành công (mỗi người xem gửi ~6 lô/phút, sẽ làm ngập log Render).
-    else if (!req.originalUrl.startsWith('/analytics/collect'))
+    // Đợt 91 — cũng bỏ log /health (dịch vụ ping gọi mỗi vài phút) cho đỡ ngập log.
+    else if (!req.originalUrl.startsWith('/analytics/collect') && !req.originalUrl.startsWith('/health'))
       logger.log(line);
   });
   next();

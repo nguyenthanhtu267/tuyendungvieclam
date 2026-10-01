@@ -25,6 +25,7 @@ export function AdSlot({ slot, className = '' }: { slot: string; className?: str
   const { me } = useAuth();
   const def = AD_SLOT_MAP[slot];
   const [ad, setAd] = useState<PublicAd | null>(null);
+  const [none, setNone] = useState(false); // đã hỏi xong và KHÔNG có banner nào phù hợp
   const ref = useRef<HTMLDivElement>(null);
   const seen = useRef(false);
   const saver = useDataSaver();
@@ -35,9 +36,13 @@ export function AdSlot({ slot, className = '' }: { slot: string; className?: str
     const choose = (feed: Awaited<ReturnType<typeof loadAdFeed>>) => {
       if (!alive) return;
       const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
-      if ((def.devices === 'desktop' && !isDesktop) || (def.devices === 'mobile' && isDesktop)) return setAd(null);
+      if ((def.devices === 'desktop' && !isDesktop) || (def.devices === 'mobile' && isDesktop)) {
+        setNone(true);
+        return setAd(null);
+      }
       const picked = pickAd(eligibleAds(feed, slot, audienceOf(me?.role), isDesktop), slot);
       if (picked) registerSlot(slot, picked);
+      setNone(!picked);
       setAd(picked);
     };
     const hit = peekAdFeed();
@@ -68,7 +73,34 @@ export function AdSlot({ slot, className = '' }: { slot: string; className?: str
     return () => io.disconnect();
   }, [ad, slot, me]);
 
-  if (!ad || !def || saver) return null;
+  // Đợt 91 — nhớ chiều cao banner (gồm lề) của lần xem trước; lần sau script ở <head> giữ sẵn chỗ này (xem layout.tsx + globals.css)
+  // nên banner về sau KHÔNG đẩy nội dung bên dưới xuống. Slot không có banner → xoá nhớ để không chừa khoảng trống.
+  const adId = ad?.id;
+  useEffect(() => {
+    if (me === undefined || !def) return;
+    const key = `${slot}:${window.matchMedia('(min-width: 1024px)').matches ? 'd' : 'm'}`;
+    try {
+      const map = JSON.parse(localStorage.getItem('tvl_ad_h') || '{}') as Record<string, number>;
+      const el = ref.current;
+      if (adId && el && el.offsetParent !== null) {
+        const cs = getComputedStyle(el);
+        const h = Math.round(el.offsetHeight + parseFloat(cs.marginTop || '0') + parseFloat(cs.marginBottom || '0'));
+        if (h > 0 && h < 500 && map[key] !== h) {
+          map[key] = h;
+          localStorage.setItem('tvl_ad_h', JSON.stringify(map));
+        }
+      } else if (!adId && none && key in map) {
+        delete map[key];
+        localStorage.setItem('tvl_ad_h', JSON.stringify(map));
+      }
+    } catch {
+      /* bỏ qua */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adId, none, slot, me, def]);
+
+  // Chưa/không có banner → thẻ giữ chỗ RỖNG, mặc định display:none (không tạo khoảng cách); chỉ hiện (có min-height) khi lần trước slot này có banner.
+  if (!ad || !def || saver) return none || saver || !def ? null : <div data-ad-reserve={slot} aria-hidden="true" />;
   return (
     <div ref={ref} className={className} data-ad-slot={slot} data-ad-key={adKey(ad)} data-ad-gov={def.variant === 'wide' || slot === 'footer-top' ? 'wide' : def.variant === 'mini' ? 'tall' : def.variant}>
       <AdBanner
@@ -79,6 +111,7 @@ export function AdSlot({ slot, className = '' }: { slot: string; className?: str
         onClose={() => {
           closeAd(ad.id);
           unregisterSlot(slot);
+          setNone(true);
           setAd(null);
         }}
       />

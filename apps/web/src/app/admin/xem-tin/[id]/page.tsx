@@ -8,7 +8,7 @@
 // tự động chặn.
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { useAuth } from '@/lib/auth-context';
 import { RichTextView } from '@/components/RichTextView';
 import { adminApi, ApiError, type JobPosting } from '@/lib/api';

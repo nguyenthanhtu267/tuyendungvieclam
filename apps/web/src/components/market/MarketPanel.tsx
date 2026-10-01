@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { jobsApi, type JobPosting, type MarketStats } from '@/lib/api';
 import { formatNumber } from '@/lib/format';

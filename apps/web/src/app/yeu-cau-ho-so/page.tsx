@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import SiteHeader from '@/components/SiteHeader';
 import { publicProfileRequestApi, ApiError } from '@/lib/api';
 

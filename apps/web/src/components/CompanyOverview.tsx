@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import type { Company, JobPosting } from '@/lib/api';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { SourcedBadge, isCompanyUnverified } from '@/components/SourcedBadge';

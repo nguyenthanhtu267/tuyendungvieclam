@@ -58,7 +58,7 @@ const config: Config = {
         border: { DEFAULT: '#E1E6ED', strong: '#C9D1DE' },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        sans: ['Inter', '"Inter Fallback"', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
         mono: ['"IBM Plex Mono"', 'ui-monospace', 'SF Mono', 'Consolas', 'monospace'],
       },
       borderRadius: {

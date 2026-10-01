@@ -1,8 +1,11 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, authApi } from './api';
 import { endImpersonation, getAdminBackupToken } from './impersonation';
+import { clearAllDrafts } from './use-draft';
+import { clearSavedCount } from './saved-count';
+import { whenPageReady } from './page-ready';
 
 export interface MeInfo {
   id: string;
@@ -64,11 +67,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const stored = typeof window !== 'undefined' ? localStorage.getItem('tvl_token') : null;
-    setTokenState(stored);
-    load(stored);
+    // Đợt 91 — chờ trang hydrate xong rồi mới đặt trạng thái đăng nhập (xem lib/page-ready.ts) để không làm nháy cả trang.
+    return whenPageReady(() => {
+      const stored = typeof window !== 'undefined' ? localStorage.getItem('tvl_token') : null;
+      setTokenState(stored);
+      load(stored);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Đợt 91 — ĐỒNG BỘ GIỮA CÁC TAB: đăng nhập / đăng xuất / đổi tài khoản ở 1 tab → các tab khác cập nhật ngay
+  // (trước đây tab cũ vẫn hiện "đã đăng nhập" rồi báo lỗi 401 khi bấm). Sự kiện `storage` chỉ bắn ở tab KHÁC nên không lặp vòng.
+  const tokenRef = useRef<string | null>(null);
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== 'tvl_token' && e.key !== null) return;
+      const next = localStorage.getItem('tvl_token');
+      if (next === tokenRef.current) return;
+      tokenRef.current = next;
+      setTokenState(next);
+      if (next) {
+        setMe(undefined);
+        load(next);
+      } else setMe(null);
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [load]);
 
   const setToken = useCallback(
     (t: string) => {
@@ -95,6 +123,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     localStorage.removeItem('tvl_token');
+    // Đợt 91 — máy dùng chung: xoá nháp + số đếm cục bộ của người vừa đăng xuất.
+    clearAllDrafts();
+    clearSavedCount();
+    try {
+      localStorage.removeItem('tvl_saved_cache');
+    } catch {
+      /* bỏ qua */
+    }
     setTokenState(null);
     setMe(null);
   }, [load]);

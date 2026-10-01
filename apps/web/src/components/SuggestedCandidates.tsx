@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { useAuth } from '@/lib/auth-context';
 import { cvSearchApi, smartApi5 } from '@/lib/api';
 

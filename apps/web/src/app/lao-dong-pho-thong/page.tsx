@@ -1,7 +1,7 @@
 import SiteHeader from '@/components/SiteHeader';
 import { WorkerForm } from '@/components/labor/WorkerForm';
 import { SLUG_KIND } from '@/lib/labor';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 
 export const metadata = { title: 'Tìm việc công nhân, sinh viên, thực tập sinh' };
 

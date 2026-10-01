@@ -283,3 +283,47 @@ input, select, textarea, button { font-family: inherit; }
   body:has(#print-area) #print-area { position: absolute; left: 0; top: 0; width: 100%; }
   body:has(#print-area) { background: #fff !important; }
 }
+
+/* ===== Đợt 91 — tối ưu điện thoại ===== */
+/* (2) iOS Safari tự phóng to trang khi chạm vào ô nhập có chữ < 16px → ép đúng 16px trên màn hình nhỏ. */
+@media (max-width: 639px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']),
+  select,
+  textarea {
+    font-size: 16px !important; /* !important: thắng các lớp text-[12.5px]... đặt riêng từng ô */
+  }
+  select,
+  .tvl-input:not(textarea) {
+    min-height: 44px;
+  }
+}
+/* (3) Vùng chạm ≥ 44px trên màn hình cảm ứng mà KHÔNG đổi bố cục: mở rộng vùng bấm bằng phần tử ảo. */
+@media (pointer: coarse) {
+  .tap-slop::after { content: ''; position: absolute; inset: -13px -9px; }
+  .pm-close { position: relative; }
+  .pm-close::after { content: ''; position: absolute; inset: -12px; }
+  /* Tự động: component TapTargets gắn class + biến --tx/--ty cho mọi nút/liên kết nhỏ hơn 44px. */
+  .tap-auto::after { content: ''; position: absolute; inset: calc(var(--ty, 0px) * -1) calc(var(--tx, 0px) * -1); }
+}
+
+/* (5) Nền động chỉ chạy trên máy tính; điện thoại/tiết kiệm dữ liệu/tab ẩn → đứng yên (đỡ pin + CPU). */
+@media (max-width: 767px), (hover: none) {
+  .dg-flow path, .dg-blink, .dg-pulse, .dg-float, .dg-line, .promo-badge { animation: none !important; }
+  .bg-fade-in { animation: none !important; }
+}
+:root[data-saver='1'] .dg-flow path,
+:root[data-saver='1'] .dg-blink,
+:root[data-saver='1'] .dg-pulse,
+:root[data-saver='1'] .dg-float,
+:root[data-saver='1'] .dg-line,
+:root[data-saver='1'] .promo-badge { animation: none !important; }
+:root[data-hidden='1'] *, :root[data-hidden='1'] *::before, :root[data-hidden='1'] *::after { animation-play-state: paused !important; }
+
+/* Chừa chỗ cho thanh điều hướng dưới (chỉ điện thoại) để không che nội dung/chân trang. */
+@media (max-width: 767px) {
+  body.has-bottom-nav { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
+  body.has-bottom-nav .tvl-above-bnav { bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+
+/* Đợt 91 — thẻ giữ chỗ banner: ẩn mặc định; script ở <head> bật + đặt min-height theo chiều cao lần xem trước. */
+[data-ad-reserve] { display: none; }

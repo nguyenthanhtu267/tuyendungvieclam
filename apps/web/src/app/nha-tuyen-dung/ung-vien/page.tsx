@@ -5,7 +5,7 @@ import InterviewScheduler from '@/components/InterviewScheduler';
 import ApplicantBulkTools from '@/components/ApplicantBulkTools';
 import { Suspense, useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import EmployerHeader from '@/components/EmployerHeader';
 import { RichTextView } from '@/components/RichTextView';
 import { useAuth } from '@/lib/auth-context';

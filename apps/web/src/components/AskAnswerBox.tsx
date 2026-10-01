@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { askQuestion } from '@/lib/ask';
 
 // Đợt 65 — hiện câu trả lời nhanh khi ô tìm kiếm trông giống một câu hỏi.

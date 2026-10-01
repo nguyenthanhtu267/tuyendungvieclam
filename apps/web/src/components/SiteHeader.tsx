@@ -2,7 +2,7 @@
 
 import { FontScale } from '@/components/FontScale';
 import { useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/i18n';

@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { workersApi, type ProfileExtra, type ApplyResult, type WorkerKind, type WorkerProfileView } from '@/lib/api';

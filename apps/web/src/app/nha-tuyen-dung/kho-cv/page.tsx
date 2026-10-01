@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import EmployerHeader from '@/components/EmployerHeader';
 import { useAuth } from '@/lib/auth-context';
 import {

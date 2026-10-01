@@ -1,4 +1,5 @@
 import { normalizeSalaryFields, assertDistrictInProvinces } from '../common/job-normalize';
+import { countByColumn } from '../common/count-by';
 import { LABOR_GROUPS, PERKS, SLOTS, slotsFor, LaborKind } from '../workers/labor-groups';
 import { cleanJobExtra } from '../workers/labor-extra';
 import { resolveWorkPlace } from '../workers/vn-geo';
@@ -153,14 +154,15 @@ export class EmployerService {
       order: { createdAt: 'DESC' },
       take: 5,
     });
-    const recentJobsWithCounts = await Promise.all(
-      recentJobs.map(async (job) => ({
-        ...job,
-        applicationCount: await this.applicationRepo.count({
-          where: { jobPostingId: job.id },
-        }),
-      })),
+    const recentCounts = await countByColumn(
+      this.applicationRepo,
+      'jobPostingId',
+      recentJobs.map((j) => j.id),
     );
+    const recentJobsWithCounts = recentJobs.map((job) => ({
+      ...job,
+      applicationCount: recentCounts.get(job.id) ?? 0,
+    }));
 
     const recentApplications = await applicationsQb()
       .leftJoinAndSelect('app.cv', 'cv')
@@ -223,17 +225,18 @@ export class EmployerService {
         /* bảng analytics chưa có / lỗi → bỏ qua, chỉ mất số liệu tuần */
       }
     }
-    const withCounts = await Promise.all(
-      jobs.map(async (job) => ({
-        ...job,
-        viewsWeek: weekly.get(job.id)?.w ?? 0,
-        viewsPrevWeek: weekly.get(job.id)?.p ?? 0,
-        applicationCount: await this.applicationRepo.count({
-          where: { jobPostingId: job.id },
-        }),
-        employerStatus: this.computeEmployerStatus(job),
-      })),
+    const appCounts = await countByColumn(
+      this.applicationRepo,
+      'jobPostingId',
+      jobs.map((j) => j.id),
     );
+    const withCounts = jobs.map((job) => ({
+      ...job,
+      viewsWeek: weekly.get(job.id)?.w ?? 0,
+      viewsPrevWeek: weekly.get(job.id)?.p ?? 0,
+      applicationCount: appCounts.get(job.id) ?? 0,
+      employerStatus: this.computeEmployerStatus(job),
+    }));
     return status
       ? withCounts.filter((j) => j.employerStatus === status)
       : withCounts;

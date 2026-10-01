@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import EmployerHeader from '@/components/EmployerHeader';
 import { CvFileContent } from '@/components/cv/CvFileContent';
 import { RichTextView } from '@/components/RichTextView';

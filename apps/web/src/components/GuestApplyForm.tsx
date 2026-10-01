@@ -2,10 +2,11 @@
 
 import ScreeningInput from '@/components/ScreeningInput';
 import { useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { applicationsApi, ApiError } from '@/lib/api';
 import { track } from '@/lib/analytics';
 import { AdSlot } from '@/components/ads/AdSlot';
+import { DraftBanner, useDraft } from '@/lib/use-draft';
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const ACCEPT = '.pdf,.doc,.docx,.jpg,.jpeg,.png';
@@ -33,6 +34,23 @@ export function GuestApplyForm({
   const [answers, setAnswers] = useState<string[]>([]);
   const [state, setState] = useState<'idle' | 'submitting' | 'done'>('idle');
   const [error, setError] = useState<string | null>(null);
+
+  // Đợt 91 — nháp họ tên/SĐT/email/link CV/thư/câu trả lời (KHÔNG lưu file CV — người dùng chọn lại file khi khôi phục).
+  const draft = useDraft<{ fullName: string; phone: string; email: string; mode: 'file' | 'link'; link: string; coverLetter: string; answers: string[] }>({
+    key: `guest-apply:${jobId}`,
+    value: { fullName, phone, email, mode, link, coverLetter, answers },
+    enabled: state !== 'done',
+    isEmpty: (v) => !v.fullName.trim() && !v.phone.trim() && !v.email.trim() && !v.link.trim() && !v.coverLetter.trim() && !v.answers.some(Boolean),
+    onRestore: (v) => {
+      setFullName(v.fullName);
+      setPhone(v.phone);
+      setEmail(v.email);
+      setMode(v.mode);
+      setLink(v.link);
+      setCoverLetter(v.coverLetter);
+      setAnswers(v.answers);
+    },
+  });
 
   function pickFile(f: File | null) {
     setError(null);
@@ -62,6 +80,7 @@ export function GuestApplyForm({
     try {
       await applicationsApi.applyAsGuest(jobId, form);
       track('apply_submit', { entityType: 'job', entityId: jobId, meta: { guest: true } });
+      draft.clear();
       setState('done');
     } catch (err) {
       setState('idle');
@@ -88,6 +107,7 @@ export function GuestApplyForm({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3" data-testid="guest-apply-form">
+      {draft.pending && <DraftBanner savedAt={draft.pending.t} onRestore={draft.restore} onDiscard={draft.discard} label="Bạn có hồ sơ ứng tuyển điền dở cho tin này" />}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="font-bold text-sm">Ứng tuyển nhanh — {jobTitle}</div>
         <div className="text-xs text-ink-muted">

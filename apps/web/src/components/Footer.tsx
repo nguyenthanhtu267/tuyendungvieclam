@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { AdSlot } from '@/components/ads/AdSlot';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { useLanguage } from '@/lib/i18n';
 
 // Đợt 12a (20/09/2026) — footer dùng chung toàn site, liên kết tới 2 trang pháp lý mới (trước đó

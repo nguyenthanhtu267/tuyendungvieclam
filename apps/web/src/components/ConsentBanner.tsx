@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { usePathname } from 'next/navigation';
 import { getConsent, setAnalyticsConsent, type ConsentLevel } from '@/lib/analytics';
 
@@ -55,7 +55,7 @@ export default function ConsentBanner() {
     <div
       role="dialog"
       aria-label="Thông báo về cookie và thống kê"
-      className="fixed z-40 left-3 right-3 bottom-3 sm:right-auto sm:left-4 sm:bottom-4 sm:w-[340px] rounded-xl border border-border bg-white shadow-lg p-3.5 text-[13px] text-ink"
+      className="tvl-above-bnav fixed z-40 left-3 right-3 bottom-3 sm:right-auto sm:left-4 sm:bottom-4 sm:w-[340px] rounded-xl border border-border bg-white shadow-lg p-3.5 text-[13px] text-ink"
     >
       <p className="leading-snug text-ink-muted">
         Web dùng cookie cần thiết để chạy và <b className="text-ink">thống kê truy cập ẩn danh</b> để cải thiện trải nghiệm.

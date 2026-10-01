@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { useEffect, useState } from 'react';
 import { workersApi, type JobExtra, type WorkerKind } from '@/lib/api';
 import { CERT_LABEL, EXPERIENCE_LABEL, INTERN_SLOTS, MONTHS_OPTIONS, PERKS_BY_KIND, PERK_LABEL, fmtM } from '@/lib/labor';

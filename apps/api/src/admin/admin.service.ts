@@ -1,4 +1,5 @@
 import { normalizeSalaryFields, assertDistrictInProvinces } from '../common/job-normalize';
+import { countByColumn } from '../common/count-by';
 import { assessJobRisk, RISK_THRESHOLD } from './job-risk';
 import {
   BadRequestException,
@@ -974,12 +975,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     if (claimed === true) qb.andWhere('company.claimedAt IS NOT NULL');
     if (claimed === false) qb.andWhere('company.claimedAt IS NULL');
     const companies = await qb.take(100).getMany();
-    const jobCounts = await Promise.all(
-      companies.map((c) => this.jobRepo.count({ where: { companyId: c.id } })),
+    const jobCounts = await countByColumn(
+      this.jobRepo,
+      'companyId',
+      companies.map((c) => c.id),
     );
-    return companies.map((company, i) => ({
+    return companies.map((company) => ({
       ...company,
-      jobCount: jobCounts[i],
+      jobCount: jobCounts.get(company.id) ?? 0,
     }));
   }
 
@@ -995,16 +998,16 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       where: { companyId: id },
       order: { createdAt: 'DESC' },
     });
-    const applicationCounts = await Promise.all(
-      jobs.map((j) =>
-        this.applicationRepo.count({ where: { jobPostingId: j.id } }),
-      ),
+    const applicationCounts = await countByColumn(
+      this.applicationRepo,
+      'jobPostingId',
+      jobs.map((j) => j.id),
     );
     return {
       company,
-      jobs: jobs.map((j, i) => ({
+      jobs: jobs.map((j) => ({
         ...j,
-        applicationCount: applicationCounts[i],
+        applicationCount: applicationCounts.get(j.id) ?? 0,
       })),
     };
   }

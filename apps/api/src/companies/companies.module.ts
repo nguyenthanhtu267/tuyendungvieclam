@@ -8,10 +8,11 @@ import { CompaniesController } from './companies.controller';
 import { CompaniesService } from './companies.service';
 import { CompanyLogoFinder } from './company-logo-finder.service';
 import { CompanyLogoController } from './company-logo.controller';
+import { LogoProxyController } from './logo-proxy.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Company, JobPosting, CompanyFollow, CompanyClaimRequest])],
-  controllers: [CompaniesController, CompanyLogoController],
+  controllers: [CompaniesController, CompanyLogoController, LogoProxyController],
   providers: [CompaniesService, CompanyLogoFinder],
 })
 export class CompaniesModule {}

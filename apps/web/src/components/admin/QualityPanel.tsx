@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { useCallback, useEffect, useState } from 'react';
 import { adminApi, smartApi, smartApi2, smartApi3, smartApi6, smartApi7, workersApi, type WebHealthItem, type AdminTodo, type DupJobGroup, type ProvinceBalance, type SuspiciousAccount, type SuspiciousWorkerGroup, type QualityOverview, type SystemHealth, type ReportGroup, type WeeklyReport, type AdTargeting } from '@/lib/api';
 

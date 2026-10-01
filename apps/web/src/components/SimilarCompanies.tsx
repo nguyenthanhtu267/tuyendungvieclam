@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { companiesApi, type SimilarCompany } from '@/lib/api';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { FitText } from '@/components/FitText';

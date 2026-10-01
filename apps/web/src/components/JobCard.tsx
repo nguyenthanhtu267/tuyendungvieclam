@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import type { JobPosting } from '@/lib/api';
 import { track } from '@/lib/analytics';
 import { candidatesApi, ApiError } from '@/lib/api';
@@ -15,6 +15,7 @@ import { matchTone, useMatches } from '@/lib/match';
 import { useCompare } from '@/lib/compare';
 import { distanceLabel, useHomePlace } from '@/lib/geo';
 import { FitText } from '@/components/FitText';
+import { bumpSavedCount } from '@/lib/saved-count';
 
 // Đợt 10 — thẻ việc làm theo mục 4 đặc tả: tiêu đề đậm + badge (MỚI) chữ đỏ trong ngoặc (không phải
 // pill), dòng lương đỏ, nhiều tỉnh ngăn bởi "|", hạn nộp/cập nhật, tag phúc lợi có icon, nút đỏ
@@ -54,10 +55,12 @@ export function JobCard({
       if (isSaved) {
         await candidatesApi.unsaveJob(token, job.id);
         setIsSaved(false);
+        bumpSavedCount(-1);
         onToggleSaved?.(job.id, false);
       } else {
         await candidatesApi.saveJob(token, job.id);
         setIsSaved(true);
+        bumpSavedCount(1);
         onToggleSaved?.(job.id, true);
       }
     } catch (err) {
@@ -92,37 +95,11 @@ export function JobCard({
           : 'border-border bg-white hover:border-primary hover:shadow-sm'
       }`}
     >
-      <button
-        type="button"
-        onClick={handleToggleSave}
-        disabled={busy}
-        aria-label={isSaved ? 'Bỏ lưu việc làm' : 'Lưu việc làm'}
-        className={`absolute top-3 right-3 text-base leading-none ${isSaved ? 'text-critical' : 'text-ink-faint hover:text-critical'}`}
-      >
-        {isSaved ? '♥' : '♡'}
-      </button>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const r = compare.toggle({ id: job.id, title: job.title });
-          setCompareMsg(r === 'full' ? 'Tối đa 3 tin' : '');
-        }}
-        aria-pressed={inCompare}
-        title={compareMsg || (inCompare ? 'Bỏ khỏi so sánh' : 'Thêm vào so sánh')}
-        className={`absolute top-2.5 right-9 text-[11px] font-semibold rounded px-1.5 py-0.5 border ${
-          inCompare ? 'bg-primary text-white border-primary' : 'text-ink-faint border-border hover:text-primary hover:border-primary'
-        }`}
-      >
-        {compareMsg || (inCompare ? '✓ So sánh' : '⇄ So sánh')}
-      </button>
-
       {/* Đợt 13 (24/09/2026) — mục 4 danh sách lỗi: logo công ty trên thẻ việc làm quá nhỏ so với
           các trang khác (chi tiết tin, trang công ty đều dùng size lớn hơn). Tăng 44→60px + cỡ chữ
           initials theo tỷ lệ để không bị vỡ layout khi công ty chưa có logoUrl. */}
       <CompanyLogo name={job.company.name} logoUrl={job.company.logoUrl} size={80} className="text-base" reserveSpace />
-      <div className="flex-1 min-w-0 pr-6">
+      <div className="flex-1 min-w-0 sm:pr-6">
         <div className="font-bold text-[13.5px] text-ink">
           {job.title}
           {isNewJob(job.createdAt) && <span className="text-critical font-extrabold ml-1.5">(MỚI)</span>}
@@ -157,7 +134,7 @@ export function JobCard({
                 router.push('/viec-lam?salaryTier=50');
               }}
               title="Xem các tin có lương từ 50 triệu trở lên"
-              className="inline-flex items-center ml-1.5 align-middle text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-[#FFD84D] text-[#5A3A00] border border-[#C99A00] tracking-wide hover:brightness-95"
+              className="tap-slop relative inline-flex items-center ml-1.5 align-middle text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-[#FFD84D] text-[#5A3A00] border border-[#C99A00] tracking-wide hover:brightness-95"
             >
               ★ CAO CẤP
             </button>
@@ -194,7 +171,7 @@ export function JobCard({
                 if (pv) qs.set('provinces', pv);
                 router.push(`/viec-lam?${qs.toString()}`);
               }}
-              className="whitespace-nowrap text-primary font-semibold hover:underline"
+              className="tap-slop relative whitespace-nowrap text-primary font-semibold hover:underline"
             >
               ≈ Việc tương tự
             </button>
@@ -207,13 +184,42 @@ export function JobCard({
             (/viec-lam/[id], mục "Phúc lợi"), không đụng gì tới trang đó hay dữ liệu backend. */}
       </div>
 
-      <div className="w-full sm:w-auto shrink-0 pt-1 sm:pt-0">
+      {/* Đợt 91 — điện thoại: ♡ + ⇄ nằm CẠNH nút Ứng tuyển, mỗi nút cao 44px (đủ ngón tay, không đè lên tiêu đề → không bấm nhầm).
+          Máy tính: giữ nguyên vị trí góc trên phải của thẻ. */}
+      <div className="w-full sm:w-auto shrink-0 pt-1 sm:pt-0 flex items-stretch gap-2 sm:block">
         <button
           type="button"
           onClick={handleApplyNow}
-          className="w-full sm:w-auto bg-critical text-white text-[13px] font-extrabold tracking-wide rounded-lg px-6 py-2.5 hover:brightness-95"
+          className="flex-1 sm:flex-none sm:w-auto bg-critical text-white text-[13px] font-extrabold tracking-wide rounded-lg px-6 py-2.5 max-sm:min-h-[44px] hover:brightness-95"
         >
           ỨNG TUYỂN NGAY
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const r = compare.toggle({ id: job.id, title: job.title });
+            setCompareMsg(r === 'full' ? 'Tối đa 3 tin' : '');
+          }}
+          aria-pressed={inCompare}
+          aria-label={inCompare ? 'Bỏ khỏi so sánh' : 'Thêm vào so sánh'}
+          title={compareMsg || (inCompare ? 'Bỏ khỏi so sánh' : 'Thêm vào so sánh')}
+          className={`sm:absolute sm:top-2.5 sm:right-9 shrink-0 max-sm:h-11 max-sm:min-w-[44px] max-sm:text-base max-sm:flex max-sm:items-center max-sm:justify-center text-[11px] font-semibold rounded px-1.5 py-0.5 max-sm:border-2 border ${
+            inCompare ? 'bg-primary text-white border-primary' : 'text-ink-faint border-border hover:text-primary hover:border-primary max-sm:bg-white max-sm:text-ink-muted max-sm:border-border-strong'
+          }`}
+        >
+          <span className="sm:hidden">{compareMsg ? '3/3' : inCompare ? '✓' : '⇄'}</span>
+          <span className="hidden sm:inline">{compareMsg || (inCompare ? '✓ So sánh' : '⇄ So sánh')}</span>
+        </button>
+        <button
+          type="button"
+          onClick={handleToggleSave}
+          disabled={busy}
+          aria-label={isSaved ? 'Bỏ lưu việc làm' : 'Lưu việc làm'}
+          className={`sm:absolute sm:top-3 sm:right-3 shrink-0 text-base leading-none max-sm:h-11 max-sm:min-w-[44px] max-sm:text-xl max-sm:rounded max-sm:border-2 max-sm:border-border-strong max-sm:bg-white max-sm:flex max-sm:items-center max-sm:justify-center ${isSaved ? 'text-critical' : 'text-ink-faint hover:text-critical'}`}
+        >
+          {isSaved ? '♥' : '♡'}
         </button>
       </div>
     </Link>

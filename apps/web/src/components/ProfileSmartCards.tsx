@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { smartApi4, smartApi6, type JobGoalData, type SalaryPosition, type SkillPremium, type WeeklyDigest, type ProfileBenchmark } from '@/lib/api';
 
 const GOAL_KEY = 'tvl_weekly_goal';

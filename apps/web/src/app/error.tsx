@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { useEffect } from 'react';
 
 // Đợt 90 — một khối bị lỗi không còn làm trắng cả trang: hiện thông báo thân thiện + nút "Thử lại".

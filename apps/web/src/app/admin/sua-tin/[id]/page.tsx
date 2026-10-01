@@ -13,7 +13,7 @@
 import { laborFromJob, laborToPayload } from '@/components/labor/labor-form';
 import { Suspense, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@/components/SmartLink';
 import { useAuth } from '@/lib/auth-context';
 import { adminApi, ApiError } from '@/lib/api';
 import { isRichTextEmpty } from '@/lib/richtext';
