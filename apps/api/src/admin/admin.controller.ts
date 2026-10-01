@@ -306,8 +306,12 @@ export class AdminController {
     @Query('status') status?: string,
     @Query('featured') featured?: string,
     @Query('noLogo') noLogo?: string,
+    @Query('attention') attention?: string,
+    @Query('hasWebsite') hasWebsite?: string,
   ) {
     return this.adminService.companyDirectory({
+      attention: attention === '1',
+      hasWebsite: hasWebsite === '1',
       q,
       status,
       featured: featured === '1',

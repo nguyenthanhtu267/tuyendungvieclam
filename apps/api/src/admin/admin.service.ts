@@ -708,7 +708,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   }
 
   // Đợt 114 — danh bạ công ty cho tab "DN yêu thích & Logo": lọc theo từ khoá/trạng thái duyệt/yêu thích/chưa có logo, mới nhất trước.
-  async companyDirectory(opts: { q?: string; status?: string; featured?: boolean; noLogo?: boolean }) {
+  async companyDirectory(opts: { q?: string; status?: string; featured?: boolean; noLogo?: boolean; attention?: boolean; hasWebsite?: boolean }) {
     const qb = this.companyRepo.createQueryBuilder('company').orderBy('company.createdAt', 'DESC');
     if (opts.q?.trim()) {
       qb.andWhere('(company.name ILIKE :q OR company.taxCode ILIKE :q)', { q: `%${opts.q.trim()}%` });
@@ -718,7 +718,29 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     }
     if (opts.featured) qb.andWhere('company.isFeaturedEmployer = true');
     if (opts.noLogo) qb.andWhere("(company.logoUrl IS NULL OR company.logoUrl = '')");
-    const [items, total] = await qb.take(300).getManyAndCount();
+    // Đợt 117 — "Cần xử lý": công ty đã đánh dấu yêu thích nhưng chưa duyệt hoặc chưa có logo.
+    if (opts.attention) {
+      qb.andWhere("company.isFeaturedEmployer = true AND (company.approvalStatus <> :ok OR company.logoUrl IS NULL OR company.logoUrl = '')", { ok: CompanyApprovalStatus.APPROVED });
+    }
+    if (opts.hasWebsite) qb.andWhere("(company.website IS NOT NULL AND company.website <> '')");
+    const [rawItems, total] = await qb.take(300).getManyAndCount();
+    // Số tin đang hiển thị công khai của từng công ty (để Admin biết công ty đáng đánh dấu yêu thích).
+    const counts = rawItems.length
+      ? await this.jobRepo
+          .createQueryBuilder('j')
+          .select('j.companyId', 'companyId')
+          .addSelect('COUNT(*)', 'n')
+          .where('j.companyId IN (:...ids)', { ids: rawItems.map((c) => c.id) })
+          .andWhere('j.approvalStatus = :ok', { ok: JobApprovalStatus.APPROVED })
+          .groupBy('j.companyId')
+          .getRawMany<{ companyId: string; n: string }>()
+      : [];
+    const cmap = new Map(counts.map((r) => [r.companyId, Number(r.n)]));
+    const items = rawItems.map((c) => Object.assign(c, { jobCount: cmap.get(c.id) ?? 0 }));
+    const attentionTotal = await this.companyRepo
+      .createQueryBuilder('c')
+      .where("c.isFeaturedEmployer = true AND (c.approvalStatus <> :ok OR c.logoUrl IS NULL OR c.logoUrl = '')", { ok: CompanyApprovalStatus.APPROVED })
+      .getCount();
     const [featuredTotal, noLogoTotal, all] = await Promise.all([
       this.companyRepo.count({ where: { isFeaturedEmployer: true } }),
       this.companyRepo
@@ -727,7 +749,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         .getCount(),
       this.companyRepo.count(),
     ]);
-    return { items, total, featuredTotal, noLogoTotal, all };
+    return { items, total, featuredTotal, noLogoTotal, all, attentionTotal };
   }
 
   async bulkSetFeatured(admin: AdminActor, ids: string[], featured: boolean) {
