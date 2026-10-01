@@ -24,6 +24,9 @@ import { RichTextEditor } from '@/components/RichTextEditor';
 import { richTextListItems } from '@/lib/richtext';
 import { formatSalary } from '@/lib/format';
 import type { WorkLocation } from '@/lib/api';
+import { CHANNEL_OPTIONS, LABOR_GROUPS } from '@/lib/labor';
+import { LaborJobFields, type LaborFieldsValue } from '@/components/labor/LaborJobFields';
+import { EMPTY_ADDRESS } from '@/components/labor/AddressPicker';
 import {
   EMPLOYMENT_TYPES,
   EXPERIENCE_LEVELS,
@@ -78,6 +81,10 @@ export interface JobWizardFormState {
   benefits: string;
   deadline: string;
   tags: string[];
+  screening: { q: string; expect: 'yes' | 'no' | 'any' }[];
+  channel: string;
+  laborGroup: string;
+  labor: LaborFieldsValue;
   contactName: string;
   contactEmail: string;
   contactPhone: string;
@@ -106,6 +113,10 @@ export const JOB_WIZARD_INITIAL: JobWizardFormState = {
   benefits: '',
   deadline: '',
   tags: [],
+  screening: [],
+  channel: 'office',
+  laborGroup: '',
+  labor: { workPlace: EMPTY_ADDRESS, perks: [], payBase: '', payOt: '', payNight: '', payAllowance: '', schedule: [] },
   contactName: '',
   contactEmail: '',
   contactPhone: '',
@@ -174,7 +185,7 @@ export function JobWizardSteps({
   rejectionInfo,
 }: JobWizardStepsProps) {
   function canProceed(): boolean {
-    if (step === 0) return form.title.trim().length > 0;
+    if (step === 0) return form.title.trim().length > 0 && (form.channel === 'office' || !!form.laborGroup);
     return true;
   }
 
@@ -218,6 +229,34 @@ export function JobWizardSteps({
         {step === 0 && (
           <>
             <h2 className="font-bold text-sm">Thông tin vị trí tuyển dụng</h2>
+            {/* Đợt 79 — kênh tin: tin công nhân / SV / thực tập hiển thị ở kênh riêng, không lẫn việc văn phòng */}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Loại tin">
+                <select id="jw-channel" className="tvl-input" value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value, laborGroup: '' })}>
+                  {CHANNEL_OPTIONS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
+                </select>
+              </Field>
+              {form.channel !== 'office' ? (
+                <Field label="Nhóm công việc" hint="để gợi ý đúng người">
+                  <select id="jw-group" className="tvl-input" value={form.laborGroup} onChange={(e) => setForm({ ...form, laborGroup: e.target.value })}>
+                    <option value="">— Chọn nhóm —</option>
+                    {LABOR_GROUPS[form.channel as 'worker' | 'student' | 'intern'].map((g) => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                </Field>
+              ) : (
+                <div className="text-[12.5px] text-ink-muted self-end pb-2">Tuyển công nhân, sinh viên làm thêm hay thực tập sinh? Chọn loại tin tương ứng — ứng viên ứng tuyển nhanh bằng số điện thoại, không cần CV.</div>
+              )}
+            </div>
+            {form.channel !== 'office' && (
+              <LaborJobFields
+                kind={form.channel as 'worker' | 'student' | 'intern'}
+                group={form.laborGroup}
+                value={form.labor}
+                onChange={(v) => setForm({ ...form, labor: v })}
+                salaryMin={form.salaryMin}
+                salaryMax={form.salaryMax}
+              />
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Chức danh">
                 <input className="tvl-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="VD: Nhân viên Kinh doanh B2B" />
@@ -453,6 +492,27 @@ export function JobWizardSteps({
 
             <Field label="Job tags / Kỹ năng (không bắt buộc)" hint="Nhập rồi Enter, VD: Tiktokshop Specialist">
               <ChipsInput value={form.tags} onChange={(v) => setForm({ ...form, tags: v })} placeholder="Nhập rồi Enter" />
+            </Field>
+
+            <Field label="Câu hỏi sàng lọc (không bắt buộc, tối đa 3 câu Có/Không)" hint="Ứng viên phải trả lời khi nộp đơn. Hồ sơ trả lời khác đáp án mong muốn sẽ được gắn cờ để bạn lọc nhanh.">
+              <div className="flex flex-col gap-2">
+                {form.screening.map((s, i) => (
+                  <div key={i} className="flex flex-wrap items-center gap-2">
+                    <input id={`screen-q-${i}`} aria-label={`Câu hỏi ${i + 1}`} className="tvl-input flex-1 min-w-[220px]" maxLength={150} placeholder="VD: Bạn có thể làm ca đêm không?" value={s.q}
+                      onChange={(e) => setForm({ ...form, screening: form.screening.map((x, j) => (j === i ? { ...x, q: e.target.value } : x)) })} />
+                    <select id={`screen-e-${i}`} aria-label="Đáp án mong muốn" className="tvl-input !w-auto" value={s.expect}
+                      onChange={(e) => setForm({ ...form, screening: form.screening.map((x, j) => (j === i ? { ...x, expect: e.target.value as 'yes' | 'no' | 'any' } : x)) })}>
+                      <option value="yes">Mong muốn: Có</option>
+                      <option value="no">Mong muốn: Không</option>
+                      <option value="any">Không lọc</option>
+                    </select>
+                    <button type="button" onClick={() => setForm({ ...form, screening: form.screening.filter((_, j) => j !== i) })} className="text-critical font-bold text-[13px]">Xoá</button>
+                  </div>
+                ))}
+                {form.screening.length < 3 && (
+                  <button type="button" onClick={() => setForm({ ...form, screening: [...form.screening, { q: '', expect: 'yes' }] })} className="self-start text-primary font-bold text-[14px]">+ Thêm câu hỏi</button>
+                )}
+              </div>
             </Field>
 
             <div className="text-[11px] text-ink-faint">

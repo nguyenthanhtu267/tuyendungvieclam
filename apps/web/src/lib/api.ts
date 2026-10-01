@@ -161,6 +161,14 @@ export interface JobPosting {
   // Đợt 12v (21/09/2026) — "JOB TAGS / SKILLS": thẻ từ khoá/kỹ năng NTD tự nhập, hiển thị dạng chip
   // dưới khối "Thông tin khác" ở trang chi tiết tin (theo ảnh mẫu người dùng gửi).
   tags?: string[];
+  screeningQuestions?: { q: string; expect?: 'yes' | 'no' | 'any' }[] | null;
+  channel?: string;
+  laborGroup?: string | null;
+  workPlace?: LaborWorkPlace | null;
+  laborPerks?: string[] | null;
+  payInfo?: LaborPayInfo | null;
+  laborSchedule?: string[] | null;
+  filledAt?: string | null;
   // Đợt 12x (21/09/2026) — "Bắt buộc nhập lý do khi Từ chối": lý do Admin chọn (danh mục cố định,
   // xem JOB_REJECTION_REASONS ở catalogs.ts) + ghi chú tự do, NTD xem lại được để biết cần sửa gì.
   rejectionReasons?: string[];
@@ -236,6 +244,9 @@ export interface JobListParams {
   featuredEmployerOnly?: boolean;
   page?: number;
   pageSize?: number;
+  // Đợt 79 — kênh tin (mặc định văn phòng) + nhóm việc phổ thông
+  channel?: string;
+  laborGroup?: string;
 }
 
 function buildJobQuery(params: JobListParams): string {
@@ -723,7 +734,7 @@ export const applicationsApi = {
   apply: (
     token: string,
     jobId: string,
-    dto: { cvId?: string; useOnlineProfile?: boolean; coverLetter?: string },
+    dto: { cvId?: string; useOnlineProfile?: boolean; coverLetter?: string; screeningAnswers?: string[] },
   ) =>
     request<Application>(`/jobs/${jobId}/apply`, {
       method: 'POST',
@@ -847,6 +858,14 @@ export interface CreateJobPayload {
   ageRange?: string;
   workSchedule?: string;
   tags?: string[];
+  screeningQuestions?: { q: string; expect?: 'yes' | 'no' | 'any' }[];
+  channel?: string;
+  laborGroup?: string | null;
+  workPlace?: LaborWorkPlace | null;
+  laborPerks?: string[] | null;
+  payInfo?: LaborPayInfo | null;
+  laborSchedule?: string[] | null;
+  filledAt?: string | null;
   // Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc), theo mẫu careerviet.vn.
   contactName?: string;
   contactEmail?: string;
@@ -2763,4 +2782,95 @@ export const smartApi5 = {
   publicTests: (ids: string[]) => request<{ items: { testId: string; jobId: string; a: string; b: string }[] }>(`/public/title-tests?ids=${ids.join(',')}`),
   testEvent: (testId: string, variant: 'a' | 'b', type: 'view' | 'click') =>
     request<{ ok: boolean }>('/public/title-tests/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testId, variant, type }) }),
+};
+
+// Đợt 78
+export interface SkillPremium { hasProfile: boolean; industry?: string | null; baseMedian?: number; items?: { tag: string; jobs: number; median: number; uplift: number }[] }
+export interface WeeklyDigest { hasProfile: boolean; scope?: string; newJobs?: number; prevJobs?: number; change?: number | null; medianSalary?: number | null; salaryChange?: number | null; latest?: { id: string; title: string; company: string }[] }
+export interface ProfileBenchmark { hasProfile: boolean; enough?: boolean; scope?: string; sample?: number; rows?: { key: string; label: string; peers: number; mine: boolean }[]; skills?: { peers: number; mine: number }; experiences?: { peers: number; mine: number }; gaps?: string[] }
+export interface ApplicantFlags { flags: Record<string, string[]>; screening: Record<string, number>; hasScreening: boolean }
+export interface SuspiciousAccount { companyId: string; name: string; score: number; reasons: string[] }
+export const smartApi6 = {
+  skillPremium: (token: string) => request<SkillPremium>('/me/skill-premium', { headers: authHeaders(token) }),
+  weeklyDigest: (token: string) => request<WeeklyDigest>('/me/weekly-digest', { headers: authHeaders(token) }),
+  benchmark: (token: string) => request<ProfileBenchmark>('/me/profile-benchmark', { headers: authHeaders(token) }),
+  applicantFlags: (token: string, jobId: string) => request<ApplicantFlags>(`/employer/applicant-flags?jobId=${jobId}`, { headers: authHeaders(token) }),
+  suspicious: (token: string) => request<{ items: SuspiciousAccount[] }>('/admin/quality/suspicious-accounts', { headers: authHeaders(token) }),
+};
+
+// Đợt 79 — lao động phổ thông (công nhân / SV làm thêm / thực tập sinh)
+export type WorkerKind = 'worker' | 'student' | 'intern';
+export interface WorkerProfileView {
+  id: string; kind: WorkerKind; fullName: string; phone: string; relativePhone: string | null; gender: string; birthDate: string;
+  province: string; addressMode: 'old' | 'new'; oldDistrict: string | null; oldWard: string | null; newWardCode: string | null; newWard: string | null;
+  addressDetail: string | null; lat: number | null; lon: number | null; radiusKm: number | null; desiredJobs: string[]; shifts: string[];
+  availability: string[]; school: string | null; major: string | null; needsHousing: boolean; needsShuttle: boolean; isSeeking: boolean; refreshedAt: string; createdAt: string;
+}
+export interface WorkerInput {
+  kind: WorkerKind; fullName: string; phone: string; relativePhone?: string; gender: string; birthDate: string; province: string;
+  addressMode: 'old' | 'new'; oldDistrict?: string; oldWard?: string; newWardCode?: string; addressDetail?: string; lat?: number | null; lon?: number | null;
+  radiusKm?: number | null; desiredJobs: string[]; shifts: string[]; availability?: string[]; school?: string; major?: string; needsHousing: boolean; needsShuttle: boolean;
+  isSeeking: boolean; consent?: boolean; verifyBirthDate?: string;
+}
+export interface LaborWorkPlace { province: string; mode: 'old' | 'new'; oldDistrict?: string | null; oldWard?: string | null; newWardCode?: string | null; newWard?: string | null; lat?: number | null; lon?: number | null }
+export interface LaborPayInfo { base: number; otHours?: number; nightHours?: number; allowance?: number }
+export interface LaborIncome { base: number; ot: number; night: number; allowance: number; gross: number; insurance: number; net: number; otHours: number; nightHours: number }
+export interface Proximity { km: number; label: string; exact: boolean }
+export interface WorkerJobCard {
+  id: string; title: string; laborGroup: string | null; channel: string; provinces: string[]; salaryMin: number | null; salaryMax: number | null;
+  isUrgent: boolean; deadline: string | null; createdAt: string; company: { id: string; name: string; logoUrl: string | null } | null; matched?: boolean;
+  workPlaceText?: string | null; perks?: string[]; income?: LaborIncome | null; schedule?: string[]; headcount?: number; hired?: number; filled?: boolean;
+  distance?: Proximity | null; scheduleFit?: boolean | null;
+}
+export interface ApplyResult { ok: boolean; already: boolean; groupCode?: string | null; groupSize?: number; joinedGroup?: boolean }
+export interface WorkerNoteView { id: string; kind: string; text: string; createdAt: string; mine: boolean }
+export interface WorkerSearchItem extends WorkerProfileView {
+  age: number; distance: Proximity | null; outOfRadius: boolean; notes: WorkerNoteView[]; refreshedAfterHired: boolean; stale: boolean;
+  myStatus: { status: string; jobId: string | null; updatedAt: string } | null; competition: number;
+}
+export interface SupplyRow { district: string; total: number; worker: number; student: number; intern: number; housing: number; shuttle: number }
+export interface SuspiciousWorkerGroup { key: string; reason: string; score: number; profiles: { id: string; fullName: string; phone: string; kind: WorkerKind; province: string; createdAt: string; isHidden: boolean }[] }
+export interface WorkerAppRow { id: string; createdAt: string; seenAt: string | null; status: string; groupCode: string | null; groupSize: number; jobId: string; jobTitle: string; profileId: string; fullName: string; phone: string; province: string; newWard: string | null; oldDistrict: string | null; kind: WorkerKind; desiredJobs: string | null }
+const qsOf = (params: Record<string, string | undefined>) => new URLSearchParams(Object.entries(params).filter(([, v]) => v != null && v !== '') as [string, string][]).toString();
+const post = (body: unknown, token?: string): RequestInit => ({ method: 'POST', body: JSON.stringify(body), headers: token ? authHeaders(token) : undefined });
+export const workersApi = {
+  catalog: () => request<{ groups: Record<WorkerKind, string[]>; shifts: string[]; radii: number[]; provinces: string[] }>('/public/workers/catalog'),
+  districts: (province: string) => request<{ items: string[] }>(`/public/workers/geo/districts?province=${encodeURIComponent(province)}`),
+  wards: (province: string, district: string) => request<{ items: string[] }>(`/public/workers/geo/wards?province=${encodeURIComponent(province)}&district=${encodeURIComponent(district)}`),
+  newWards: (province: string) => request<{ items: { code: string; name: string }[] }>(`/public/workers/geo/new-wards?province=${encodeURIComponent(province)}`),
+  check: (phone: string) => request<{ valid: boolean; exists: boolean; refreshedAt: string | null }>('/public/workers/check', post({ phone })),
+  verify: (phone: string, birthDate: string) => request<WorkerProfileView>('/public/workers/verify', post({ phone, birthDate })),
+  refresh: (phone: string, birthDate: string) => request<WorkerProfileView>('/public/workers/refresh', post({ phone, birthDate })),
+  save: (b: WorkerInput) => request<{ updated: boolean; profile: WorkerProfileView }>('/public/workers/profile', post(b)),
+  jobs: (params: Record<string, string | undefined>) => request<WorkerJobCard[]>(`/public/workers/jobs?${qsOf(params)}`),
+  browse: (params: Record<string, string | undefined>) => request<{ items: WorkerJobCard[]; total: number; page: number; totalPages: number }>(`/public/workers/browse?${qsOf(params)}`),
+  salaryStats: (kind: string, group?: string, province?: string) =>
+    request<{ scope: string | null; count: number; p25: number | null; median: number | null; p75: number | null }>(`/public/workers/salary-stats?${qsOf({ kind, group, province })}`),
+  progress: (jobId: string) => request<{ headcount: number; hired: number; filled: boolean; income: LaborIncome | null }>(`/public/workers/jobs/${jobId}/progress`),
+  groupInfo: (jobId: string, code: string) => request<{ valid: boolean; size: number; leader: string | null }>(`/public/workers/jobs/${jobId}/group/${encodeURIComponent(code)}`),
+  quickApply: (jobId: string, phone: string, birthDate: string, group?: string) => request<ApplyResult>(`/public/workers/jobs/${jobId}/apply`, post({ phone, birthDate, group })),
+  // ứng viên có tài khoản
+  mine: (token: string) => request<WorkerProfileView | null>('/me/worker-profile', { headers: authHeaders(token) }),
+  saveMine: (token: string, b: WorkerInput) => request<{ updated: boolean; profile: WorkerProfileView }>('/me/worker-profile', post(b, token)),
+  refreshMine: (token: string) => request<WorkerProfileView>('/me/worker-profile/refresh', post({}, token)),
+  applyMine: (token: string, jobId: string, group?: string) => request<ApplyResult>(`/me/worker-apply/${jobId}`, post({ group }, token)),
+  // nhà tuyển dụng
+  search: (token: string, params: Record<string, string | undefined>) => {
+    return request<{ items: WorkerSearchItem[]; total: number; page: number; totalPages: number; origin: { province: string } | null }>(`/employer/workers?${qsOf(params)}`, { headers: authHeaders(token) });
+  },
+  origin: (token: string) => request<{ province: string | null; address: string | null }>('/employer/workers/origin', { headers: authHeaders(token) }),
+  addNote: (token: string, id: string, kind: 'hired' | 'note', text?: string) => request<WorkerNoteView>(`/employer/workers/${id}/notes`, post({ kind, text }, token)),
+  delNote: (token: string, noteId: string) => request<{ ok: boolean }>(`/employer/workers/notes/${noteId}`, { method: 'DELETE', headers: authHeaders(token) }),
+  applications: (token: string) =>
+    request<{ items: WorkerAppRow[]; jobs: { id: string; title: string; headcount: number; hired: number; filled: boolean; channel: string }[] }>('/employer/worker-applications', { headers: authHeaders(token) }),
+  setContact: (token: string, id: string, status: string, jobId?: string | null) =>
+    request<{ status: string | null; jobId?: string | null; updatedAt?: string }>(`/employer/workers/${id}/contact`, { method: 'PUT', body: JSON.stringify({ status, jobId }), headers: authHeaders(token) }),
+  appStatus: (token: string, id: string, status: string) => request<{ ok: boolean }>(`/employer/worker-applications/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }), headers: authHeaders(token) }),
+  setFilled: (token: string, jobId: string, filled: boolean) => request<{ ok: boolean }>(`/employer/jobs/${jobId}/filled`, { method: 'PATCH', body: JSON.stringify({ filled }), headers: authHeaders(token) }),
+  supply: (token: string, params: Record<string, string | undefined>) =>
+    request<{ origin: { province: string } | null; totalInProvince?: number; districts: SupplyRow[]; provinces: { province: string; total: number; km: number }[] }>(`/employer/workers/supply?${qsOf(params)}`, { headers: authHeaders(token) }),
+  adminStats: (token: string) => request<{ items: { kind: WorkerKind; n: number; fresh: number; hidden: number }[]; apps: number; contacts: number }>('/admin/workers/stats', { headers: authHeaders(token) }),
+  adminSuspicious: (token: string) => request<{ items: SuspiciousWorkerGroup[] }>('/admin/workers/suspicious', { headers: authHeaders(token) }),
+  adminHide: (token: string, id: string, hidden: boolean) => request<{ ok: boolean }>(`/admin/workers/${id}/hide`, { method: 'PATCH', body: JSON.stringify({ hidden }), headers: authHeaders(token) }),
+  seen: (token: string, id: string) => request<{ ok: boolean }>(`/employer/worker-applications/${id}/seen`, { method: 'PATCH', headers: authHeaders(token) }),
 };

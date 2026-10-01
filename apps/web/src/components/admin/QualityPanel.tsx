@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { adminApi, smartApi, smartApi2, smartApi3, type QualityOverview, type SystemHealth, type ReportGroup, type WeeklyReport, type AdTargeting } from '@/lib/api';
+import { adminApi, smartApi, smartApi2, smartApi3, smartApi6, workersApi, type SuspiciousAccount, type SuspiciousWorkerGroup, type QualityOverview, type SystemHealth, type ReportGroup, type WeeklyReport, type AdTargeting } from '@/lib/api';
 
-type Sub = 'reports' | 'weekly' | 'ads' | 'system' | 'duplicates' | 'suspicious' | 'lowQuality' | 'spam';
+type Sub = 'reports' | 'weekly' | 'ads' | 'system' | 'duplicates' | 'suspicious' | 'lowQuality' | 'spam' | 'accounts' | 'workers';
 
 // Đợt 63 — Admin: phát hiện tin trùng, tin đáng ngờ (dùng bộ chấm rủi ro) và chấm chất lượng tin tổng hợp.
 export function QualityPanel({ token }: { token: string }) {
@@ -14,6 +14,9 @@ export function QualityPanel({ token }: { token: string }) {
   const [reports, setReports] = useState<ReportGroup[] | null>(null);
   const [weekly, setWeekly] = useState<WeeklyReport | null>(null);
   const [ads, setAds] = useState<AdTargeting | null>(null);
+  const [accts, setAccts] = useState<SuspiciousAccount[]>([]);
+  const [wg, setWg] = useState<SuspiciousWorkerGroup[]>([]);
+  const [wstats, setWstats] = useState<{ items: { kind: string; n: number; fresh: number; hidden: number }[]; apps: number; contacts: number } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
   const load = useCallback(() => {
@@ -22,6 +25,9 @@ export function QualityPanel({ token }: { token: string }) {
     smartApi2.systemHealth(token).then(setSys).catch(() => undefined);
     smartApi3.reports(token).then((r) => setReports(r.items)).catch(() => setReports([]));
     smartApi3.weekly(token).then(setWeekly).catch(() => undefined);
+    smartApi6.suspicious(token).then((r) => setAccts(r.items)).catch(() => setAccts([]));
+    workersApi.adminSuspicious(token).then((r) => setWg(r.items)).catch(() => setWg([]));
+    workersApi.adminStats(token).then(setWstats).catch(() => undefined);
     smartApi3.adTargeting(token).then(setAds).catch(() => undefined);
   }, [token]);
   useEffect(load, [load]);
@@ -43,6 +49,8 @@ export function QualityPanel({ token }: { token: string }) {
     { id: 'weekly', label: 'Báo cáo tuần', n: 0 },
     { id: 'ads', label: 'Gợi ý nhắm quảng cáo', n: ads?.items.length ?? 0 },
     { id: 'system', label: 'Sức khoẻ hệ thống', n: sys?.alerts.filter((a) => a.level === 'warn').length ?? 0 },
+    { id: 'accounts', label: 'Tài khoản nhà tuyển dụng đáng ngờ', n: accts.length },
+    { id: 'workers', label: 'Hồ sơ lao động phổ thông nghi ảo', n: wg.length },
     { id: 'spam', label: 'Nghi spam ứng tuyển', n: (sys?.spam.burst.length ?? 0) + (sys?.spam.sameLetter.length ?? 0) },
     { id: 'lowQuality', label: 'Tin tổng hợp chất lượng thấp', n: data?.lowQuality.length ?? 0 },
     { id: 'duplicates', label: 'Tin trùng', n: data?.duplicates.length ?? 0 },
@@ -178,7 +186,54 @@ export function QualityPanel({ token }: { token: string }) {
           ))}
         </div>
       )}
-      {sub !== 'system' && sub !== 'spam' && sub !== 'reports' && sub !== 'weekly' && sub !== 'ads' && (!data ? (
+      {sub === 'accounts' && (
+        <div className="rounded-xl border border-border bg-white divide-y divide-border">
+          {accts.length === 0 ? <Empty /> : accts.map((a) => (
+            <div key={a.companyId} className="p-3">
+              <div className="font-bold text-[13.5px]">
+                <Link href={`/cong-ty/${a.companyId}`} className="hover:underline">{a.name}</Link>
+                <span className="ml-2 rounded bg-surface-alt border border-border px-1.5 py-0.5 text-[11.5px] font-extrabold">Điểm {a.score}</span>
+              </div>
+              <div className="text-[12.5px] text-ink-soft mt-0.5">{a.reasons.join('; ')}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {sub === 'workers' && (
+        <div className="flex flex-col gap-2">
+          {wstats && (
+            <div className="rounded-xl border border-border bg-white p-3 text-[13.5px] text-ink flex flex-wrap gap-x-5 gap-y-1">
+              {wstats.items.map((r) => (
+                <span key={r.kind}><b>{r.kind === 'worker' ? 'Công nhân' : r.kind === 'student' ? 'Sinh viên' : 'Thực tập sinh'}:</b> {r.n} hồ sơ ({r.fresh} cập nhật 30 ngày, {r.hidden} đã ẩn)</span>
+              ))}
+              <span><b>Ứng tuyển nhanh:</b> {wstats.apps}</span>
+              <span><b>Lượt NTD ghi sổ gọi:</b> {wstats.contacts}</span>
+            </div>
+          )}
+          <div className="rounded-xl border border-border bg-white divide-y divide-border">
+            {wg.length === 0 ? <div className="p-6 text-center text-sm text-ink-faint">Không phát hiện nhóm hồ sơ đáng ngờ.</div> : wg.map((g) => (
+              <div key={g.key} className="p-3 flex flex-col gap-1">
+                <div className="font-bold text-[13.5px]">{g.reason} <span className="ml-1 rounded bg-surface-alt border border-border px-1.5 py-0.5 text-[11.5px] font-extrabold">Điểm {g.score}</span></div>
+                <ul className="flex flex-col gap-0.5">
+                  {g.profiles.map((p) => (
+                    <li key={p.id} className="flex flex-wrap items-center gap-2 text-[13px] text-ink">
+                      <span className={p.isHidden ? 'line-through text-ink-faint' : ''}>{p.fullName} · {p.phone} · {p.province}</span>
+                      <button
+                        type="button"
+                        onClick={() => workersApi.adminHide(token, p.id, !p.isHidden).then(() => setWg((l) => l.map((x) => ({ ...x, profiles: x.profiles.map((y) => (y.id === p.id ? { ...y, isHidden: !p.isHidden } : y)) }))))}
+                        className={`rounded border px-1.5 py-0.5 text-[12px] font-bold ${p.isHidden ? 'border-border-strong text-ink' : 'border-critical text-critical'}`}
+                      >
+                        {p.isHidden ? 'Hiện lại' : 'Ẩn hồ sơ'}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {sub !== 'workers' && sub !== 'accounts' && sub !== 'system' && sub !== 'spam' && sub !== 'reports' && sub !== 'weekly' && sub !== 'ads' && (!data ? (
         <div className="text-ink-faint text-sm py-6">Đang quét…</div>
       ) : (
         <div className="rounded-xl bg-white border border-border divide-y divide-border">

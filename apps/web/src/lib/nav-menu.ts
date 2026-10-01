@@ -59,6 +59,14 @@ export const JOBS_MEGA_MENU: { columns: NavMenuGroup[][] } = {
           { label: 'Tất cả việc làm', href: '/viec-lam' },
         ],
       },
+      {
+        title: 'Lao Động Phổ Thông',
+        items: [
+          { label: 'Việc làm công nhân', href: '/lao-dong-pho-thong/viec-lam?loai=cong-nhan' },
+          { label: 'Sinh viên làm thêm', href: '/lao-dong-pho-thong/viec-lam?loai=sinh-vien' },
+          { label: 'Thực tập sinh', href: '/lao-dong-pho-thong/viec-lam?loai=thuc-tap-sinh' },
+        ],
+      },
     ],
   ],
 };
@@ -70,6 +78,7 @@ export const UTILITY_LIVE: { label: string; href: string }[] = [
   { label: 'Tính lương Gross – Net', href: '/tien-ich/tinh-luong' },
   { label: 'Tính thuế thu nhập cá nhân', href: '/tien-ich/tinh-luong' },
   { label: 'Tính bảo hiểm xã hội', href: '/tien-ich/tinh-luong' },
+  { label: 'So sánh các lời mời làm việc', href: '/tien-ich/so-sanh-offer' },
 ];
 
 export const UTILITY_TOOLS: string[] = [
@@ -88,6 +97,7 @@ export const CANDIDATE_ACCOUNT_MENU: NavLinkItem[] = [
   { label: 'Tạo CV', href: '/ho-so/cv' },
   { label: 'Việc làm gợi ý', href: '/ho-so#suggestions' },
   { label: 'Việc làm của tôi', href: '/ho-so#applications' },
+  { label: 'Hồ sơ lao động phổ thông', href: '/lao-dong-pho-thong' },
   { label: 'CV & tệp đính kèm', href: '/ho-so#cvs' },
   { label: 'Cài đặt', href: '/ho-so#settings' },
 ];
@@ -96,6 +106,7 @@ export const CANDIDATE_ACCOUNT_MENU: NavLinkItem[] = [
 export const EMPLOYER_CTA_MENU: NavLinkItem[] = [
   { label: 'Đăng Tin Tuyển Dụng', href: '/nha-tuyen-dung/dang-tin' },
   { label: 'Tìm Hồ Sơ Ứng Viên', href: '/nha-tuyen-dung/tim-ho-so' },
+  { label: 'Tìm Công Nhân, Sinh Viên, Thực Tập Sinh', href: '/nha-tuyen-dung/lao-dong-pho-thong' },
   { label: 'Bảng Giá Dịch Vụ', href: '/nha-tuyen-dung/don-hang' },
   { label: 'Đăng Ký Tài Khoản Nhà Tuyển Dụng', href: '/nha-tuyen-dung/dang-ky' },
 ];

@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // Ứng với màn B2 (Đăng tin tuyển dụng) trong mockup — wizard 4 bước, gửi 1 lần khi hoàn tất.
@@ -96,6 +96,36 @@ export class CreateJobDto {
   @IsOptional()
   @IsArray()
   tags?: string[];
+
+  // Đợt 78 — câu hỏi sàng lọc Có/Không (tối đa 3).
+  @IsOptional()
+  @IsArray()
+  screeningQuestions?: { q: string; expect: 'yes' | 'no' | 'any' }[];
+
+  // Đợt 79 — kênh tin + nhóm việc (kênh lao động phổ thông)
+  @IsOptional()
+  @IsIn(['office', 'worker', 'student', 'intern'])
+  channel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  laborGroup?: string | null;
+
+  // Đợt 80 — nơi làm việc chi tiết, quyền lợi, ước tính thu nhập, ca cần người (kênh phổ thông)
+  @IsOptional()
+  workPlace?: Record<string, unknown> | null;
+
+  @IsOptional()
+  @IsArray()
+  laborPerks?: string[] | null;
+
+  @IsOptional()
+  payInfo?: Record<string, unknown> | null;
+
+  @IsOptional()
+  @IsArray()
+  laborSchedule?: string[] | null;
 
   // Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc), theo mẫu careerviet.vn.
   @IsOptional()

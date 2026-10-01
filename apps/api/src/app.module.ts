@@ -73,6 +73,8 @@ import { AdsModule } from './ads/ads.module';
 import { BackgroundModule } from './background/background.module';
 import { BgImage } from './database/entities/bg-image.entity';
 import { JobReport } from './database/entities/job-report.entity';
+import { WorkerProfile, WorkerNote, WorkerApplication, WorkerContact } from './database/entities/worker-profile.entity';
+import { WorkersModule } from './workers/workers.module';
 
 const entities = [
   User,
@@ -125,6 +127,10 @@ const entities = [
   AdCampaignStat,
   BgImage,
   JobReport,
+  WorkerProfile,
+  WorkerNote,
+  WorkerApplication,
+  WorkerContact,
 ];
 
 @Module({
@@ -175,6 +181,7 @@ const entities = [
     StorageModule,
     AdsModule,
     BackgroundModule,
+    WorkersModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

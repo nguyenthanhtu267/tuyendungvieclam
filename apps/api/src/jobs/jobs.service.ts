@@ -83,6 +83,10 @@ export class JobsService {
   }
 
   private applyFilters(qb: SelectQueryBuilder<JobPosting>, query: ListJobsDto) {
+    // Đợt 79 — tách kênh: danh sách việc làm văn phòng không lẫn tin công nhân/SV/thực tập.
+    if (query.channel === 'labor') qb.andWhere("job.channel IN ('worker','student','intern')");
+    else qb.andWhere('job.channel = :channel', { channel: query.channel ?? 'office' });
+    if (query.laborGroup) qb.andWhere('job.laborGroup = :laborGroup', { laborGroup: query.laborGroup });
     if (query.q) {
       // Đợt 75 — mở rộng theo từ đồng nghĩa / có dấu ↔ không dấu (xem search-synonyms.ts).
       const terms = expandQuery(query.q);
@@ -204,6 +208,20 @@ export class JobsService {
     };
   }
 
+  // Đợt 78 — dữ liệu gọn cho thẻ chia sẻ (Zalo/Facebook): KHÔNG tăng lượt xem.
+  async shareMeta(id: string) {
+    const job = await this.jobRepo.findOne({ where: { id }, relations: { company: true } });
+    if (!job || job.approvalStatus !== JobApprovalStatus.APPROVED || job.isPaused) throw new NotFoundException('Không tìm thấy tin tuyển dụng');
+    return {
+      title: job.title,
+      company: job.company?.name ?? '',
+      salaryMin: job.salaryMin ?? null,
+      salaryMax: job.salaryMax ?? null,
+      location: job.provinces?.[0] ?? job.location ?? '',
+      urgent: !!job.isUrgent,
+    };
+  }
+
   async findOne(id: string) {
     const job = await this.jobRepo.findOne({
       where: { id },
@@ -225,6 +243,7 @@ export class JobsService {
       })
       .andWhere('job.isPaused = false')
       .andWhere('job.id != :id', { id })
+      .andWhere('job.channel = :ch', { ch: job.channel ?? 'office' })
       .andWhere('job.industry = :industry', { industry: job.industry ?? '' })
       .orderBy('job.createdAt', 'DESC')
       .take(3)
@@ -237,6 +256,7 @@ export class JobsService {
     this.jobRepo.increment({ id }, 'viewCount', 1).catch(() => {});
     job.viewCount = (job.viewCount ?? 0) + 1;
 
+    if (job.screeningQuestions) (job as { screeningQuestions?: unknown }).screeningQuestions = job.screeningQuestions.map((x) => ({ q: x.q }));
     return { job, related };
   }
 
@@ -476,7 +496,7 @@ export class JobsService {
   }
 
   private baseQueryPublic() {
-    return this.baseQuery();
+    return this.baseQuery().andWhere("job.channel = 'office'");
   }
 
   async getCompatibility(userId: string, jobId: string) {

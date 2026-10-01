@@ -10,6 +10,8 @@ const TEMPLATES: { id: string; label: string; status: string; text: string }[] =
   { id: 'thanks', label: 'Cảm ơn và từ chối lịch sự', status: 'rejected', text: 'Chào {ten}, cảm ơn bạn đã quan tâm đến vị trí {vitri} tại {congty}. Sau khi cân nhắc, hồ sơ của bạn chưa phù hợp với nhu cầu hiện tại. Chúng tôi sẽ lưu hồ sơ và liên hệ khi có vị trí phù hợp hơn. Chúc bạn sớm tìm được công việc như ý.' },
   { id: 'reviewing', label: 'Đã nhận và đang xem xét', status: 'reviewing', text: 'Chào {ten}, {congty} đã nhận hồ sơ ứng tuyển vị trí {vitri} của bạn và đang xem xét. Chúng tôi sẽ phản hồi trong thời gian sớm nhất.' },
   { id: 'suitable', label: 'Hồ sơ phù hợp, sẽ liên hệ', status: 'suitable', text: 'Chào {ten}, hồ sơ của bạn phù hợp với vị trí {vitri}. {congty} sẽ liên hệ với bạn để sắp xếp bước tiếp theo, bạn vui lòng giữ liên lạc.' },
+  { id: 'remind', label: 'Nhắc lịch phỏng vấn', status: 'interview', text: 'Chào {ten}, {congty} xin nhắc lịch phỏng vấn vị trí {vitri} của bạn. Nếu cần đổi lịch, bạn vui lòng phản hồi sớm để chúng tôi sắp xếp lại.' },
+  { id: 'moredocs', label: 'Đề nghị bổ sung hồ sơ', status: 'reviewing', text: 'Chào {ten}, để tiếp tục xét hồ sơ vị trí {vitri}, {congty} đề nghị bạn bổ sung thêm thông tin về kinh nghiệm và thành tích gần nhất. Bạn vui lòng cập nhật hồ sơ hoặc phản hồi tin nhắn này.' },
 ];
 
 const fill = (t: string, a: EmployerApplication) =>

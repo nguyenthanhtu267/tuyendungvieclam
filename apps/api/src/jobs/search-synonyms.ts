@@ -63,6 +63,29 @@ function wordIn(hay: string, needle: string): boolean {
 }
 
 // Trả về danh sách cụm cần tìm (luôn có cụm gốc đứng đầu). Tối đa 8 cụm để truy vấn không phình.
+// Đợt 78 — viết tắt chức danh phổ biến ↔ dạng đầy đủ (chuẩn hoá chức danh khi tìm kiếm).
+const ABBR: [string, string][] = [
+  ['nv', 'nhân viên'], ['kd', 'kinh doanh'], ['tp', 'trưởng phòng'], ['gđ', 'giám đốc'], ['pgđ', 'phó giám đốc'],
+  ['hcns', 'hành chính nhân sự'], ['cskh', 'chăm sóc khách hàng'], ['bđs', 'bất động sản'], ['qlcl', 'quản lý chất lượng'],
+  ['tgđ', 'tổng giám đốc'], ['gv', 'giáo viên'], ['kcs', 'kiểm tra chất lượng'], ['ktv', 'kỹ thuật viên'], ['lái xe', 'tài xế'],
+];
+
+function abbrVariants(q: string): string[] {
+  const out: string[] = [];
+  const words = q.trim().toLowerCase().split(/\s+/);
+  if (words.length > 6) return out;
+  const expandedWords = words.map((w) => ABBR.find(([a]) => foldText(a) === foldText(w) && a !== 'lái xe')?.[1] ?? w);
+  const expanded = expandedWords.join(' ');
+  if (expanded !== words.join(' ')) out.push(expanded);
+  let shortened = words.join(' ');
+  for (const [a, full] of ABBR) {
+    if (a === 'lái xe') continue;
+    if (foldText(shortened).includes(foldText(full))) shortened = shortened.replace(new RegExp(full, 'i'), a);
+  }
+  if (shortened !== words.join(' ')) out.push(shortened);
+  return out;
+}
+
 export function expandQuery(raw: string): string[] {
   const q = raw.trim();
   if (!q) return [];
@@ -81,6 +104,7 @@ export function expandQuery(raw: string): string[] {
       out.add(foldText(hit) === f ? t : q.replace(new RegExp(hit, 'i'), t));
     }
   }
+  for (const v of abbrVariants(q)) out.add(v);
   return [...out].slice(0, 8);
 }
 

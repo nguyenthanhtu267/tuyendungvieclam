@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { JobReport } from './entities/job-report.entity';
+import { WorkerProfile, WorkerNote, WorkerApplication, WorkerContact } from './entities/worker-profile.entity';
 import { DataSource } from 'typeorm';
 import {
   User,
@@ -104,6 +105,10 @@ export const AppDataSource = new DataSource({
     AdCampaignStat,
     BgImage,
     JobReport,
+    WorkerProfile,
+    WorkerNote,
+    WorkerApplication,
+    WorkerContact,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,

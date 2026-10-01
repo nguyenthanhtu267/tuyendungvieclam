@@ -19,6 +19,8 @@ import {
   smartApi,
   smartApi3,
   type ApplicantScoreInfo,
+  smartApi6,
+  type ApplicantFlags,
 } from '@/lib/api';
 import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatNumber } from '@/lib/format';
 
@@ -147,6 +149,8 @@ function UngVienPageInner() {
   const [applicants, setApplicants] = useState<EmployerApplication[]>([]);
   // Đợt 63 — điểm phù hợp từng hồ sơ + sắp xếp theo độ phù hợp.
   const [scores, setScores] = useState<Record<string, ApplicantScoreInfo>>({});
+  const [flagInfo, setFlagInfo] = useState<ApplicantFlags | null>(null);
+  const [pushFail, setPushFail] = useState(true);
   // Đợt 65 — NTD tự chỉnh trọng số tiêu chí (hệ số 0–3, mặc định 1) để xếp hạng lại tại chỗ.
   const [mult, setMult] = useState<Record<string, number>>({});
   const [showWeights, setShowWeights] = useState(false);
@@ -224,6 +228,11 @@ function UngVienPageInner() {
     if (!token) return;
     employerApi.listFolders(token).then(setFolders).catch(() => {});
   }, [token]);
+
+  useEffect(() => {
+    if (!token || !jobId) return;
+    smartApi6.applicantFlags(token, jobId).then(setFlagInfo).catch(() => setFlagInfo(null));
+  }, [token, jobId, applicants.length]);
 
   useEffect(() => {
     if (!token || !jobId) return;
@@ -577,6 +586,11 @@ function UngVienPageInner() {
                               {sortBest ? '↓ Phù hợp nhất' : 'Mới nộp trước'}
                             </button>
                           )}
+                          {view === 'active' && flagInfo?.hasScreening && (
+                            <button type="button" onClick={() => setPushFail((v) => !v)} className="ml-1 rounded-full border border-border px-2 py-0.5 text-[11px] font-bold text-primary">
+                              {pushFail ? '✓ Không đạt sàng lọc xếp cuối' : 'Xếp theo thứ tự thường'}
+                            </button>
+                          )}
                           {view === 'active' && Object.keys(scores).length > 0 && (
                             <button type="button" onClick={() => setShowWeights((v) => !v)} className="ml-1 rounded-full border border-border px-2 py-0.5 text-[11px] font-bold text-primary">
                               ⚖ Chỉnh trọng số
@@ -594,10 +608,12 @@ function UngVienPageInner() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(view === 'active' && sortBest
-                        ? [...applicants].sort((a, b) => (adjScore(b.id) ?? -1) - (adjScore(a.id) ?? -1))
-                        : applicants
-                      ).map((app) => (
+                      {(() => {
+                        const base = view === 'active' && sortBest ? [...applicants].sort((a, b) => (adjScore(b.id) ?? -1) - (adjScore(a.id) ?? -1)) : applicants;
+                        if (view !== 'active' || !flagInfo?.hasScreening || !pushFail) return base;
+                        const bad = (id: string) => (flagInfo.screening[id] ?? 0) > 0;
+                        return [...base.filter((a) => !bad(a.id)), ...base.filter((a) => bad(a.id))];
+                      })().map((app) => (
                         <tr key={app.id} className="border-t border-border align-top">
                           {view === 'active' && (
                             <td className="py-3 pl-4 pr-0">
@@ -647,6 +663,13 @@ function UngVienPageInner() {
                                   )}
                                 </div>
                               </>
+                            )}
+                            {view === 'active' && flagInfo?.flags[app.id] && (
+                              <div className="mt-1 flex flex-col gap-0.5">
+                                {flagInfo.flags[app.id].map((f) => (
+                                  <span key={f} className="inline-block w-fit max-w-xs rounded px-1.5 py-0.5 text-[11px] font-bold bg-critical-tint text-critical">⚠ {f}</span>
+                                ))}
+                              </div>
                             )}
                             {view === 'active' && scores[app.id] && (
                               <div className="mt-1 max-w-xs" title={[...scores[app.id].reasons, ...scores[app.id].gaps.map((g) => `⚠ ${g}`)].join('\n')}>

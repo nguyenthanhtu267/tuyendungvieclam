@@ -32,6 +32,12 @@ export class GuestApplyDto {
   @MaxLength(2000)
   coverLetter?: string;
 
+  // Đợt 78 — JSON mảng 'yes'|'no' (form gửi multipart nên là chuỗi).
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  screeningAnswers?: string;
+
   @IsOptional()
   @IsUrl(
     { require_protocol: true, protocols: ['http', 'https'] },

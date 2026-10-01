@@ -26,6 +26,11 @@ export class JobsController {
     return this.jobsService.suggest(q);
   }
 
+  @Get(':id/share-meta')
+  shareMeta(@Param('id') id: string) {
+    return this.jobsService.shareMeta(id);
+  }
+
   @Get('facets')
   facets(@Query() query: ListJobsDto) {
     return this.jobsService.facets(query);

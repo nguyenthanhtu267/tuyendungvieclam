@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsArray, IsBoolean, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class ApplyJobDto {
   // Đợt 21 (27/09/2026) — "2 cách chia sẻ hồ sơ": chọn 1 CV có sẵn (file/link) HOẶC dùng thẳng
@@ -15,4 +15,8 @@ export class ApplyJobDto {
   @IsOptional()
   @IsString()
   coverLetter?: string;
+
+  @IsOptional()
+  @IsArray()
+  screeningAnswers?: string[];
 }

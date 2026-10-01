@@ -13,7 +13,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/ho-so', '/nha-tuyen-dung/dashboard', '/nha-tuyen-dung/tai-khoan', '/nha-tuyen-dung/tin-dang', '/nha-tuyen-dung/dang-tin', '/nha-tuyen-dung/ung-vien', '/nha-tuyen-dung/don-hang', '/nha-tuyen-dung/tim-ho-so', '/admin'],
+      disallow: ['/ho-so', '/nha-tuyen-dung/dashboard', '/nha-tuyen-dung/tai-khoan', '/nha-tuyen-dung/tin-dang', '/nha-tuyen-dung/dang-tin', '/nha-tuyen-dung/ung-vien', '/nha-tuyen-dung/don-hang', '/nha-tuyen-dung/tim-ho-so', '/nha-tuyen-dung/lao-dong-pho-thong', '/admin'],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
   };

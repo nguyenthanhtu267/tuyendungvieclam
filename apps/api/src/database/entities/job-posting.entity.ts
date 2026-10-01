@@ -142,6 +142,39 @@ export class JobPosting {
   @Column({ type: 'simple-array', nullable: true })
   tags?: string[];
 
+  // Đợt 78 — tối đa 3 câu hỏi sàng lọc Có/Không; `expect` là đáp án NTD mong muốn (không công khai cho ứng viên).
+  @Column({ name: 'screening_questions', type: 'jsonb', nullable: true })
+  screeningQuestions?: { q: string; expect: 'yes' | 'no' | 'any' }[] | null;
+
+  // Đợt 79 — kênh tin: office (văn phòng, mặc định) | worker (công nhân) | student (SV làm thêm) | intern (thực tập sinh).
+  // Tin kênh lao động phổ thông KHÔNG hiện trong danh sách việc làm văn phòng.
+  @Column({ type: 'varchar', length: 10, default: 'office' })
+  channel: string;
+
+  // Nhóm việc cho tin kênh phổ thông (khớp "Công việc mong muốn" của ứng viên)
+  @Column({ name: 'labor_group', type: 'varchar', length: 60, nullable: true })
+  laborGroup?: string | null;
+
+  // Đợt 80 — nơi làm việc chi tiết (tỉnh + phường/xã, có thể có toạ độ) để tính "việc gần tôi"
+  @Column({ name: 'work_place', type: 'jsonb', nullable: true })
+  workPlace?: { province: string; mode: 'old' | 'new'; oldDistrict?: string | null; oldWard?: string | null; newWardCode?: string | null; newWard?: string | null; lat?: number | null; lon?: number | null } | null;
+
+  // housing | shuttle | meals | no_fee | intern_cert
+  @Column({ name: 'labor_perks', type: 'simple-array', nullable: true })
+  laborPerks?: string[] | null;
+
+  // Ước tính thu nhập: lương cơ bản (triệu/tháng), giờ tăng ca/tháng, giờ ca đêm/tháng, phụ cấp (triệu/tháng)
+  @Column({ name: 'pay_info', type: 'jsonb', nullable: true })
+  payInfo?: { base: number; otHours?: number; nightHours?: number; allowance?: number } | null;
+
+  // Ca cần người (SV làm thêm): mã "t2-sang", "cn-toi"...
+  @Column({ name: 'labor_schedule', type: 'simple-array', nullable: true })
+  laborSchedule?: string[] | null;
+
+  // Tuyển đủ số lượng ⇒ ngừng nhận ứng tuyển nhanh
+  @Column({ name: 'filled_at', type: 'timestamp', nullable: true })
+  filledAt?: Date | null;
+
   // Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (theo mẫu careerviet.vn, mục người dùng yêu cầu bổ
   // sung cùng "Quyền lợi được hưởng" — mục sau thực ra đã có sẵn từ trước dưới tên `benefits`/"Phúc
   // lợi", chỉ có Thông tin liên hệ là thật sự thiếu). Cả 3 đều không bắt buộc — khi bỏ trống, trang

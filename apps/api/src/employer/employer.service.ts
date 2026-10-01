@@ -1,3 +1,5 @@
+import { LABOR_GROUPS, PERKS, SLOTS } from '../workers/labor-groups';
+import { resolveWorkPlace } from '../workers/vn-geo';
 import { applyCompanyProfileFields } from '../common/company-profile-fields';
 import {
   BadRequestException,
@@ -47,6 +49,39 @@ import { FileStorageService } from '../storage/file-storage.service';
 import { CvSearchService } from '../cv-search/cv-search.service';
 
 const LEGAL_DOC_MAX_BYTES = 3 * 1024 * 1024; // 3MB — theo Mục 9 SRS
+
+// Đợt 78 — chuẩn hoá câu hỏi sàng lọc: tối đa 3 câu, 5–150 ký tự, đáp án mong muốn yes/no/any.
+// Đợt 79/80 — kênh tin + các trường riêng của tin lao động phổ thông (chỉ giữ khi kênh khác "office").
+export function sanitizeChannel(dto: { channel?: string; laborGroup?: string | null; workPlace?: unknown; laborPerks?: unknown; payInfo?: unknown; laborSchedule?: unknown }) {
+  const ch = ['worker', 'student', 'intern'].includes(String(dto.channel)) ? String(dto.channel) : 'office';
+  if (ch === 'office') return { channel: 'office', laborGroup: null, workPlace: null, laborPerks: null, payInfo: null, laborSchedule: null };
+  const groups = LABOR_GROUPS[ch as 'worker'];
+  const perks = Array.isArray(dto.laborPerks) ? dto.laborPerks.filter((x) => PERKS.includes(String(x))).map(String) : [];
+  const sched = Array.isArray(dto.laborSchedule) ? dto.laborSchedule.filter((x) => SLOTS.includes(String(x))).map(String) : [];
+  const pi = (dto.payInfo ?? null) as Record<string, unknown> | null;
+  const n = (v: unknown, max: number) => {
+    const x = Number(v);
+    return Number.isFinite(x) && x >= 0 && x <= max ? Math.round(x * 10) / 10 : 0;
+  };
+  const payInfo = pi && n(pi.base, 200) > 0 ? { base: n(pi.base, 200), otHours: n(pi.otHours, 120), nightHours: n(pi.nightHours, 208), allowance: n(pi.allowance, 50) } : null;
+  return {
+    channel: ch,
+    laborGroup: dto.laborGroup && groups.includes(dto.laborGroup) ? dto.laborGroup : null,
+    workPlace: resolveWorkPlace(dto.workPlace),
+    laborPerks: perks.length ? perks : null,
+    payInfo,
+    laborSchedule: sched.length ? sched : null,
+  };
+}
+
+export function sanitizeScreening(v: unknown): { q: string; expect: 'yes' | 'no' | 'any' }[] | null {
+  if (!Array.isArray(v)) return null;
+  const out = v
+    .map((x) => ({ q: String((x as { q?: unknown })?.q ?? '').replace(/\s+/g, ' ').trim().slice(0, 150), expect: (['yes', 'no'].includes(String((x as { expect?: unknown })?.expect)) ? (x as { expect: 'yes' | 'no' }).expect : 'any') as 'yes' | 'no' | 'any' }))
+    .filter((x) => x.q.length >= 5)
+    .slice(0, 3);
+  return out.length ? out : null;
+}
 
 @Injectable()
 export class EmployerService {
@@ -275,6 +310,13 @@ export class EmployerService {
       ageRange: job.ageRange,
       workSchedule: job.workSchedule,
       tags: job.tags,
+      screeningQuestions: job.screeningQuestions,
+      channel: job.channel,
+      laborGroup: job.laborGroup,
+      workPlace: job.workPlace,
+      laborPerks: job.laborPerks,
+      payInfo: job.payInfo,
+      laborSchedule: job.laborSchedule,
       contactName: job.contactName,
       contactEmail: job.contactEmail,
       contactPhone: job.contactPhone,
@@ -316,6 +358,8 @@ export class EmployerService {
       ageRange: dto.ageRange,
       workSchedule: dto.workSchedule,
       tags: dto.tags,
+      screeningQuestions: sanitizeScreening(dto.screeningQuestions),
+      ...sanitizeChannel(dto),
       contactName: dto.contactName,
       contactEmail: dto.contactEmail,
       contactPhone: dto.contactPhone,
@@ -365,6 +409,11 @@ export class EmployerService {
           : dto[key];
         (job as unknown as Record<string, unknown>)[key] = value;
       }
+    }
+    if (Object.prototype.hasOwnProperty.call(dto, 'screeningQuestions')) job.screeningQuestions = sanitizeScreening(dto.screeningQuestions);
+    if (Object.prototype.hasOwnProperty.call(dto, 'channel')) {
+      Object.assign(job, sanitizeChannel(dto));
+      job.filledAt = null;
     }
     job.approvalStatus = JobApprovalStatus.PENDING;
     return this.jobRepo.save(job);

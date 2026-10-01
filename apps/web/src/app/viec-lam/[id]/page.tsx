@@ -13,11 +13,13 @@ import { CompanyLogo } from '@/components/CompanyLogo';
 import { SourcedBadge, isCompanyUnverified } from '@/components/SourcedBadge';
 import { CompatibilityRadar } from '@/components/CompatibilityRadar';
 import { GuestApplyForm } from '@/components/GuestApplyForm';
+import { LaborApplyPanel } from '@/components/labor/LaborApplyPanel';
 import { CompatibilityChecklist } from '@/components/CompatibilityChecklist';
 import JobInsightsPanel from '@/components/JobInsightsPanel';
 import InterviewPrepPanel from '@/components/InterviewPrepPanel';
 import SalaryNudge from '@/components/SalaryNudge';
 import ApplyCheckNote from '@/components/ApplyCheckNote';
+import ScreeningInput from '@/components/ScreeningInput';
 import CvTailorPanel from '@/components/CvTailorPanel';
 import TranslateHint from '@/components/TranslateHint';
 import ReportJobButton from '@/components/ReportJobButton';
@@ -69,6 +71,7 @@ function JobDetailInner() {
   const [cvs, setCvs] = useState<CV[] | null>(null);
   const [selectedCvId, setSelectedCvId] = useState('');
   const [coverLetter, setCoverLetter] = useState('');
+  const [screenAnswers, setScreenAnswers] = useState<string[]>([]);
   const [drafting, setDrafting] = useState(false);
   const [applyState, setApplyState] = useState<'idle' | 'submitting' | 'done'>('idle');
   const [applyError, setApplyError] = useState<string | null>(null);
@@ -209,10 +212,16 @@ function JobDetailInner() {
   async function submitApply(quickLetter?: string) {
     if (!token) return;
     if (!useOnlineProfile && !selectedCvId) return;
+    const sq = job?.screeningQuestions ?? [];
+    if (sq.length && sq.some((_, i) => screenAnswers[i] !== 'yes' && screenAnswers[i] !== 'no')) {
+      setApplyError('Vui lòng trả lời đủ các câu hỏi của nhà tuyển dụng');
+      return;
+    }
     setApplyState('submitting');
     setApplyError(null);
     try {
       await applicationsApi.apply(token, params.id, {
+        ...(sq.length ? { screeningAnswers: screenAnswers.slice(0, sq.length) } : {}),
         ...(useOnlineProfile ? { useOnlineProfile: true } : { cvId: selectedCvId }),
         coverLetter: (quickLetter ?? coverLetter) || undefined,
       });
@@ -249,6 +258,7 @@ function JobDetailInner() {
     );
   }
 
+  const isLabor = !!job.channel && job.channel !== 'office';
   return (
     <main className="min-h-screen">
       <SiteHeader />
@@ -298,19 +308,23 @@ function JobDetailInner() {
             >
               {saved ? '♥' : '♡'}
             </button>
-            <button onClick={handleApplyClick} className="tvl-btn-accent !w-auto px-5">
+            <button
+              onClick={() => (isLabor ? document.getElementById('labor-apply')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) : handleApplyClick())}
+              className="tvl-btn-accent !w-auto px-5"
+            >
               Nộp Đơn Ứng Tuyển
             </button>
           </div>
         </div>
 
-        {applyOpen && (
+        {isLabor && <LaborApplyPanel job={job} inviteCode={searchParams.get('nhom') ?? undefined} />}
+        {applyOpen && !isLabor && (
           <div className="mt-3 rounded-xl border border-border bg-white p-5">
             {me?.role === 'candidate' && <SalaryNudge jobId={params.id} />}
             {me?.role === 'candidate' && <ApplyCheckNote jobId={params.id} />}
             {!me ? (
               // Đợt 22 — khách chưa đăng nhập vẫn ứng tuyển được (họ tên/SĐT/email + file hoặc link CV).
-              <GuestApplyForm jobId={params.id} jobTitle={job.title} onCancel={() => setApplyOpen(false)} />
+              <GuestApplyForm jobId={params.id} jobTitle={job.title} questions={job.screeningQuestions ?? []} onCancel={() => setApplyOpen(false)} />
             ) : applyState === 'done' ? (
               <>
                 <div className="flex items-center gap-3 text-success text-sm font-semibold">
@@ -399,6 +413,7 @@ function JobDetailInner() {
                     )}
                   </label>
                 )}
+                <ScreeningInput questions={job.screeningQuestions ?? []} value={screenAnswers} onChange={setScreenAnswers} />
                 <label className="flex flex-col gap-1.5">
                   <span className="text-xs font-bold flex items-center justify-between gap-2">
                     Thư ứng tuyển (không bắt buộc)

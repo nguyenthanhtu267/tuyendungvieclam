@@ -1,5 +1,6 @@
 'use client';
 
+import ScreeningInput from '@/components/ScreeningInput';
 import { useState } from 'react';
 import Link from 'next/link';
 import { applicationsApi, ApiError } from '@/lib/api';
@@ -14,10 +15,12 @@ const ACCEPT = '.pdf,.doc,.docx,.jpg,.jpeg,.png';
 export function GuestApplyForm({
   jobId,
   jobTitle,
+  questions = [],
   onCancel,
 }: {
   jobId: string;
   jobTitle: string;
+  questions?: { q: string }[];
   onCancel: () => void;
 }) {
   const [fullName, setFullName] = useState('');
@@ -27,6 +30,7 @@ export function GuestApplyForm({
   const [file, setFile] = useState<File | null>(null);
   const [link, setLink] = useState('');
   const [coverLetter, setCoverLetter] = useState('');
+  const [answers, setAnswers] = useState<string[]>([]);
   const [state, setState] = useState<'idle' | 'submitting' | 'done'>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -45,11 +49,13 @@ export function GuestApplyForm({
     setError(null);
     if (mode === 'file' && !file) return setError('Vui lòng chọn file CV (PDF/Word/ảnh) hoặc chuyển sang dán link CV.');
     if (mode === 'link' && !link.trim()) return setError('Vui lòng dán link CV (VD link chia sẻ Google Drive).');
+    if (questions.length && questions.some((_, i) => answers[i] !== 'yes' && answers[i] !== 'no')) return setError('Vui lòng trả lời đủ các câu hỏi của nhà tuyển dụng.');
     const form = new FormData();
     form.append('fullName', fullName.trim());
     form.append('phone', phone.trim());
     form.append('email', email.trim());
     if (coverLetter.trim()) form.append('coverLetter', coverLetter.trim());
+    if (questions.length) form.append('screeningAnswers', JSON.stringify(answers.slice(0, questions.length)));
     if (mode === 'file' && file) form.append('file', file);
     if (mode === 'link') form.append('cvLink', link.trim());
     setState('submitting');
@@ -142,6 +148,8 @@ export function GuestApplyForm({
           </label>
         )}
       </div>
+
+      <ScreeningInput questions={questions} value={answers} onChange={setAnswers} />
 
       <label className="flex flex-col gap-1.5">
         <span className="text-xs font-bold">Lời nhắn cho nhà tuyển dụng (không bắt buộc)</span>

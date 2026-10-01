@@ -28,7 +28,13 @@ const strip = (h?: string | null) => (h ?? '').replace(/<[^>]*>/g, ' ').replace(
 export const fold = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 
+// Đợt 80 — bỏ các cụm phủ định ("không thu phí", "không giữ giấy tờ"...) trước khi dò để tránh báo nhầm.
+export const dropNegations = (t: string) => t.replace(/\bkhong (?:thu|nop|dong|giu|dat|yeu cau|mat|lay)\b[a-z ]{0,12}/g, ' ');
+
 const SCAM_PATTERNS: [RegExp, string][] = [
+  // Đợt 80 — dấu hiệu lừa đảo hay gặp ở tin lao động phổ thông
+  [/giu (?:cccd|can cuoc|cmnd|chung minh|bang goc|giay to goc|so ho khau)|nop (?:cccd|can cuoc|cmnd) (?:ban )?goc/, 'Yêu cầu giữ CCCD / giấy tờ gốc'],
+  [/(?:phi|tien|coc) dong phuc|dong phuc .{0,12}(?:tu tra|tru luong truoc)|phi gioi thieu|phi moi gioi|phi xuat (?:khau|canh)|phi giu cho/, 'Thu tiền đồng phục / phí giới thiệu, môi giới'],
   [/dat coc|nop phi|phi nhan viec|dong phi|thu phi (?:dao tao|ho so)|phi ho so|mua bo ho so/, 'Yêu cầu đặt cọc / nộp phí'],
   [/viec nhe luong cao|luong cao (?:khong can|de dang)|khong can (?:bang cap|kinh nghiem).{0,30}luong .{0,10}(?:trieu|tr)/, 'Cam kết "việc nhẹ lương cao"'],
   [/kiem tien online|lam giau nhanh|nap tien|dau tu sinh loi|da cap|chot don online tai nha thu nhap/, 'Dấu hiệu lừa đảo / đa cấp'],
@@ -43,7 +49,7 @@ export function assessJobRisk(job: RiskJob, ctx: RiskContext): RiskResult {
     reasons.push(why);
   };
 
-  const text = fold(`${job.title} ${strip(job.description)} ${strip(job.requirements)}`);
+  const text = dropNegations(fold(`${job.title} ${strip(job.description)} ${strip(job.requirements)}`));
   for (const [re, why] of SCAM_PATTERNS) if (re.test(text)) add(re.source.includes('dat coc') ? 45 : 35, why);
 
   const max = job.salaryMax ?? job.salaryMin ?? 0;

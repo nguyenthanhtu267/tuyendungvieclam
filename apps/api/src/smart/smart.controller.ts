@@ -8,11 +8,42 @@ import { SmartService } from './smart.service';
 import { Smart2Service } from './smart2.service';
 import { Smart3Service } from './smart3.service';
 import { Smart4Service } from './smart4.service';
+import { Smart5Service } from './smart5.service';
 
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SmartController {
-  constructor(private readonly smart: SmartService, private readonly smart2: Smart2Service, private readonly smart3: Smart3Service, private readonly smart4: Smart4Service) {}
+  constructor(private readonly smart: SmartService, private readonly smart2: Smart2Service, private readonly smart3: Smart3Service, private readonly smart4: Smart4Service, private readonly smart5: Smart5Service) {}
+
+  @Get('me/skill-premium')
+  @Roles(UserRole.CANDIDATE)
+  skillPremium(@CurrentUser() user: { userId: string }) {
+    return this.smart5.skillPremium(user.userId);
+  }
+
+  @Get('me/weekly-digest')
+  @Roles(UserRole.CANDIDATE)
+  weeklyDigest(@CurrentUser() user: { userId: string }) {
+    return this.smart5.weeklyDigest(user.userId);
+  }
+
+  @Get('me/profile-benchmark')
+  @Roles(UserRole.CANDIDATE)
+  benchmark(@CurrentUser() user: { userId: string }) {
+    return this.smart5.profileBenchmark(user.userId);
+  }
+
+  @Get('employer/applicant-flags')
+  @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB)
+  applicantFlags(@CurrentUser() user: { userId: string }, @Query('jobId') jobId: string) {
+    return this.smart5.applicantFlags(user.userId, jobId);
+  }
+
+  @Get('admin/quality/suspicious-accounts')
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  suspicious() {
+    return this.smart5.suspiciousAccounts();
+  }
 
   @Get('employer/pending-applications')
   @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB)

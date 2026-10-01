@@ -86,6 +86,15 @@ export class ListJobsDto {
   @IsBoolean()
   urgentOnly?: boolean;
 
+  // Đợt 79 — kênh tin: mặc định chỉ tin văn phòng; 'labor' = cả 3 kênh phổ thông.
+  @IsOptional()
+  @IsIn(['office', 'worker', 'student', 'intern', 'labor'])
+  channel?: string;
+
+  @IsOptional()
+  @IsString()
+  laborGroup?: string;
+
   @IsOptional()
   @Transform(toBool)
   @IsBoolean()

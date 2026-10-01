@@ -47,6 +47,25 @@ export class ApplicationsService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  // Đợt 78 — nếu tin có câu hỏi sàng lọc thì bắt buộc trả lời đủ (Có/Không).
+  private checkScreening(job: JobPosting, answers?: string[]): string[] | null {
+    const n = job.screeningQuestions?.length ?? 0;
+    if (!n) return null;
+    if (!Array.isArray(answers) || answers.length !== n || answers.some((a) => a !== 'yes' && a !== 'no'))
+      throw new BadRequestException('Vui lòng trả lời đủ các câu hỏi sàng lọc của nhà tuyển dụng');
+    return answers;
+  }
+
+  private parseAnswers(v?: string): string[] | undefined {
+    if (!v) return undefined;
+    try {
+      const a = JSON.parse(v);
+      return Array.isArray(a) ? a.map(String) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   async apply(
     userId: string,
     jobId: string,
@@ -109,6 +128,7 @@ export class ApplicationsService {
       jobPostingId: jobId,
       cvId: cv.id,
       coverLetter: dto.coverLetter,
+      screeningAnswers: this.checkScreening(job, dto.screeningAnswers),
     });
     const saved = await this.applicationRepo.save(application);
     // Đợt 12o (21/09/2026) — ghi dòng đầu tiên của "Nhật ký trạng thái ứng tuyển" ngay khi nộp hồ
@@ -224,6 +244,7 @@ export class ApplicationsService {
           jobPostingId: jobId,
           cvId: cv.id,
           coverLetter: dto.coverLetter?.trim() || undefined,
+          screeningAnswers: this.checkScreening(job, this.parseAnswers(dto.screeningAnswers)),
         }),
       );
     } catch (err) {

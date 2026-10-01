@@ -6,6 +6,7 @@
 // tạo/sửa tin phải giống hệt nhau, lấy đúng trang "Đăng tin" NTD làm gốc). File này giờ chỉ còn
 // phần RIÊNG của NTD: nạp dữ liệu khi sửa tin của chính mình (`?edit=<id>`), gọi employerApi, màn
 // hình "Đã gửi/Đã lưu" — không đổi hành vi nghiệp vụ nào so với trước.
+import { laborFromJob, laborToPayload } from '@/components/labor/labor-form';
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -78,6 +79,10 @@ function DangTinInner() {
           benefits: job.benefits ?? '',
           deadline: job.deadline ?? '',
           tags: job.tags ?? [],
+          screening: (job.screeningQuestions ?? []).map((x) => ({ q: x.q, expect: x.expect ?? 'any' })),
+          channel: job.channel ?? 'office',
+          laborGroup: job.laborGroup ?? '',
+          labor: laborFromJob(job),
           contactName: job.contactName ?? '',
           contactEmail: job.contactEmail ?? '',
           contactPhone: job.contactPhone ?? '',
@@ -132,6 +137,10 @@ function DangTinInner() {
       benefits: isRichTextEmpty(form.benefits) ? undefined : form.benefits,
       deadline: form.deadline || undefined,
       tags: form.tags.length ? form.tags : undefined,
+      screeningQuestions: form.screening.filter((s) => s.q.trim().length >= 5),
+      channel: form.channel,
+      laborGroup: form.channel === 'office' ? null : form.laborGroup || null,
+      ...laborToPayload(form.channel, form.labor),
       contactName: form.contactName.trim() || undefined,
       contactEmail: form.contactEmail.trim() || undefined,
       contactPhone: form.contactPhone.trim() || undefined,

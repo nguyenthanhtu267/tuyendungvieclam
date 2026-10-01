@@ -15,6 +15,8 @@ const NAV_LINKS = [
   // Đợt 18a (26/09/2026) — Kho CV: mọi CV ứng viên đã nộp, lưu vĩnh viễn, tìm lại được.
   { href: '/nha-tuyen-dung/kho-cv', label: 'Kho CV', enabled: true },
   { href: '/nha-tuyen-dung/tim-ho-so', label: 'Tìm CV', enabled: true },
+  // Đợt 79 — tìm công nhân / sinh viên / thực tập sinh (kênh lao động phổ thông)
+  { href: '/nha-tuyen-dung/lao-dong-pho-thong', label: 'Công Nhân/SV', enabled: true },
 ];
 
 // Đợt 11 — gom "Tài Khoản" thành dropdown (Thông tin công ty, Đơn hàng, Đăng xuất) + thêm nút xanh

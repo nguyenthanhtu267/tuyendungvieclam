@@ -58,6 +58,10 @@ export class Application {
   @Column({ name: 'cover_letter', type: 'text', nullable: true })
   coverLetter?: string;
 
+  // Đợt 78 — trả lời câu hỏi sàng lọc của tin ('yes' | 'no' theo thứ tự câu hỏi).
+  @Column({ name: 'screening_answers', type: 'jsonb', nullable: true })
+  screeningAnswers?: string[] | null;
+
   // Đợt 11b — Mục #4 nâng cấp ATS: đánh giá sao (1-5) và thư mục hồ sơ (chữ tự do NTD đặt, ví dụ
   // "Ứng viên tiềm năng", "Vòng 2" — không dùng bảng riêng để giữ đơn giản, danh sách thư mục đang
   // dùng lấy qua DISTINCT trong service).

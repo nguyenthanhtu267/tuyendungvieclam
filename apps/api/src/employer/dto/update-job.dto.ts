@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsEmail, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // Đợt 12l (21/09/2026) — sửa tin đã đăng. Khác CreateJobDto ở chỗ MỌI trường đều optional (kể cả
@@ -97,6 +97,34 @@ export class UpdateJobDto {
   @IsOptional()
   @IsArray()
   tags?: string[];
+
+  @IsOptional()
+  @IsArray()
+  screeningQuestions?: { q: string; expect: 'yes' | 'no' | 'any' }[];
+
+  @IsOptional()
+  @IsIn(['office', 'worker', 'student', 'intern'])
+  channel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  laborGroup?: string | null;
+
+  // Đợt 80 — nơi làm việc chi tiết, quyền lợi, ước tính thu nhập, ca cần người (kênh phổ thông)
+  @IsOptional()
+  workPlace?: Record<string, unknown> | null;
+
+  @IsOptional()
+  @IsArray()
+  laborPerks?: string[] | null;
+
+  @IsOptional()
+  payInfo?: Record<string, unknown> | null;
+
+  @IsOptional()
+  @IsArray()
+  laborSchedule?: string[] | null;
 
   // Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc), theo mẫu careerviet.vn.
   @IsOptional()

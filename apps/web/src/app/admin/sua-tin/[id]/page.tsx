@@ -10,6 +10,7 @@
 // đổi từ anchor-scroll sang chọn đúng bước, vì trang không còn cuộn liền 1 mạch nữa).
 // Vẫn gọi PATCH /admin/jobs/:id (AdminService.adminUpdateJob) — khác EmployerService.updateJob() ở
 // chỗ KHÔNG đổi approvalStatus (tin đang chờ duyệt vẫn chờ duyệt, Admin tự bấm "Duyệt" ở bước sau).
+import { laborFromJob, laborToPayload } from '@/components/labor/labor-form';
 import { Suspense, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -68,6 +69,10 @@ function AdminSuaTinInner() {
           benefits: job.benefits ?? '',
           deadline: job.deadline ?? '',
           tags: job.tags ?? [],
+          screening: (job.screeningQuestions ?? []).map((x) => ({ q: x.q, expect: x.expect ?? 'any' })),
+          channel: job.channel ?? 'office',
+          laborGroup: job.laborGroup ?? '',
+          labor: laborFromJob(job),
           contactName: job.contactName ?? '',
           contactEmail: job.contactEmail ?? '',
           contactPhone: job.contactPhone ?? '',

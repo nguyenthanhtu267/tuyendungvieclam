@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { parseNaturalQuery, nlToParams } from '@/lib/nl-search';
 import AskAnswerBox from '@/components/AskAnswerBox';
+import { RefreshReminder } from '@/components/labor/RefreshReminder';
 import SiteHeader from '@/components/SiteHeader';
 import OnlineBanner from '@/components/OnlineBanner';
 import { JobCard } from '@/components/JobCard';
@@ -93,6 +94,8 @@ export default function Home() {
       <OnlineBanner />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-1.5 pb-3">
+        {/* Đợt 80 — nhắc người lao động làm mới thông tin (chỉ hiện khi máy này từng đăng ký và quá 7 ngày) */}
+        <div className="empty:hidden mb-1.5"><RefreshReminder /></div>
         <div className="grid md:grid-cols-2 gap-2 items-stretch">
           <div className="rounded-2xl border border-border bg-white px-6 py-3 flex flex-col gap-2 justify-center">
             <div className="text-xs font-bold text-primary uppercase tracking-wide">
@@ -151,6 +154,21 @@ export default function Home() {
                 >
                   {t('home.urgentJobs')}
                 </button>
+              </div>
+              {/* Đợt 79 — 3 lối vào kênh lao động phổ thông (không bắt buộc đăng nhập) */}
+              <div className="grid grid-cols-2 sm:grid-cols-[1.9fr_1fr_1fr] gap-1.5">
+                <a
+                  href="/lao-dong-pho-thong?loai=cong-nhan"
+                  className="col-span-2 sm:col-span-1 rounded-lg border-2 border-[#C8102E] bg-[#FFD84D] text-[#C8102E] font-extrabold uppercase text-[14px] sm:text-[15px] text-center px-2 py-2 hover:bg-[#FFCC1A] leading-tight"
+                >
+                  Dành riêng tuyển công nhân
+                </a>
+                <a href="/lao-dong-pho-thong?loai=sinh-vien" className="rounded-lg border-2 border-border-strong bg-white text-ink font-extrabold uppercase text-[13px] text-center px-1.5 py-2 hover:border-primary hover:text-primary leading-tight">
+                  Sinh viên làm thêm
+                </a>
+                <a href="/lao-dong-pho-thong?loai=thuc-tap-sinh" className="rounded-lg border-2 border-border-strong bg-white text-ink font-extrabold uppercase text-[13px] text-center px-1.5 py-2 hover:border-primary hover:text-primary leading-tight">
+                  Thực tập sinh
+                </a>
               </div>
             </form>
             {!me && (

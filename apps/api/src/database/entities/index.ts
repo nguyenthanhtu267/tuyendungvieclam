@@ -29,3 +29,4 @@ export * from './stored-file.entity';
 export * from './ad-campaign.entity';
 export * from './bg-image.entity';
 export * from './job-report.entity';
+export * from './worker-profile.entity';
