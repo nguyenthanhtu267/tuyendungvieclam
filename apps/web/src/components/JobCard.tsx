@@ -142,9 +142,9 @@ export function JobCard({
             </button>
           )}
         </div>
-        <div className="text-xs text-ink-muted mt-0.5 truncate flex items-center gap-1.5">
-          <span className="min-w-0 flex-1 max-w-full">
-            <FitText lines={1} min={0.7} className="co-name">{job.company.name}</FitText>
+        <div className="text-xs text-ink-muted mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+          <span className="min-w-0 flex-1 basis-[11rem] max-w-full">
+            <FitText lines={2} min={0.75} className="co-name">{job.company.name}</FitText>
           </span>
           {isCompanyUnverified(job.company) && <span className="shrink-0"><SourcedBadge /></span>}
         </div>

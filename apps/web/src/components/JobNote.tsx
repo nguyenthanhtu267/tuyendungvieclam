@@ -44,7 +44,9 @@ export function JobNoteButton({ jobId, light = false }: { jobId: string; light?:
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   useEffect(() => setText(cur.note), [cur.note]);
-  const btn = 'inline-flex items-center justify-center gap-1 h-10 flex-1 basis-0 min-w-[68px] px-2 rounded-full text-[13px] font-bold border whitespace-nowrap ' + (light ? 'bg-surface-alt text-ink border-border' : 'bg-white/15 text-white border-white/30');
+  const btn = light
+    ? 'inline-flex items-center justify-center gap-1 h-8 px-3 rounded-full text-[12px] font-semibold border whitespace-nowrap bg-surface-alt text-ink-muted border-border hover:text-primary hover:border-primary'
+    : 'inline-flex items-center justify-center gap-1 h-10 flex-1 basis-0 min-w-[68px] px-2 rounded-full text-[13px] font-bold border whitespace-nowrap bg-white/15 text-white border-white/30';
   return (
     <>
       <button type="button" onClick={() => setOpen((o) => !o)} className={btn} aria-pressed={cur.pinned}>

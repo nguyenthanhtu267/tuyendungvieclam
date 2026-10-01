@@ -125,7 +125,7 @@ export default function XemTinNtdPage() {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-[1fr_280px] gap-5 mt-5 items-start">
+        <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_280px] gap-5 mt-5 items-start">
           <div>
             <div className="rounded-xl border border-border bg-white p-5">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-[12.5px]">

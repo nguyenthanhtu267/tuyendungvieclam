@@ -943,7 +943,7 @@ function HeatmapView({ token, from, to }: { token: string; from: string; to: str
                     {fmtDuration(hm.avgTimeMs)}
                   </span>
                 </div>
-                <div className="grid xl:grid-cols-[1fr_280px] gap-4">
+                <div className="grid grid-cols-[minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_280px] gap-4">
                   <HeatCanvas hm={hm} />
                   <div className="flex flex-col gap-4">
                     <Card title="Được bấm nhiều nhất">

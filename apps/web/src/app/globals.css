@@ -358,3 +358,10 @@ html[data-theme='dark'] [data-keep-color] { filter: invert(1) hue-rotate(180deg)
 @keyframes tvl-progress { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
 .tvl-progress-bar { animation: tvl-progress 1.1s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .tvl-progress-bar { animation: none; width: 100%; opacity: .6; } }
+
+/* Đợt 133 — nội dung tin (mô tả/yêu cầu/quyền lợi) không bao giờ làm tràn ngang trang: link dài tự xuống dòng,
+   bảng/khối mã cuộn ngang trong khung riêng, ảnh co theo bề ngang. */
+.tvl-richtext-view { overflow-wrap: anywhere; word-break: break-word; min-width: 0; max-width: 100%; }
+.tvl-richtext-view img, .tvl-richtext-view video, .tvl-richtext-view iframe { max-width: 100%; height: auto; }
+.tvl-richtext-view table { display: block; max-width: 100%; overflow-x: auto; }
+.tvl-richtext-view pre { max-width: 100%; overflow-x: auto; white-space: pre-wrap; }

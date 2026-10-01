@@ -604,9 +604,9 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
             <button type="button" onClick={() => setLoadTry((n) => n + 1)} className="underline">Thử tải lại</button>
           </div>
         )}
-        <div className={`grid gap-5 mt-5 items-start ${reading ? 'max-w-[760px] mx-auto text-[16px] leading-relaxed' : 'lg:grid-cols-[1fr_280px]'}`}>
-          <div>
-            <div className="flex gap-1 border-b border-border bg-white rounded-t-xl px-2 items-center">
+        <div className={`grid gap-5 mt-5 items-start ${reading ? 'max-w-[760px] mx-auto text-[16px] leading-relaxed' : 'grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_280px]'}`}>
+          <div className="min-w-0">
+            <div className="flex gap-1 border-b border-border bg-white rounded-t-xl px-2 items-center min-w-0">
               {(
                 [
                   ['details', 'Chi tiết'],
@@ -633,7 +633,7 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
                 📌 <span className="max-sm:hidden">{pinned ? 'Đã lưu offline' : 'Lưu offline'}</span>
               </button>
               <button type="button" onClick={toggleReading} aria-pressed={reading} className={`my-1 px-2.5 h-9 rounded-lg text-[12.5px] whitespace-nowrap shrink-0 max-sm:text-[12px] font-bold border ${reading ? 'bg-primary text-white border-primary' : 'text-primary border-border-strong'}`}>
-                📖 {reading ? 'Thoát đọc' : 'Chế độ đọc'}
+                📖 <span className="max-[400px]:hidden">{reading ? 'Thoát đọc' : 'Chế độ đọc'}</span>
               </button>
               {reading && (
                 <>

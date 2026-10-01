@@ -22,9 +22,11 @@ export function JobQuickActions({ jobId, title, company, phone, light = false }:
       /* người dùng đóng bảng chia sẻ */
     }
   }
-  const btn = 'inline-flex items-center justify-center gap-1 h-10 flex-1 basis-0 min-w-[68px] px-2 rounded-full text-[13px] font-bold border whitespace-nowrap ' + (light ? 'bg-surface-alt text-ink border-border' : 'bg-white/15 text-white border-white/30');
+  const btn = light
+    ? 'inline-flex items-center justify-center gap-1 h-8 px-3 rounded-full text-[12px] font-semibold border whitespace-nowrap bg-surface-alt text-ink-muted border-border hover:text-primary hover:border-primary'
+    : 'inline-flex items-center justify-center gap-1 h-10 flex-1 basis-0 min-w-[68px] px-2 rounded-full text-[13px] font-bold border whitespace-nowrap bg-white/15 text-white border-white/30';
   return (
-    <div className="flex items-center gap-2 flex-wrap md:max-w-lg">
+    <div className={`flex items-center flex-wrap ${light ? 'gap-1.5' : 'gap-2 md:max-w-lg'}`}>
       {phone && (
         <a href={`tel:${phone.replace(/[^\d+]/g, '')}`} className={btn}>
           📞 Gọi

@@ -10,7 +10,7 @@ export function SourcedBadge({ className = '' }: { className?: string }) {
   return (
     <span
       title="Tin do đội ngũ Tuyển Dụng Việc Làm tổng hợp từ nguồn khác — công ty chưa xác thực tài khoản trên hệ thống."
-      className={`inline-flex items-center gap-1 text-[10px] font-extrabold rounded-full bg-warning-tint text-warning px-2 py-0.5 whitespace-nowrap ${className}`}
+      className={`inline-flex items-center gap-1 text-[10px] font-extrabold rounded-full bg-warning-tint text-warning px-2 py-0.5 whitespace-nowrap max-w-full max-[380px]:whitespace-normal ${className}`}
     >
       🏷️ Tin tổng hợp — chưa xác thực
     </span>

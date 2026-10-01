@@ -102,7 +102,7 @@ export default function CongTyPage() {
         {isCompanyUnverified(company) && <ClaimCompanySection companyId={company.id} />}
 
         {/* Đợt 49 — bố cục theo mẫu "Tổng quan công ty" (components/CompanyOverview.tsx), dùng chung với tab ở trang tin. */}
-        <div className="grid lg:grid-cols-[1fr_300px] gap-5 mt-3 items-start">
+        <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_300px] gap-5 mt-3 items-start">
           <div className="rounded-xl border border-border bg-white p-4 sm:p-5 min-w-0">
             <CompanyOverview
               company={company}

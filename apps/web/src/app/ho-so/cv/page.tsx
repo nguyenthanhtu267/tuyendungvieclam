@@ -165,7 +165,7 @@ export default function CvBuilderPage() {
             </div>
           </header>
 
-          <div className="grid grid-cols-[1fr_220px] gap-8 mt-5">
+          <div className="grid grid-cols-[minmax(0,1fr)_220px] gap-8 mt-5">
             <div className="flex flex-col gap-5 min-w-0">
               {profile.careerObjective && (
                 <CvSection title="Mục tiêu nghề nghiệp">
