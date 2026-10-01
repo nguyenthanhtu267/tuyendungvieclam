@@ -5,6 +5,8 @@ import { text } from 'express';
 import { AppModule } from './app.module';
 import { resolveCorsOrigins } from './config/env-guard';
 import { requestLogger } from './common/request-logger.middleware';
+import { httpCache } from './common/http-cache.middleware';
+import compression = require('compression');
 
 const logger = new Logger('Bootstrap');
 
@@ -17,7 +19,11 @@ async function bootstrap() {
   app.enableCors({
     origin: resolveCorsOrigins(process.env.CORS_ORIGIN),
     credentials: true,
+    // Đợt 90 — trình duyệt nhớ kết quả "hỏi trước" (preflight OPTIONS) 24 giờ, không hỏi lại trước MỖI lần gọi API.
+    maxAge: 86400,
   });
+  // Đợt 90 — nén gzip/br mọi phản hồi > 1 KB (danh sách tin ~20 KB → ~4 KB).
+  app.use(compression({ threshold: 1024 }));
   // Đợt 22 (29/09/2026) — API chạy sau proxy của Render: nếu không khai báo "trust proxy" thì req.ip luôn là
   // địa chỉ proxy nội bộ → mọi khách dùng CHUNG 1 bộ đếm giới hạn tốc độ (ứng tuyển không đăng nhập, đăng nhập...)
   // và bị chặn oan. Tin 1 lớp proxy (đổi bằng biến TRUST_PROXY_HOPS nếu hạ tầng thay đổi; 0 = tắt, dùng khi chạy
@@ -28,6 +34,7 @@ async function bootstrap() {
   );
   if (hops > 0) app.set('trust proxy', hops);
   app.use(requestLogger);
+  app.use(httpCache);
   // Đợt 19 (26/09/2026) — bộ ghi truy cập gửi lô dữ liệu bằng navigator.sendBeacon dạng text/plain (loại
   // "simple request" nên không cần preflight CORS, vẫn gửi được lúc người dùng đóng tab).
   app.use('/analytics/collect', text({ type: 'text/plain', limit: '100kb' }));

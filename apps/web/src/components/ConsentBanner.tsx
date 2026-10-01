@@ -14,10 +14,28 @@ export default function ConsentBanner() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  // Đợt 90 — chỉ hiện sau khi người xem đã bắt đầu thao tác (cuộn/chạm/gõ) VÀ đã qua 2,5 giây: nội dung chính luôn
+  // hiện trước, thông báo cookie không bị Google tính là "nội dung lớn nhất" làm điểm tốc độ trang tụt.
   useEffect(() => {
     if (getConsent()) return;
-    const t = setTimeout(() => setOpen(true), 2500);
-    return () => clearTimeout(t);
+    let timeUp = false;
+    let acted = false;
+    const tryOpen = () => timeUp && acted && setOpen(true);
+    const t = setTimeout(() => {
+      timeUp = true;
+      tryOpen();
+    }, 2500);
+    const evs = ['pointerdown', 'scroll', 'keydown', 'touchstart'] as const;
+    const onAct = () => {
+      acted = true;
+      evs.forEach((e) => window.removeEventListener(e, onAct));
+      tryOpen();
+    };
+    evs.forEach((e) => window.addEventListener(e, onAct, { passive: true, once: true }));
+    return () => {
+      clearTimeout(t);
+      evs.forEach((e) => window.removeEventListener(e, onAct));
+    };
   }, []);
 
   useEffect(() => {

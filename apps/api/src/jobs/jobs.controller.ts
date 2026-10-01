@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../database/entities/user.entity';
@@ -49,6 +49,21 @@ export class JobsController {
   @Get('province-insights')
   provinceInsights(@Query('province') province: string, @Query() query: ListJobsDto) {
     return this.jobsService.provinceInsights(province, query);
+  }
+
+  // Đợt 90 — gộp 5 lệnh gọi của trang chủ thành 1 (tin mới, bộ lọc, nhà tuyển dụng nổi bật, số liệu trang chủ, thị trường).
+  // Lưu đệm 60 giây (common/http-cache.middleware.ts). Từng phần lỗi → phần đó trả null, không làm hỏng cả trang.
+  @Get('home-bundle')
+  async homeBundle() {
+    const safe = <T,>(p: Promise<T>) => p.catch(() => null);
+    const [jobs, facets, featured, stats, market] = await Promise.all([
+      safe(this.jobsService.findAll({ pageSize: 4 } as ListJobsDto)),
+      safe(this.jobsService.facets({} as ListJobsDto)),
+      safe(this.jobsService.featuredEmployers()),
+      safe(this.jobsService.getHomepageStats()),
+      safe(this.jobsService.getMarketStats()),
+    ]);
+    return { jobs: jobs ? (jobs as { items: unknown[] }).items : null, facets, featured, stats, market };
   }
 
   @Get('featured-employers')
@@ -117,8 +132,15 @@ export class JobsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.jobsService.findOne(id);
+  findOne(@Param('id') id: string, @Query('noview') noview?: string) {
+    // Đợt 90 — máy chủ web dựng sẵn trang gọi kèm ?noview=1 (không tính lượt xem); trình duyệt báo lượt xem qua POST bên dưới.
+    return this.jobsService.findOne(id, noview !== '1');
+  }
+
+  @Post(':id/view')
+  @HttpCode(204)
+  async countView(@Param('id') id: string) {
+    await this.jobsService.countView(id);
   }
 
   // Đợt 12ab (24/09/2026) — "Đánh giá mức độ tương thích": chỉ ứng viên đã đăng nhập mới xem được

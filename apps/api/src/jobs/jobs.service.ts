@@ -227,7 +227,7 @@ export class JobsService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, countView = true) {
     const job = await this.jobRepo.findOne({
       where: { id },
       relations: { company: true },
@@ -258,8 +258,10 @@ export class JobsService {
     // Đợt 12p (21/09/2026) — mỗi lượt xem trang chi tiết công khai +1 view_count (dùng cho thống kê
     // "Lượt xem"/"Tỷ lệ chuyển đổi" của NTD). Không await trước khi trả kết quả để không làm chậm
     // phản hồi trang chi tiết — lỗi tăng đếm (nếu có) không nên chặn người dùng xem tin.
-    this.jobRepo.increment({ id }, 'viewCount', 1).catch(() => {});
-    job.viewCount = (job.viewCount ?? 0) + 1;
+    if (countView) {
+      this.jobRepo.increment({ id }, 'viewCount', 1).catch(() => {});
+      job.viewCount = (job.viewCount ?? 0) + 1;
+    }
 
     if (job.screeningQuestions) (job as { screeningQuestions?: unknown }).screeningQuestions = job.screeningQuestions.map((x) => ({ q: x.q }));
     return { job, related };
@@ -331,6 +333,11 @@ export class JobsService {
       })),
       locations,
     };
+  }
+
+  // Đợt 90 — +1 lượt xem (dùng khi trang chi tiết được dựng sẵn ở máy chủ web).
+  async countView(id: string) {
+    await this.jobRepo.increment({ id }, 'viewCount', 1).catch(() => undefined);
   }
 
   // Chip quận/huyện kèm số lượng (mục 3 đặc tả) — chỉ có ý nghĩa khi đã chọn 1 tỉnh/thành cụ thể.

@@ -1,10 +1,7 @@
 import CompareTray from '@/components/CompareTray';
+import ServerWaking from '@/components/ServerWaking';
 import type { Metadata } from 'next';
-import '@fontsource/inter/400.css';
-import '@fontsource/inter/500.css';
-import '@fontsource/inter/600.css';
-import '@fontsource/inter/700.css';
-import '@fontsource/inter/800.css';
+import './fonts.css';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
 import { LanguageProvider } from '@/lib/i18n';
@@ -44,6 +41,7 @@ export default function RootLayout({
             <ConsentBanner />
             <div className="flex-1 flex flex-col">{children}</div>
             <CompareTray />
+            <ServerWaking />
             <Footer />
             </BackgroundProvider>
           </LanguageProvider>

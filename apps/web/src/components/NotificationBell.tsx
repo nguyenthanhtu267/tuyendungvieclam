@@ -37,9 +37,15 @@ export function NotificationBell({ token, variant = 'light' }: { token: string; 
   }, [token]);
 
   useEffect(() => {
+    // Đợt 90 — chỉ hỏi số thông báo mới khi tab đang mở; quay lại tab thì cập nhật ngay.
     loadUnread();
-    const timer = setInterval(loadUnread, 60000);
-    return () => clearInterval(timer);
+    const tick = () => document.visibilityState === 'visible' && loadUnread();
+    const timer = setInterval(tick, 60000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', tick);
+    };
   }, [loadUnread]);
 
   useEffect(() => {

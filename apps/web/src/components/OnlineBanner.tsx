@@ -7,7 +7,8 @@ import { presenceApi } from '@/lib/api';
 // dùng 18/09/2026 ("Banner nhỏ ở trang chủ"). Gửi heartbeat định kỳ để PresenceService (đợt 12a)
 // tính số phiên THẬT đang mở web, đồng thời đọc số hiển thị (thật + nền "ảo" dao động theo giờ
 // trong ngày, tối đa >1000 vào buổi tối) mỗi cùng chu kỳ để số nhảy mượt, không giật cục.
-const HEARTBEAT_MS = 20_000;
+// Đợt 90 — 45 giây (máy chủ coi là online nếu có ping trong 90 giây) và DỪNG khi tab bị ẩn → giảm ~60% lượt gọi.
+const HEARTBEAT_MS = 45_000;
 
 function genSessionId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
@@ -34,13 +35,18 @@ export default function OnlineBanner() {
         .catch(() => {});
     }
 
-    ping();
-    refreshCount();
-    const pingTimer = setInterval(ping, HEARTBEAT_MS);
-    const countTimer = setInterval(refreshCount, HEARTBEAT_MS);
+    function beat() {
+      if (document.visibilityState !== 'visible') return;
+      ping();
+      refreshCount();
+    }
+    beat();
+    const timer = setInterval(beat, HEARTBEAT_MS);
+    const onVis = () => document.visibilityState === 'visible' && beat();
+    document.addEventListener('visibilitychange', onVis);
     return () => {
-      clearInterval(pingTimer);
-      clearInterval(countTimer);
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVis);
     };
   }, []);
 

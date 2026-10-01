@@ -20,7 +20,8 @@ export default async function Image({ params }: { params: { id: string } }) {
   const [b1, b2, r1, r2] = await Promise.all([font('inter-latin-700'), font('inter-vietnamese-700'), font('inter-latin-400'), font('inter-vietnamese-400')]);
   let j: { title: string; company: string; salaryMin: number | null; salaryMax: number | null; location: string; urgent: boolean } | null = null;
   try {
-    const res = await fetch(`${API}/jobs/${params.id}/share-meta`, { cache: 'no-store' });
+    // Đợt 90 — lưu đệm 5 phút + tối đa 2,5 giây: máy chủ API đang thức dậy không được làm treo cả trang.
+    const res = await fetch(`${API}/jobs/${params.id}/share-meta`, { next: { revalidate: 300 }, signal: AbortSignal.timeout(2500) });
     if (res.ok) j = await res.json();
   } catch {
     j = null;

@@ -22,7 +22,7 @@ import JobForecastPanel from '@/components/JobForecastPanel';
 import { suggestJobContent } from '@/lib/job-writer';
 import { MultiSelectPopover } from '@/components/search/MultiSelectPopover';
 import { ChipsInput } from '@/components/profile/ui';
-import { RichTextEditor } from '@/components/RichTextEditor';
+import { RichTextEditor } from '@/components/LazyRichTextEditor';
 import { richTextListItems } from '@/lib/richtext';
 import { formatSalary } from '@/lib/format';
 import type { WorkLocation } from '@/lib/api';

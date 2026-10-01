@@ -2,7 +2,8 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { SmartThrottlerGuard } from './common/smart-throttler.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -160,7 +161,8 @@ const entities = [
     // Bảo mật (đợt 12a, 20/09/2026): giới hạn số request mặc định 100 lần/60s theo IP cho toàn bộ
     // API — chống dò mật khẩu/spam cơ bản. Endpoint đăng nhập/đăng ký còn bị giới hạn chặt hơn
     // riêng qua @Throttle() ở auth.controller.ts.
-    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]),
+    // Đợt 90 — 300 yêu cầu/phút cho mỗi NGƯỜI (xem SmartThrottlerGuard); API nhạy cảm vẫn có giới hạn riêng chặt hơn.
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 300 }]),
     AuthModule,
     UsersModule,
     JobsModule,
@@ -184,6 +186,6 @@ const entities = [
     WorkersModule,
   ],
   controllers: [AppController],
-  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [AppService, { provide: APP_GUARD, useClass: SmartThrottlerGuard }],
 })
 export class AppModule {}

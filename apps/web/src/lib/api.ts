@@ -10,25 +10,102 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
+// Đợt 90 — lớp gọi API "không treo, không lỗi vặt":
+// • GET không gửi Content-Type → trình duyệt không phải "hỏi trước" (preflight) với yêu cầu không đăng nhập.
+// • Giới hạn 15 giây mỗi lần; GET tự thử lại 1 lần khi mạng chập chờn / máy chủ 502-504 (máy chủ miễn phí đang thức dậy).
+// • Quá 4 giây chưa xong → phát sự kiện `tvl-api-slow` để hiện "Máy chủ đang khởi động…" thay vì màn hình đứng im.
+// • GET công khai giống hệt nhau gọi cùng lúc được gộp làm 1 (nhiều khối trên trang dùng chung dữ liệu).
+const TIMEOUT_MS = 15_000;
+const SLOW_MS = 4_000;
+const inflight = new Map<string, Promise<unknown>>();
+let slowCount = 0;
+function slowSignal(on: boolean) {
+  if (typeof window === 'undefined') return;
+  slowCount = Math.max(0, slowCount + (on ? 1 : -1));
+  window.dispatchEvent(new CustomEvent('tvl-api-slow', { detail: slowCount > 0 }));
+}
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-  const data = await res.json().catch(() => null);
+async function fetchOnce(url: string, init: RequestInit): Promise<Response> {
+  const ctrl = new AbortController();
+  const outer = init.signal;
+  if (outer) outer.addEventListener('abort', () => ctrl.abort(), { once: true });
+  const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  let slow = false;
+  const s = setTimeout(() => {
+    slow = true;
+    slowSignal(true);
+  }, SLOW_MS);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+    clearTimeout(s);
+    if (slow) slowSignal(false);
+  }
+}
 
-  if (!res.ok) {
+async function doRequest<T>(path: string, options: RequestInit): Promise<T> {
+  const method = (options.method ?? 'GET').toUpperCase();
+  const hasBody = options.body !== undefined && options.body !== null;
+  const headers: Record<string, string> = { ...(options.headers as Record<string, string> | undefined) };
+  if (hasBody && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+  const init: RequestInit = { ...options, headers };
+  const url = `${API_URL}${path}`;
+  const canRetry = method === 'GET';
+  let res: Response | null = null;
+  for (let attempt = 0; attempt < (canRetry ? 2 : 1); attempt++) {
+    try {
+      res = await fetchOnce(url, init);
+      if (canRetry && attempt === 0 && [502, 503, 504].includes(res.status)) {
+        await sleep(1500);
+        continue;
+      }
+      break;
+    } catch (e) {
+      if (options.signal?.aborted) throw e;
+      if (!canRetry || attempt === 1) {
+        throw new ApiError(
+          typeof navigator !== 'undefined' && navigator.onLine === false
+            ? 'Mất kết nối mạng — kiểm tra wifi/4G rồi thử lại'
+            : 'Máy chủ phản hồi chậm, vui lòng thử lại sau ít giây',
+          0,
+        );
+      }
+      await sleep(1500);
+    }
+  }
+  const r = res as Response;
+  const data = await r.json().catch(() => null);
+  if (!r.ok) {
     const message =
       (data && (Array.isArray(data.message) ? data.message.join(', ') : data.message)) ||
-      'Đã có lỗi xảy ra, vui lòng thử lại';
-    throw new ApiError(message, res.status);
+      (r.status === 429 ? 'Bạn thao tác quá nhanh, vui lòng chờ vài giây rồi thử lại' : 'Đã có lỗi xảy ra, vui lòng thử lại');
+    throw new ApiError(message, r.status);
   }
-
   return data as T;
+}
+
+// Đợt 90 — dữ liệu máy chủ đã lấy sẵn khi dựng trang: khối nào gọi đúng đường này trong 60 giây thì dùng luôn, không gọi lại.
+const primed = new Map<string, { exp: number; data: unknown }>();
+export function primeGet(path: string, data: unknown, ttlMs = 60_000) {
+  primed.set(path, { exp: Date.now() + ttlMs, data });
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const method = (options.method ?? 'GET').toUpperCase();
+  const auth = (options.headers as Record<string, string> | undefined)?.Authorization;
+  if (method !== 'GET' || options.signal) return doRequest<T>(path, options);
+  if (!auth) {
+    const p = primed.get(path);
+    if (p && p.exp > Date.now()) return p.data as T;
+  }
+  const key = `${auth ?? ''}|${path}`;
+  const hit = inflight.get(key);
+  if (hit) return hit as Promise<T>;
+  const p = doRequest<T>(path, options).finally(() => inflight.delete(key));
+  inflight.set(key, p);
+  return p;
 }
 
 // Dành cho gửi FormData (upload tệp) — không tự set Content-Type để trình duyệt tự thêm boundary.
@@ -250,7 +327,7 @@ export interface JobListParams {
   laborGroup?: string;
 }
 
-function buildJobQuery(params: JobListParams): string {
+export function buildJobQuery(params: JobListParams): string {
   const qs = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
     if (v === undefined || v === '' || v === false) return;
@@ -270,6 +347,7 @@ export const jobsApi = {
   },
   suggest: (q: string) => request<{ suggestion: string | null; synonyms: string[] }>(`/jobs/suggest?q=${encodeURIComponent(q)}`),
   get: (id: string) => request<{ job: JobPosting; related: JobPosting[] }>(`/jobs/${id}`),
+  countView: (id: string) => request<void>(`/jobs/${id}/view`, { method: 'POST' }),
   // Đợt 38 — độ phù hợp việc ↔ hồ sơ (ứng viên đăng nhập).
   match: (token: string, ids: string[]) =>
     request<{ hasProfile: boolean; scores: Record<string, { score: number; reasons: string[]; gaps: string[] }> }>(`/jobs/match?ids=${ids.join(',')}`, { headers: authHeaders(token) }),
