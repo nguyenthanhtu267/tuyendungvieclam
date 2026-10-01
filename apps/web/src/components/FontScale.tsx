@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useLanguage } from '@/lib/i18n';
+import { applySaver, readSaver, setSaver, useDataSaver } from '@/lib/data-saver';
 
 // Đợt 48 — gộp "Ngôn ngữ" + "Cỡ chữ" vào 1 nút tối giản trên header (thay cho 2 nút 🌐 VI và AA).
 // Cỡ chữ 80% → 200% (bước 10%), áp cho TOÀN website (mọi cỡ chữ/khoảng cách dùng rem).
@@ -34,7 +35,11 @@ export function FontScale({ className = '' }: { className?: string }) {
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => setPct(readPct()), []);
+  const saver = useDataSaver();
+  useEffect(() => {
+    setPct(readPct());
+    applySaver(readSaver());
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -123,6 +128,15 @@ export function FontScale({ className = '' }: { className?: string }) {
               <span>80%</span>
               <span>200%</span>
             </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-border">
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input id="data-saver" type="checkbox" checked={saver} onChange={(e) => setSaver(e.target.checked)} className="mt-1 w-4 h-4 accent-[#163B7A]" />
+              <span>
+                <span className="font-extrabold text-sm text-ink block">Tiết kiệm dữ liệu</span>
+                <span className="text-[12.5px] text-ink-soft block">Tắt nền hình và banner quảng cáo — trang tải nhanh hơn khi mạng yếu.</span>
+              </span>
+            </label>
           </div>
         </div>
       )}

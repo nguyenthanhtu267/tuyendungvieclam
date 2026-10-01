@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { publicSettingsApi } from '@/lib/api';
 import { BG_THEMES, DEFAULT_BG_SETTING, currentBgTheme, nextBgChange, type BgSetting, type BgTheme } from '@/lib/bg-themes';
 import { ArtScene } from './ArtScene';
+import { useDataSaver } from '@/lib/data-saver';
 
 // Đợt 29 (30/09/2026) — nền vector TOÀN website. Admin chọn 1 mẫu cố định hoặc "tự động đổi mỗi N giờ (mặc định 2 giờ)":
 // mẫu đang hiển thị được tính từ giờ hiện tại nên MỌI người xem cùng thấy 1 mẫu, tới mốc giờ thì tự chuyển (mờ dần) —
@@ -18,6 +19,7 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
   const [setting, setSetting] = useState<BgSetting>(cached ?? DEFAULT_BG_SETTING);
   const [now, setNow] = useState(0);
   const [prev, setPrev] = useState<BgTheme | null>(null);
+  const saver = useDataSaver();
 
   useEffect(() => {
     setMounted(true);
@@ -60,7 +62,7 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={shown}>
       {/* Chế độ "none" (Admin tắt nền): không vẽ lớp nền, trang dùng nền trơn; khung số liệu vẫn dùng mẫu mặc định. */}
-      <div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true" hidden={setting.mode === 'none'}>
+      <div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true" hidden={setting.mode === 'none' || saver}>
         {prev && (
           <div className="absolute inset-0">
             <ArtScene theme={prev} mode="page" />

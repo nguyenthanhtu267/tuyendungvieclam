@@ -17,6 +17,7 @@ import {
 } from '@/lib/ads';
 import { AD_SLOT_MAP } from '@/lib/ad-slots';
 import { AdBanner } from './AdBanner';
+import { useDataSaver } from '@/lib/data-saver';
 
 // Đợt 24 (29/09/2026) — 1 "vùng" đặt banner. Không có banner phù hợp → không render gì (không để lại khoảng trống).
 // `className` chỉ áp khi có banner (VD khoảng cách mt-8, hidden lg:block cho vùng chỉ có trên máy tính).
@@ -26,9 +27,10 @@ export function AdSlot({ slot, className = '' }: { slot: string; className?: str
   const [ad, setAd] = useState<PublicAd | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const seen = useRef(false);
+  const saver = useDataSaver();
 
   useEffect(() => {
-    if (me === undefined || !def) return; // chờ biết là khách hay đã đăng nhập
+    if (me === undefined || !def || saver) return; // chờ biết là khách hay đã đăng nhập
     let alive = true;
     const choose = (feed: Awaited<ReturnType<typeof loadAdFeed>>) => {
       if (!alive) return;
@@ -45,7 +47,7 @@ export function AdSlot({ slot, className = '' }: { slot: string; className?: str
       alive = false;
       unregisterSlot(slot);
     };
-  }, [me, slot, def]);
+  }, [me, slot, def, saver]);
 
   // Lượt hiển thị: tính 1 lần khi ≥ 50% banner lọt vào màn hình (Admin/Điều phối viên xem không tính).
   useEffect(() => {
@@ -66,7 +68,7 @@ export function AdSlot({ slot, className = '' }: { slot: string; className?: str
     return () => io.disconnect();
   }, [ad, slot, me]);
 
-  if (!ad || !def) return null;
+  if (!ad || !def || saver) return null;
   return (
     <div ref={ref} className={className} data-ad-slot={slot} data-ad-key={adKey(ad)} data-ad-gov={def.variant === 'wide' || slot === 'footer-top' ? 'wide' : def.variant === 'mini' ? 'tall' : def.variant}>
       <AdBanner

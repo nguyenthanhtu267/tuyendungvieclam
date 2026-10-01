@@ -6,7 +6,14 @@ export interface LintIssue {
 }
 const strip = (h: string) => (h || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
-export function lintJob(f: { title: string; description: string; requirements: string; benefits: string }): LintIssue[] {
+export interface LintForm {
+  title: string; description: string; requirements: string; benefits: string;
+  level?: string; experienceLevel?: string; salaryMin?: string; salaryMax?: string; negotiable?: boolean; channel?: string;
+}
+const LOW_EXP = ['Không yêu cầu kinh nghiệm', 'Chưa có kinh nghiệm', 'Đến dưới 1 năm'];
+const HIGH_EXP = ['Từ 5 đến 7 năm', 'Từ 7 đến 10 năm', 'Từ 11 năm'];
+
+export function lintJob(f: LintForm): LintIssue[] {
   const out: LintIssue[] = [];
   const title = f.title || '';
   const all = `${title} ${strip(f.description)} ${strip(f.requirements)} ${strip(f.benefits)}`.toLowerCase();
@@ -25,5 +32,20 @@ export function lintJob(f: { title: string; description: string; requirements: s
   if (/(\+?84|0)\s?\d{2,3}[\s.]?\d{3}[\s.]?\d{3,4}/.test(strip(f.description)) || /\bzalo\b|@\w+\.\w+/i.test(strip(f.description)))
     out.push({ level: 'warn', text: 'Mô tả đang chứa số điện thoại/email/Zalo. Hãy điền vào mục "Thông tin liên hệ" để không trùng và dễ ẩn/hiện.' });
   if (strip(f.benefits).length < 20) out.push({ level: 'warn', text: 'Chưa có quyền lợi rõ ràng, tin có quyền lợi thường nhận nhiều đơn hơn.' });
+  // Đợt 87 — kiểm tra mâu thuẫn giữa các trường (chỉ với tin văn phòng/chuyên môn)
+  if (!f.channel || f.channel === 'office') {
+    const lvl = f.level ?? '';
+    const exp = f.experienceLevel ?? '';
+    const isMgr = /quản lý|điều hành|trưởng/i.test(lvl);
+    if (isMgr && LOW_EXP.includes(exp)) out.push({ level: 'warn', text: `Cấp bậc “${lvl}” nhưng kinh nghiệm “${exp}” — thường không khớp, ứng viên sẽ nghi ngờ hoặc nộp sai đối tượng.` });
+    if (/sinh viên|thực tập/i.test(lvl) && HIGH_EXP.includes(exp)) out.push({ level: 'warn', text: `Cấp bậc “${lvl}” nhưng yêu cầu “${exp}” — hai thông tin mâu thuẫn.` });
+    if (/không (cần|yêu cầu) kinh nghiệm|chưa có kinh nghiệm cũng/i.test(all) && HIGH_EXP.includes(exp)) out.push({ level: 'warn', text: 'Mô tả nói “không cần kinh nghiệm” nhưng mục Kinh nghiệm lại yêu cầu nhiều năm.' });
+    const mn = Number(f.salaryMin) || 0;
+    const mx = Number(f.salaryMax) || 0;
+    if (!f.negotiable && mn && mx && mn > mx) out.push({ level: 'high', text: 'Lương tối thiểu đang lớn hơn lương tối đa.' });
+    if (!f.negotiable && mn && mx && mx / mn > 3) out.push({ level: 'warn', text: `Khung lương quá rộng (${mn}–${mx} triệu), ứng viên khó tin — nên thu hẹp.` });
+    if (!f.negotiable && (mx || mn) && isMgr && (mx || mn) < 12) out.push({ level: 'warn', text: 'Mức lương khá thấp so với cấp bậc quản lý — dễ ít người nộp.' });
+    if (f.negotiable && /quản lý|điều hành/i.test(lvl) === false && !mn && !mx) out.push({ level: 'warn', text: 'Chọn “Thoả thuận” — tin ghi rõ lương thường nhận nhiều đơn hơn.' });
+  }
   return out;
 }

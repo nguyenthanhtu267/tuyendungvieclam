@@ -1,4 +1,6 @@
 'use client';
+import SearchHints from '@/components/SearchHints';
+import { rememberSearch } from '@/lib/search-hints';
 import { nearestProvince, saveHome } from '@/lib/geo';
 
 import { MultiSelectPopover } from './MultiSelectPopover';
@@ -61,7 +63,10 @@ export function FilterBar({
   return (
     <div className="rounded-xl border border-border bg-white p-3.5 flex flex-col gap-3">
       <form
-        onSubmit={onSearchSubmit ?? ((e) => e.preventDefault())}
+        onSubmit={(e) => {
+          if (showSearchField) rememberSearch(searchValue ?? '');
+          (onSearchSubmit ?? ((ev: React.FormEvent) => ev.preventDefault()))(e);
+        }}
         className="flex flex-col sm:flex-row gap-2.5"
       >
         {showSearchField && (
@@ -121,6 +126,7 @@ export function FilterBar({
           </button>
         )}
       </form>
+      {showSearchField && <SearchHints q={searchValue ?? ''} onPick={(v) => { onSearchChange?.(v); rememberSearch(v); }} />}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         <select

@@ -9,6 +9,8 @@ import SiteHeader from '@/components/SiteHeader';
 import OnlineBanner from '@/components/OnlineBanner';
 import { JobCard } from '@/components/JobCard';
 import { RecommendedJobs } from '@/components/RecommendedJobs';
+import SearchHints from '@/components/SearchHints';
+import { rememberSearch } from '@/lib/search-hints';
 import ContinueBlock from '@/components/ContinueBlock';
 import { jobsApi, type JobFacets, type JobPosting, type FeaturedEmployer, type HomepageStats } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -83,6 +85,7 @@ export default function Home() {
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
+    rememberSearch(keyword);
     const params = nlToParams(parseNaturalQuery(keyword).filters);
     router.push(`/viec-lam${params.toString() ? `?${params}` : ''}`);
   }
@@ -121,6 +124,7 @@ export default function Home() {
                   }}
                 />
               </div>
+              <SearchHints q={keyword} onPick={(v) => { setKeyword(v); rememberSearch(v); }} />
               <AskAnswerBox text={keyword} />
               <div className="flex gap-3 flex-wrap">
                 <button type="submit" className="tvl-btn-accent !w-auto px-6">

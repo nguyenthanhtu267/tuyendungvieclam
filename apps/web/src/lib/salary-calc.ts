@@ -2,8 +2,8 @@
 // Nguồn: NQ 110 (giảm trừ gia cảnh), biểu thuế TNCN 5 bậc hiệu lực 01/07/2026, mức đóng bảo hiểm người lao động 10,5%.
 export const PERSONAL_DEDUCTION = 15_500_000;
 export const DEPENDENT_DEDUCTION = 6_200_000;
-export const BASE_SALARY = 2_340_000; // lương cơ sở
-export const INS_CAP = BASE_SALARY * 20; // trần BHXH, BHYT = 46,8 triệu
+export const BASE_SALARY = 2_530_000; // lương cơ sở từ 01/07/2026
+export const INS_CAP = BASE_SALARY * 20; // trần BHXH, BHYT = 50,6 triệu
 export const REGION_MIN_WAGE: Record<1 | 2 | 3 | 4, number> = { 1: 5_310_000, 2: 4_730_000, 3: 4_140_000, 4: 3_700_000 };
 export const RATES = { bhxh: 0.08, bhyt: 0.015, bhtn: 0.01 };
 

@@ -14,6 +14,7 @@ import { Smart2Service } from './smart2.service';
 import { Smart3Service } from './smart3.service';
 import { Smart4Service } from './smart4.service';
 import { Smart5Service } from './smart5.service';
+import { Smart6Service } from './smart6.service';
 import { CvSearchModule } from '../cv-search/cv-search.module';
 import { SmartController, SmartPublicController, SmartSharePublicController } from './smart.controller';
 import { SmartService } from './smart.service';
@@ -30,6 +31,6 @@ import { SmartService } from './smart.service';
     }),
   ],
   controllers: [SmartController, SmartPublicController, SmartSharePublicController],
-  providers: [SmartService, Smart2Service, Smart3Service, Smart4Service, Smart5Service],
+  providers: [SmartService, Smart2Service, Smart3Service, Smart4Service, Smart5Service, Smart6Service],
 })
 export class SmartModule {}

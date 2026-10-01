@@ -427,6 +427,21 @@ export default function AdminDashboardPage() {
                                 </span>
                               </div>
                             )}
+                            {(job as { reviewPriority?: string }).reviewPriority && (
+                              <div className="mt-1.5">
+                                {(() => {
+                                  const rp = (job as { reviewPriority?: string }).reviewPriority;
+                                  const n = (job as { companyApprovedCount?: number }).companyApprovedCount ?? 0;
+                                  const m: Record<string, [string, string]> = {
+                                    high: ['Ưu tiên soát trước — rủi ro cao', 'bg-critical-tint text-critical'],
+                                    newco: ['Công ty mới — chưa có tin nào được duyệt', 'bg-warning-tint text-ink border border-warning'],
+                                    fast: [`Có thể duyệt nhanh — công ty uy tín (${n} tin đã duyệt), nội dung sạch`, 'bg-success-tint text-success'],
+                                  };
+                                  const t = m[rp ?? ''];
+                                  return t ? <span className={`font-semibold text-[10.5px] rounded-full px-2 py-0.5 ${t[1]}`}>{t[0]}</span> : null;
+                                })()}
+                              </div>
+                            )}
                             {job.risk && job.risk.score >= 40 && (
                               <div className="mt-1.5 rounded-lg bg-critical-tint text-critical px-2.5 py-1.5 text-[12px] font-semibold leading-snug">
                                 ⚠ Khả nghi {job.risk.score}/100 — không tự duyệt

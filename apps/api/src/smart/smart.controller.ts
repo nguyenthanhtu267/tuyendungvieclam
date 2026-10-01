@@ -9,11 +9,36 @@ import { Smart2Service } from './smart2.service';
 import { Smart3Service } from './smart3.service';
 import { Smart4Service } from './smart4.service';
 import { Smart5Service } from './smart5.service';
+import { Smart6Service } from './smart6.service';
 
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SmartController {
-  constructor(private readonly smart: SmartService, private readonly smart2: Smart2Service, private readonly smart3: Smart3Service, private readonly smart4: Smart4Service, private readonly smart5: Smart5Service) {}
+  constructor(private readonly smart: SmartService, private readonly smart2: Smart2Service, private readonly smart3: Smart3Service, private readonly smart4: Smart4Service, private readonly smart5: Smart5Service, private readonly smart6: Smart6Service) {}
+
+  @Get('employer/funnel')
+  @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB)
+  funnel(@CurrentUser() user: { userId: string }) {
+    return this.smart6.funnel(user.userId);
+  }
+
+  @Get('employer/budget')
+  @Roles(UserRole.EMPLOYER_MAIN, UserRole.EMPLOYER_SUB)
+  budget(@CurrentUser() user: { userId: string }) {
+    return this.smart6.budget(user.userId);
+  }
+
+  @Get('me/reports')
+  @Roles(UserRole.CANDIDATE)
+  myReports(@CurrentUser() user: { userId: string }) {
+    return this.smart6.myReports(user.userId);
+  }
+
+  @Get('admin/quality/health')
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  health() {
+    return this.smart6.health();
+  }
 
   @Get('me/skill-premium')
   @Roles(UserRole.CANDIDATE)
@@ -243,7 +268,14 @@ export class SmartPublicController {
 // Đợt 65 — công khai: xem hồ sơ tóm tắt qua link chia sẻ (không có thông tin liên hệ).
 @Controller('public')
 export class SmartSharePublicController {
-  constructor(private readonly smart2: Smart2Service, private readonly smart4: Smart4Service) {}
+  constructor(private readonly smart2: Smart2Service, private readonly smart4: Smart4Service, private readonly smart6: Smart6Service) {}
+
+  // Đợt 87 — điểm "tin đáng ứng tuyển" (công khai, chỉ dùng dữ liệu tổng hợp).
+  @Get('jobs/:id/worth')
+  worth(@Param('id') id: string) {
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return { score: 0, label: '', level: 'poor', parts: [] };
+    return this.smart6.worthScore(id);
+  }
 
   // Đợt 75 — A/B tiêu đề: danh sách tin đang thử nghiệm + ghi nhận lượt hiển thị/bấm (ẩn danh, chỉ đếm).
   @Get('title-tests')

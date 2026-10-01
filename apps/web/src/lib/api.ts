@@ -2909,3 +2909,17 @@ export const workersApi = {
   adminHide: (token: string, id: string, hidden: boolean) => request<{ ok: boolean }>(`/admin/workers/${id}/hide`, { method: 'PATCH', body: JSON.stringify({ hidden }), headers: authHeaders(token) }),
   seen: (token: string, id: string) => request<{ ok: boolean }>(`/employer/worker-applications/${id}/seen`, { method: 'PATCH', headers: authHeaders(token) }),
 };
+
+// Đợt 87 — điểm đáng ứng tuyển, phễu, ngân sách, báo cáo của tôi, sức khoẻ web
+export interface WorthScore { score: number; label: string; level: 'good' | 'fair' | 'poor'; parts: { key: string; label: string; score: number; weight: number; note: string }[] }
+export interface FunnelJob { id: string; title: string; steps: { key: string; label: string; n: number }[]; worst: { from: string; to: string; lostPct: number; advice: string } | null }
+export interface BudgetItem { id: string; name: string; type: string; quantity: number; remaining: number; daysLeft: number | null; warns: string[]; estApplications: number | null }
+export interface MyReport { id: string; jobId: string; title: string; reason: string; createdAt: string; stage: string; done: boolean }
+export interface WebHealthItem { key: string; label: string; n: number; hint: string; level: 'ok' | 'warn' }
+export const smartApi7 = {
+  worth: (jobId: string) => request<WorthScore>(`/public/jobs/${jobId}/worth`),
+  funnel: (token: string) => request<{ items: FunnelJob[] }>('/employer/funnel', { headers: authHeaders(token) }),
+  budget: (token: string) => request<{ items: BudgetItem[]; avgApplicationsPerJob: number | null }>('/employer/budget', { headers: authHeaders(token) }),
+  myReports: (token: string) => request<{ items: MyReport[] }>('/me/reports', { headers: authHeaders(token) }),
+  health: (token: string) => request<{ items: WebHealthItem[]; warnCount: number }>('/admin/quality/health', { headers: authHeaders(token) }),
+};

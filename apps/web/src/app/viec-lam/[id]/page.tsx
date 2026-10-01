@@ -17,6 +17,7 @@ import { LaborApplyPanel } from '@/components/labor/LaborApplyPanel';
 import { CompatibilityChecklist } from '@/components/CompatibilityChecklist';
 import JobInsightsPanel from '@/components/JobInsightsPanel';
 import InterviewPrepPanel from '@/components/InterviewPrepPanel';
+import JobWorthPanel from '@/components/JobWorthPanel';
 import SalaryNudge from '@/components/SalaryNudge';
 import ApplyCheckNote from '@/components/ApplyCheckNote';
 import ScreeningInput from '@/components/ScreeningInput';
@@ -734,6 +735,7 @@ function JobDetailInner() {
                 <CompatibilityChecklist checklist={compatibility.checklist} missingSkills={compatibility.missingSkills} />
               </div>
             )}
+            <JobWorthPanel jobId={job.id} salaryMin={job.salaryMin} salaryMax={job.salaryMax} province={job.provinces?.[0]} />
             {me?.role === 'candidate' && compatibility && <JobInsightsPanel jobId={job.id} />}
             {me?.role === 'candidate' && compatibility && <CvTailorPanel jobId={job.id} />}
             {me?.role === 'candidate' && <InterviewPrepPanel job={job as never} />}

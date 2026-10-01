@@ -9,6 +9,7 @@ import { smartApi, type JobHealthItem, employerApi, type Company, type EmployerD
 import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatNumber } from '@/lib/format';
 import { AdSlot } from '@/components/ads/AdSlot';
 import EmployerSmartCards from '@/components/EmployerSmartCards';
+import EmployerFunnelPanel from '@/components/EmployerFunnelPanel';
 
 const JOB_STATUS_LABEL: Record<string, string> = {
   draft: 'Nháp',
@@ -99,6 +100,7 @@ export default function EmployerDashboardPage() {
             </div>
 
             <EmployerSmartCards />
+            <EmployerFunnelPanel />
 
             {health.length > 0 && (
               <div className="rounded-xl bg-white border border-border p-5">

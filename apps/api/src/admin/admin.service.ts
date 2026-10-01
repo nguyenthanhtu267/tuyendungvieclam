@@ -234,7 +234,24 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     });
     // Đợt 42 — kèm điểm rủi ro (tin khả nghi/trùng) để Admin ưu tiên soát.
     const others = await this.riskContextFor(jobs);
-    return jobs.map((j) => ({ ...j, risk: assessJobRisk(j, { others }) }));
+    // Đợt 87 — hàng đợi ưu tiên: rủi ro cao → công ty mới (chưa có tin nào được duyệt) → bình thường → duyệt nhanh (công ty uy tín + tin sạch).
+    const cids = [...new Set(jobs.map((j) => j.companyId))];
+    const approved = new Map<string, number>();
+    if (cids.length) {
+      const rows: { cid: string; n: string }[] = await this.jobRepo.manager.query(
+        `SELECT company_id::text AS cid, COUNT(*) AS n FROM job_postings WHERE approval_status = 'approved' AND company_id::text = ANY($1::text[]) GROUP BY company_id`,
+        [cids],
+      );
+      rows.forEach((r) => approved.set(r.cid, Number(r.n)));
+    }
+    const rank = { high: 1, newco: 2, normal: 3, fast: 4 } as const;
+    const out = jobs.map((j) => {
+      const risk = assessJobRisk(j, { others });
+      const n = approved.get(j.companyId) ?? 0;
+      const reviewPriority: keyof typeof rank = risk.score >= 40 ? 'high' : n === 0 ? 'newco' : n >= 5 && risk.score < 15 ? 'fast' : 'normal';
+      return { ...j, risk, reviewPriority, companyApprovedCount: n };
+    });
+    return out.sort((x, y) => rank[x.reviewPriority] - rank[y.reviewPriority] || +new Date(x.updatedAt) - +new Date(y.updatedAt));
   }
 
   // Tin dùng để so trùng: các tin đang chờ + đã duyệt gần đây (tối đa 2000) — đủ cho quy mô hiện tại.

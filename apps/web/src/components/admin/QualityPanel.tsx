@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { adminApi, smartApi, smartApi2, smartApi3, smartApi6, workersApi, type AdminTodo, type DupJobGroup, type ProvinceBalance, type SuspiciousAccount, type SuspiciousWorkerGroup, type QualityOverview, type SystemHealth, type ReportGroup, type WeeklyReport, type AdTargeting } from '@/lib/api';
+import { adminApi, smartApi, smartApi2, smartApi3, smartApi6, smartApi7, workersApi, type WebHealthItem, type AdminTodo, type DupJobGroup, type ProvinceBalance, type SuspiciousAccount, type SuspiciousWorkerGroup, type QualityOverview, type SystemHealth, type ReportGroup, type WeeklyReport, type AdTargeting } from '@/lib/api';
 
-type Sub = 'reports' | 'weekly' | 'ads' | 'system' | 'duplicates' | 'suspicious' | 'lowQuality' | 'spam' | 'accounts' | 'workers';
+type Sub = 'reports' | 'weekly' | 'ads' | 'system' | 'duplicates' | 'suspicious' | 'lowQuality' | 'spam' | 'accounts' | 'workers' | 'health';
 
 // Đợt 63 — Admin: phát hiện tin trùng, tin đáng ngờ (dùng bộ chấm rủi ro) và chấm chất lượng tin tổng hợp.
 export function QualityPanel({ token }: { token: string }) {
@@ -19,6 +19,7 @@ export function QualityPanel({ token }: { token: string }) {
   const [wstats, setWstats] = useState<{ items: { kind: string; n: number; fresh: number; hidden: number }[]; apps: number; contacts: number; provinces?: ProvinceBalance[] } | null>(null);
   const [todo, setTodo] = useState<AdminTodo | null>(null);
   const [dups, setDups] = useState<DupJobGroup[]>([]);
+  const [health, setHealth] = useState<WebHealthItem[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
   const load = useCallback(() => {
@@ -33,6 +34,7 @@ export function QualityPanel({ token }: { token: string }) {
     workersApi.adminTodo(token).then(setTodo).catch(() => undefined);
     workersApi.adminDuplicateJobs(token).then((r) => setDups(r.items)).catch(() => setDups([]));
     smartApi3.adTargeting(token).then(setAds).catch(() => undefined);
+    smartApi7.health(token).then((r) => setHealth(r.items)).catch(() => setHealth([]));
   }, [token]);
   useEffect(load, [load]);
 
@@ -57,6 +59,7 @@ export function QualityPanel({ token }: { token: string }) {
     { id: 'workers', label: 'Hồ sơ lao động phổ thông nghi ảo', n: wg.length },
     { id: 'spam', label: 'Nghi spam ứng tuyển', n: (sys?.spam.burst.length ?? 0) + (sys?.spam.sameLetter.length ?? 0) },
     { id: 'lowQuality', label: 'Tin tổng hợp chất lượng thấp', n: data?.lowQuality.length ?? 0 },
+    { id: 'health', label: 'Sức khoẻ web', n: health.filter((h) => h.level === 'warn').length },
     { id: 'duplicates', label: 'Tin trùng', n: data?.duplicates.length ?? 0 },
     { id: 'suspicious', label: 'Tin đáng ngờ', n: data?.suspicious.length ?? 0 },
   ];
@@ -146,6 +149,20 @@ export function QualityPanel({ token }: { token: string }) {
               </tbody>
             </table>
           )}
+        </div>
+      )}
+      {sub === 'health' && (
+        <div className="rounded-xl bg-white border border-border divide-y divide-border">
+          {health.length === 0 && <div className="p-4 text-[13.5px] text-ink-muted">Đang tải…</div>}
+          {health.map((h) => (
+            <div key={h.key} className="p-3 flex items-center gap-3">
+              <div className={`shrink-0 min-w-[48px] text-center rounded-lg px-2 py-1 font-extrabold text-[16px] border ${h.level === 'warn' ? 'border-warning bg-warning-tint text-ink' : 'border-border bg-white text-success'}`}>{h.n}</div>
+              <div>
+                <div className="font-bold text-[14px] text-ink">{h.label}</div>
+                <div className="text-[12.5px] text-ink-muted">{h.hint}</div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
       {sub === 'system' && sys && (

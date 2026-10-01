@@ -5,6 +5,7 @@ import CvAutofill from '@/components/CvAutofill';
 import ShareProfileCard from '@/components/ShareProfileCard';
 import BulkApplyModal from '@/components/BulkApplyModal';
 import ApplicationTracker from '@/components/ApplicationTracker';
+import MyReportsPanel from '@/components/MyReportsPanel';
 import ProfileSmartCards from '@/components/ProfileSmartCards';
 import ApplicationStepper from '@/components/ApplicationStepper';
 import { useEffect, useRef, useState } from 'react';
@@ -264,6 +265,7 @@ export default function MyCenterPage() {
                     )}
                   </span>
                 </div>
+                <MyReportsPanel />
                 {applications.length === 0 ? (
                   <div className="text-[12.5px] text-ink-muted py-4">Bạn chưa ứng tuyển việc làm nào.</div>
                 ) : appView === 'board' ? (
