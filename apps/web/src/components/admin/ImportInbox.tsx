@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { API_URL, ApiError, type JobImportRow, type JobImportData, type MailScanStatus } from '@/lib/api';
 import { adminApi } from '@/lib/api-admin';
-import { INDUSTRIES } from '@/lib/catalogs';
+import { SearchSelect } from './SearchSelect';
+import { INDUSTRIES, EXPERIENCE_LEVELS, LEVELS, GENDER_OPTIONS } from '@/lib/catalogs';
 import { formatDate, formatDateTime } from '@/lib/format';
 
 // Đợt 119 — "Hộp nhập tin từ link": dán nhiều link tin tuyển dụng → web đọc sẵn tin + công ty → Admin xem lại rồi bấm Đăng.
@@ -92,6 +93,17 @@ function MailAutoPanel({ token, onNewItems }: { token: string; onNewItems: () =>
       setPickBusy(false);
     }
   }
+  const [apBusy, setApBusy] = useState(false);
+  async function setAutoPublish(m: number) {
+    setApBusy(true);
+    try {
+      setSt(await adminApi.mailScanAutoPublish(token, m));
+    } catch {
+      setMsg('Không đổi được chế độ tự đăng.');
+    } finally {
+      setApBusy(false);
+    }
+  }
   async function toggle(v: boolean) {
     try {
       setSt(await adminApi.mailScanEnabled(token, v));
@@ -129,6 +141,25 @@ function MailAutoPanel({ token, onNewItems }: { token: string; onNewItems: () =>
             <button type="button" onClick={() => setShowGuide(!(showGuide ?? true))} className="ml-auto text-xs font-bold text-primary underline">{(showGuide ?? true) ? 'Ẩn hướng dẫn' : 'Xem hướng dẫn cài đặt'}</button>
           </>
         )}
+      </div>
+      <div className="flex items-center gap-2 flex-wrap mt-2 text-xs">
+        <span className="font-semibold">⏱ Tự đăng tin trong “Chờ xem” sau:</span>
+        <div role="radiogroup" aria-label="Tự đăng tin" className="inline-flex rounded-lg border border-border overflow-hidden">
+          {([0, 15, 30] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={(st.autoPublishMinutes ?? 0) === m}
+              disabled={apBusy}
+              onClick={() => setAutoPublish(m)}
+              className={`px-3 py-1.5 font-bold ${(st.autoPublishMinutes ?? 0) === m ? 'bg-primary text-white' : 'bg-white text-ink'}`}
+            >
+              {m === 0 ? 'Tắt' : `${m} phút`}
+            </button>
+          ))}
+        </div>
+        <span className="text-ink-faint">{(st.autoPublishMinutes ?? 0) === 0 ? 'Tin mới tìm được chờ bạn xem rồi bấm Đăng.' : `Tin tìm được từ lúc bật, sau ${st.autoPublishMinutes} phút nếu chưa bấm gì sẽ tự đăng. Tin cũ đang chờ không bị đăng tự động.`}</span>
       </div>
       {msg && <div className="text-xs font-semibold text-ink-muted mt-2">{msg}</div>}
       {st.configured && (
@@ -286,6 +317,8 @@ export function ImportInbox({ token }: { token: string }) {
   const [rowMsg, setRowMsg] = useState('');
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [enriching, setEnriching] = useState<string | null>(null);
+  const [bulkProg, setBulkProg] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -323,14 +356,27 @@ export function ImportInbox({ token }: { token: string }) {
     if (open === r.id) return setOpen(null);
     setOpen(r.id);
     setEdit({ ...r.data });
+    // Tin nhập từ trước Đợt 126: đọc lại trang gốc để điền sẵn ngành nghề + các khối còn thiếu.
+    if (r.status === 'pending' && !r.data?.enriched) {
+      setEnriching(r.id);
+      adminApi
+        .enrichImport(token, r.id)
+        .then((nr) => {
+          setEdit({ ...(nr.data ?? {}) });
+          setData((d) => (d ? { ...d, items: d.items.map((i) => (i.id === r.id ? { ...i, data: nr.data } : i)) } : d));
+        })
+        .catch(() => undefined)
+        .finally(() => setEnriching(null));
+    }
   }
 
-  async function act(r: JobImportRow, kind: 'publish' | 'notify' | 'skip') {
+  async function act(r: JobImportRow, kind: 'publish' | 'notify' | 'skip' | 'restore') {
     setRowBusy(r.id);
     setRowMsg('');
     try {
       if (kind === 'publish') await adminApi.publishImport(token, r.id, edit as Record<string, unknown>);
       else if (kind === 'notify') await adminApi.notifyImportOwner(token, r.id);
+      else if (kind === 'restore') await adminApi.restoreImport(token, r.id);
       else await adminApi.skipImport(token, r.id);
       setOpen(null);
       await load();
@@ -341,18 +387,47 @@ export function ImportInbox({ token }: { token: string }) {
     }
   }
 
-  async function publishSelected() {
-    if (!sel.size || !window.confirm(`Đăng ${sel.size} tin đã chọn? Mỗi công ty mới sẽ được tạo hồ sơ + tài khoản nháp.`)) return;
+  async function bulkAct(action: 'skip' | 'restore' | 'notify', label: string) {
+    if (!sel.size) return;
     setBulkBusy(true);
+    setMsg('');
     try {
-      const r = await adminApi.publishManyImports(token, Array.from(sel));
-      setMsg(`Đã đăng ${r.ok} tin${r.failed.length ? `, ${r.failed.length} tin lỗi (xem lại từng tin)` : ''}.`);
+      const r = await adminApi.bulkImports(token, Array.from(sel), action);
+      setMsg(`${label}: ${r.ok}/${sel.size} tin${r.failed.length ? `. Chưa được ${r.failed.length} tin: ${r.failed.slice(0, 2).map((f) => f.message).join(' · ')}` : '.'}`);
       setSel(new Set());
       await load();
     } catch (e) {
       setMsg(e instanceof ApiError ? e.message : 'Có lỗi, thử lại.');
     } finally {
       setBulkBusy(false);
+    }
+  }
+
+  async function publishSelected() {
+    if (!sel.size || !window.confirm(`Đăng ${sel.size} tin đã chọn? Mỗi công ty mới sẽ được tạo hồ sơ + tài khoản nháp.`)) return;
+    setBulkBusy(true);
+    setMsg('');
+    const ids = Array.from(sel);
+    let ok = 0;
+    const failed: { id: string; message: string }[] = [];
+    try {
+      // Đăng từng nhóm nhỏ (4 tin/lượt) để không bị quá thời gian chờ — chọn bao nhiêu đăng bấy nhiêu, có báo tiến độ.
+      for (let i = 0; i < ids.length; i += 4) {
+        setBulkProg(`Đang đăng ${Math.min(i + 4, ids.length)}/${ids.length}…`);
+        try {
+          const r = await adminApi.publishManyImports(token, ids.slice(i, i + 4));
+          ok += r.ok;
+          failed.push(...r.failed);
+        } catch (e) {
+          ids.slice(i, i + 4).forEach((id) => failed.push({ id, message: e instanceof ApiError ? e.message : 'Lỗi mạng' }));
+        }
+      }
+      setMsg(`Đã đăng ${ok}/${ids.length} tin${failed.length ? `. ${failed.length} tin chưa đăng được (còn trong "Chờ xem", mở từng tin để xem lý do): ${failed.slice(0, 3).map((f) => f.message).join(' · ')}` : '.'}`);
+      setSel(new Set(failed.map((f) => f.id)));
+      await load();
+    } finally {
+      setBulkBusy(false);
+      setBulkProg('');
     }
   }
   const counts = data?.counts ?? {};
@@ -383,14 +458,19 @@ export function ImportInbox({ token }: { token: string }) {
         ))}
       </div>
 
-      {tab === 'pending' && data && data.items.length > 0 && (
+      {tab !== 'published' && data && data.items.length > 0 && (
         <div className="flex items-center gap-3 mb-2 text-xs flex-wrap">
           <label className="flex items-center gap-1.5 font-semibold cursor-pointer">
             <input type="checkbox" checked={sel.size === data.items.length} onChange={(e) => setSel(e.target.checked ? new Set(data.items.map((i) => i.id)) : new Set())} />
             Chọn tất cả ({data.items.length})
           </label>
           {sel.size > 0 && (
-            <button type="button" disabled={bulkBusy} onClick={publishSelected} className="tvl-btn-primary !w-auto px-4 disabled:opacity-50">{bulkBusy ? 'Đang đăng…' : `Đăng ${sel.size} tin đã chọn`}</button>
+            <>
+              {tab === 'pending' && <button type="button" disabled={bulkBusy} onClick={publishSelected} className="tvl-btn-primary !w-auto px-4 disabled:opacity-50">{bulkBusy ? bulkProg || 'Đang đăng…' : `Đăng ${sel.size} tin đã chọn`}</button>}
+              {tab === 'owner_review' && <button type="button" disabled={bulkBusy} onClick={() => bulkAct('notify', 'Đã báo công ty')} className="tvl-btn-primary !w-auto px-4 disabled:opacity-50">Báo công ty {sel.size} tin đã chọn</button>}
+              {(tab === 'skipped' || tab === 'owner_notified') && <button type="button" disabled={bulkBusy} onClick={() => bulkAct('restore', tab === 'skipped' ? 'Đã đưa về Chờ xem' : 'Đã đưa về Công ty có chủ')} className="tvl-btn-primary !w-auto px-4 disabled:opacity-50">{tab === 'skipped' ? `Đưa ${sel.size} tin về Chờ xem` : `Đưa ${sel.size} tin về Công ty có chủ`}</button>}
+              {['pending', 'owner_review', 'failed'].includes(tab) && <button type="button" disabled={bulkBusy} onClick={() => bulkAct('skip', 'Đã bỏ qua')} className="tvl-btn-ghost !w-auto px-4 disabled:opacity-50">Bỏ qua {sel.size} tin</button>}
+            </>
           )}
         </div>
       )}
@@ -414,7 +494,7 @@ export function ImportInbox({ token }: { token: string }) {
             return (
               <li key={r.id} className="rounded-lg border border-border">
                 <div className="flex items-start">
-                {tab === 'pending' && <input type="checkbox" aria-label="Chọn tin" className="mt-3.5 ml-3" checked={sel.has(r.id)} onChange={() => setSel((p) => { const n = new Set(p); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} />}
+                {tab !== 'published' && <input type="checkbox" aria-label="Chọn tin" className="mt-3.5 ml-3" checked={sel.has(r.id)} onChange={() => setSel((p) => { const n = new Set(p); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} />}
                 <button type="button" onClick={() => toggle(r)} className="flex-1 text-left px-3 py-2.5 flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="font-bold text-[13px] truncate">{d.title || '(chưa đọc được chức danh)'}</div>
@@ -437,23 +517,43 @@ export function ImportInbox({ token }: { token: string }) {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <label className="flex flex-col gap-1">Chức danh<input className="tvl-input" value={edit.title ?? ''} onChange={(e) => set('title', e.target.value)} /></label>
                         <label className="flex flex-col gap-1">Tên công ty<input className="tvl-input" value={edit.companyName ?? ''} onChange={(e) => set('companyName', e.target.value)} /></label>
-                        <label className="flex flex-col gap-1">Ngành nghề
-                          <select className="tvl-input" value={edit.industry ?? ''} onChange={(e) => set('industry', e.target.value)}>
-                            <option value="">— Chọn ngành —</option>
-                            {INDUSTRIES.map((i) => <option key={i} value={i}>{i}</option>)}
-                          </select>
-                        </label>
+                        <div className="flex flex-col gap-1"><label htmlFor="imp-industry">Ngành nghề (gõ để tìm)</label><SearchSelect id="imp-industry" value={edit.industry ?? ''} options={INDUSTRIES} onChange={(v) => set('industry', v)} /></div>
                         <label className="flex flex-col gap-1">Địa điểm<input className="tvl-input" value={edit.location ?? ''} onChange={(e) => set('location', e.target.value)} /></label>
                         <label className="flex flex-col gap-1">Lương từ (triệu)<input className="tvl-input" inputMode="numeric" value={edit.salaryMin ?? ''} onChange={(e) => setEdit((p) => ({ ...p, salaryMin: e.target.value ? Number(e.target.value) : undefined }))} /></label>
                         <label className="flex flex-col gap-1">Lương đến (triệu)<input className="tvl-input" inputMode="numeric" value={edit.salaryMax ?? ''} onChange={(e) => setEdit((p) => ({ ...p, salaryMax: e.target.value ? Number(e.target.value) : undefined }))} /></label>
                         <label className="flex flex-col gap-1">Hạn nộp<input className="tvl-input" type="date" value={edit.deadline ?? ''} onChange={(e) => set('deadline', e.target.value)} /></label>
                         <label className="flex flex-col gap-1">Website công ty<input className="tvl-input" value={edit.companyWebsite ?? ''} onChange={(e) => set('companyWebsite', e.target.value)} /></label>
-                        <label className="flex flex-col gap-1 sm:col-span-2">Mô tả (HTML)<textarea className="tvl-input" rows={5} value={edit.description ?? ''} onChange={(e) => set('description', e.target.value)} /></label>
+                        <label className="flex flex-col gap-1">Địa chỉ làm việc<input className="tvl-input" value={edit.address ?? ''} onChange={(e) => set('address', e.target.value)} /></label>
+                        <label className="flex flex-col gap-1">Thời gian làm việc<input className="tvl-input" value={edit.workSchedule ?? ''} onChange={(e) => set('workSchedule', e.target.value)} /></label>
+                        <label className="flex flex-col gap-1">Kinh nghiệm
+                          <select className="tvl-input" value={edit.experienceLevel ?? ''} onChange={(e) => set('experienceLevel', e.target.value)}>
+                            <option value="">— Không rõ —</option>
+                            {EXPERIENCE_LEVELS.map((i) => <option key={i} value={i}>{i}</option>)}
+                          </select>
+                        </label>
+                        <label className="flex flex-col gap-1">Cấp bậc
+                          <select className="tvl-input" value={edit.level ?? ''} onChange={(e) => set('level', e.target.value)}>
+                            <option value="">— Không rõ —</option>
+                            {LEVELS.map((i) => <option key={i} value={i}>{i}</option>)}
+                          </select>
+                        </label>
+                        <label className="flex flex-col gap-1">Số lượng tuyển<input className="tvl-input" inputMode="numeric" value={edit.headcount ?? ''} onChange={(e) => setEdit((p) => ({ ...p, headcount: e.target.value ? Number(e.target.value) : undefined }))} /></label>
+                        <label className="flex flex-col gap-1">Giới tính
+                          <select className="tvl-input" value={edit.gender ?? ''} onChange={(e) => set('gender', e.target.value)}>
+                            <option value="">— Không rõ —</option>
+                            {GENDER_OPTIONS.map((i) => <option key={i} value={i}>{i}</option>)}
+                          </select>
+                        </label>
+                        <label className="flex flex-col gap-1">Độ tuổi<input className="tvl-input" value={edit.ageRange ?? ''} onChange={(e) => set('ageRange', e.target.value)} /></label>
+                        {enriching === r.id && <div className="sm:col-span-2 text-ink-faint">Đang đọc kỹ trang gốc để điền ngành nghề và các mục còn thiếu…</div>}
+                        <label className="flex flex-col gap-1 sm:col-span-2">Mô tả công việc (HTML)<textarea className="tvl-input" rows={5} value={edit.description ?? ''} onChange={(e) => set('description', e.target.value)} /></label>
+                        <label className="flex flex-col gap-1 sm:col-span-2">Yêu cầu ứng viên (HTML)<textarea className="tvl-input" rows={4} value={edit.requirements ?? ''} onChange={(e) => set('requirements', e.target.value)} /></label>
+                        <label className="flex flex-col gap-1 sm:col-span-2">Quyền lợi (HTML)<textarea className="tvl-input" rows={4} value={edit.benefits ?? ''} onChange={(e) => set('benefits', e.target.value)} /></label>
                       </div>
                     ) : (
                       <div className="text-ink-muted">
                         {r.status === 'owner_review' && 'Công ty này đã có chủ thật nên không đăng hộ. Bấm "Báo công ty nhận tin" để họ nhận tin đã điền sẵn trong mục Tin đăng.'}
-                        {r.status === 'owner_notified' && 'Đã báo công ty, đang chờ họ nhận hoặc bỏ qua.'}
+                        {r.status === 'owner_notified' && 'Đã báo công ty, đang chờ họ nhận hoặc bỏ qua. Nếu muốn báo lại, đưa về "Công ty có chủ".'}
                         {r.status === 'published' && (r.jobId ? <PostedJobTools token={token} row={r} onChanged={load} /> : 'Tin đã được đăng.')}
                         {r.status === 'skipped' && 'Mục này đã bị bỏ qua.'}
                       </div>
@@ -462,6 +562,8 @@ export function ImportInbox({ token }: { token: string }) {
                     <div className="flex gap-2 flex-wrap">
                       {canPublish && <button type="button" disabled={rowBusy === r.id} onClick={() => act(r, 'publish')} className="tvl-btn-primary !w-auto px-4 disabled:opacity-50">{rowBusy === r.id ? 'Đang đăng…' : 'Đăng tin'}</button>}
                       {r.status === 'owner_review' && <button type="button" disabled={rowBusy === r.id} onClick={() => act(r, 'notify')} className="tvl-btn-primary !w-auto px-4 disabled:opacity-50">Báo công ty nhận tin</button>}
+                      {r.status === 'skipped' && <button type="button" disabled={rowBusy === r.id} onClick={() => act(r, 'restore')} className="tvl-btn-primary !w-auto px-4 disabled:opacity-50">↩ Đưa về Chờ xem</button>}
+                      {r.status === 'owner_notified' && <button type="button" disabled={rowBusy === r.id} onClick={() => act(r, 'restore')} className="tvl-btn-ghost !w-auto px-4 disabled:opacity-50">↩ Đưa về Công ty có chủ</button>}
                       {['pending', 'failed', 'owner_review'].includes(r.status) && <button type="button" disabled={rowBusy === r.id} onClick={() => act(r, 'skip')} className="tvl-btn-ghost !w-auto px-4">Bỏ qua</button>}
                     </div>
                   </div>

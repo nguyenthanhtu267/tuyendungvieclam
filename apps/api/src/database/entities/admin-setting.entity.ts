@@ -28,6 +28,13 @@ export class AdminSetting {
   @Column({ name: 'mail_scan_labels', type: 'text', nullable: true })
   mailScanLabels?: string | null;
 
+  // Đợt 127 — tự đăng tin "Chờ xem" sau N phút (0 = tắt). Chỉ áp dụng cho tin tìm được từ lúc bật.
+  @Column({ name: 'import_auto_publish_minutes', type: 'int', default: 0 })
+  importAutoPublishMinutes: number;
+
+  @Column({ name: 'import_auto_publish_since', type: 'timestamp', nullable: true })
+  importAutoPublishSince?: Date | null;
+
   @Column({ name: 'mail_scan_last_at', type: 'timestamp', nullable: true })
   mailScanLastAt?: Date | null;
 

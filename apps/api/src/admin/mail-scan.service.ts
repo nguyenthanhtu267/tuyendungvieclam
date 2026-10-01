@@ -59,6 +59,7 @@ export interface MailScanSummary {
 export class MailScanService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(MailScanService.name);
   private timer?: ReturnType<typeof setInterval>;
+  private pubTimer?: ReturnType<typeof setInterval>;
   private running = false;
 
   constructor(
@@ -71,9 +72,13 @@ export class MailScanService implements OnModuleInit, OnModuleDestroy {
     this.timer = setInterval(() => {
       this.autoTick().catch(() => undefined);
     }, EVERY_MS);
+    this.pubTimer = setInterval(() => {
+      this.autoPublishTick().catch(() => undefined);
+    }, 60_000);
   }
   onModuleDestroy() {
     if (this.timer) clearInterval(this.timer);
+    if (this.pubTimer) clearInterval(this.pubTimer);
   }
 
   // Nhiều hộp thư: MAIL_IMAP_USER/PASS (hộp 1) và MAIL_IMAP_USER_2/PASS_2 … _5 (hộp 2–5).
@@ -201,6 +206,7 @@ export class MailScanService implements OnModuleInit, OnModuleDestroy {
       accounts: this.accounts().map((a) => ({ idx: a.idx, user: a.user.replace(/^(.).*(@.*)$/, '$1***$2'), labels: this.selectedLabels(s, a.user) })),
       senders: (process.env.MAIL_SENDERS || '').split(',').map((x) => x.trim()).filter(Boolean),
       enabled: s.mailScanEnabled,
+      autoPublishMinutes: s.importAutoPublishMinutes ?? 0,
       running: this.running,
       lastAt: s.mailScanLastAt ?? null,
       last,
@@ -212,6 +218,24 @@ export class MailScanService implements OnModuleInit, OnModuleDestroy {
     s.mailScanEnabled = enabled;
     await this.settings.save(s);
     return this.status();
+  }
+
+  async setAutoPublish(minutes: number) {
+    const m = [15, 30].includes(Number(minutes)) ? Number(minutes) : 0;
+    const s = await this.row();
+    if (m > 0 && (s.importAutoPublishMinutes ?? 0) === 0) s.importAutoPublishSince = new Date();
+    if (m === 0) s.importAutoPublishSince = null;
+    s.importAutoPublishMinutes = m;
+    await this.settings.save(s);
+    return this.status();
+  }
+
+  // Mỗi phút: đăng các tin "Chờ xem" đã quá N phút (chỉ tin tìm được từ lúc bật chế độ), tối đa 5 tin/lượt.
+  async autoPublishTick(): Promise<number> {
+    const s = await this.row();
+    const m = s.importAutoPublishMinutes ?? 0;
+    if (!m || !s.importAutoPublishSince) return 0;
+    return this.imports.autoPublishDue(m, s.importAutoPublishSince, { userId: 'system', email: 'system-auto-import' });
   }
 
   private async autoTick() {

@@ -8,6 +8,7 @@ import { JobImport, JobImportStatus } from '../database/entities/job-import.enti
 import { AdminService, AdminActor } from './admin.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { extractJobFromUrl } from '../common/job-url-extractor.util';
+import { inferIndustry } from '../common/job-industry.util';
 import { findProvince } from '../common/cv-parser.util';
 import { normalizeSearchText } from '../common/search-text.util';
 import { unaccentSql } from '../common/sql-unaccent.util';
@@ -224,6 +225,7 @@ export class JobImportService {
 
   // Đăng tin (Admin đã xem/sửa): công ty đã có (nguồn ngoài, chưa có chủ) → thêm vào; chưa có → tạo mới + tài khoản nháp.
   async publish(admin: AdminActor, id: string, edit: Record<string, unknown> = {}) {
+    await this.enrich(id).catch(() => undefined);
     const row = await this.getOne(id);
     if (row.status === 'owner_review') throw new BadRequestException('Công ty này đã có chủ thật — hãy bấm "Báo công ty nhận tin" thay vì đăng hộ.');
     if (!['pending', 'failed'].includes(row.status)) throw new BadRequestException('Mục này không ở trạng thái chờ đăng');
@@ -251,9 +253,20 @@ export class JobImportService {
     const prov = findProvince(d.location);
     const job = await this.admin.createJobForCompany(admin, company.id, {
       title,
-      industry: d.industry || undefined,
+      industry: d.industry || inferIndustry(title, d.description) || undefined,
       provinces: prov ? [prov] : undefined,
-      address: d.location || undefined,
+      location: d.location || undefined,
+      address: d.address || d.location || undefined,
+      requirements: d.requirements || undefined,
+      benefits: d.benefits || undefined,
+      experienceLevel: d.experienceLevel || undefined,
+      level: d.level || undefined,
+      headcount: Number(d.headcount) > 0 ? Number(d.headcount) : undefined,
+      gender: d.gender || undefined,
+      ageRange: d.ageRange || undefined,
+      workSchedule: d.workSchedule || undefined,
+      tags: Array.isArray(d.tags) && d.tags.length ? d.tags : undefined,
+      isUrgent: d.isUrgent === true ? true : undefined,
       employmentType: d.employmentType || undefined,
       salaryMin: d.salaryMin ?? undefined,
       salaryMax: d.salaryMax ?? undefined,
@@ -268,9 +281,58 @@ export class JobImportService {
     return { import: row, job, company };
   }
 
+  // Đọc lại trang gốc của tin cũ (nhập trước Đợt 126) để bổ sung ngành nghề + các khối còn thiếu. Chỉ điền chỗ còn trống, không đè phần Admin đã sửa.
+  async enrich(id: string) {
+    const row = await this.getOne(id);
+    const d = (row.data ?? {}) as Record<string, any>;
+    if (d.enriched || !['pending', 'failed'].includes(row.status)) return row;
+    const ex = await extractJobFromUrl(row.sourceUrl);
+    if (!ex.found) return row;
+    const merged: Record<string, any> = { ...d };
+    for (const [k, v] of Object.entries(ex.data as Record<string, any>)) {
+      const cur = merged[k];
+      const empty = cur === undefined || cur === null || cur === '' || (Array.isArray(cur) && !cur.length);
+      if (empty && v !== undefined && v !== null && v !== '') merged[k] = v;
+    }
+    if (merged.companyWebsite && d.companyWebsite && !ex.data.companyWebsite) merged.companyWebsite = undefined;
+    merged.enriched = true;
+    row.data = merged as never;
+    return this.repo.save(row);
+  }
+
+  // Tự đăng: tin "Chờ xem" tìm được sau `since` và đã quá `minutes` phút. Lỗi 2 lần thì thôi (để Admin xem tay).
+  async autoPublishDue(minutes: number, since: Date, actor: AdminActor): Promise<number> {
+    const cutoff = new Date(Date.now() - minutes * 60_000);
+    const rows = await this.repo
+      .createQueryBuilder('i')
+      .where("i.status = 'pending'")
+      .andWhere('i.createdAt >= :since AND i.createdAt <= :cutoff', { since, cutoff })
+      .orderBy('i.createdAt', 'ASC')
+      .take(15)
+      .getMany();
+    let n = 0;
+    for (const r of rows) {
+      if (n >= 5) break;
+      const fails = Number((r.data as Record<string, unknown>)?.autoFails ?? 0);
+      if (fails >= 2) continue;
+      try {
+        await this.publish(actor, r.id, {});
+        n++;
+      } catch (e) {
+        const fresh = await this.repo.findOne({ where: { id: r.id } });
+        if (fresh && fresh.status === 'pending') {
+          fresh.data = { ...(fresh.data as object), autoFails: fails + 1 } as never;
+          fresh.note = `Tự đăng chưa được: ${(e as Error).message}`;
+          await this.repo.save(fresh);
+        }
+      }
+    }
+    return n;
+  }
+
   // Đăng nhiều tin một lúc (đã xem lướt): lần lượt từng tin để công ty vừa tạo được nhận ra ở tin sau.
   async publishMany(admin: AdminActor, ids: string[]) {
-    const list = Array.from(new Set((ids ?? []).map(String))).slice(0, 50);
+    const list = Array.from(new Set((ids ?? []).map(String))).slice(0, 10);
     let ok = 0;
     const failed: { id: string; message: string }[] = [];
     for (const id of list) {
@@ -322,6 +384,44 @@ export class JobImportService {
     const row = await this.getOne(id);
     row.status = 'skipped';
     return this.repo.save(row);
+  }
+
+  // Đưa mục về lại hàng chờ: "Bỏ qua" → "Chờ xem" (hoặc "Công ty có chủ" nếu công ty đó đã có chủ thật); "Đã báo công ty" → "Công ty có chủ".
+  // Đặt lại giờ để chế độ tự đăng không đăng ngay các tin vừa đưa về.
+  async restore(id: string) {
+    const row = await this.getOne(id);
+    if (!['skipped', 'owner_notified'].includes(row.status)) throw new BadRequestException('Mục này không cần đưa về hàng chờ');
+    let owner = row.status === 'owner_notified';
+    if (!owner && row.matchedCompanyId) {
+      const c = await this.companyRepo.findOne({ where: { id: row.matchedCompanyId } });
+      owner = !!c && this.hasOwner(c);
+    }
+    const d = { ...(row.data as Record<string, unknown>) };
+    delete d.autoFails;
+    row.data = d as never;
+    row.status = owner ? 'owner_review' : 'pending';
+    row.note = null as never;
+    await this.repo.save(row);
+    await this.repo.update(id, { createdAt: new Date() } as never);
+    return row;
+  }
+
+  // Thao tác hàng loạt trên nhiều mục: bỏ qua / đưa về hàng chờ / báo công ty.
+  async bulk(admin: AdminActor, ids: string[], action: 'skip' | 'restore' | 'notify') {
+    const list = Array.from(new Set((ids ?? []).map(String))).slice(0, 100);
+    let ok = 0;
+    const failed: { id: string; message: string }[] = [];
+    for (const id of list) {
+      try {
+        if (action === 'skip') await this.skip(id);
+        else if (action === 'restore') await this.restore(id);
+        else await this.notifyOwner(admin, id);
+        ok++;
+      } catch (e) {
+        failed.push({ id, message: (e as Error).message });
+      }
+    }
+    return { ok, failed };
   }
 
   // ===== Phía nhà tuyển dụng =====

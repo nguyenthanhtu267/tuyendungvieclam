@@ -195,9 +195,15 @@ export const adminApi = {
   mailScanNow: (token: string, days?: number) => request<{ started: boolean; reason?: string }>('/admin/mail-scan', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ days }) }),
   mailScanLabels: (token: string, account = 1) => request<{ items: { path: string; selected: boolean }[]; error?: string }>(`/admin/mail-scan/labels?account=${account}`, { headers: authHeaders(token) }),
   publishManyImports: (token: string, ids: string[]) => request<{ ok: number; failed: { id: string; message: string }[] }>('/admin/imports/publish-many', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ ids }) }),
+  restoreImport: (token: string, id: string) => request<unknown>(`/admin/imports/${id}/restore`, { method: 'POST', headers: authHeaders(token) }),
+  bulkImports: (token: string, ids: string[], action: 'skip' | 'restore' | 'notify') =>
+    request<{ ok: number; failed: { id: string; message: string }[] }>('/admin/imports/bulk', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ ids, action }) }),
+  enrichImport: (token: string, id: string) => request<JobImportRow>(`/admin/imports/${id}/enrich`, { method: 'POST', headers: authHeaders(token) }),
   mergeImportDuplicates: (token: string) => request<{ merged: number }>('/admin/imports/merge-duplicates', { method: 'POST', headers: authHeaders(token) }),
   mailScanSetLabels: (token: string, labels: string[], account = 1) =>
     request<MailScanStatus>('/admin/mail-scan/labels', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ labels, account }) }),
+  mailScanAutoPublish: (token: string, minutes: number) =>
+    request<MailScanStatus>('/admin/mail-scan/auto-publish', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ minutes }) }),
   mailScanEnabled: (token: string, enabled: boolean) =>
     request<MailScanStatus>('/admin/mail-scan/enabled', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ enabled }) }),
   // Đợt 119 — Hộp nhập tin từ link.

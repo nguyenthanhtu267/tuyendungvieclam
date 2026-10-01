@@ -263,9 +263,34 @@ export class AdminController {
     return this.mailScan.setEnabled(!!enabled);
   }
 
+  @Post('mail-scan/auto-publish')
+  mailScanAutoPublish(@Body('minutes') minutes: number) {
+    return this.mailScan.setAutoPublish(Number(minutes));
+  }
+
   @Post('imports/publish-many')
   publishManyImports(@CurrentUser() admin: { userId: string; email: string }, @Body('ids') ids: string[]) {
     return this.imports.publishMany(admin, Array.isArray(ids) ? ids : []);
+  }
+
+  @Post('imports/bulk')
+  bulkImports(
+    @CurrentUser() admin: { userId: string; email: string },
+    @Body('ids') ids: string[],
+    @Body('action') action: string,
+  ) {
+    const a = ['skip', 'restore', 'notify'].includes(action) ? (action as 'skip' | 'restore' | 'notify') : 'skip';
+    return this.imports.bulk(admin, Array.isArray(ids) ? ids : [], a);
+  }
+
+  @Post('imports/:id/restore')
+  restoreImport(@Param('id') id: string) {
+    return this.imports.restore(id);
+  }
+
+  @Post('imports/:id/enrich')
+  enrichImport(@Param('id') id: string) {
+    return this.imports.enrich(id);
   }
 
   @Post('imports/:id/reopen')
@@ -520,6 +545,7 @@ export class MailScanCronController {
   @Get('run')
   run(@Query('key') key?: string) {
     if (!this.mailScan.checkCronKey(key)) throw new NotFoundException();
+    this.mailScan.autoPublishTick().catch(() => undefined);
     return this.mailScan.start();
   }
 }

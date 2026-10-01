@@ -8,6 +8,7 @@
 // Admin tự nhập tay — KHÔNG coi đây là lỗi cứng.
 
 import { assertPublicHttpUrl } from './public-url.util';
+import { inferIndustry } from './job-industry.util';
 
 export interface ExtractedJobData {
   title?: string;
@@ -23,6 +24,20 @@ export interface ExtractedJobData {
   companyWebsite?: string;
   companyLogo?: string;
   industry?: string;
+  // Đợt 126 — đọc thật kỹ: tách các khối nội dung + thông tin phụ để đăng xong là đầy đủ như trang gốc.
+  requirements?: string;
+  benefits?: string;
+  experienceLevel?: string;
+  level?: string;
+  headcount?: number;
+  gender?: string;
+  ageRange?: string;
+  workSchedule?: string;
+  address?: string;
+  tags?: string[];
+  isUrgent?: boolean;
+  // Đợt 126 — đã đọc kỹ (đánh dấu để không đọc lại lần nữa khi đăng hàng loạt).
+  enriched?: boolean;
 }
 
 export interface ExtractJobUrlResult {
@@ -299,6 +314,7 @@ export async function extractJobFromUrl(url: string): Promise<ExtractJobUrlResul
       companyLogo: asUrl(org?.logo) ?? asUrl((org?.logo as Record<string, unknown> | undefined)?.url),
       industry: asText(node.industry),
     };
+    enrichFromNode(node, data);
     const hasAnyField = Object.values(data).some((v) => v !== undefined);
     if (hasAnyField) return { found: true, data, finalUrl };
   }
@@ -309,4 +325,182 @@ export async function extractJobFromUrl(url: string): Promise<ExtractJobUrlResul
     warning: 'Trang này không có sẵn dữ liệu chuẩn hoá (JSON-LD) để trích xuất tự động — vui lòng nhập tay.',
     finalUrl,
   };
+}
+
+
+// ===== Đợt 126 — đọc kỹ: tách khối + suy ra thông tin phụ =====
+const BOARD_SITES = /(careerviet|vietnamworks|topcv|itviec|glints|jobsgo|timviec365|vieclam24h|123job|mywork|joboko|careerlink|vieclamtot|indeed|linkedin|jobstreet|navigos|ybox|topdev|viectotnhat|timviecnhanh|lamthem|facebook|zalo|google|youtube)\./i;
+export function isJobBoardUrl(u?: string): boolean {
+  try {
+    return !!u && BOARD_SITES.test(new URL(u).hostname.replace(/^www\./, '') + '.');
+  } catch {
+    return false;
+  }
+}
+
+function plain(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+}
+
+type Section = 'desc' | 'req' | 'ben' | 'sched' | 'addr' | 'other' | 'apply';
+function headingOf(line: string): { sec: Section; rest: string } | null {
+  const m = line.match(/^[•\-\s*#]*([^:：]{3,70}?)\s*[:：]\s*(.*)$/);
+  const head = plain(m ? m[1] : line.replace(/^[•\-\s*#]+/, '')).trim();
+  const rest = m ? m[2] : '';
+  const short = !m && line.length <= 60;
+  if (!m && !short) return null;
+  const table: [RegExp, Section][] = [
+    [/^(mo ta( cong viec)?|noi dung cong viec|trach nhiem|nhiem vu)$/, 'desc'],
+    [/^(yeu cau( ung vien| cong viec| tuyen dung| khac)?|tieu chuan|ky nang|trinh do|ung vien can)$/, 'req'],
+    [/^(quyen loi|quyen loi duoc huong|phuc loi|che do( phuc loi)?|che do dai ngo|thu nhap va phuc loi|tai sao ban se yeu thich)$/, 'ben'],
+    [/^(thoi gian lam viec|gio lam viec|ca lam viec|lich lam viec)$/, 'sched'],
+    [/^(dia diem lam viec|noi lam viec|dia chi lam viec)$/, 'addr'],
+    [/^(ho so|ho so ung tuyen|cach thuc ung tuyen|cach nop|lien he|thong tin lien he)$/, 'apply'],
+    [/^(thong tin khac|luu y)$/, 'other'],
+  ];
+  for (const [re, sec] of table) if (re.test(head)) return { sec, rest: rest.trim() };
+  return null;
+}
+
+function splitSections(lines: string[]) {
+  const out: Record<Section, string[]> = { desc: [], req: [], ben: [], sched: [], addr: [], other: [], apply: [] };
+  let cur: Section = 'desc';
+  let found = false;
+  for (const ln of lines) {
+    const h = headingOf(ln);
+    if (h) {
+      found = true;
+      cur = h.sec;
+      if (h.rest) out[cur].push(h.rest);
+      continue;
+    }
+    // Dòng dạng "Số lượng: 2", "Giới tính: Nam"... là thông tin phụ, không thuộc khối đang đọc.
+    if (/^[•\-\s*]*(so luong|gioi tinh|do tuoi|kinh nghiem|cap bac|hinh thuc|muc luong|han nop|nganh nghe|hoc van)[^:：]{0,20}[:：]/.test(plain(ln))) {
+      out.other.push(ln);
+      continue;
+    }
+    out[cur].push(ln);
+  }
+  return { out, found };
+}
+
+const toP = (ls: string[]) => (ls.length ? ls.map((l) => `<p>${escapeHtml(l)}</p>`).join('') : undefined);
+
+function expLevelFromYears(y: number): string {
+  if (y <= 0) return 'Không yêu cầu kinh nghiệm';
+  if (y < 1) return 'Đến dưới 1 năm';
+  if (y < 5) return 'Từ 1 đến 4 năm';
+  if (y < 7) return 'Từ 5 đến 7 năm';
+  if (y < 11) return 'Từ 7 đến 10 năm';
+  return 'Từ 11 năm';
+}
+
+export function inferLevel(title: string): string {
+  const t = plain(title);
+  if (/giam doc|director|\bceo\b|\bcfo\b|\bcoo\b|tong giam doc/.test(t)) return 'Quản lý cấp cao';
+  if (/truong phong|pho phong|manager|quan ly|truong bo phan|truong chi nhanh/.test(t)) return 'Quản lý';
+  if (/truong nhom|giam sat|leader|supervisor|to truong|truong ca|team lead/.test(t)) return 'Trưởng nhóm / Giám sát';
+  if (/thuc tap|intern/.test(t)) return 'Sinh viên / Thực tập sinh';
+  if (/moi tot nghiep|fresher/.test(t)) return 'Mới tốt nghiệp';
+  return 'Nhân viên';
+}
+
+function textOf(v: unknown): string[] {
+  if (Array.isArray(v)) return v.flatMap(textOf);
+  if (v && typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    return textOf(o.name ?? o.description ?? o.value ?? '');
+  }
+  return typeof v === 'string' ? cleanTextLines(v) : [];
+}
+
+// Bổ sung các trường phụ cho `data` từ nút JSON-LD gốc + văn bản mô tả. Chỉ điền trường còn trống.
+export function enrichFromNode(node: Record<string, unknown>, data: ExtractedJobData): ExtractedJobData {
+  const raw = [...cleanTextLines(node.description)];
+  const extra = {
+    resp: textOf(node.responsibilities),
+    qual: [...textOf(node.qualifications), ...textOf(node.educationRequirements), ...textOf(node.skills)],
+    ben: [...textOf(node.jobBenefits), ...textOf(node.incentiveCompensation)],
+    hours: textOf(node.workHours),
+  };
+  const { out, found } = splitSections(raw);
+  const desc = found ? [...out.desc, ...extra.resp] : [...raw, ...extra.resp];
+  const req = [...out.req, ...extra.qual];
+  const ben = [...out.ben, ...extra.ben];
+  // Phần "thông tin khác"/hồ sơ ứng tuyển vẫn giữ lại ở cuối mô tả để không mất chữ nào của trang gốc.
+  const tail = [...out.other, ...out.apply];
+  if (found) {
+    data.description = toP([...desc, ...tail.map((l) => l)]) ?? data.description;
+    data.requirements ??= toP(req);
+    data.benefits ??= toP(ben);
+  }
+  const fullText = [...raw, ...extra.qual, ...extra.hours].join('\n');
+  const ft = plain(fullText);
+  const title = data.title ?? '';
+
+  data.workSchedule ??= (extra.hours[0] ?? out.sched.join('; ')) || undefined;
+  if (!data.address) {
+    const loc = node.jobLocation;
+    const place = (Array.isArray(loc) ? loc[0] : loc) as Record<string, any> | undefined;
+    const a = (place?.address ?? {}) as Record<string, unknown>;
+    const parts = [a.streetAddress, a.addressLocality, a.addressRegion].filter((x) => typeof x === 'string' && x.trim()) as string[];
+    data.address = (parts.length ? decodeHtmlEntities(parts.join(', ')) : out.addr.join(', ')) || data.location || undefined;
+  }
+
+  // Kinh nghiệm
+  if (!data.experienceLevel) {
+    const er = node.experienceRequirements as Record<string, unknown> | string | undefined;
+    const months = er && typeof er === 'object' ? Number((er as Record<string, unknown>).monthsOfExperience) : NaN;
+    if (Number.isFinite(months)) data.experienceLevel = expLevelFromYears(months / 12);
+    else if (/khong yeu cau (kinh nghiem|kn)|khong can kinh nghiem|chua co kinh nghiem|chua can kinh nghiem/.test(ft)) data.experienceLevel = 'Không yêu cầu kinh nghiệm';
+    else {
+      const m = ft.match(/(\d{1,2})\s*(?:-|den|~)?\s*(\d{1,2})?\s*nam\s*(?:kinh nghiem|kn)/) ?? ft.match(/kinh nghiem[^0-9\n]{0,25}(\d{1,2})\s*(?:-|den|~)?\s*(\d{1,2})?\s*nam/);
+      if (m) data.experienceLevel = expLevelFromYears(Number(m[1]));
+      else if (/(duoi|it hon) 1 nam|(\d+)\s*thang kinh nghiem/.test(ft)) data.experienceLevel = 'Đến dưới 1 năm';
+    }
+  }
+  data.level ??= inferLevel(title);
+
+  // Số lượng tuyển
+  if (data.headcount === undefined) {
+    const n = Number(node.totalJobOpenings);
+    const m = ft.match(/so luong( tuyen)?\s*[:\-]?\s*(\d{1,3})/);
+    const v = Number.isFinite(n) && n > 0 ? n : m ? Number(m[2]) : undefined;
+    if (v && v > 0) data.headcount = v;
+  }
+
+  // Giới tính + độ tuổi
+  if (!data.gender) {
+    const g = ft.match(/gioi tinh\s*[:\-]?\s*(nam\s*\/\s*nu|nu\s*\/\s*nam|nam|nu|khong yeu cau)/);
+    if (g) data.gender = /\//.test(g[1]) || /khong/.test(g[1]) ? 'Không yêu cầu' : g[1] === 'nam' ? 'Nam' : 'Nữ';
+    else if (/\(nam\)/.test(plain(title))) data.gender = 'Nam';
+    else if (/\(nu\)/.test(plain(title))) data.gender = 'Nữ';
+  }
+  if (!data.ageRange) {
+    const a = ft.match(/(?:do tuoi|tuoi)\s*[:\-]?\s*(?:tu\s*)?(\d{2})\s*(?:-|–|den|~|toi)\s*(\d{2})/);
+    if (a) data.ageRange = `${a[1]} - ${a[2]}`;
+  }
+
+  // Hình thức làm việc (nếu JSON-LD chưa có)
+  if (!data.employmentType) {
+    if (/thuc tap sinh|internship/.test(plain(title))) data.employmentType = 'Thực tập';
+    else if (/part ?time|ban thoi gian|thoi vu/.test(ft + plain(title))) data.employmentType = 'Thời vụ - Nghề tự do';
+    else if (/full ?time|toan thoi gian/.test(ft)) data.employmentType = 'Nhân viên chính thức';
+  }
+
+  // Thẻ kỹ năng
+  if (!data.tags) {
+    const sk = textOf(node.skills).flatMap((s) => s.split(/[,;•]/)).map((s) => s.trim()).filter((s) => s.length > 1 && s.length < 40);
+    if (sk.length) data.tags = Array.from(new Set(sk)).slice(0, 10);
+  }
+
+  if (data.isUrgent === undefined && /(\bgap\b|di lam ngay|urgent|tuyen gap)/.test(plain(title))) data.isUrgent = true;
+
+  // Ngành nghề: ưu tiên đoán từ nội dung; ngành ghi trên trang gốc chỉ dùng nếu trùng danh mục.
+  data.industry = inferIndustry(title, fullText, data.industry) ?? undefined;
+
+  // Website công ty: bỏ nếu thực chất là link trang việc làm.
+  if (data.companyWebsite && isJobBoardUrl(data.companyWebsite)) data.companyWebsite = undefined;
+  data.enriched = true;
+  return data;
 }

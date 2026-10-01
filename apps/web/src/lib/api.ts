@@ -2718,6 +2718,18 @@ export interface JobImportData {
   salaryMin?: number;
   salaryMax?: number;
   deadline?: string;
+  requirements?: string;
+  benefits?: string;
+  experienceLevel?: string;
+  level?: string;
+  headcount?: number;
+  gender?: string;
+  ageRange?: string;
+  workSchedule?: string;
+  address?: string;
+  tags?: string[];
+  isUrgent?: boolean;
+  enriched?: boolean;
 }
 export interface JobImportRow {
   id: string;
@@ -2737,6 +2749,7 @@ export interface JobImportRow {
 export interface MailScanStatus {
   configured: boolean;
   cronKeySet: boolean;
+  autoPublishMinutes?: number;
   accounts: { idx: number; user: string; labels: string[] }[];
   senders: string[];
   enabled: boolean;
