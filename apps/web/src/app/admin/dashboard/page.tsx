@@ -1482,6 +1482,7 @@ function SourcedCompaniesCard({ token }: { token: string }) {
   const [q, setQ] = useState('');
   const [claimedFilter, setClaimedFilter] = useState<'unclaimed' | 'claimed' | 'all'>('unclaimed');
   const [companies, setCompanies] = useState<Company[] | null>(null);
+  const [newestFirst, setNewestFirst] = useState(true);
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -1611,22 +1612,32 @@ function SourcedCompaniesCard({ token }: { token: string }) {
                 <tr className="text-left text-ink-faint bg-surface-alt">
                   <th className="py-2.5 px-4 font-semibold">Tên công ty</th>
                   <th className="py-2.5 px-3 font-semibold">Nguồn</th>
-                  <th className="py-2.5 px-3 font-semibold">Số tin</th>
+                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap">
+                    <button type="button" onClick={() => setNewestFirst((v) => !v)} className="font-semibold hover:text-primary" title="Bấm để đổi thứ tự">
+                      Ngày thêm {newestFirst ? '↓' : '↑'}
+                    </button>
+                  </th>
+                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Số tin đăng</th>
                   <th className="py-2.5 px-3 font-semibold">Trạng thái</th>
                   <th className="py-2.5 px-4 font-semibold text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
-                {companies.map((c) => (
+                {[...companies]
+                  .sort((a, b) => (new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime()) * (newestFirst ? -1 : 1))
+                  .map((c) => (
                   <tr key={c.id} className="border-t border-border align-top">
                     <td className="py-3 px-4 font-bold">
                       <div className="flex items-center gap-2">
                         <CompanyLogo name={c.name} logoUrl={c.logoUrl} size={24} className="text-[9px] shrink-0" />
-                        {c.name}
+                        <a href={`/cong-ty/${c.id}`} target="_blank" rel="noopener noreferrer" className="hover:text-primary hover:underline" title="Mở trang công ty như người dùng thấy">
+                          {c.name}
+                        </a>
                       </div>
                     </td>
                     <td className="py-3 px-3 text-ink-faint">{c.sourceLabel ?? '—'}</td>
-                    <td className="py-3 px-3 tabular-nums">{c.jobCount ?? 0}</td>
+                    <td className="py-3 px-3 text-ink-muted whitespace-nowrap tabular-nums" title={c.createdAt ? formatDateTime(c.createdAt) : ''}>{c.createdAt ? formatDate(c.createdAt) : '—'}</td>
+                    <td className="py-3 px-3 tabular-nums font-bold">{c.jobCount ?? 0}</td>
                     <td className="py-3 px-3">
                       {c.claimedAt ? (
                         <span className="font-semibold text-[10px] rounded-full bg-success-tint text-success px-2 py-0.5">
@@ -1912,7 +1923,7 @@ function CompanyDetailPanel({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-start justify-center overflow-y-auto py-8 px-4 z-50">
-      <div className="bg-white rounded-2xl max-w-2xl w-full p-5">
+      <div className="bg-white rounded-2xl max-w-5xl w-full p-6 sm:p-8 my-4">
         <div className="flex items-center justify-between mb-3">
           <div className="font-bold text-sm">{data?.company.name ?? 'Đang tải…'}</div>
           <button onClick={onClose} className="text-ink-faint hover:text-ink text-lg leading-none">✕</button>
@@ -2221,7 +2232,7 @@ function RescrapeJobModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start justify-center overflow-y-auto py-8 px-4 z-[60]">
-      <div className="bg-white rounded-2xl max-w-lg w-full p-5">
+      <div className="bg-white rounded-2xl max-w-3xl w-full p-6 sm:p-8 my-4">
         <div className="flex items-center justify-between mb-3">
           <div className="font-bold text-sm">🔄 Cào lại dữ liệu — {job.title}</div>
           <button onClick={onClose} className="text-ink-faint hover:text-ink text-lg leading-none">✕</button>
