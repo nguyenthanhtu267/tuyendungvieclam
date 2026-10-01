@@ -419,7 +419,6 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
                 </div>
               </div>
             </div>
-            <JobQuickActions jobId={job.id} title={job.title} company={job.company.name} phone={job.contactPhone} />
           </div>
           <div className="flex gap-2 items-center md:shrink-0">
             <button
@@ -785,6 +784,11 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
                       </div>
                     </div>
                   )}
+
+                  {/* Đợt 132 — các nút Gọi · Zalo · Chia sẻ · Ghim chuyển xuống cuối nội dung, ngay sau Job tags (banner đầu trang gọn hơn). */}
+                  <div className="mt-5">
+                    <JobQuickActions jobId={job.id} title={job.title} company={job.company.name} phone={job.contactPhone} light />
+                  </div>
 
                   {/* Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc) NTD nhập khi đăng
                       tin, chỉ hiện khi có ít nhất 1 trường, theo mẫu careerviet.vn.

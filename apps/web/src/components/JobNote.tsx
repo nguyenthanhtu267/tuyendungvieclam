@@ -38,20 +38,20 @@ export function useJobNotes(): JobNotes {
   return n;
 }
 
-export function JobNoteButton({ jobId }: { jobId: string }) {
+export function JobNoteButton({ jobId, light = false }: { jobId: string; light?: boolean }) {
   const notes = useJobNotes();
   const cur = notes[jobId] ?? { note: '', pinned: false };
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   useEffect(() => setText(cur.note), [cur.note]);
-  const btn = 'inline-flex items-center justify-center gap-1 h-10 flex-1 basis-0 min-w-[68px] px-2 rounded-full bg-white/15 text-white text-[13px] font-bold border border-white/30 whitespace-nowrap';
+  const btn = 'inline-flex items-center justify-center gap-1 h-10 flex-1 basis-0 min-w-[68px] px-2 rounded-full text-[13px] font-bold border whitespace-nowrap ' + (light ? 'bg-surface-alt text-ink border-border' : 'bg-white/15 text-white border-white/30');
   return (
     <>
       <button type="button" onClick={() => setOpen((o) => !o)} className={btn} aria-pressed={cur.pinned}>
         {cur.pinned ? '📌 Đã ghim' : '📌 Ghim'}
       </button>
       {open && (
-        <div className="basis-full rounded-xl bg-white text-ink p-3 flex flex-col gap-2">
+        <div className={`basis-full rounded-xl bg-white text-ink p-3 flex flex-col gap-2 ${light ? 'border border-border' : ''}`}>
           <textarea id="job-note" className="tvl-input" rows={2} maxLength={200} placeholder="Ghi chú riêng, vd: gọi lại thứ Hai" value={text} onChange={(e) => setText(e.target.value)} />
           <div className="flex gap-2">
             <button type="button" className="tvl-btn-primary !w-auto px-4" onClick={() => { writeNote(jobId, { note: text, pinned: true }); setOpen(false); }}>Ghim & lưu</button>

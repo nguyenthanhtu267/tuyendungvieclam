@@ -5,7 +5,7 @@ import { JobNoteButton } from '@/components/JobNote';
 
 // Đợt 98 — hàng nút nhanh dưới tiêu đề tin (điện thoại): Gọi ngay (nếu tin có SĐT) · Chia sẻ (bảng chia sẻ của điện thoại:
 // Zalo/Messenger/…; máy không hỗ trợ thì chép liên kết). Nút cao 40px, không cần cuộn xuống mới thấy.
-export function JobQuickActions({ jobId, title, company, phone }: { jobId?: string; title: string; company: string; phone?: string }) {
+export function JobQuickActions({ jobId, title, company, phone, light = false }: { jobId?: string; title: string; company: string; phone?: string; light?: boolean }) {
   const [msg, setMsg] = useState('');
   async function share() {
     const url = window.location.href;
@@ -22,7 +22,7 @@ export function JobQuickActions({ jobId, title, company, phone }: { jobId?: stri
       /* người dùng đóng bảng chia sẻ */
     }
   }
-  const btn = 'inline-flex items-center justify-center gap-1 h-10 flex-1 basis-0 min-w-[68px] px-2 rounded-full bg-white/15 text-white text-[13px] font-bold border border-white/30 whitespace-nowrap';
+  const btn = 'inline-flex items-center justify-center gap-1 h-10 flex-1 basis-0 min-w-[68px] px-2 rounded-full text-[13px] font-bold border whitespace-nowrap ' + (light ? 'bg-surface-alt text-ink border-border' : 'bg-white/15 text-white border-white/30');
   return (
     <div className="flex items-center gap-2 flex-wrap md:max-w-lg">
       {phone && (
@@ -38,8 +38,8 @@ export function JobQuickActions({ jobId, title, company, phone }: { jobId?: stri
       <button type="button" onClick={share} className={btn}>
         ↗ Chia sẻ
       </button>
-      {jobId && <JobNoteButton jobId={jobId} />}
-      {msg && <span className="basis-full text-[12.5px] text-white">{msg}</span>}
+      {jobId && <JobNoteButton jobId={jobId} light={light} />}
+      {msg && <span className={`basis-full text-[12.5px] ${light ? 'text-ink-muted' : 'text-white'}`}>{msg}</span>}
     </div>
   );
 }
