@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { adminAdsApi, ApiError, type AdCampaignInput, type AdCampaignRow } from '@/lib/api';
+import { ApiError, type AdCampaignInput, type AdCampaignRow } from '@/lib/api';
+import { adminAdsApi } from '@/lib/api-admin';
 import { AD_SLOT_DEFS, type AdSlotDef } from '@/lib/ad-slots';
 import { THEMES, THEME_KEYS, buildLook } from '@/lib/ad-theme';
 import { AdBanner, type AdContent } from '@/components/ads/AdBanner';

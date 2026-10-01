@@ -25,32 +25,39 @@ export default function OnlineBanner() {
     if (!sessionIdRef.current) sessionIdRef.current = genSessionId();
     const sessionId = sessionIdRef.current;
 
-    function ping() {
-      presenceApi.ping(sessionId).catch(() => {
-        // Im lặng bỏ qua — banner không quan trọng tới mức làm phiền người dùng bằng lỗi.
-      });
+    // Đợt 94 — dùng /presence/beat (1 lần gọi thay 2) và để MÁY CHỦ quyết định khoảng chờ kế tiếp (45s lúc vắng → 4 phút lúc rất đông/quá tải).
+    // Cộng ±15% ngẫu nhiên để hàng nghìn người không "đập" máy chủ cùng một giây.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let stopped = false;
+    function schedule(ms: number) {
+      if (stopped) return;
+      clearTimeout(timer);
+      timer = setTimeout(beat, ms * (0.85 + Math.random() * 0.3));
     }
-    function refreshCount() {
+    function beat() {
+      if (stopped) return;
+      if (document.visibilityState !== 'visible') {
+        schedule(HEARTBEAT_MS); // tab ẩn: không gọi; khi quay lại sẽ gọi ngay (onVis)
+        return;
+      }
       presenceApi
-        .getCount()
+        .beat(sessionId)
         .then((res) => {
           setCount(res.displayed);
           setFailed(false);
+          schedule(Math.min(Math.max(res.next || HEARTBEAT_MS, 30_000), 300_000));
         })
-        .catch(() => setFailed(true));
-    }
-
-    function beat() {
-      if (document.visibilityState !== 'visible') return;
-      ping();
-      refreshCount();
+        .catch(() => {
+          setFailed(true);
+          schedule(120_000); // lỗi → thử lại thưa, không dồn dập
+        });
     }
     beat();
-    const timer = setInterval(beat, HEARTBEAT_MS);
     const onVis = () => document.visibilityState === 'visible' && beat();
     document.addEventListener('visibilitychange', onVis);
     return () => {
-      clearInterval(timer);
+      stopped = true;
+      clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVis);
     };
   }, []);

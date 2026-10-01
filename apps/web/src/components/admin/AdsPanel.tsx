@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { adminAdsApi, ApiError, type AdCampaignRow, type AdStats } from '@/lib/api';
+import { ApiError, type AdCampaignRow, type AdStats } from '@/lib/api';
+import { adminAdsApi } from '@/lib/api-admin';
 import { AD_SLOT_DEFS } from '@/lib/ad-slots';
 import { formatNumber } from '@/lib/format';
 import { AdBanner } from '@/components/ads/AdBanner';

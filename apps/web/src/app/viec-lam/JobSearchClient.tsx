@@ -27,7 +27,7 @@ import { readRecentJobs } from '@/lib/recent-jobs';
 // hàng chip quận/huyện khi chỉ chọn đúng 1 tỉnh/thành, danh sách JobCard kiểu careerviet.vn.
 
 
-function JobSearchPage({ initial }: { initial: { key: string; data: JobListResponse } | null }) {
+function JobSearchPage({ initial, initialFacets }: { initial: { key: string; data: JobListResponse } | null; initialFacets: { key: string; data: JobFacets } | null }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { me, token } = useAuth();
@@ -68,7 +68,8 @@ function JobSearchPage({ initial }: { initial: { key: string; data: JobListRespo
   }, [me, token]);
   const visibleItems = onlyNew ? sortedItems.filter((j) => !seenIds.has(j.id) && !appliedIds.has(j.id)) : sortedItems;
   const hiddenCount = sortedItems.length - visibleItems.length;
-  const [facets, setFacets] = useState<JobFacets | null>(null);
+  const facetsHit = useRef(initialFacets && initialFacets.key === searchParams.toString() ? initialFacets.data : null);
+  const [facets, setFacets] = useState<JobFacets | null>(facetsHit.current);
   const [districts, setDistricts] = useState<{ province: string; items: DistrictFacet[] }[]>([]);
   const [loading, setLoading] = useState(true);
   // Đợt 12i (21/09/2026) — "Địa điểm phổ biến" chỉ hiện Top 15-20 tỉnh nhiều tin nhất kèm nút
@@ -106,6 +107,10 @@ function JobSearchPage({ initial }: { initial: { key: string; data: JobListRespo
   }, [searchParams]);
 
   useEffect(() => {
+    if (facetsHit.current) {
+      facetsHit.current = null; // đã có từ máy chủ cho đúng bộ lọc này — không gọi lại lần mở đầu
+      return;
+    }
     jobsApi
       .facets(filters)
       .then(setFacets)
@@ -496,10 +501,10 @@ function JobSearchPage({ initial }: { initial: { key: string; data: JobListRespo
   );
 }
 
-export default function JobSearchClient({ initial }: { initial: { key: string; data: JobListResponse } | null }) {
+export default function JobSearchClient({ initial, initialFacets }: { initial: { key: string; data: JobListResponse } | null; initialFacets: { key: string; data: JobFacets } | null }) {
   return (
     <Suspense fallback={null}>
-      <JobSearchPage initial={initial} />
+      <JobSearchPage initial={initial} initialFacets={initialFacets} />
     </Suspense>
   );
 }

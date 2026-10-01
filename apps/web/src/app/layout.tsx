@@ -35,6 +35,8 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
+const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -43,6 +45,10 @@ export default function RootLayout({
   return (
     <html lang="vi" suppressHydrationWarning>
       <head>
+        {/* Đợt 93 — bắt tay TLS tới API sớm + tải sẵn gói /public/boot (nền, banner, nhãn logo) ngay khi trình duyệt đọc <head>,
+            không chờ JS chạy → bỏ 1 vòng chờ đầu tiên (đáng kể trên 4G + máy chủ ở xa). Khớp lib/boot.ts (cùng chế độ credentials mặc định — khác chế độ thì trình duyệt tải lại lần 2). */}
+        <link rel="preconnect" href={API_ORIGIN} crossOrigin="anonymous" />
+        <link rel="preload" as="fetch" crossOrigin="anonymous" href={process.env.NEXT_PUBLIC_EDGE_CACHE === '1' ? '/_c/public/boot' : `${API_ORIGIN}/public/boot`} />
         {/* Đợt 91 — tải sớm 2 file font Inter (file nằm ở public/fonts, cache 1 năm — xem next.config.mjs) → chữ về đúng font sớm hơn ~300–800ms trên mạng chậm. */}
         <link rel="preload" as="font" type="font/woff2" crossOrigin="anonymous" href="/fonts/inter-latin-wght-normal.woff2" />
         <link rel="preload" as="font" type="font/woff2" crossOrigin="anonymous" href="/fonts/inter-vietnamese-wght-normal.woff2" />

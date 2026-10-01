@@ -12,6 +12,7 @@ const CompareTray = dynamic(() => import('@/components/CompareTray'), { ssr: fal
 const BottomNav = dynamic(() => import('@/components/BottomNav'), { ssr: false });
 const PwaRegister = dynamic(() => import('@/components/PwaRegister'), { ssr: false });
 const TapTargets = dynamic(() => import('@/components/TapTargets'), { ssr: false });
+const VitalsReporter = dynamic(() => import('@/components/VitalsReporter'), { ssr: false });
 
 export default function DeferredWidgets() {
   const [ready, setReady] = useState(false);
@@ -37,6 +38,7 @@ export default function DeferredWidgets() {
   return (
     <Suspense fallback={null}>
       <AnalyticsTracker />
+      <VitalsReporter />
       <ConsentBanner />
       <CompareTray />
       <BottomNav />

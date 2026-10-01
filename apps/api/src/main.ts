@@ -38,6 +38,8 @@ async function bootstrap() {
   // Đợt 19 (26/09/2026) — bộ ghi truy cập gửi lô dữ liệu bằng navigator.sendBeacon dạng text/plain (loại
   // "simple request" nên không cần preflight CORS, vẫn gửi được lúc người dùng đóng tab).
   app.use('/analytics/collect', text({ type: 'text/plain', limit: '100kb' }));
+  // Đợt 93 — số đo tốc độ thật (Web Vitals) cũng gửi bằng sendBeacon text/plain.
+  app.use('/analytics/vitals', text({ type: 'text/plain', limit: '4kb' }));
   // Đợt 24 — lượt hiển thị/bấm banner quảng cáo cũng gửi bằng sendBeacon dạng text/plain.
   app.use('/public/ads/events', text({ type: 'text/plain', limit: '20kb' }));
   app.use('/public/promos/events', text({ type: 'text/plain', limit: '20kb' }));

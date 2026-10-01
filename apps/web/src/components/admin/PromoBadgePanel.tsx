@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { adminApi, ApiError } from '@/lib/api';
+import { ApiError } from '@/lib/api';
+import { adminApi } from '@/lib/api-admin';
 
 // Đợt 23 (29/09/2026) — Admin "📣 Nhãn logo": bật/tắt, sửa chữ và link của nhãn nhấp nháy cạnh logo header.
 export function PromoBadgePanel({ token }: { token: string }) {

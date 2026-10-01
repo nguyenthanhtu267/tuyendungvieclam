@@ -19,6 +19,7 @@ import { UserRole } from '../database/entities/user.entity';
 import { AnalyticsIngestService } from './analytics-ingest.service';
 import { AnalyticsReportService } from './analytics-report.service';
 import { detectBot } from './ua.util';
+import { loadMonitor } from '../common/load-monitor';
 
 function ownHost(req: Request): string | null {
   const origin =
@@ -42,6 +43,8 @@ export class AnalyticsCollectController {
   @Post('collect')
   @HttpCode(HttpStatus.NO_CONTENT)
   async collect(@Body() body: unknown, @Req() req: Request) {
+    // Đợt 94 — máy chủ đang quá tải: bỏ qua gói thống kê này (việc phụ), dành CPU cho người đang xem/ứng tuyển.
+    if (loadMonitor.level() >= 2) return;
     await this.ingest
       .collect(body, req.headers['user-agent'], ownHost(req))
       .catch((err) =>

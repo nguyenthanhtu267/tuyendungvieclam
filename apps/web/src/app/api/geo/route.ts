@@ -1,6 +1,8 @@
 // Đợt 19 (26/09/2026) — trả vị trí ƯỚC LƯỢNG (quốc gia, thành phố) của người đang xem, đọc từ header địa lý
 // Vercel tự gắn vào mỗi request. Không đọc/không lưu IP. Bộ ghi truy cập gọi 1 lần/phiên.
 export const dynamic = 'force-dynamic';
+// Đợt 93 — chạy ở Edge (không khởi động nguội như hàm Node, trả lời gần người xem).
+export const runtime = 'edge';
 
 export function GET(req: Request) {
   const h = req.headers;

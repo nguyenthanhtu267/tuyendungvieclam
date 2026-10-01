@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { adminApi, ApiError } from '@/lib/api';
+import { ApiError } from '@/lib/api';
+import { adminApi } from '@/lib/api-admin';
 import { ArtScene } from '@/components/bg/ArtScene';
 import {
   BG_GROUPS,

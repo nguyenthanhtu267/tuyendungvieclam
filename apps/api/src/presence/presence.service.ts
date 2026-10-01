@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { loadMonitor } from '../common/load-monitor';
 
 // Đợt 12d (20/09/2026) — banner "X người đang online" ở trang chủ, theo yêu cầu của người dùng:
 // số THẬT (phiên đang mở web, heartbeat mỗi ~20s từ frontend) cộng với 1 nền "ảo" dao động theo
@@ -45,18 +46,42 @@ function pseudoRandom01(seed: number): number {
 
 @Injectable()
 export class PresenceService {
+  // Đợt 94 — mỗi phiên nhớ THỜI ĐIỂM HẾT HẠN riêng (= 1,6 × khoảng ping máy chủ giao cho phiên đó), vì khoảng ping nay thay đổi theo tải.
   private readonly lastSeen = new Map<string, number>();
+  private lastDisplayed = 0;
 
+  /** Khoảng cách giữa 2 lần báo "đang online" mà máy chủ giao cho trình duyệt: càng đông / càng quá tải càng thưa (tiết kiệm CPU, 0 đồng). */
+  private nextIntervalMs(real: number): number {
+    let ms = 45_000;
+    if (real >= 5000) ms = 240_000;
+    else if (real >= 2000) ms = 150_000;
+    else if (real >= 500) ms = 90_000;
+    if (loadMonitor.level() >= 2) ms = Math.max(ms, 240_000);
+    else if (loadMonitor.level() >= 1) ms = Math.max(ms, 120_000);
+    return ms;
+  }
+
+  /** Gộp "ping + hỏi số đếm" thành 1 lần gọi (trước đây 2 lần mỗi chu kỳ). */
+  beat(sessionId: string) {
+    const real = this.countRealOnline();
+    const next = this.nextIntervalMs(real);
+    this.lastSeen.set(sessionId, Date.now() + Math.round(next * 1.6));
+    const displayed = this.getCount().displayed;
+    this.lastDisplayed = displayed;
+    return { displayed, next };
+  }
+
+  // Bản cũ (web cũ còn chạy trong lúc Vercel/Render cập nhật lệch nhau).
   ping(sessionId: string) {
-    this.lastSeen.set(sessionId, Date.now());
+    this.lastSeen.set(sessionId, Date.now() + HEARTBEAT_WINDOW_MS);
     return { success: true };
   }
 
   private countRealOnline(): number {
-    const cutoff = Date.now() - HEARTBEAT_WINDOW_MS;
+    const now = Date.now();
     let count = 0;
-    for (const [id, ts] of this.lastSeen) {
-      if (ts < cutoff) this.lastSeen.delete(id);
+    for (const [id, exp] of this.lastSeen) {
+      if (exp < now) this.lastSeen.delete(id);
       else count++;
     }
     return count;

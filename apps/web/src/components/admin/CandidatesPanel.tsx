@@ -1,15 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import {
-  adminCandidatesApi,
-  ApiError,
-  type AdminCandidateDetail,
-  type AdminCandidateQuery,
-  type AdminCandidateRow,
-  type ProfileVisibility,
-  type SuggestedJob,
-} from '@/lib/api';
+import { ApiError, type AdminCandidateDetail, type AdminCandidateQuery, type AdminCandidateRow, type ProfileVisibility, type SuggestedJob } from '@/lib/api';
+import { adminCandidatesApi } from '@/lib/api-admin';
 import { APPLICATION_STATUS_LABEL, formatDate, formatNumber, formatSalary } from '@/lib/format';
 import { PROVINCES } from '@/lib/catalogs';
 import { Modal } from '@/components/profile/ui';

@@ -2,18 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from '@/components/SmartLink';
-import {
-  adminAnalyticsApi,
-  ApiError,
-  type AnalyticsBehavior,
-  type AnalyticsContent,
-  type AnalyticsDimRow,
-  type AnalyticsHeatmap,
-  type AnalyticsOverview,
-  type AnalyticsRealtime,
-} from '@/lib/api';
+import { ApiError, type AnalyticsBehavior, type AnalyticsContent, type AnalyticsDimRow, type AnalyticsHeatmap, type AnalyticsOverview, type AnalyticsRealtime } from '@/lib/api';
+import { adminAnalyticsApi } from '@/lib/api-admin';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { BarList, ColumnChart, Kpi, LineChart, SERIES, WeekHourGrid, fmtDay, fmtDuration, pct } from './analytics/charts';
+import { VitalsCard } from './VitalsCard';
 
 // Đợt 19 (26/09/2026) — Admin "🔎 Phân tích truy cập": toàn bộ là dữ liệu THẬT (theo yêu cầu người dùng
 // "trong admin toàn bộ là dữ liệu thật hoàn toàn"): lượt xem, người xem, thời gian ở lại, độ cuộn, mọi
@@ -133,6 +126,7 @@ export function AnalyticsPanel({ token }: { token: string }) {
       </div>
 
       <RealtimeCard token={token} />
+      <VitalsCard token={token} />
 
       <div className="rounded-xl bg-white border border-border p-3 flex flex-wrap items-center gap-2 justify-between">
         <div className="flex flex-wrap gap-1.5" role="tablist">

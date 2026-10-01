@@ -29,6 +29,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { UserRole } from '../database/entities/user.entity';
 import { AdsService } from './ads.service';
 import { AdSettingsDto, SaveAdDto } from './dto/save-ad.dto';
+import { loadMonitor } from '../common/load-monitor';
 
 type Actor = { userId: string; email: string };
 
@@ -49,6 +50,7 @@ export class PublicAdsController {
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @HttpCode(HttpStatus.NO_CONTENT)
   async events(@Body() body: unknown, @Req() req: Request) {
+    if (loadMonitor.level() >= 2) return; // Đợt 94 — quá tải: bỏ qua lượt hiển thị banner (việc phụ)
     await this.ads.recordEvents(body, req.headers['user-agent']).catch(() => 0);
   }
 

@@ -2,14 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import {
-  adminApi,
-  adminPeopleApi,
-  ApiError,
-  type AdminPersonDetail,
-  type AdminPersonRow,
-  type ProfileVisibility,
-} from '@/lib/api';
+import { ApiError, type AdminPersonDetail, type AdminPersonRow, type ProfileVisibility } from '@/lib/api';
+import { adminApi, adminPeopleApi } from '@/lib/api-admin';
 import { formatDate, formatNumber } from '@/lib/format';
 import { INDUSTRIES, PROVINCES } from '@/lib/catalogs';
 import { Modal } from '@/components/profile/ui';

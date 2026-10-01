@@ -2,6 +2,7 @@
 // cho từng vùng (lọc theo vùng/đối tượng/thiết bị, xoay vòng theo trọng số, KHÔNG lặp 1 banner 2 lần trên cùng
 // trang), gắn UTM cho link ngoài, ghi lượt hiển thị (≥50% banner lọt vào màn hình) và lượt bấm.
 
+import { loadBoot } from './boot';
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 export const ADS_API_BASE = API;
 
@@ -45,8 +46,9 @@ export function loadAdFeed(): Promise<AdFeed | null> {
   const hit = peekAdFeed();
   if (hit !== undefined) return Promise.resolve(hit);
   if (!inflight) {
-    inflight = fetch(`${API}/public/promos`)
-      .then((r) => (r.ok ? (r.json() as Promise<AdFeed>) : null))
+    // Đợt 93 — lấy từ gói /public/boot (đã gọi sẵn 1 lần cho cả trang); không có thì gọi đường cũ.
+    inflight = loadBoot()
+      .then((b) => (b?.promos ? b.promos : fetch(`${API}/public/promos`).then((r) => (r.ok ? (r.json() as Promise<AdFeed>) : null))))
       .catch(() => null)
       .then((v) => {
         cache = { at: Date.now(), value: v };

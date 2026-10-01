@@ -2,7 +2,8 @@
 
 import Link from '@/components/SmartLink';
 import { useCallback, useEffect, useState } from 'react';
-import { adminApi, smartApi, smartApi2, smartApi3, smartApi6, smartApi7, workersApi, type WebHealthItem, type AdminTodo, type DupJobGroup, type ProvinceBalance, type SuspiciousAccount, type SuspiciousWorkerGroup, type QualityOverview, type SystemHealth, type ReportGroup, type WeeklyReport, type AdTargeting } from '@/lib/api';
+import { smartApi, smartApi2, smartApi3, smartApi6, smartApi7, workersApi, type WebHealthItem, type AdminTodo, type DupJobGroup, type ProvinceBalance, type SuspiciousAccount, type SuspiciousWorkerGroup, type QualityOverview, type SystemHealth, type ReportGroup, type WeeklyReport, type AdTargeting } from '@/lib/api';
+import { adminApi } from '@/lib/api-admin';
 
 type Sub = 'reports' | 'weekly' | 'ads' | 'system' | 'duplicates' | 'suspicious' | 'lowQuality' | 'spam' | 'accounts' | 'workers' | 'health';
 

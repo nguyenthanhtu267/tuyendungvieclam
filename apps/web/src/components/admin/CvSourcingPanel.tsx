@@ -1,16 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import {
-  adminSourcingApi,
-  ApiError,
-  type CvCardDraftResponse,
-  type CvQueueResponse,
-  type CvShareStatus,
-  type ProfileRequestRow,
-  type RealProfileState,
-  type SourcedProfileRow,
-} from '@/lib/api';
+import { ApiError, type CvCardDraftResponse, type CvQueueResponse, type CvShareStatus, type ProfileRequestRow, type RealProfileState, type SourcedProfileRow } from '@/lib/api';
+import { adminSourcingApi } from '@/lib/api-admin';
 import { formatDate, formatDateTime, formatNumber } from '@/lib/format';
 import { Modal } from '@/components/profile/ui';
 import { CandidateDraftForm } from '@/components/cv/CandidateDraftForm';

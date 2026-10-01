@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { adminStorageApi, ApiError, type StorageStatus } from '@/lib/api';
+import { ApiError, type StorageStatus } from '@/lib/api';
+import { adminStorageApi } from '@/lib/api-admin';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { useAuth } from '@/lib/auth-context';
 

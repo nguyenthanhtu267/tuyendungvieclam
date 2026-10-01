@@ -1,5 +1,6 @@
 import type { BgImage, BgSetting } from './bg-themes';
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+import { loadBoot } from './boot';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 // Đợt 91 — logo công ty: nhờ API thu nhỏ (WebP ≤192px) thay vì tải ảnh gốc to. Bỏ qua ảnh đã nhỏ sẵn (favicon Google, data:).
 export function logoProxyUrl(src: string, boxPx: number): string | null {
@@ -51,20 +52,31 @@ async function fetchOnce(url: string, init: RequestInit): Promise<Response> {
   }
 }
 
+// Đợt 94 — bộ đệm biên Vercel (xem next.config.mjs): khi bật, các GET công khai (không đăng nhập) trong danh sách này đi qua `/_c`.
+const EDGE_CACHE = process.env.NEXT_PUBLIC_EDGE_CACHE === '1';
+const EDGE_PATHS =
+  /^\/(public\/boot|jobs\/home-bundle|jobs\/facets|jobs\/district-facets|jobs\/stats\/|jobs\/featured-employers|jobs\/province-insights|public\/workers\/catalog|jobs(\?|$)|jobs\/[0-9a-f-]{36}\?(.*&)?noview=1)/i;
+export function apiBaseFor(path: string, method = 'GET', authed = false): string {
+  return EDGE_CACHE && typeof window !== 'undefined' && method === 'GET' && !authed && EDGE_PATHS.test(path) ? '/_c' : API_URL;
+}
+
 async function doRequest<T>(path: string, options: RequestInit): Promise<T> {
   const method = (options.method ?? 'GET').toUpperCase();
   const hasBody = options.body !== undefined && options.body !== null;
   const headers: Record<string, string> = { ...(options.headers as Record<string, string> | undefined) };
   if (hasBody && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
   const init: RequestInit = { ...options, headers };
-  const url = `${API_URL}${path}`;
+  const url = `${apiBaseFor(path, method, !!headers.Authorization)}${path}`;
   const canRetry = method === 'GET';
   let res: Response | null = null;
   for (let attempt = 0; attempt < (canRetry ? 2 : 1); attempt++) {
     try {
       res = await fetchOnce(url, init);
-      if (canRetry && attempt === 0 && [502, 503, 504].includes(res.status)) {
-        await sleep(1500);
+      if (canRetry && attempt === 0 && [429, 502, 503, 504].includes(res.status)) {
+        // Đợt 94 — chờ theo `Retry-After` (nếu máy chủ bảo) + độ trễ NGẪU NHIÊN: hàng nghìn người cùng thử lại đúng 1,5 giây sau
+        // sẽ lại đổ dồn vào máy chủ đang quá tải; ngẫu nhiên hoá giúp dàn đều.
+        const ra = Number(res.headers.get('retry-after'));
+        await sleep(Math.min(5000, ra > 0 ? ra * 1000 : 1500) + Math.random() * 1200);
         continue;
       }
       break;
@@ -78,7 +90,7 @@ async function doRequest<T>(path: string, options: RequestInit): Promise<T> {
           0,
         );
       }
-      await sleep(1500);
+      await sleep(1500 + Math.random() * 1500);
     }
   }
   const r = res as Response;
@@ -98,7 +110,7 @@ export function primeGet(path: string, data: unknown, ttlMs = 60_000) {
   primed.set(path, { exp: Date.now() + ttlMs, data });
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const method = (options.method ?? 'GET').toUpperCase();
   const auth = (options.headers as Record<string, string> | undefined)?.Authorization;
   if (method !== 'GET' || options.signal) return doRequest<T>(path, options);
@@ -115,7 +127,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 // Dành cho gửi FormData (upload tệp) — không tự set Content-Type để trình duyệt tự thêm boundary.
-async function requestForm<T>(path: string, token: string, form: FormData): Promise<T> {
+export async function requestForm<T>(path: string, token: string, form: FormData): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
@@ -131,7 +143,7 @@ async function requestForm<T>(path: string, token: string, form: FormData): Prom
   return data as T;
 }
 
-function authHeaders(token: string): HeadersInit {
+export function authHeaders(token: string): HeadersInit {
   return { Authorization: `Bearer ${token}` };
 }
 
@@ -1251,202 +1263,20 @@ export interface PromoBadgeSetting {
 export const apiAsset = (path: string) => `${API_URL}${path}`;
 
 export const publicSettingsApi = {
-  getPromoBadge: () =>
-    request<{ badge: { text: string; url: string } | null }>('/public/settings/promo-badge'),
+  // Đợt 93 — ưu tiên dữ liệu gộp /public/boot (1 lần gọi cho cả nền + nhãn logo + banner); thiếu thì gọi đường cũ.
+  getPromoBadge: async () => {
+    const b = await loadBoot();
+    if (b && b.badge !== undefined) return { badge: b.badge };
+    return request<{ badge: { text: string; url: string } | null }>('/public/settings/promo-badge');
+  },
   // Đợt 29 — cấu hình nền giao diện toàn website.
-  background: () => request<BgSetting>('/public/settings/background'),
+  background: async () => {
+    const b = await loadBoot();
+    if (b?.background) return b.background;
+    return request<BgSetting>('/public/settings/background');
+  },
 };
 
-export const adminApi = {
-  getBackground: (token: string) => request<BgSetting>('/admin/settings/background', { headers: authHeaders(token) }),
-  setBackground: (token: string, body: Omit<BgSetting, 'images'>) =>
-    request<BgSetting>('/admin/settings/background', { method: 'PATCH', headers: { ...authHeaders(token), 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
-  // Đợt 30b — ảnh nền tải lên (trình duyệt đã thu nhỏ + đổi sang WEBP/JPEG trước khi gửi).
-  uploadBgImage: (token: string, blob: Blob, meta: { name: string; overlay: number; width: number; height: number }) => {
-    const form = new FormData();
-    form.append('file', blob, `nen.${blob.type === 'image/webp' ? 'webp' : blob.type === 'image/png' ? 'png' : 'jpg'}`);
-    form.append('name', meta.name);
-    form.append('overlay', String(meta.overlay));
-    form.append('width', String(meta.width));
-    form.append('height', String(meta.height));
-    return requestForm<BgImage>('/admin/settings/background/images', token, form);
-  },
-  updateBgImage: (token: string, id: string, body: { overlay?: number; name?: string }) =>
-    request<BgImage>(`/admin/settings/background/images/${id}`, { method: 'PUT', headers: { ...authHeaders(token), 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
-  deleteBgImage: (token: string, id: string) =>
-    request<BgSetting>(`/admin/settings/background/images/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
-  dashboard: (token: string) => request<AdminDashboard>('/admin/dashboard', { headers: authHeaders(token) }),
-  listPendingJobs: (token: string) =>
-    request<JobPosting[]>('/admin/jobs/pending', { headers: authHeaders(token) }),
-  // Đợt 12i — xem trước đúng nội dung tin (kể cả tin CHƯA duyệt) trước khi Duyệt/Từ chối.
-  getJobForReview: (token: string, id: string) =>
-    request<JobPosting>(`/admin/jobs/${id}`, { headers: authHeaders(token) }),
-  approveJob: (token: string, id: string) =>
-    request<JobPosting>(`/admin/jobs/${id}/approve`, { method: 'PATCH', headers: authHeaders(token) }),
-  // Đợt 15 (25/09/2026) — "Tự động duyệt tin": công tắc chung + nút "Tin đã kiểm tra" cho tin đã
-  // được tự động duyệt (còn hiện trong danh sách /admin/jobs/pending chờ Admin kiểm tra lần 2).
-  getAutoApproveSetting: (token: string) =>
-    request<{ enabled: boolean }>('/admin/settings/auto-approve', { headers: authHeaders(token) }),
-  setAutoApproveSetting: (token: string, enabled: boolean) =>
-    request<{ enabled: boolean }>('/admin/settings/auto-approve', {
-      method: 'PATCH',
-      headers: authHeaders(token),
-      body: JSON.stringify({ enabled }),
-    }),
-  // Đợt 23 (29/09/2026) — nhãn quảng bá cạnh logo: Admin bật/tắt + sửa chữ + link (mở tab mới).
-  getPromoBadge: (token: string) =>
-    request<PromoBadgeSetting>('/admin/settings/promo-badge', { headers: authHeaders(token) }),
-  setPromoBadge: (token: string, dto: { enabled: boolean; text: string; url: string }) =>
-    request<PromoBadgeSetting>('/admin/settings/promo-badge', {
-      method: 'PATCH',
-      headers: authHeaders(token),
-      body: JSON.stringify(dto),
-    }),
-  markJobReviewed: (token: string, id: string) =>
-    request<JobPosting>(`/admin/jobs/${id}/mark-reviewed`, { method: 'PATCH', headers: authHeaders(token) }),
-  // Đợt 12x (21/09/2026) — "Bắt buộc nhập lý do khi Từ chối": nay cần body { reasons, note? }.
-  rejectJob: (token: string, id: string, dto: { reasons: string[]; note?: string }) =>
-    request<JobPosting>(`/admin/jobs/${id}/reject`, {
-      method: 'PATCH',
-      headers: authHeaders(token),
-      body: JSON.stringify(dto),
-    }),
-  // Đợt 12x (21/09/2026) — "Sửa tin trước khi duyệt": Admin sửa toàn bộ trường như form NTD, không
-  // đổi approvalStatus (dùng chung kiểu payload với employerApi.updateJob).
-  updateJob: (token: string, id: string, dto: Partial<CreateJobPayload>) =>
-    request<JobPosting>(`/admin/jobs/${id}`, {
-      method: 'PATCH',
-      headers: authHeaders(token),
-      body: JSON.stringify(dto),
-    }),
-  listPendingCompanies: (token: string) =>
-    request<Company[]>('/admin/companies/pending', { headers: authHeaders(token) }),
-  approveCompany: (token: string, id: string) =>
-    request<Company>(`/admin/companies/${id}/approve`, { method: 'PATCH', headers: authHeaders(token) }),
-  rejectCompany: (token: string, id: string) =>
-    request<Company>(`/admin/companies/${id}/reject`, { method: 'PATCH', headers: authHeaders(token) }),
-  listPendingOrders: (token: string) =>
-    request<Order[]>('/admin/orders/pending', { headers: authHeaders(token) }),
-  confirmOrderPayment: (token: string, id: string) =>
-    request<Order>(`/admin/orders/${id}/confirm-payment`, { method: 'PATCH', headers: authHeaders(token) }),
-  // Đợt 12a — Admin tra cứu tài khoản theo email + đặt lại mật khẩu tạm (thay cho "quên mật khẩu"
-  // tự phục vụ qua email, vì Giai đoạn 1 không có email/SMS).
-  findUserByEmail: (token: string, email: string) =>
-    request<{ id: string; email: string; fullName?: string; role: string; status: string }>(
-      `/admin/users?email=${encodeURIComponent(email)}`,
-      { headers: authHeaders(token) },
-    ),
-  resetUserPassword: (token: string, id: string) =>
-    request<{ email: string; tempPassword: string }>(`/admin/users/${id}/reset-password`, {
-      method: 'PATCH',
-      headers: authHeaders(token),
-    }),
-
-  // Đợt 12q (21/09/2026) — Batch 5 mục #2: duyệt/từ chối hàng loạt.
-  bulkApproveJobs: (token: string, ids: string[]) =>
-    request<BulkActionResult>('/admin/jobs/bulk-approve', {
-      method: 'PATCH',
-      headers: authHeaders(token),
-      body: JSON.stringify({ ids }),
-    }),
-  bulkRejectJobs: (token: string, ids: string[]) =>
-    request<BulkActionResult>('/admin/jobs/bulk-reject', {
-      method: 'PATCH',
-      headers: authHeaders(token),
-      body: JSON.stringify({ ids }),
-    }),
-  bulkApproveCompanies: (token: string, ids: string[]) =>
-    request<BulkActionResult>('/admin/companies/bulk-approve', {
-      method: 'PATCH',
-      headers: authHeaders(token),
-      body: JSON.stringify({ ids }),
-    }),
-  bulkRejectCompanies: (token: string, ids: string[]) =>
-    request<BulkActionResult>('/admin/companies/bulk-reject', {
-      method: 'PATCH',
-      headers: authHeaders(token),
-      body: JSON.stringify({ ids }),
-    }),
-
-  // Đợt 12q (21/09/2026) — Batch 5 mục #1: tìm công ty + bật/tắt "Doanh nghiệp yêu thích".
-  searchCompanies: (token: string, q: string) =>
-    request<Company[]>(`/admin/companies?q=${encodeURIComponent(q)}`, { headers: authHeaders(token) }),
-  toggleFeaturedEmployer: (token: string, id: string) =>
-    request<Company>(`/admin/companies/${id}/toggle-featured`, { method: 'PATCH', headers: authHeaders(token) }),
-  // Đợt 16 (25/09/2026) — mục 22b: công cụ Admin tìm & gán logo công ty thủ công.
-  updateCompanyLogo: (token: string, id: string, logoUrl: string) =>
-    request<Company>(`/admin/companies/${id}/logo`, {
-      method: 'PATCH',
-      headers: authHeaders(token),
-      body: JSON.stringify({ logoUrl }),
-    }),
-
-  // Đợt 12q (21/09/2026) — Batch 5 mục #3: chuỗi thời gian cho biểu đồ dashboard.
-  statsTimeSeries: (token: string, days = 14) =>
-    request<AdminStatsPoint[]>(`/admin/stats/timeseries?days=${days}`, { headers: authHeaders(token) }),
-
-  // Đợt 12q (21/09/2026) — Batch 5 mục #4: nhật ký thao tác admin.
-  auditLog: (token: string, page = 1) =>
-    request<AdminAuditLogResponse>(`/admin/audit-log?page=${page}`, { headers: authHeaders(token) }),
-
-  // ===== Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp" =====
-  createDraftCompany: (token: string, dto: CreateDraftCompanyPayload) =>
-    request<{ company: Company; draftAccount: DraftAccountInfo }>('/admin/companies/draft', {
-      method: 'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify(dto),
-    }),
-  listSourcedCompanies: (token: string, q?: string, claimed?: boolean) => {
-    const qs = new URLSearchParams();
-    if (q) qs.set('q', q);
-    if (claimed !== undefined) qs.set('claimed', String(claimed));
-    const suffix = qs.toString() ? `?${qs.toString()}` : '';
-    return request<Company[]>(`/admin/companies/sourced${suffix}`, { headers: authHeaders(token) });
-  },
-  // Đợt 17k (25/09/2026) — mỗi tin kèm `applicationCount` để FE cảnh báo trước khi xoá (xem deleteJob).
-  getSourcedCompanyDetail: (token: string, id: string) =>
-    request<{ company: Company; jobs: (JobPosting & { applicationCount: number })[] }>(
-      `/admin/companies/${id}/sourced-detail`,
-      { headers: authHeaders(token) },
-    ),
-  createJobForCompany: (token: string, companyId: string, dto: CreateJobPayload) =>
-    request<JobPosting>(`/admin/companies/${companyId}/jobs`, {
-      method: 'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify(dto),
-    }),
-  claimCompany: (token: string, companyId: string, dto: ClaimCompanyPayload) =>
-    request<{ company: Company; account: DraftAccountInfo }>(`/admin/companies/${companyId}/claim`, {
-      method: 'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify(dto),
-    }),
-  extractJobFromUrl: (token: string, url: string) =>
-    request<ExtractJobUrlResult>('/admin/extract-job-url', {
-      method: 'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify({ url }),
-    }),
-  // Đợt 17k (25/09/2026) — "xoá tin đăng" (theo yêu cầu người dùng, màn "Quản lý" công ty nguồn ngoài).
-  deleteJob: (token: string, id: string) =>
-    request<{ success: true }>(`/admin/jobs/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
-  listClaimRequests: (token: string, status?: CompanyClaimRequestStatus) =>
-    request<CompanyClaimRequestRow[]>(`/admin/claim-requests${status ? `?status=${status}` : ''}`, {
-      headers: authHeaders(token),
-    }),
-  approveClaimRequest: (token: string, id: string, dto: { adminNote?: string; taxCode?: string } = {}) =>
-    request<{ request: CompanyClaimRequestRow; account: DraftAccountInfo }>(`/admin/claim-requests/${id}/approve`, {
-      method: 'PATCH',
-      headers: authHeaders(token),
-      body: JSON.stringify(dto),
-    }),
-  rejectClaimRequest: (token: string, id: string, dto: { adminNote?: string } = {}) =>
-    request<CompanyClaimRequestRow>(`/admin/claim-requests/${id}/reject`, {
-      method: 'PATCH',
-      headers: authHeaders(token),
-      body: JSON.stringify(dto),
-    }),
-};
 
 // Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp": type cho form tạo công ty nháp, tài khoản tạm
 // trả về sau khi tạo/claim, chuyển giao thủ công, trích xuất URL, và yêu cầu "nhận lại" công khai.
@@ -1721,6 +1551,18 @@ export const presenceApi = {
   ping: (sessionId: string) =>
     request<{ success: boolean }>('/presence/ping', { method: 'POST', body: JSON.stringify({ sessionId }) }),
   getCount: () => request<{ displayed: number }>('/presence/count'),
+  // Đợt 94 — 1 lần gọi thay 2 (ping + đếm); máy chủ trả luôn `next` = số mili-giây chờ tới lần báo kế tiếp (thưa dần khi đông/quá tải).
+  // API bản cũ chưa có /presence/beat (404) → quay về ping + đếm như trước.
+  beat: async (sessionId: string): Promise<{ displayed: number; next: number }> => {
+    try {
+      return await request<{ displayed: number; next: number }>('/presence/beat', { method: 'POST', body: JSON.stringify({ sessionId }) });
+    } catch (e) {
+      if (!(e instanceof ApiError) || e.status !== 404) throw e;
+      await request<{ success: boolean }>('/presence/ping', { method: 'POST', body: JSON.stringify({ sessionId }) }).catch(() => undefined);
+      const c = await request<{ displayed: number }>('/presence/count');
+      return { displayed: c.displayed, next: 45_000 };
+    }
+  },
 };
 
 // Đợt 12m (21/09/2026) — chuông thông báo hoạt động thật (dùng chung ứng viên/NTD/admin).
@@ -2087,94 +1929,13 @@ export interface ProfileRequestRow {
   matches: { id: string; fullName: string; profileTitle: string | null; phone: string | null; email: string | null; sourceLabel: string | null }[];
 }
 
-function qs(params: Record<string, string | number | boolean | undefined | null>) {
+export function qs(params: Record<string, string | number | boolean | undefined | null>) {
   const q = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== '') q.set(k, String(v));
   const str = q.toString();
   return str ? `?${str}` : '';
 }
 
-export const adminSourcingApi = {
-  summary: (token: string) =>
-    request<{ pending: number; sourced: number; requests: number; sharedLast7Days: number }>('/admin/cv-sourcing/summary', {
-      headers: authHeaders(token),
-    }),
-  getAutoShare: (token: string) =>
-    request<{ enabled: boolean; enabledAt: string | null }>('/admin/cv-sourcing/settings/auto-share', { headers: authHeaders(token) }),
-  setAutoShare: (token: string, enabled: boolean) =>
-    request<{ enabled: boolean; enabledAt: string | null }>('/admin/cv-sourcing/settings/auto-share', {
-      method: 'PATCH',
-      headers: authHeaders(token),
-      body: JSON.stringify({ enabled }),
-    }),
-  queue: (token: string, params: { status?: CvShareStatus; q?: string; page?: number; pageSize?: number }) =>
-    request<CvQueueResponse>(`/admin/cv-sourcing/queue${qs(params)}`, { headers: authHeaders(token) }),
-  draft: (token: string, id: string) =>
-    request<CvCardDraftResponse>(`/admin/cv-sourcing/queue/${id}/draft`, { headers: authHeaders(token) }),
-  share: (token: string, id: string, draft?: CandidateDraft) =>
-    request<{ status: 'shared' | 'already_public'; profileId: string | null }>(`/admin/cv-sourcing/queue/${id}/share`, {
-      method: 'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify(draft ? { draft } : {}),
-    }),
-  dismiss: (token: string, id: string) =>
-    request<{ dismissed: number }>(`/admin/cv-sourcing/queue/${id}/dismiss`, { method: 'POST', headers: authHeaders(token) }),
-  requeue: (token: string, id: string) =>
-    request<{ success: true }>(`/admin/cv-sourcing/queue/${id}/requeue`, { method: 'POST', headers: authHeaders(token) }),
-  bulkShare: (token: string, ids: string[]) =>
-    request<{ shared: number; alreadyPublic: number; failed: number }>('/admin/cv-sourcing/queue/bulk-share', {
-      method: 'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify({ ids }),
-    }),
-  bulkDismiss: (token: string, ids: string[]) =>
-    request<{ dismissed: number }>('/admin/cv-sourcing/queue/bulk-dismiss', {
-      method: 'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify({ ids }),
-    }),
-  downloadEntryFile: async (token: string, entryId: string): Promise<Blob> => {
-    const res = await fetch(`${API_URL}/admin/cv-sourcing/entries/${entryId}/file`, { headers: authHeaders(token) });
-    if (!res.ok) {
-      const data = await res.json().catch(() => null);
-      throw new ApiError((data && data.message) || 'Không tải được tệp CV', res.status);
-    }
-    return res.blob();
-  },
-  profiles: (token: string, params: { q?: string; page?: number; pageSize?: number }) =>
-    request<{ items: SourcedProfileRow[]; total: number; page: number; pageSize: number }>(
-      `/admin/cv-sourcing/profiles${qs(params)}`,
-      { headers: authHeaders(token) },
-    ),
-  createProfile: (token: string, draft: CandidateDraft, file?: File | null) => {
-    const form = new FormData();
-    form.append('payload', JSON.stringify(draft));
-    if (file) form.append('file', file);
-    return requestForm<{ id: string }>('/admin/cv-sourcing/profiles', token, form);
-  },
-  deleteProfile: (token: string, id: string) =>
-    request<{ success: true }>(`/admin/cv-sourcing/profiles/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
-  requests: (token: string, status: 'pending' | 'resolved' | 'rejected' = 'pending') =>
-    request<ProfileRequestRow[]>(`/admin/cv-sourcing/requests?status=${status}`, { headers: authHeaders(token) }),
-  resolveRemove: (token: string, id: string, profileId: string, adminNote?: string) =>
-    request<{ success: true }>(`/admin/cv-sourcing/requests/${id}/remove`, {
-      method: 'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify({ profileId, adminNote }),
-    }),
-  resolveClaim: (token: string, id: string, profileId: string, adminNote?: string) =>
-    request<{ email: string; tempPassword: string }>(`/admin/cv-sourcing/requests/${id}/claim`, {
-      method: 'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify({ profileId, adminNote }),
-    }),
-  reject: (token: string, id: string, adminNote?: string) =>
-    request<{ success: true }>(`/admin/cv-sourcing/requests/${id}/reject`, {
-      method: 'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify({ adminNote }),
-    }),
-};
 
 export const publicProfileRequestApi = {
   create: (payload: { fullName: string; email: string; phone?: string; requestType: 'remove' | 'claim'; note?: string }) =>
@@ -2243,57 +2004,6 @@ export interface ImpersonateResult {
   expiresInMinutes: number;
 }
 
-export const adminPeopleApi = {
-  list: (
-    token: string,
-    params: { q?: string; role?: 'candidate' | 'employer' | 'admin'; status?: string; page?: number; pageSize?: number },
-  ) =>
-    request<{ items: AdminPersonRow[]; total: number; page: number; pageSize: number }>(`/admin/people${qs(params)}`, {
-      headers: authHeaders(token),
-    }),
-  detail: (token: string, userId: string) => request<AdminPersonDetail>(`/admin/people/${userId}`, { headers: authHeaders(token) }),
-  updateUser: (
-    token: string,
-    userId: string,
-    payload: { fullName?: string; email?: string; phone?: string; status?: string; role?: string },
-  ) =>
-    request<AdminPersonDetail>(`/admin/people/${userId}`, {
-      method: 'PATCH',
-      headers: authHeaders(token),
-      body: JSON.stringify(payload),
-    }),
-  updateCompany: (
-    token: string,
-    companyId: string,
-    payload: { name?: string; taxCode?: string; industry?: string; size?: string; website?: string; logoUrl?: string; description?: string; address?: string; contactPerson?: string; companyType?: string; vision?: string; mission?: string; galleryUrls?: string[] },
-  ) =>
-    request<{ success: true }>(`/admin/people/companies/${companyId}`, {
-      method: 'PATCH',
-      headers: authHeaders(token),
-      body: JSON.stringify(payload),
-    }),
-  updateCandidate: (
-    token: string,
-    profileId: string,
-    payload: {
-      fullName?: string;
-      profileTitle?: string;
-      phone?: string;
-      contactEmail?: string;
-      province?: string;
-      desiredPosition?: string;
-      visibility?: ProfileVisibility;
-      hideContactInfo?: boolean;
-    },
-  ) =>
-    request<{ success: true }>(`/admin/people/candidates/${profileId}`, {
-      method: 'PATCH',
-      headers: authHeaders(token),
-      body: JSON.stringify(payload),
-    }),
-  impersonate: (token: string, userId: string) =>
-    request<ImpersonateResult>(`/admin/people/${userId}/impersonate`, { method: 'POST', headers: authHeaders(token) }),
-};
 
 // ---------- 18f — Ứng viên ----------
 
@@ -2364,34 +2074,6 @@ export interface AdminCandidateQuery {
   pageSize?: number;
 }
 
-export const adminCandidatesApi = {
-  list: (token: string, params: AdminCandidateQuery) =>
-    request<{ items: AdminCandidateRow[]; total: number; page: number; pageSize: number }>(
-      `/admin/candidates${qs({ ...params })}`,
-      { headers: authHeaders(token) },
-    ),
-  tags: (token: string) => request<{ tag: string; count: number }[]>('/admin/candidates/tags', { headers: authHeaders(token) }),
-  detail: (token: string, id: string) => request<AdminCandidateDetail>(`/admin/candidates/${id}`, { headers: authHeaders(token) }),
-  setNote: (token: string, id: string, payload: { tags?: string[]; note?: string }) =>
-    request<{ tags: string[]; note: string | null }>(`/admin/candidates/${id}/note`, {
-      method: 'PUT',
-      headers: authHeaders(token),
-      body: JSON.stringify(payload),
-    }),
-  suggestedJobs: (token: string, id: string) =>
-    request<SuggestedJob[]>(`/admin/candidates/${id}/suggested-jobs`, { headers: authHeaders(token) }),
-  invite: (token: string, id: string, jobPostingId: string) =>
-    request<{ success: true }>(`/admin/candidates/${id}/invite`, {
-      method: 'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify({ jobPostingId }),
-    }),
-  toSourced: (token: string, id: string) =>
-    request<{ status: 'shared' | 'already_public'; profileId: string | null }>(`/admin/candidates/${id}/to-sourced`, {
-      method: 'POST',
-      headers: authHeaders(token),
-    }),
-};
 
 // ============================================================================================
 // Đợt 19 (26/09/2026) — Admin "Phân tích truy cập": 100% dữ liệu thật (bộ ghi truy cập + CSDL).
@@ -2565,22 +2247,6 @@ export interface AnalyticsHeatmap {
   samplePaths: { path: string; views: number }[];
 }
 
-export const adminAnalyticsApi = {
-  realtime: (token: string) => request<AnalyticsRealtime>('/admin/analytics/realtime', { headers: authHeaders(token) }),
-  overview: (token: string, from: string, to: string) =>
-    request<AnalyticsOverview>(`/admin/analytics/overview${qs({ from, to })}`, { headers: authHeaders(token) }),
-  content: (token: string, from: string, to: string) =>
-    request<AnalyticsContent>(`/admin/analytics/content${qs({ from, to })}`, { headers: authHeaders(token) }),
-  behavior: (token: string, from: string, to: string) =>
-    request<AnalyticsBehavior>(`/admin/analytics/behavior${qs({ from, to })}`, { headers: authHeaders(token) }),
-  heatmapPages: (token: string, from: string, to: string) =>
-    request<{ range: { from: string; to: string }; pages: { route: string; device: string; clicks: number }[] }>(
-      `/admin/analytics/heatmap/pages${qs({ from, to })}`,
-      { headers: authHeaders(token) },
-    ),
-  heatmap: (token: string, params: { route: string; device: string; from: string; to: string; path?: string }) =>
-    request<AnalyticsHeatmap>(`/admin/analytics/heatmap${qs(params)}`, { headers: authHeaders(token) }),
-};
 
 // ============================================================================================
 // Đợt 20 (27/09/2026) — Admin "Lưu trữ file": lưu file lên Google Drive của chủ web.
@@ -2598,16 +2264,6 @@ export interface StorageStatus {
   categories: { category: string; label: string; dbCount: number; dbBytes: number; driveCount: number; driveBytes: number }[];
 }
 
-export const adminStorageApi = {
-  status: (token: string) => request<StorageStatus>('/admin/storage/status', { headers: authHeaders(token) }),
-  connectUrl: (token: string, returnTo: string) =>
-    request<{ url: string }>(`/admin/storage/google/connect-url${qs({ returnTo })}`, { headers: authHeaders(token) }),
-  disconnect: (token: string) =>
-    request<StorageStatus>('/admin/storage/google/disconnect', { method: 'POST', headers: authHeaders(token) }),
-  setMigrationPaused: (token: string, paused: boolean) =>
-    request<StorageStatus>('/admin/storage/migration', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ paused }) }),
-  migrateNow: (token: string) => request<{ moved: number }>('/admin/storage/migrate-now', { method: 'POST', headers: authHeaders(token) }),
-};
 
 // ------------------------------------------------------------------ Đợt 24 — banner quảng cáo (Admin)
 export interface AdCampaignInput {
@@ -2651,40 +2307,6 @@ export interface AdStats {
   daily: { day: string; impressions: number; clicks: number }[];
 }
 
-export const adminAdsApi = {
-  list: (token: string) => request<AdCampaignRow[]>('/admin/ads', { headers: authHeaders(token) }),
-  settings: (token: string) =>
-    request<{ enabled: boolean; disabledSlots: string[] }>('/admin/ads/settings', { headers: authHeaders(token) }),
-  setSettings: (token: string, dto: { enabled: boolean; disabledSlots: string[] }) =>
-    request<{ enabled: boolean; disabledSlots: string[] }>('/admin/ads/settings', {
-      method: 'PATCH',
-      headers: authHeaders(token),
-      body: JSON.stringify(dto),
-    }),
-  stats: (token: string, days = 30) => request<AdStats>(`/admin/ads/stats?days=${days}`, { headers: authHeaders(token) }),
-  create: (token: string, dto: AdCampaignInput) =>
-    request<AdCampaignRow>('/admin/ads', { method: 'POST', headers: authHeaders(token), body: JSON.stringify(dto) }),
-  update: (token: string, id: string, dto: AdCampaignInput) =>
-    request<AdCampaignRow>(`/admin/ads/${id}`, { method: 'PUT', headers: authHeaders(token), body: JSON.stringify(dto) }),
-  setEnabled: (token: string, id: string, enabled: boolean) =>
-    request<AdCampaignRow>(`/admin/ads/${id}/enabled`, {
-      method: 'PATCH',
-      headers: authHeaders(token),
-      body: JSON.stringify({ enabled }),
-    }),
-  duplicate: (token: string, id: string) =>
-    request<AdCampaignRow>(`/admin/ads/${id}/duplicate`, { method: 'POST', headers: authHeaders(token) }),
-  remove: (token: string, id: string) =>
-    request<{ ok: boolean }>(`/admin/ads/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
-  uploadImage: (token: string, id: string, file: File, tone: 'light' | 'dark') => {
-    const form = new FormData();
-    form.append('file', file);
-    form.append('tone', tone);
-    return requestForm<AdCampaignRow>(`/admin/ads/${id}/image`, token, form);
-  },
-  removeImage: (token: string, id: string) =>
-    request<AdCampaignRow>(`/admin/ads/${id}/image`, { method: 'DELETE', headers: authHeaders(token) }),
-};
 
 export interface SalaryStats {
   count: number;
@@ -2938,8 +2560,46 @@ export interface SuspiciousWorkerGroup { key: string; reason: string; score: num
 export interface WorkerAppRow { certRequestedAt?: string | null; birthDate?: string; extra?: ProfileExtra | null; interviewAt?: string | null; interviewPlace?: string | null; startedAt?: string | null; id: string; createdAt: string; seenAt: string | null; status: string; groupCode: string | null; groupSize: number; jobId: string; jobTitle: string; profileId: string; fullName: string; phone: string; province: string; newWard: string | null; oldDistrict: string | null; kind: WorkerKind; desiredJobs: string | null }
 const qsOf = (params: Record<string, string | undefined>) => new URLSearchParams(Object.entries(params).filter(([, v]) => v != null && v !== '') as [string, string][]).toString();
 const post = (body: unknown, token?: string): RequestInit => ({ method: 'POST', body: JSON.stringify(body), headers: token ? authHeaders(token) : undefined });
+type WorkersCatalog = { groups: Record<WorkerKind, string[]>; shifts: string[]; radii: number[]; provinces: string[] };
+let wcatMem: { at: number; v: WorkersCatalog } | null = null;
+let wcatInflight: Promise<WorkersCatalog> | null = null;
+function workersCatalog(): Promise<WorkersCatalog> {
+  const DAY = 24 * 3600_000;
+  if (wcatMem && Date.now() - wcatMem.at < DAY) return Promise.resolve(wcatMem.v);
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('tvl_wcat') : null;
+    if (raw) {
+      const o = JSON.parse(raw) as { at: number; v: WorkersCatalog };
+      if (o && Date.now() - o.at < DAY && Array.isArray(o.v?.provinces)) {
+        wcatMem = o;
+        return Promise.resolve(o.v);
+      }
+    }
+  } catch {
+    /* bỏ qua */
+  }
+  if (!wcatInflight) {
+    wcatInflight = request<WorkersCatalog>('/public/workers/catalog')
+      .then((v) => {
+        wcatMem = { at: Date.now(), v };
+        try {
+          localStorage.setItem('tvl_wcat', JSON.stringify(wcatMem));
+        } catch {
+          /* bỏ qua */
+        }
+        return v;
+      })
+      .finally(() => {
+        wcatInflight = null;
+      });
+  }
+  return wcatInflight;
+}
+
 export const workersApi = {
-  catalog: () => request<{ groups: Record<WorkerKind, string[]>; shifts: string[]; radii: number[]; provinces: string[] }>('/public/workers/catalog'),
+  // Đợt 93 — danh mục (nhóm nghề, ca, bán kính, tỉnh) gần như không đổi (API cũng lưu đệm 24 giờ): nhớ trong RAM + ở máy người xem
+  // 24 giờ và gộp các lần gọi trùng → mở các trang lao động phổ thông lần 2 trở đi không gọi API; lần đầu vẫn lấy như cũ.
+  catalog: () => workersCatalog(),
   districts: (province: string) => request<{ items: string[] }>(`/public/workers/geo/districts?province=${encodeURIComponent(province)}`),
   wards: (province: string, district: string) => request<{ items: string[] }>(`/public/workers/geo/wards?province=${encodeURIComponent(province)}&district=${encodeURIComponent(district)}`),
   newWards: (province: string) => request<{ items: { code: string; name: string }[] }>(`/public/workers/geo/new-wards?province=${encodeURIComponent(province)}`),

@@ -21,5 +21,6 @@ import { AdminAdsController, PublicAdsController } from './ads.controller';
   ],
   controllers: [PublicAdsController, AdminAdsController],
   providers: [AdsService],
+  exports: [AdsService],
 })
 export class AdsModule {}

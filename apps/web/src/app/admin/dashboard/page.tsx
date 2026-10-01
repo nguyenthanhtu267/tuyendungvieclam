@@ -3,23 +3,10 @@
 import CompanyVerifyBox from '@/components/admin/CompanyVerifyBox';
 import { useEffect, useState, useRef, useCallback, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth-context';
-import {
-  adminApi,
-  ApiError,
-  type AdminDashboard,
-  type JobPosting,
-  type Company,
-  type Order,
-  type AdminStatsPoint,
-  type AdminAuditLogEntry,
-  type CreateDraftCompanyPayload,
-  type DraftAccountInfo,
-  type CompanyClaimRequestRow,
-  type CompanyClaimRequestStatus,
-  type CreateJobPayload,
-  type ExtractJobUrlResult,
-} from '@/lib/api';
+import { ApiError, type AdminDashboard, type JobPosting, type Company, type Order, type AdminStatsPoint, type AdminAuditLogEntry, type CreateDraftCompanyPayload, type DraftAccountInfo, type CompanyClaimRequestRow, type CompanyClaimRequestStatus, type CreateJobPayload, type ExtractJobUrlResult } from '@/lib/api';
+import { adminApi } from '@/lib/api-admin';
 import { formatDate, formatDateTime, formatSalary, formatCurrency, formatNumber, normalizeSalaryAmount, PAYMENT_METHOD_LABEL } from '@/lib/format';
 import ChangePasswordCard from '@/components/ChangePasswordCard';
 import { scanJobContent } from '@/lib/content-moderation';
@@ -27,15 +14,20 @@ import { CompanyLogo } from '@/components/CompanyLogo';
 import { isRichTextEmpty } from '@/lib/richtext';
 import { JobWizardSteps, JOB_WIZARD_INITIAL, type JobWizardFormState } from '@/components/JobWizardForm';
 import { INDUSTRIES, PROVINCES } from '@/lib/catalogs';
-import { CvSourcingPanel } from '@/components/admin/CvSourcingPanel';
-import { PeoplePanel } from '@/components/admin/PeoplePanel';
-import { CandidatesPanel } from '@/components/admin/CandidatesPanel';
-import { AnalyticsPanel } from '@/components/admin/AnalyticsPanel';
-import { StoragePanel } from '@/components/admin/StoragePanel';
-import { BackgroundPanel } from '@/components/admin/BackgroundPanel';
-import { QualityPanel } from '@/components/admin/QualityPanel';
-import { PromoBadgePanel } from '@/components/admin/PromoBadgePanel';
-import { AdsPanel } from '@/components/admin/AdsPanel';
+
+// Đợt 93 — mỗi tab Admin nạp RIÊNG khi được mở (trước đây cả 9 bảng ~230KB JS tải ngay khi vào trang). Có `loading` riêng để
+// không làm ranh giới Suspense ở trên cùng hiện lại khung xương (xem DeferredWidgets).
+const PanelLoading = () => <div className="p-6 text-[14px] text-ink-muted">Đang tải…</div>;
+const CvSourcingPanel = dynamic(() => import('@/components/admin/CvSourcingPanel').then((m) => m.CvSourcingPanel), { ssr: false, loading: PanelLoading });
+const PeoplePanel = dynamic(() => import('@/components/admin/PeoplePanel').then((m) => m.PeoplePanel), { ssr: false, loading: PanelLoading });
+const CandidatesPanel = dynamic(() => import('@/components/admin/CandidatesPanel').then((m) => m.CandidatesPanel), { ssr: false, loading: PanelLoading });
+const AnalyticsPanel = dynamic(() => import('@/components/admin/AnalyticsPanel').then((m) => m.AnalyticsPanel), { ssr: false, loading: PanelLoading });
+const StoragePanel = dynamic(() => import('@/components/admin/StoragePanel').then((m) => m.StoragePanel), { ssr: false, loading: PanelLoading });
+const BackgroundPanel = dynamic(() => import('@/components/admin/BackgroundPanel').then((m) => m.BackgroundPanel), { ssr: false, loading: PanelLoading });
+const QualityPanel = dynamic(() => import('@/components/admin/QualityPanel').then((m) => m.QualityPanel), { ssr: false, loading: PanelLoading });
+const PromoBadgePanel = dynamic(() => import('@/components/admin/PromoBadgePanel').then((m) => m.PromoBadgePanel), { ssr: false, loading: PanelLoading });
+const AdsPanel = dynamic(() => import('@/components/admin/AdsPanel').then((m) => m.AdsPanel), { ssr: false, loading: PanelLoading });
+
 
 // Đợt 12f (21/09/2026) — bổ sung mục "Đổi mật khẩu" tự phục vụ cho Admin, còn thiếu sót ở Đợt
 // 12a (lúc đó chỉ làm cho Ứng viên và Nhà tuyển dụng). Trước khi có mục này, Admin chỉ có thể

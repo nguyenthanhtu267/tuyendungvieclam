@@ -38,5 +38,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
   ],
   controllers: [AdminController, PublicSettingsController],
   providers: [AdminService],
+  exports: [AdminService],
 })
 export class AdminModule {}

@@ -24,6 +24,13 @@ export class PresenceController {
     return this.presenceService.ping(dto.sessionId);
   }
 
+  // Đợt 94 — 1 lần gọi thay 2: trả số hiển thị + khoảng chờ lần báo kế tiếp (máy chủ quyết định).
+  @Post('beat')
+  @HttpCode(HttpStatus.OK)
+  beat(@Body() dto: PingDto) {
+    return this.presenceService.beat(dto.sessionId);
+  }
+
   @Get('count')
   getCount() {
     return this.presenceService.getCount();

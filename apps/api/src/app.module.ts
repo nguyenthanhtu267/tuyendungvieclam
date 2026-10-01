@@ -72,6 +72,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { StorageModule } from './storage/storage.module';
 import { AdsModule } from './ads/ads.module';
 import { BackgroundModule } from './background/background.module';
+import { BootModule } from './boot/boot.module';
 import { BgImage } from './database/entities/bg-image.entity';
 import { JobReport } from './database/entities/job-report.entity';
 import { WorkerProfile, WorkerNote, WorkerApplication, WorkerContact } from './database/entities/worker-profile.entity';
@@ -195,6 +196,7 @@ const entities = [
     StorageModule,
     AdsModule,
     BackgroundModule,
+    BootModule,
     WorkersModule,
   ],
   controllers: [AppController],

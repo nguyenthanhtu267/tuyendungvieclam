@@ -14,5 +14,6 @@ import {
   imports: [TypeOrmModule.forFeature([AdminSetting, AdminAuditLog, BgImage])],
   controllers: [PublicBackgroundController, AdminBackgroundController],
   providers: [BackgroundService],
+  exports: [BackgroundService],
 })
 export class BackgroundModule {}

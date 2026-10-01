@@ -2,6 +2,7 @@ import { Controller, Get, Head, HttpCode, ServiceUnavailableException } from '@n
 import { SkipThrottle } from '@nestjs/throttler';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { loadMonitor } from '../common/load-monitor';
 
 // Vận hành (đợt 12a, 20/09/2026) — endpoint kiểm tra sống, quan trọng vì Render free tier tự
 // "ngủ" sau ~15 phút không có traffic; dùng để theo dõi uptime hoặc chủ động "đánh thức" server.
@@ -36,6 +37,7 @@ export class HealthController {
   @Head('ping')
   @HttpCode(200)
   ping() {
-    return { ok: true, uptimeSec: Math.round(process.uptime()) };
+    // Đợt 94 — kèm độ trễ vòng lặp (ms) + mức tải 0/1/2 để dễ nhìn máy chủ có đang quá tải không (xem lib common/load-monitor.ts).
+    return { ok: true, uptimeSec: Math.round(process.uptime()), lagMs: loadMonitor.lagMs(), load: loadMonitor.level() };
   }
 }

@@ -86,6 +86,9 @@ const PAGES = [
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     p.on('pageerror', (e) => errs.push('JS: ' + e.message));
     p.on('console', (m) => { if (m.type() === 'error' && /hydrat/i.test(m.text())) errs.push('Hydration: ' + m.text().slice(0, 140)); });
+    // Đợt 93 — ngân sách số lần gọi API khi mở trang: đếm theo địa chỉ + bắt các lần gọi lẻ đã được gộp vào /public/boot.
+    const apiCalls = [];
+    p.on('request', (r) => { const u = r.url(); if (/:3001\//.test(u) || /onrender\.com\//.test(u)) apiCalls.push(u.replace(/^https?:\/\/[^/]+/, '').split('?')[0]); });
     await p.addInitScript(() => {
       window.__cls = 0;
       try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__cls += e.value; }).observe({ type: 'layout-shift', buffered: true }); } catch {}
@@ -116,6 +119,8 @@ const PAGES = [
           overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
           bottomNav: !!document.querySelector('nav[aria-label="Điều hướng nhanh"]'),
           manifest: !!document.querySelector('link[rel="manifest"]'),
+          bgLayers: document.querySelectorAll('div.fixed.-z-10 > div').length,
+          preconnect: !!document.querySelector('link[rel="preconnect"]'),
         };
       });
       if (m.cls > 0.1) errs.push(`Giật bố cục CLS ${m.cls} (ngưỡng 0,1)`);
@@ -124,10 +129,19 @@ const PAGES = [
       if (m.small > 12) errs.push(`${m.small} nút/liên kết nhỏ hơn 40px (ngưỡng 12)`);
       if (pg.bottomNav && !m.bottomNav) errs.push('Thiếu thanh điều hướng dưới');
       if (!m.manifest) errs.push('Thiếu <link rel="manifest">');
+      // Đợt 93 — một lớp nền duy nhất, preconnect API, ngân sách gọi API
+      if (m.bgLayers > 1) errs.push(`${m.bgLayers} lớp nền cùng lúc (phải ≤ 1 — lỗi "2 hình nền khi F5")`);
+      if (!m.preconnect) errs.push('Thiếu <link rel="preconnect"> tới API');
+      const hasBoot = apiCalls.includes('/public/boot');
+      const lone = apiCalls.filter((u) => u === '/public/settings/background' || u === '/public/promos' || u === '/public/settings/promo-badge');
+      if (hasBoot && lone.length) errs.push('Còn gọi lẻ ' + lone.join(', ') + ' dù đã có /public/boot');
+      const budget = pg.name === 'dt-chi-tiet-tin' ? 9 : 7;
+      if (apiCalls.length > budget) errs.push(`Gọi API ${apiCalls.length} lần (ngân sách ${budget}): ${apiCalls.join(' ')}`);
+      pg.api = apiCalls.length;
       pg.perf = { cls: m.cls, small: m.small };
       await p.screenshot({ path: `${OUT}/${pg.name}.png` });
     } catch (e) { errs.push('Không mở được: ' + e.message); }
-    const info = pg.perf ? `  [CLS ${pg.perf.cls}, nút nhỏ ${pg.perf.small}]` : '';
+    const info = pg.perf ? `  [CLS ${pg.perf.cls}, nút nhỏ ${pg.perf.small}, API ${pg.api}]` : '';
     console.log(errs.length ? `✗ ${pg.name}${info}\n   ${errs.join('\n   ')}` : `✓ ${pg.name}${info}`);
     if (errs.length) fail++;
     await mctx.close();
