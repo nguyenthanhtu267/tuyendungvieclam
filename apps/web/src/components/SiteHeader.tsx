@@ -38,7 +38,18 @@ export default function SiteHeader() {
         {/* Đợt 23 (29/09/2026) — khung `relative` để đặt nhãn quảng bá nhấp nháy ngay góc trên chữ
             "MIỄN PHÍ" (nhãn là link riêng, KHÔNG lồng trong <Link> logo vì <a> không được lồng <a>). */}
         <div className="relative shrink-0">
-        <Link href="/" className="flex items-center gap-2 shrink-0">
+        <Link
+          href="/"
+          aria-label="Về trang chủ"
+          onClick={(e) => {
+            // Đợt 95 — đang ở trang chủ thì bấm logo phải có phản hồi: cuộn lên đầu trang (trước đây không thấy gì xảy ra).
+            if (pathname === '/') {
+              e.preventDefault();
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          }}
+          className="flex items-center gap-2 shrink-0"
+        >
           {/* Đợt 12j (21/09/2026) — đổi biểu tượng logo từ icon dấu tích sang chữ "V" đơn giản
               theo yêu cầu người dùng. */}
           <span className="w-7 h-7 rounded-md bg-primary flex items-center justify-center">

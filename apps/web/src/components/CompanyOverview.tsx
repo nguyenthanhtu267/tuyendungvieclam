@@ -69,18 +69,19 @@ export default function CompanyOverview({
   return (
     <div className="flex flex-col gap-6 text-ink min-w-0">
       <section className="rounded-lg bg-[#EEF2F9] border border-border p-4 sm:p-5">
-        <div className="flex items-center gap-2 flex-wrap mb-3">
-          <h2 className="font-extrabold text-[18px] uppercase tracking-tight min-w-0 max-w-full">
-            <FitText lines={2} min={0.7}>{company.name}</FitText>
-          </h2>
-          {isCompanyUnverified(company) && <SourcedBadge />}
+        {/* Đợt 95 — logo đứng TRƯỚC (bên trái), tên công ty bên phải xuống tối đa 3 dòng, quá khung thì tự co chữ. */}
+        <div className="flex gap-3 sm:gap-4 items-start">
+          <div className="shrink-0 w-[84px] h-[72px] sm:w-[128px] sm:h-[108px] rounded-md bg-white border border-border flex items-center justify-center overflow-hidden">
+            <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={104} className="text-xl max-w-full max-h-full" />
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col gap-1.5 justify-center sm:min-h-[108px]">
+            <h2 className="font-extrabold text-[17px] sm:text-[18px] leading-snug uppercase tracking-tight min-w-0 max-w-full">
+              <FitText lines={3} min={0.55}>{company.name}</FitText>
+            </h2>
+            {isCompanyUnverified(company) && <div><SourcedBadge /></div>}
+          </div>
         </div>
-        <div className="flex gap-4 items-start flex-col sm:flex-row">
-          {(
-            <div className="shrink-0 w-[128px] h-[108px] rounded-md bg-white border border-border flex items-center justify-center">
-              <CompanyLogo name={company.name} logoUrl={company.logoUrl} size={104} className="text-xl" />
-            </div>
-          )}
+        <div className="mt-3">
           <div className="flex-1 min-w-0 w-full">
             {company.address && (
               <div className="text-[14px] pb-2 border-b border-border-strong/60">

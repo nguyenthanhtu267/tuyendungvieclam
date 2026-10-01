@@ -9,7 +9,7 @@ import { useSavedCount, setSavedCount } from '@/lib/saved-count';
 import { candidatesApi } from '@/lib/api';
 
 // Đợt 91 — thanh điều hướng DƯỚI cho điện thoại (ngón cái với tới được, không phải mở menu ☰):
-// Trang chủ · Tìm việc · Đã lưu · Thông báo · Tài khoản. Mỗi mục cao 56px, có số đếm. Chỉ hiện ở màn hình < 768px,
+// Trang chủ · Văn phòng · Đã lưu · Thông báo · Tài khoản. Mỗi mục cao 56px, có số đếm. Chỉ hiện ở màn hình < 768px,
 // ẩn khi bàn phím đang mở (đang gõ) và ở khu vực Admin/Nhà tuyển dụng (đã có thanh riêng).
 const SHOW_PREFIXES = ['/viec-lam', '/cong-ty', '/ho-so', '/lao-dong-pho-thong', '/tien-ich'];
 
@@ -110,7 +110,7 @@ export default function BottomNav() {
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', boxSizing: 'content-box' }}
     >
       <Tab href="/" icon="🏠" label="Trang chủ" active={is('/')} />
-      <Tab href="/viec-lam" icon="🔎" label="Tìm việc" active={is('/viec-lam')} />
+      <Tab href="/viec-lam" icon="🔎" label="Văn phòng" active={is('/viec-lam')} />
       {logged ? (
         <>
           <Tab href="/ho-so#saved" icon="♡" label="Đã lưu" active={false} badge={saved} />
@@ -121,7 +121,7 @@ export default function BottomNav() {
         </>
       ) : (
         <>
-          <Tab href="/lao-dong-pho-thong" icon="🧰" label="Lao động" active={is('/lao-dong-pho-thong')} />
+          <Tab href="/lao-dong-pho-thong" icon="🧰" label="Công nhân" active={is('/lao-dong-pho-thong')} />
           <Tab href="/dang-nhap" icon="👤" label="Đăng nhập" active={false} />
         </>
       )}
