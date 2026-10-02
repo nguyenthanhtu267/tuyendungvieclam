@@ -1,5 +1,6 @@
 'use client';
 
+import { Combobox } from '@/components/ui/Combobox';
 // Đợt 17h (25/09/2026) — theo yêu cầu người dùng: 3 nơi tạo/sửa tin tuyển dụng (wizard "Đăng tin"
 // của NTD, "Sửa tin" của Admin, "Cách 3" ở tab Nguồn ngoài của Admin) phải GIỐNG HỆT NHAU — không
 // chỉ cùng bộ trường (đã làm ở Đợt 17g) mà cùng GIAO DIỆN: wizard 4 Bước (Thông tin vị trí → Mô tả
@@ -260,10 +261,7 @@ export function JobWizardSteps({
               </Field>
               {form.channel !== 'office' ? (
                 <Field label="Nhóm công việc" hint="để gợi ý đúng người">
-                  <select id="jw-group" className="tvl-input" value={form.laborGroup} onChange={(e) => setForm({ ...form, laborGroup: e.target.value })}>
-                    <option value="">— Chọn nhóm —</option>
-                    {LABOR_GROUPS[form.channel as 'worker' | 'student' | 'intern'].map((g) => <option key={g} value={g}>{g}</option>)}
-                  </select>
+                  <Combobox id="jw-group" value={form.laborGroup} options={LABOR_GROUPS[form.channel as 'worker' | 'student' | 'intern']} placeholder="— Chọn hoặc gõ nhóm việc —" onChange={(v) => setForm({ ...form, laborGroup: v })} />
                 </Field>
               ) : (
                 <div className="text-[12.5px] text-ink-muted self-end pb-2">Tuyển công nhân, sinh viên hay thực tập sinh? Chọn loại tin tương ứng — ứng viên ứng tuyển nhanh bằng số điện thoại, không cần CV.</div>
@@ -398,18 +396,11 @@ export function JobWizardSteps({
             </div>
             {form.provinces.length === 1 && (
               <Field label="Quận / Huyện" hint="chọn đúng quận/huyện của tỉnh">
-                <input
-                  className="tvl-input"
-                  list="job-district-list"
-                  value={form.district}
-                  onChange={(e) => setForm({ ...form, district: e.target.value })}
-                  placeholder="VD: Quận 1"
-                />
-                <datalist id="job-district-list">
-                  {distOptions.map((d) => (
-                    <option key={d} value={d} />
-                  ))}
-                </datalist>
+                {distOptions.length > 0 ? (
+                  <Combobox id="jw-district" value={form.district} options={distOptions} placeholder="— Chọn hoặc gõ quận/huyện —" onChange={(v) => setForm({ ...form, district: v })} />
+                ) : (
+                  <input className="tvl-input" value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} placeholder="VD: Quận 1" />
+                )}
                 {form.district && distOptions.length > 0 && !distOptions.some((d) => d.toLowerCase() === form.district.trim().toLowerCase()) && (
                   <div className="text-[12px] font-bold text-critical mt-1">
                     “{form.district}” không thuộc {form.provinces[0]} — hãy chọn quận/huyện trong danh sách gợi ý.

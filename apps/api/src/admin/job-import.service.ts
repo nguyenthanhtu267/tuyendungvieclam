@@ -9,6 +9,7 @@ import { AdminService, AdminActor } from './admin.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { extractJobFromUrl } from '../common/job-url-extractor.util';
 import { inferIndustry } from '../common/job-industry.util';
+import { inferChannel } from '../common/job-channel.util';
 import { findProvince } from '../common/cv-parser.util';
 import { normalizeSearchText } from '../common/search-text.util';
 import { unaccentSql } from '../common/sql-unaccent.util';
@@ -211,6 +212,13 @@ export class JobImportService {
     return {
       items: items.map((i) => ({
         ...i,
+        // Đợt 135 — tin cũ chưa có kênh: đoán ngay từ chức danh/mô tả để hiện nhãn + lọc kênh
+        data: (() => {
+          const d = (i.data ?? {}) as Record<string, any>;
+          if (d.channel) return d;
+          const g = inferChannel(String(d.title ?? ''), String(d.description ?? ''), String(d.address ?? d.location ?? ''));
+          return { ...d, channel: g.channel, ...(g.channel !== 'office' ? { laborGroup: g.laborGroup, laborPerks: g.laborPerks, workPlace: g.workPlace } : {}) };
+        })(),
         matchedCompany: i.matchedCompanyId ? { id: cmap.get(i.matchedCompanyId)?.id, name: cmap.get(i.matchedCompanyId)?.name, isAdminSourced: cmap.get(i.matchedCompanyId)?.isAdminSourced } : null,
       })),
       counts: Object.fromEntries(counts.map((c) => [c.status, Number(c.n)])),
@@ -251,7 +259,17 @@ export class JobImportService {
       company = created.company;
     }
     const prov = findProvince(d.location);
+    // Đợt 135 — kênh tin: Admin chọn trong form > đã đoán lúc đọc tin > đoán lại từ nội dung.
+    const guess = d.channel ? null : inferChannel(title, String(d.description ?? ''), String(d.address ?? d.location ?? ''));
+    const channel = String(d.channel || guess?.channel || 'office');
+    const labor = channel === 'office' ? {} : {
+      channel,
+      laborGroup: d.laborGroup || guess?.laborGroup || undefined,
+      laborPerks: Array.isArray(d.laborPerks) ? d.laborPerks : guess?.laborPerks ?? [],
+      workPlace: d.workPlace ?? guess?.workPlace ?? (prov ? { province: prov, mode: 'old' } : null),
+    };
     const job = await this.admin.createJobForCompany(admin, company.id, {
+      ...labor,
       title,
       industry: d.industry || inferIndustry(title, d.description) || undefined,
       provinces: prov ? [prov] : undefined,
@@ -302,11 +320,11 @@ export class JobImportService {
 
   // Tự đăng: tin "Chờ xem" tìm được sau `since` và đã quá `minutes` phút. Lỗi 2 lần thì thôi (để Admin xem tay).
   async autoPublishDue(minutes: number, since: Date, actor: AdminActor): Promise<number> {
-    const cutoff = new Date(Date.now() - minutes * 60_000);
+    // So giờ ngay trong CSDL (now()) để không lệch múi giờ giữa máy chủ web và CSDL.
     const rows = await this.repo
       .createQueryBuilder('i')
       .where("i.status = 'pending'")
-      .andWhere('i.createdAt >= :since AND i.createdAt <= :cutoff', { since, cutoff })
+      .andWhere("i.createdAt >= :since AND i.createdAt <= now() - make_interval(mins => :m)", { since, m: Math.round(minutes) })
       .orderBy('i.createdAt', 'ASC')
       .take(15)
       .getMany();
@@ -402,7 +420,7 @@ export class JobImportService {
     row.status = owner ? 'owner_review' : 'pending';
     row.note = null as never;
     await this.repo.save(row);
-    await this.repo.update(id, { createdAt: new Date() } as never);
+    await this.repo.query('UPDATE job_imports SET created_at = now() WHERE id = $1', [id]);
     return row;
   }
 

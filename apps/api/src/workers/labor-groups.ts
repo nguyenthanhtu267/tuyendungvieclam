@@ -61,3 +61,22 @@ export function minorUnsafeReason(j: { laborGroup?: string | null; title?: strin
   return null;
 }
 export const ageOf = (birth: string | Date) => Math.floor((Date.now() - new Date(birth).getTime()) / (365.25 * 864e5));
+
+/** Đợt 134 — suy ra ca làm của một tin (để lọc "Ca làm" và hiện nhãn): từ lưới ca cần người + chữ trong tiêu đề/mô tả + giờ làm đêm. */
+export function jobShiftTags(j: { title?: string | null; description?: string | null; workSchedule?: string | null; laborSchedule?: string[] | null; payInfo?: { nightHours?: number } | null }): string[] {
+  const t = ` ${[j.title, j.workSchedule, (j.description ?? '').replace(/<[^>]+>/g, ' ')].filter(Boolean).join(' ')} `.toLowerCase();
+  const sched = j.laborSchedule ?? [];
+  const out = new Set<string>();
+  if (/xoay ca|ca xoay|đảo ca|luân phiên ca|3 ca|ba ca|2 ca|hai ca|ca kíp|làm ca\b/.test(t)) out.add('Xoay ca');
+  if (/ca đêm|làm đêm|ca 3\b|đêm/.test(t) || (j.payInfo?.nightHours ?? 0) > 0) out.add('Ca đêm');
+  if (/hành chính|giờ hành chính|8h ?- ?17h|8h ?- ?17h30|7h30 ?- ?16h30/.test(t)) out.add('Hành chính');
+  if (/cuối tuần|thứ 7, chủ nhật|t7, cn|thứ bảy|chủ nhật/.test(t) || (sched.length > 0 && sched.every((x) => x.startsWith('t7') || x.startsWith('cn')))) out.add('Cuối tuần');
+  if (/theo giờ|linh hoạt|bán thời gian|part ?-?time|thời vụ|ca gãy/.test(t)) out.add('Theo giờ linh hoạt');
+  if (sched.length) {
+    const weekdayDay = sched.some((x) => /^t[2-6]-(sang|chieu)$/.test(x));
+    const anyEvening = sched.some((x) => x.endsWith('-toi'));
+    if (weekdayDay && !anyEvening && !out.has('Xoay ca')) out.add('Hành chính');
+    if (anyEvening && !weekdayDay) out.add('Theo giờ linh hoạt');
+  }
+  return SHIFTS.filter((s) => out.has(s));
+}

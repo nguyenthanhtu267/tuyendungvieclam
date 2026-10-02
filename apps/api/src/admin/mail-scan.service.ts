@@ -223,10 +223,12 @@ export class MailScanService implements OnModuleInit, OnModuleDestroy {
   async setAutoPublish(minutes: number) {
     const m = [15, 30].includes(Number(minutes)) ? Number(minutes) : 0;
     const s = await this.row();
-    if (m > 0 && (s.importAutoPublishMinutes ?? 0) === 0) s.importAutoPublishSince = new Date();
+    const turnOn = m > 0 && (s.importAutoPublishMinutes ?? 0) === 0;
     if (m === 0) s.importAutoPublishSince = null;
     s.importAutoPublishMinutes = m;
     await this.settings.save(s);
+    // mốc "từ lúc bật" lấy theo giờ CSDL (cùng nguồn với created_at của tin)
+    if (turnOn) await this.settings.query('UPDATE admin_settings SET import_auto_publish_since = now() WHERE id = $1', [s.id]);
     return this.status();
   }
 

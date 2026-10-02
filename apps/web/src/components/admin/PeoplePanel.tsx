@@ -1,5 +1,6 @@
 'use client';
 
+import { Combobox } from '@/components/ui/Combobox';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { ApiError, type AdminPersonDetail, type AdminPersonRow, type ProfileVisibility } from '@/lib/api';
@@ -407,14 +408,7 @@ function PersonModal({
                   <input className="tvl-input text-sm" value={c.taxCode} onChange={(e) => setC({ ...c, taxCode: e.target.value })} />
                 </L>
                 <L label="Ngành nghề">
-                  <select className="tvl-input text-sm" value={c.industry} onChange={(e) => setC({ ...c, industry: e.target.value })}>
-                    <option value="">—</option>
-                    {(INDUSTRIES.includes(c.industry) || !c.industry ? INDUSTRIES : [c.industry, ...INDUSTRIES]).map((i) => (
-                      <option key={i} value={i}>
-                        {i}
-                      </option>
-                    ))}
-                  </select>
+                  <Combobox inputClassName="text-sm" value={c.industry} options={INDUSTRIES.includes(c.industry) || !c.industry ? INDUSTRIES : [c.industry, ...INDUSTRIES]} placeholder="— Gõ để tìm ngành —" onChange={(v) => setC({ ...c, industry: v })} />
                 </L>
                 <L label="Quy mô">
                   <input className="tvl-input text-sm" value={c.size} onChange={(e) => setC({ ...c, size: e.target.value })} />
@@ -490,14 +484,7 @@ function PersonModal({
                   />
                 </L>
                 <L label="Tỉnh/thành">
-                  <select className="tvl-input text-sm" value={p.province} onChange={(e) => setP({ ...p, province: e.target.value })}>
-                    <option value="">—</option>
-                    {PROVINCES.map((x) => (
-                      <option key={x} value={x}>
-                        {x}
-                      </option>
-                    ))}
-                  </select>
+                  <Combobox inputClassName="text-sm" value={p.province} options={PROVINCES} placeholder="— Gõ để tìm tỉnh/thành —" onChange={(v) => setP({ ...p, province: v })} />
                 </L>
                 <L label="SĐT liên hệ">
                   <input className="tvl-input text-sm" value={p.phone} onChange={(e) => setP({ ...p, phone: e.target.value })} />

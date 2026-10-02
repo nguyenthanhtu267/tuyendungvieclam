@@ -1,5 +1,6 @@
 'use client';
 
+import { Combobox } from '@/components/ui/Combobox';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from '@/components/SmartLink';
@@ -157,14 +158,7 @@ export default function KhoCvPage() {
               extra={
                 <label className="flex flex-col gap-1">
                   <span className="text-[11.5px] font-bold text-ink-muted">Gắn với tin tuyển dụng (không bắt buộc)</span>
-                  <select className="tvl-input text-sm" value={importJobId} onChange={(e) => setImportJobId(e.target.value)}>
-                    <option value="">— Không gắn tin nào —</option>
-                    {myJobs.map((j) => (
-                      <option key={j.id} value={j.id}>
-                        {j.title}
-                      </option>
-                    ))}
-                  </select>
+                  <Combobox ariaLabel="Gắn với tin tuyển dụng" inputClassName="text-sm" value={importJobId} options={myJobs.map((j) => ({ value: j.id, label: j.title }))} allLabel="— Không gắn tin nào —" onChange={setImportJobId} />
                 </label>
               }
               onCancel={() => setImportOpen(false)}
@@ -209,21 +203,7 @@ export default function KhoCvPage() {
             value={qInput}
             onChange={(e) => setQInput(e.target.value)}
           />
-          <select
-            className="tvl-input !w-auto text-sm max-w-[320px]"
-            value={jobId}
-            onChange={(e) => {
-              setJobId(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">Tất cả vị trí đã ứng tuyển</option>
-            {jobs.map((j) => (
-              <option key={j.jobId} value={j.jobId}>
-                {j.jobTitle} ({formatNumber(j.count)})
-              </option>
-            ))}
-          </select>
+          <Combobox ariaLabel="Vị trí đã ứng tuyển" className="min-w-[13rem] w-72 max-w-full" inputClassName="text-sm" value={jobId} options={jobs.map((j) => ({ value: j.jobId, label: j.jobTitle, hint: formatNumber(j.count) }))} allLabel="Tất cả vị trí đã ứng tuyển" onChange={(v) => { setJobId(v); setPage(1); }} />
           {hasFilters && (
             <button
               className="text-xs font-semibold text-critical px-2"

@@ -1,5 +1,7 @@
 'use client';
 
+import { Combobox } from '@/components/ui/Combobox';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from '@/components/SmartLink';
@@ -662,18 +664,7 @@ function CandidateCard({
             <div className="text-[11px] text-ink-faint">Bạn chưa có tin nào đang đăng để mời ứng viên.</div>
           ) : (
             <>
-              <select
-                className="tvl-input text-xs"
-                value={inviteJobId}
-                onChange={(e) => setInviteJobId(e.target.value)}
-              >
-                <option value="">— Chọn tin tuyển dụng —</option>
-                {jobOptions.map((j) => (
-                  <option key={j.id} value={j.id}>
-                    {j.title}
-                  </option>
-                ))}
-              </select>
+              <Combobox ariaLabel="Chọn tin tuyển dụng" inputClassName="text-xs" value={inviteJobId} options={jobOptions.map((j) => ({ value: j.id, label: j.title }))} placeholder="— Gõ để tìm tin tuyển dụng —" onChange={setInviteJobId} />
               <div className="flex justify-end gap-2">
                 <button onClick={() => setInviteOpen(false)} className="tvl-btn-ghost !w-auto px-3 py-1 text-[11px]">
                   Đóng

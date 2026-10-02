@@ -1,5 +1,7 @@
 'use client';
 
+import { Combobox } from '@/components/ui/Combobox';
+
 import { useRef, useState } from 'react';
 import Link from '@/components/SmartLink';
 import type { Company, JobPosting } from '@/lib/api';
@@ -179,20 +181,7 @@ export default function CompanyOverview({
               />
             </label>
             {places.length > 1 && (
-              <select
-                id="co-job-place"
-                aria-label="Địa điểm làm việc"
-                className="tvl-input sm:w-[210px]"
-                value={place}
-                onChange={(e) => setPlace(e.target.value)}
-              >
-                <option value="">Tất cả địa điểm ({base.length})</option>
-                {places.map(([pv, n]) => (
-                  <option key={pv} value={pv}>
-                    {pv} ({n})
-                  </option>
-                ))}
-              </select>
+              <Combobox id="co-job-place" ariaLabel="Địa điểm làm việc" className="w-full sm:w-[210px]" value={place} options={places.map(([pv, n]) => ({ value: pv, label: pv, hint: String(n) }))} allLabel={`Tất cả địa điểm (${base.length})`} onChange={setPlace} />
             )}
             <select
               id="co-job-sort"

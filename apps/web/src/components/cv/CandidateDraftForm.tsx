@@ -1,5 +1,6 @@
 'use client';
 
+import { Combobox } from '@/components/ui/Combobox';
 import { useState } from 'react';
 import {
   cvParseApi,
@@ -281,14 +282,7 @@ export function CandidateDraftForm({
             </select>
           </F>
           <F label="Tỉnh/thành">
-            <select id="draft-province" className="tvl-input text-sm" value={draft.province ?? ''} onChange={(e) => set('province', e.target.value)}>
-              <option value="">—</option>
-              {PROVINCES.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
+            <Combobox id="draft-province" inputClassName="text-sm" value={draft.province ?? ''} options={PROVINCES} placeholder="— Gõ để tìm tỉnh/thành —" onChange={(v) => set('province', v)} />
           </F>
           <F label="Địa chỉ">
             <input id="draft-address" className="tvl-input text-sm" value={draft.address ?? ''} onChange={(e) => set('address', e.target.value)} />

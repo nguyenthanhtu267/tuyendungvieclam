@@ -5,12 +5,14 @@ import { WorkerApplication, WorkerContact, WorkerNote, WorkerProfile, WorkerKind
 import { JobApprovalStatus, JobPosting } from '../database/entities/job-posting.entity';
 import { CompanyUser } from '../database/entities/company-user.entity';
 import { Company } from '../database/entities/company.entity';
-import { LABOR_GROUPS, PERKS, RADII, SHIFTS, SHIFTS_BY_KIND, SLOTS, estimateIncome, minorUnsafeReason, slotsFor, ageOf, LaborKind } from './labor-groups';
+import { LABOR_GROUPS, PERKS, RADII, SHIFTS, SHIFTS_BY_KIND, SLOTS, estimateIncome, jobShiftTags, minorUnsafeReason, slotsFor, ageOf, LaborKind } from './labor-groups';
 import { cleanProfileExtra, fitOf, hourlyInfo, profileSanity, ProfileExtra } from './labor-extra';
 import { JobReport } from '../database/entities/job-report.entity';
+import { NotificationsService } from '../notifications/notifications.service';
+import { unaccentSql } from '../common/sql-unaccent.util';
 import { assessJobRisk, fold, RiskJob } from '../admin/job-risk';
 import { minWageOf, wageWarning } from './min-wage';
-import { districtLabel, guessProvince, haversineKm, Loc, provinceCentroid, proximity, resolvePlace } from './vn-geo';
+import { districtLabel, guessProvince, haversineKm, Loc, nearestProvince, provinceCentroid, proximity, resolvePlace } from './vn-geo';
 
 const CALL_STATUSES = ['no_answer', 'callback', 'interview', 'hired', 'rejected', 'no_show'];
 
@@ -99,6 +101,7 @@ export class WorkersService {
     @InjectRepository(Company) private readonly companies: Repository<Company>,
     @InjectRepository(WorkerContact) private readonly contacts: Repository<WorkerContact>,
     @InjectRepository(JobReport) private readonly reports: Repository<JobReport>,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ---------- xác minh ----------
@@ -250,7 +253,7 @@ export class WorkersService {
     return this.view(p);
   }
 
-  private view(p: WorkerProfile) {
+  view(p: WorkerProfile) {
     return {
       id: p.id, kind: p.kind, fullName: p.fullName, phone: p.phone, relativePhone: p.relativePhone ?? null, gender: p.gender,
       birthDate: String(p.birthDate).slice(0, 10), province: p.province, addressMode: p.addressMode, oldDistrict: p.oldDistrict ?? null,
@@ -299,6 +302,7 @@ export class WorkersService {
       perks: j.laborPerks ?? [],
       income: estimateIncome(j.payInfo),
       schedule: j.laborSchedule ?? [],
+      shiftTags: jobShiftTags(j),
       headcount: j.headcount ?? 1,
       hired: extra.hired ?? 0,
       filled: !!j.filledAt,
@@ -408,10 +412,16 @@ export class WorkersService {
     // Đợt 84 — người chưa đủ 18 tuổi: ẩn tin ca đêm/nặng nhọc; sinh viên: lọc theo số giờ/tuần
     const isMinor = q.minor === '1';
     const maxH = Number(q.hours) || 0;
-    const rows = rows1.filter((j) => (!isMinor || !minorUnsafeReason(j)) && (!maxH || !j.laborExtra?.hours || j.laborExtra.hours <= maxH));
+    // Đợt 134 — lọc "Ca làm" (chọn nhiều = tin có ít nhất 1 ca đã chọn)
+    const wantShifts = (q.shifts ?? '').split(',').map((x) => x.trim()).filter((x) => SHIFTS.includes(x));
+    const rows = rows1.filter((j) => (!isMinor || !minorUnsafeReason(j)) && (!maxH || !j.laborExtra?.hours || j.laborExtra.hours <= maxH) && (!wantShifts.length || jobShiftTags(j).some((t) => wantShifts.includes(t))));
 
     // Vị trí người tìm việc (từ hồ sơ của họ trên trình duyệt) để tính gần/xa
     let origin: Loc | null = null;
+    // Đợt 134 — chỉ có vị trí máy (chưa có hồ sơ): suy ra tỉnh gần nhất để vẫn xếp "Gần tôi" được.
+    if (!q.oProvince && q.oLat && q.oLon && Number.isFinite(Number(q.oLat)) && Number.isFinite(Number(q.oLon))) {
+      q = { ...q, oProvince: nearestProvince(Number(q.oLat), Number(q.oLon)) ?? undefined };
+    }
     if (q.oProvince) {
       origin = { province: q.oProvince, oldDistrict: q.oDistrict || null, newWardCode: q.oWard || null };
       const lat = Number(q.oLat);
@@ -441,6 +451,13 @@ export class WorkersService {
       if (fit && fit.missing.length === 0 && fit.ok.length) score += 1;
       return { j, distance, scheduleFit, score, fit };
     });
+    // Đợt 134 — bán kính (km) khi đã biết vị trí người tìm việc
+    const radius = Number(q.radius) || 0;
+    if (radius > 0 && origin) {
+      const keep = scored.filter((x) => x.distance && x.distance.km <= radius);
+      scored.length = 0;
+      scored.push(...keep);
+    }
     const sort = q.sort ?? (origin ? 'near' : 'new');
     if (sort === 'near' && origin) scored.sort((a, b) => (!!a.j.filledAt === !!b.j.filledAt ? 0 : a.j.filledAt ? 1 : -1) || (a.distance!.km - b.distance!.km) || (b.score - a.score));
     else if (sort === 'match') scored.sort((a, b) => b.score - a.score || (a.distance?.km ?? 999) - (b.distance?.km ?? 999));
@@ -1163,6 +1180,110 @@ export class WorkersService {
     const bal = (await this.provinceBalance()).filter((x) => Math.abs(x.gap) >= 5).slice(0, 3);
     return { openReports: rep?.n ?? 0, suspicious: sus.items.length, duplicates: dup.items.length, pendingTotal: pending.length, riskyPending: risky, imbalance: bal };
   }
+  // ===== Đợt 135 — Admin quản lý hồ sơ lao động phổ thông (giống tab Ứng viên văn phòng) =====
+  async adminList(q: Record<string, string | undefined>) {
+    const qb = this.repo.createQueryBuilder('w');
+    if (q.kind && KINDS.includes(q.kind as WorkerKind)) qb.andWhere('w.kind = :k', { k: q.kind });
+    if (q.province) qb.andWhere('w.province = :pv', { pv: q.province });
+    if (q.group) qb.andWhere("(',' || w.desired_jobs || ',') LIKE :g", { g: `%,${q.group},%` });
+    if (q.shift) qb.andWhere("(',' || w.shifts || ',') LIKE :sh", { sh: `%,${q.shift},%` });
+    if (q.seeking === '1') qb.andWhere('w.is_seeking = true');
+    if (q.seeking === '0') qb.andWhere('w.is_seeking = false');
+    if (q.hidden === '1') qb.andWhere('w.is_hidden = true');
+    else if (q.hidden !== 'all') qb.andWhere('w.is_hidden = false');
+    if (q.account === '1') qb.andWhere('w.user_id IS NOT NULL');
+    if (q.account === '0') qb.andWhere('w.user_id IS NULL');
+    if (q.tag) qb.andWhere(':tag = ANY(w.admin_tags)', { tag: q.tag });
+    if (q.stale === '1') qb.andWhere("w.refreshed_at < now() - interval '30 days'");
+    const text = (q.q ?? '').trim();
+    if (text) {
+      const digits = text.replace(/\D/g, '');
+      const t = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+      qb.andWhere(`(${unaccentSql('w.full_name')} LIKE :t OR ${unaccentSql("coalesce(w.admin_note,'')")} LIKE :t OR ${unaccentSql("coalesce(w.desired_jobs,'')")} LIKE :t${digits.length >= 3 ? ' OR w.phone LIKE :d OR w.relative_phone LIKE :d' : ''})`, { t: `%${t}%`, d: `%${digits}%` });
+    }
+    const sort = q.sort === 'new' ? 'w.created_at' : 'w.refreshed_at';
+    qb.orderBy(sort, 'DESC');
+    const size = 20;
+    const page = Math.max(1, Number(q.page) || 1);
+    const [rows, total] = await qb.skip((page - 1) * size).take(size).getManyAndCount();
+    const ids = rows.map((r) => r.id);
+    const appN: { pid: string; n: number }[] = ids.length ? await this.repo.manager.query('SELECT profile_id AS pid, COUNT(*)::int AS n FROM worker_applications WHERE profile_id = ANY($1) GROUP BY profile_id', [ids]) : [];
+    const callN: { pid: string; n: number }[] = ids.length ? await this.repo.manager.query('SELECT profile_id AS pid, COUNT(*)::int AS n FROM worker_contacts WHERE profile_id = ANY($1) GROUP BY profile_id', [ids]) : [];
+    const am = new Map(appN.map((x) => [x.pid, x.n]));
+    const cm = new Map(callN.map((x) => [x.pid, x.n]));
+    const counts: { kind: string; n: number }[] = await this.repo.manager.query('SELECT kind, COUNT(*)::int AS n FROM worker_profiles WHERE is_hidden = false GROUP BY kind');
+    return {
+      items: rows.map((w) => ({
+        id: w.id, kind: w.kind, fullName: w.fullName, phone: w.phone, gender: w.gender, age: ageOf(String(w.birthDate).slice(0, 10)),
+        province: w.province, place: districtLabel({ province: w.province, oldDistrict: w.oldDistrict, newWardCode: w.newWardCode }),
+        desiredJobs: w.desiredJobs ?? [], shifts: w.shifts ?? [], isSeeking: w.isSeeking, isHidden: w.isHidden, hasAccount: !!w.userId,
+        refreshedAt: w.refreshedAt, createdAt: w.createdAt, tags: w.adminTags ?? [], note: w.adminNote ?? null,
+        applications: am.get(w.id) ?? 0, calls: cm.get(w.id) ?? 0,
+      })),
+      total, page, totalPages: Math.max(1, Math.ceil(total / size)),
+      counts: Object.fromEntries(counts.map((c) => [c.kind, c.n])),
+    };
+  }
+
+  async adminTags() {
+    const rows: { tag: string; n: number }[] = await this.repo.manager.query('SELECT t AS tag, COUNT(*)::int AS n FROM worker_profiles, unnest(admin_tags) t GROUP BY t ORDER BY n DESC, t LIMIT 200');
+    return rows.map((r) => ({ tag: r.tag, count: r.n }));
+  }
+
+  async adminDetail(id: string) {
+    const p = await this.repo.findOne({ where: { id } });
+    if (!p) throw new NotFoundException('Không tìm thấy hồ sơ');
+    const apps: { id: string; status: string; createdAt: Date; jobId: string; title: string; company: string }[] = await this.repo.manager.query(
+      `SELECT a.id, a.status, a.created_at AS "createdAt", j.id AS "jobId", j.title, c.name AS company
+       FROM worker_applications a JOIN job_postings j ON j.id = a.job_posting_id LEFT JOIN companies c ON c.id = j.company_id
+       WHERE a.profile_id = $1 ORDER BY a.created_at DESC LIMIT 50`, [id]);
+    const calls: { status: string; updatedAt: Date; company: string; jobTitle: string | null }[] = await this.repo.manager.query(
+      `SELECT k.status, k.updated_at AS "updatedAt", c.name AS company, j.title AS "jobTitle"
+       FROM worker_contacts k LEFT JOIN companies c ON c.id = k.company_id LEFT JOIN job_postings j ON j.id = k.job_posting_id
+       WHERE k.profile_id = $1 ORDER BY k.updated_at DESC LIMIT 50`, [id]);
+    const notes = await this.notes.find({ where: { profileId: id }, order: { createdAt: 'DESC' }, take: 30 });
+    return { profile: { ...this.view(p), isHidden: p.isHidden, hasAccount: !!p.userId, tags: p.adminTags ?? [], note: p.adminNote ?? null }, applications: apps, calls, notes: notes.map((n) => ({ kind: n.kind, text: n.text, createdAt: n.createdAt })) };
+  }
+
+  async adminSetMeta(id: string, b: { tags?: string[]; note?: string | null }) {
+    const p = await this.repo.findOne({ where: { id } });
+    if (!p) throw new NotFoundException('Không tìm thấy hồ sơ');
+    if (Array.isArray(b.tags)) p.adminTags = Array.from(new Set(b.tags.map((t) => String(t).trim().slice(0, 40)).filter(Boolean))).slice(0, 15);
+    if (b.note !== undefined) p.adminNote = b.note ? String(b.note).slice(0, 1000) : null;
+    await this.repo.save(p);
+    return { ok: true, tags: p.adminTags ?? [], note: p.adminNote ?? null };
+  }
+
+  /** Gợi ý tin phù hợp: cùng kênh, gần nơi ở, đúng việc muốn làm / ca / nhu cầu (dùng chung bộ chấm điểm của trang việc làm). */
+  async adminSuggest(id: string) {
+    const p = await this.repo.findOne({ where: { id } });
+    if (!p) throw new NotFoundException('Không tìm thấy hồ sơ');
+    const r = await this.browse({
+      kind: p.kind, sort: 'match', hideFilled: '1', pageSize: '10',
+      oProvince: p.province, oDistrict: p.oldDistrict ?? undefined, oWard: p.newWardCode ?? undefined,
+      oLat: p.lat != null ? String(p.lat) : undefined, oLon: p.lon != null ? String(p.lon) : undefined,
+      groups: (p.desiredJobs ?? []).join('|'), avail: (p.availability ?? []).join(','),
+      needs: [p.needsHousing ? 'housing' : '', p.needsShuttle ? 'shuttle' : ''].filter(Boolean).join(','),
+      shifts: (p.shifts ?? []).join(',') || undefined,
+    });
+    // không có tin đúng ca → bỏ điều kiện ca
+    const items = r.items.length ? r.items : (await this.browse({ kind: p.kind, sort: 'match', hideFilled: '1', pageSize: '10', oProvince: p.province, oDistrict: p.oldDistrict ?? undefined, groups: (p.desiredJobs ?? []).join('|') })).items;
+    const applied = new Set((await this.apps.find({ where: { profileId: id }, select: { jobPostingId: true } })).map((a) => a.jobPostingId));
+    return items.map((j) => ({ id: j.id, title: j.title, company: j.company?.name ?? '', distance: j.distance?.label ?? null, salaryMin: j.salaryMin, salaryMax: j.salaryMax, matched: j.matched, applied: applied.has(j.id) }));
+  }
+
+  /** Mời ứng tuyển: người có tài khoản nhận thông báo trong web (+ email nếu bật); không có tài khoản → trả về SĐT để Admin gọi/Zalo. */
+  async adminInvite(id: string, jobId: string) {
+    const p = await this.repo.findOne({ where: { id } });
+    const job = await this.jobs.findOne({ where: { id: jobId }, relations: { company: true } });
+    if (!p || !job) throw new NotFoundException('Không tìm thấy hồ sơ hoặc tin');
+    if (p.userId) {
+      await this.notifications.createMany([p.userId], 'job_invite', `Có việc phù hợp với bạn: "${job.title}" — ${job.company?.name ?? ''}. Bấm để xem và ứng tuyển nhanh.`, `/viec-lam/${job.id}`);
+      return { ok: true, via: 'notification' as const };
+    }
+    return { ok: false, via: 'phone' as const, phone: p.phone, message: `Người này chưa có tài khoản — gọi hoặc nhắn Zalo ${p.phone} kèm link tin: /viec-lam/${job.id}` };
+  }
+
   async adminHide(id: string, hidden: boolean) {
     await this.repo.update({ id }, { isHidden: hidden });
     return { ok: true };

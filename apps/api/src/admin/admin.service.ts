@@ -45,6 +45,7 @@ import {
 import { NotificationsService } from '../notifications/notifications.service';
 import { UpdateJobDto } from '../employer/dto/update-job.dto';
 import { CreateJobDto } from '../employer/dto/create-job.dto';
+import { sanitizeChannel } from '../workers/sanitize-channel.util';
 import { RejectJobDto } from './dto/reject-job.dto';
 import { CreateDraftCompanyDto } from './dto/create-draft-company.dto';
 import { ClaimCompanyDto } from './dto/claim-company.dto';
@@ -1201,6 +1202,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       contactPhone: dto.contactPhone,
       contactNote: sanitizeRichText(dto.contactNote),
       sourceUrl: dto.sourceUrl?.trim() || undefined,
+      // Đợt 135 — tin Admin đăng hộ cũng đăng được vào kênh công nhân / sinh viên / thực tập (cùng quy tắc với NTD).
+      ...sanitizeChannel(dto as never),
       approvalStatus: JobApprovalStatus.APPROVED,
       adminReviewed: true,
     });

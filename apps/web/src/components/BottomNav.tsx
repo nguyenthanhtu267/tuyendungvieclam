@@ -154,19 +154,17 @@ export default function BottomNav() {
     >
       <Tab href="/" icon="🏠" label="Trang chủ" active={is('/')} />
       <Tab href="/viec-lam" icon="🔎" label="Văn phòng" active={is('/viec-lam')} />
+      {/* Đợt 134 — "Công nhân" luôn có (cả khi đã đăng nhập) và mở thẳng DANH SÁCH VIỆC; "Đã lưu" xem trong Tài khoản. */}
+      <Tab href="/lao-dong-pho-thong/viec-lam" icon="🧰" label="Công nhân" active={is('/lao-dong-pho-thong')} />
       {logged ? (
         <>
-          <Tab href="/ho-so#saved" icon="♡" label="Đã lưu" active={false} badge={saved} />
           <div className="flex-1 min-w-0 h-full">
             <NotificationBell token={token as string} variant="tab" />
           </div>
           <Tab href="/ho-so" icon="👤" label="Tài khoản" active={is('/ho-so')} badge={appNews} />
         </>
       ) : (
-        <>
-          <Tab href="/lao-dong-pho-thong" icon="🧰" label="Công nhân" active={is('/lao-dong-pho-thong')} />
-          <Tab href={pathname && pathname !== '/' && !pathname.startsWith('/dang-nhap') ? `/dang-nhap?next=${encodeURIComponent(pathname)}` : '/dang-nhap'} icon="👤" label="Đăng nhập" active={false} />
-        </>
+        <Tab href={pathname && pathname !== '/' && !pathname.startsWith('/dang-nhap') ? `/dang-nhap?next=${encodeURIComponent(pathname)}` : '/dang-nhap'} icon="👤" label="Đăng nhập" active={false} />
       )}
     </nav>
   );

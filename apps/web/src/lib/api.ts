@@ -2560,7 +2560,7 @@ export interface Proximity { km: number; label: string; exact: boolean }
 export interface WorkerJobCard {
   id: string; title: string; laborGroup: string | null; channel: string; provinces: string[]; salaryMin: number | null; salaryMax: number | null;
   isUrgent: boolean; deadline: string | null; createdAt: string; company: { id: string; name: string; logoUrl: string | null } | null; matched?: boolean;
-  workPlaceText?: string | null; perks?: string[]; income?: LaborIncome | null; schedule?: string[]; headcount?: number; hired?: number; filled?: boolean;
+  workPlaceText?: string | null; perks?: string[]; income?: LaborIncome | null; schedule?: string[]; shiftTags?: string[]; headcount?: number; hired?: number; filled?: boolean;
   distance?: Proximity | null; scheduleFit?: boolean | null; warnings?: string[]; ageDays?: number; closed?: boolean; trust?: TrustInfo | null;
   laborExtra?: JobExtra | null; hourly?: { hourly: number; belowMin: boolean; min: number; region: number; monthEstimate: number | null } | null; minorUnsafe?: string | null; minorBlocked?: boolean; fit?: FitResult | null;
 }
@@ -2619,6 +2619,17 @@ function workersCatalog(): Promise<WorkersCatalog> {
   return wcatInflight;
 }
 
+export interface AdminWorkerRow {
+  id: string; kind: WorkerKind; fullName: string; phone: string; gender: string; age: number; province: string; place: string;
+  desiredJobs: string[]; shifts: string[]; isSeeking: boolean; isHidden: boolean; hasAccount: boolean; refreshedAt: string; createdAt: string;
+  tags: string[]; note: string | null; applications: number; calls: number;
+}
+export interface AdminWorkerDetail {
+  profile: WorkerProfileView & { isHidden: boolean; hasAccount: boolean; tags: string[]; note: string | null };
+  applications: { id: string; status: string; createdAt: string; jobId: string; title: string; company: string | null }[];
+  calls: { status: string; updatedAt: string; company: string | null; jobTitle: string | null }[];
+  notes: { kind: string; text: string; createdAt: string }[];
+}
 export const workersApi = {
   // Đợt 93 — danh mục (nhóm nghề, ca, bán kính, tỉnh) gần như không đổi (API cũng lưu đệm 24 giờ): nhớ trong RAM + ở máy người xem
   // 24 giờ và gộp các lần gọi trùng → mở các trang lao động phổ thông lần 2 trở đi không gọi API; lần đầu vẫn lấy như cũ.
@@ -2678,6 +2689,13 @@ export const workersApi = {
     request<{ origin: { province: string } | null; totalInProvince?: number; districts: SupplyRow[]; provinces: { province: string; total: number; km: number }[]; hours?: number[]; bestHours?: { h: number; n: number }[]; dropout?: DropoutRow[] }>(`/employer/workers/supply?${qsOf(params)}`, { headers: authHeaders(token) }),
   adminStats: (token: string) => request<{ items: { kind: WorkerKind; n: number; fresh: number; hidden: number }[]; apps: number; contacts: number; provinces?: ProvinceBalance[] }>('/admin/workers/stats', { headers: authHeaders(token) }),
   adminSuspicious: (token: string) => request<{ items: SuspiciousWorkerGroup[] }>('/admin/workers/suspicious', { headers: authHeaders(token) }),
+  // Đợt 135 — Admin quản lý hồ sơ lao động phổ thông
+  adminList: (token: string, params: Record<string, string | undefined>) => request<{ items: AdminWorkerRow[]; total: number; page: number; totalPages: number; counts: Record<string, number> }>(`/admin/workers/list?${qsOf(params)}`, { headers: authHeaders(token) }),
+  adminTags: (token: string) => request<{ tag: string; count: number }[]>('/admin/workers/tags', { headers: authHeaders(token) }),
+  adminDetail: (token: string, id: string) => request<AdminWorkerDetail>(`/admin/workers/${id}/detail`, { headers: authHeaders(token) }),
+  adminMeta: (token: string, id: string, b: { tags?: string[]; note?: string | null }) => request<{ ok: boolean; tags: string[]; note: string | null }>(`/admin/workers/${id}/meta`, { method: 'PATCH', body: JSON.stringify(b), headers: authHeaders(token) }),
+  adminSuggest: (token: string, id: string) => request<{ id: string; title: string; company: string; distance: string | null; salaryMin: number | null; salaryMax: number | null; matched: boolean; applied: boolean }[]>(`/admin/workers/${id}/suggested-jobs`, { headers: authHeaders(token) }),
+  adminInvite: (token: string, id: string, jobId: string) => request<{ ok: boolean; via: 'notification' | 'phone'; phone?: string; message?: string }>(`/admin/workers/${id}/invite`, { method: 'POST', body: JSON.stringify({ jobId }), headers: authHeaders(token) }),
   adminHide: (token: string, id: string, hidden: boolean) => request<{ ok: boolean }>(`/admin/workers/${id}/hide`, { method: 'PATCH', body: JSON.stringify({ hidden }), headers: authHeaders(token) }),
   seen: (token: string, id: string) => request<{ ok: boolean }>(`/employer/worker-applications/${id}/seen`, { method: 'PATCH', headers: authHeaders(token) }),
 };
@@ -2730,6 +2748,9 @@ export interface JobImportData {
   tags?: string[];
   isUrgent?: boolean;
   enriched?: boolean;
+  channel?: string;
+  laborGroup?: string;
+  laborPerks?: string[];
 }
 export interface JobImportRow {
   id: string;

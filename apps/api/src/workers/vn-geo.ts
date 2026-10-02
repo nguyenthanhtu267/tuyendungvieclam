@@ -157,6 +157,16 @@ export function districtLabel(p: { province: string; oldDistrict?: string | null
   const first = set ? Array.from(set).find((x) => x.startsWith(`${p.province}|`)) : null;
   return first ? first.split('|')[1] : 'Chưa rõ quận/huyện';
 }
+/** Đợt 134 — tỉnh gần nhất với một toạ độ (vị trí máy của người tìm việc). */
+export function nearestProvince(lat: number, lon: number): string | null {
+  let best: string | null = null;
+  let bd = Infinity;
+  for (const [p, c] of Object.entries(PC)) {
+    const d = haversineKm([lat, lon], c);
+    if (d < bd) { bd = d; best = p; }
+  }
+  return best;
+}
 export function provinceCentroid(p: string) {
   return PC[p] ?? null;
 }

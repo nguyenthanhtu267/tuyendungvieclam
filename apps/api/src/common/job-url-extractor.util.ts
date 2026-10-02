@@ -9,6 +9,7 @@
 
 import { assertPublicHttpUrl } from './public-url.util';
 import { inferIndustry } from './job-industry.util';
+import { inferChannel } from './job-channel.util';
 
 export interface ExtractedJobData {
   title?: string;
@@ -38,6 +39,11 @@ export interface ExtractedJobData {
   isUrgent?: boolean;
   // Đợt 126 — đã đọc kỹ (đánh dấu để không đọc lại lần nữa khi đăng hàng loạt).
   enriched?: boolean;
+  // Đợt 135 — kênh tin + nhóm việc + phúc lợi + nơi làm việc (tin công nhân/sinh viên/thực tập)
+  channel?: string;
+  laborGroup?: string;
+  laborPerks?: string[];
+  workPlace?: { province: string; mode: 'old'; oldDistrict?: string | null } | null;
 }
 
 export interface ExtractJobUrlResult {
@@ -501,6 +507,15 @@ export function enrichFromNode(node: Record<string, unknown>, data: ExtractedJob
 
   // Website công ty: bỏ nếu thực chất là link trang việc làm.
   if (data.companyWebsite && isJobBoardUrl(data.companyWebsite)) data.companyWebsite = undefined;
+  if (!data.channel) {
+    const ch = inferChannel(title, [data.description, data.requirements, data.benefits].filter(Boolean).join(' '), data.address ?? data.location ?? '');
+    data.channel = ch.channel;
+    if (ch.channel !== 'office') {
+      data.laborGroup = ch.laborGroup;
+      data.laborPerks = ch.laborPerks;
+      data.workPlace = ch.workPlace ?? null;
+    }
+  }
   data.enriched = true;
   return data;
 }

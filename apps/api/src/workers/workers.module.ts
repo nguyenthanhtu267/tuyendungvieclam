@@ -7,9 +7,10 @@ import { JobReport } from '../database/entities/job-report.entity';
 import { Company } from '../database/entities/company.entity';
 import { WorkersController, WorkersPublicController } from './workers.controller';
 import { WorkersService } from './workers.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([WorkerContact, WorkerProfile, WorkerNote, WorkerApplication, JobPosting, CompanyUser, Company, JobReport])],
+  imports: [TypeOrmModule.forFeature([WorkerContact, WorkerProfile, WorkerNote, WorkerApplication, JobPosting, CompanyUser, Company, JobReport]), NotificationsModule],
   controllers: [WorkersPublicController, WorkersController],
   providers: [WorkersService],
 })

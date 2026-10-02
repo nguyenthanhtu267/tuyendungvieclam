@@ -1,5 +1,7 @@
 'use client';
 
+import { Combobox } from '@/components/ui/Combobox';
+
 // Đợt 79 — chọn ngày sinh bằng 3 ô Ngày / Tháng / Năm (dễ dùng trên điện thoại hơn lịch).
 export function DateSelect({ value, onChange, idPrefix }: { value: string; onChange: (v: string) => void; idPrefix: string }) {
   const [y, m, d] = value ? value.split('-') : ['', '', ''];
@@ -27,12 +29,8 @@ export function DateSelect({ value, onChange, idPrefix }: { value: string; onCha
           <option key={v} value={v}>Tháng {Number(v)}</option>
         ))}
       </select>
-      <select id={`${idPrefix}-y`} aria-label="Năm" className={cls} value={y ?? ''} onChange={(e) => emit(e.target.value, m, d)}>
-        <option value="">Năm</option>
-        {years.map((v) => (
-          <option key={v} value={v}>{v}</option>
-        ))}
-      </select>
+      {/* Đợt 135 — năm sinh: gõ thẳng "1998" (danh sách 56 năm, cuộn rất lâu) */}
+      <Combobox id={`${idPrefix}-y`} ariaLabel="Năm" inputClassName="font-normal !pl-2" inputMode="numeric" clearable={false} value={y ?? ''} options={years} placeholder="Năm" onChange={(v) => emit(v, m, d)} />
     </div>
   );
 }

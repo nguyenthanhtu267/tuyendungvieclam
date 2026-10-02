@@ -268,6 +268,37 @@ export class WorkersController {
   todo() {
     return this.svc.adminTodo();
   }
+  // Đợt 135 — danh sách + chi tiết + thẻ/ghi chú + gợi ý tin + mời ứng tuyển (đặt trước các route ':id')
+  @Get('admin/workers/list')
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  adminList(@Query() q: Record<string, string>) {
+    return this.svc.adminList(q ?? {});
+  }
+  @Get('admin/workers/tags')
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  adminTags() {
+    return this.svc.adminTags();
+  }
+  @Get('admin/workers/:id/detail')
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  adminDetail(@Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.adminDetail(id);
+  }
+  @Patch('admin/workers/:id/meta')
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  adminMeta(@Param('id', ParseUUIDPipe) id: string, @Body() b: { tags?: string[]; note?: string | null }) {
+    return this.svc.adminSetMeta(id, b ?? {});
+  }
+  @Get('admin/workers/:id/suggested-jobs')
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  adminSuggest(@Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.adminSuggest(id);
+  }
+  @Post('admin/workers/:id/invite')
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  adminInvite(@Param('id', ParseUUIDPipe) id: string, @Body('jobId') jobId: string) {
+    return this.svc.adminInvite(id, jobId);
+  }
   @Patch('admin/workers/:id/hide')
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   hide(@Param('id', ParseUUIDPipe) id: string, @Body() b: { hidden?: boolean }) {

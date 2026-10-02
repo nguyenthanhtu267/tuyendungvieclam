@@ -1,5 +1,6 @@
 'use client';
 
+import { Combobox } from '@/components/ui/Combobox';
 import { useEffect, useMemo, useState } from 'react';
 import SiteHeader from '@/components/SiteHeader';
 import { jobsApi, type SalaryStats } from '@/lib/api';
@@ -144,18 +145,8 @@ export default function TinhLuongPage() {
             <div className="rounded-xl bg-white border border-border p-4 text-[15px]">
               <div className="font-extrabold text-ink mb-2">So với mức lương trên web (tin đang tuyển)</div>
               <div className="grid sm:grid-cols-2 gap-2 mb-3">
-                <select aria-label="Ngành nghề" className="tvl-input" value={industry} onChange={(e) => setIndustry(e.target.value)}>
-                  <option value="">Tất cả ngành nghề</option>
-                  {(stats?.industries ?? []).map((i) => (
-                    <option key={i}>{i}</option>
-                  ))}
-                </select>
-                <select aria-label="Tỉnh thành" className="tvl-input" value={province} onChange={(e) => setProvince(e.target.value)}>
-                  <option value="">Tất cả tỉnh thành</option>
-                  {(stats?.provinces ?? []).map((p) => (
-                    <option key={p}>{p}</option>
-                  ))}
-                </select>
+                <Combobox ariaLabel="Ngành nghề" value={industry} options={stats?.industries ?? []} allLabel="Tất cả ngành nghề" onChange={setIndustry} />
+                <Combobox ariaLabel="Tỉnh thành" value={province} options={stats?.provinces ?? []} allLabel="Tất cả tỉnh thành" onChange={setProvince} />
               </div>
               {stats && stats.count >= 3 ? (
                 <>

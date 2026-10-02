@@ -1,5 +1,6 @@
 'use client';
 
+import { Combobox } from '@/components/ui/Combobox';
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, type AdminCandidateDetail, type AdminCandidateQuery, type AdminCandidateRow, type ProfileVisibility, type SuggestedJob } from '@/lib/api';
 import { adminCandidatesApi } from '@/lib/api-admin';
@@ -22,7 +23,7 @@ const VIS: Record<ProfileVisibility, { label: string; cls: string }> = {
   locked: { label: 'Khoá', cls: 'bg-critical-tint text-critical' },
 };
 
-export function CandidatesPanel({ token }: { token: string }) {
+export function CandidatesPanel({ token, embedded = false }: { token: string; embedded?: boolean }) {
   const [filters, setFilters] = useState<AdminCandidateQuery>({});
   const [qInput, setQInput] = useState('');
   const [skillInput, setSkillInput] = useState('');
@@ -72,7 +73,7 @@ export function CandidatesPanel({ token }: { token: string }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div>
+      <div className={embedded ? 'hidden' : ''}>
         <h1 className="font-bold text-base">Ứng viên</h1>
         <p className="text-xs text-ink-faint mt-1 max-w-3xl">
           Mọi hồ sơ ứng viên trên web — kể cả hồ sơ chưa từng nộp cho NTD nào. Lọc nhanh, gắn thẻ & ghi chú nội bộ, xem gợi ý việc làm phù
@@ -112,28 +113,14 @@ export function CandidatesPanel({ token }: { token: string }) {
           <option value="50">Hoàn thiện ≥ 50%</option>
           <option value="80">Hoàn thiện ≥ 80%</option>
         </select>
-        <select className="tvl-input !w-auto text-sm" value={filters.province ?? ''} onChange={(e) => setF('province', e.target.value)} aria-label="Tỉnh/thành">
-          <option value="">Mọi tỉnh/thành</option>
-          {PROVINCES.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
+        <Combobox ariaLabel="Tỉnh/thành" className="min-w-[11rem] w-52" inputClassName="text-sm" value={filters.province ?? ''} options={PROVINCES} allLabel="Mọi tỉnh/thành" onChange={(v) => setF('province', v)} />
         <input
           className="tvl-input !w-[150px] text-sm"
           placeholder="Kỹ năng…"
           value={skillInput}
           onChange={(e) => setSkillInput(e.target.value)}
         />
-        <select className="tvl-input !w-auto text-sm" value={filters.tag ?? ''} onChange={(e) => setF('tag', e.target.value)} aria-label="Thẻ">
-          <option value="">Mọi thẻ</option>
-          {tags.map((t) => (
-            <option key={t.tag} value={t.tag}>
-              {t.tag} ({t.count})
-            </option>
-          ))}
-        </select>
+        <Combobox ariaLabel="Thẻ" className="min-w-[10rem] w-48" inputClassName="text-sm" value={filters.tag ?? ''} options={tags.map((t) => ({ value: t.tag, label: t.tag, hint: String(t.count) }))} allLabel="Mọi thẻ" onChange={(v) => setF('tag', v)} />
         <select className="tvl-input !w-auto text-sm" value={filters.sourced ?? ''} onChange={(e) => setF('sourced', e.target.value as 'only' | 'exclude')} aria-label="Nguồn">
           <option value="">Mọi nguồn</option>
           <option value="exclude">Ứng viên tự đăng ký</option>

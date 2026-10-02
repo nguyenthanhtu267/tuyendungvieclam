@@ -1,5 +1,7 @@
 'use client';
 
+import { ChannelChips, CHANNEL_ICON, CHANNEL_LABEL } from '@/components/ChannelChips';
+import { Combobox } from '@/components/ui/Combobox';
 import CompanyVerifyBox from '@/components/admin/CompanyVerifyBox';
 import { useEffect, useState, useRef, useCallback, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
@@ -21,7 +23,7 @@ const PanelLoading = () => <div className="p-6 text-[14px] text-ink-muted">Đang
 const ImportInbox = dynamic(() => import('@/components/admin/ImportInbox').then((m) => m.ImportInbox), { ssr: false, loading: PanelLoading });
 const CvSourcingPanel = dynamic(() => import('@/components/admin/CvSourcingPanel').then((m) => m.CvSourcingPanel), { ssr: false, loading: PanelLoading });
 const PeoplePanel = dynamic(() => import('@/components/admin/PeoplePanel').then((m) => m.PeoplePanel), { ssr: false, loading: PanelLoading });
-const CandidatesPanel = dynamic(() => import('@/components/admin/CandidatesPanel').then((m) => m.CandidatesPanel), { ssr: false, loading: PanelLoading });
+const CandidateGroups = dynamic(() => import('@/components/admin/CandidateGroups').then((m) => m.CandidateGroups), { ssr: false, loading: PanelLoading });
 const AnalyticsPanel = dynamic(() => import('@/components/admin/AnalyticsPanel').then((m) => m.AnalyticsPanel), { ssr: false, loading: PanelLoading });
 const StoragePanel = dynamic(() => import('@/components/admin/StoragePanel').then((m) => m.StoragePanel), { ssr: false, loading: PanelLoading });
 const BackgroundPanel = dynamic(() => import('@/components/admin/BackgroundPanel').then((m) => m.BackgroundPanel), { ssr: false, loading: PanelLoading });
@@ -86,6 +88,7 @@ export default function AdminDashboardPage() {
   const [jLists, setJLists] = useState<{ approved: { items: JobPosting[]; total: number }; rejected: { items: JobPosting[]; total: number } } | null>(null);
   const [jq, setJq] = useState('');
   const [jIndustry, setJIndustry] = useState('');
+  const [jChannel, setJChannel] = useState('');
   const [jRange, setJRange] = useState<'all' | 'today' | '7d'>('all');
   const [jPrio, setJPrio] = useState<'' | 'high' | 'newco' | 'fast' | 'warn'>('');
   const [jSort, setJSort] = useState<'default' | 'new' | 'old' | 'salary'>('default');
@@ -132,6 +135,7 @@ export default function AdminDashboardPage() {
     const rows = jBase.filter((j) => {
       if (q && !fold(`${j.title} ${j.company?.name ?? ''} ${j.industry ?? ''}`).includes(q)) return false;
       if (jIndustry && j.industry !== jIndustry) return false;
+      if (jChannel && (j.channel || 'office') !== jChannel) return false;
       if (from && jTs(j) < from) return false;
       if (jStatus === 'pending' && jPrio) {
         const rp = (j as { reviewPriority?: string }).reviewPriority;
@@ -574,12 +578,7 @@ export default function AdminDashboardPage() {
               <>
               <div className="flex items-center gap-2 flex-wrap mb-3 text-xs">
                 <input id="jq" value={jq} onChange={(e) => { setJq(e.target.value); setJLimit(50); }} placeholder="🔎 Tìm tên tin, công ty, ngành…" className="tvl-input !w-[300px] max-w-full" />
-                <select id="j-industry" value={jIndustry} onChange={(e) => { setJIndustry(e.target.value); setJLimit(50); }} className="tvl-input !w-auto">
-                  <option value="">Tất cả ngành</option>
-                  {jIndustries.map((i) => (
-                    <option key={i} value={i}>{i}</option>
-                  ))}
-                </select>
+                <Combobox id="j-industry" ariaLabel="Ngành" className="min-w-[11rem] w-56" value={jIndustry} options={jIndustries} allLabel="Tất cả ngành" onChange={(v) => { setJIndustry(v); setJLimit(50); }} />
                 <div className="inline-flex rounded-lg border border-border-strong overflow-hidden font-semibold">
                   {([['all', 'Tất cả'], ['today', `Hôm nay (${jNewToday})`], ['7d', '7 ngày']] as const).map(([k, l]) => (
                     <button key={k} type="button" onClick={() => { setJRange(k); setJLimit(50); }} aria-pressed={jRange === k} className={`px-3 py-2 ${jRange === k ? 'bg-primary text-white' : 'bg-white text-ink-muted'}`}>{l}</button>
@@ -591,13 +590,16 @@ export default function AdminDashboardPage() {
                   <option value="old">Cũ nhất trước</option>
                   <option value="salary">Lương cao nhất</option>
                 </select>
-                {(jq || jIndustry || jRange !== 'all' || jPrio) && (
-                  <button type="button" onClick={() => { setJq(''); setJIndustry(''); setJRange('all'); setJPrio(''); }} className="font-bold text-primary underline">Xóa lọc</button>
+                {(jq || jIndustry || jChannel || jRange !== 'all' || jPrio) && (
+                  <button type="button" onClick={() => { setJq(''); setJIndustry(''); setJChannel(''); setJRange('all'); setJPrio(''); }} className="font-bold text-primary underline">Xóa lọc</button>
                 )}
                 <span className="ml-auto text-ink-faint font-semibold">
                   Hiển thị {Math.min(shownJobs.length, jLimit)}/{shownJobs.length}
                   {jStatus !== 'pending' && !jRemoteHit && jTotal > jBase.length ? ` (đang tải ${jBase.length} mới nhất / ${jTotal} — gõ tìm để tìm trên toàn bộ)` : ''}
                 </span>
+              </div>
+              <div className="mb-3">
+                <ChannelChips value={jChannel} onChange={(v) => { setJChannel(v); setJLimit(50); }} counts={jBase.reduce<Record<string, number>>((m, j) => { const c = j.channel || 'office'; m[c] = (m[c] ?? 0) + 1; return m; }, {})} />
               </div>
               {jStatus === 'pending' && (
                 <div className="flex items-center gap-1.5 flex-wrap mb-3 text-[11.5px]">
@@ -657,6 +659,7 @@ export default function AdminDashboardPage() {
                             <CompanyLogo name={job.company?.name ?? ''} logoUrl={job.company?.logoUrl} size={36} className="text-[10px]" />
                           </td>
                           <td className="py-3 px-4 font-bold">
+                            {job.channel && job.channel !== 'office' && <span className="mr-1.5 inline-block rounded bg-warning-tint text-[#7A4A00] text-[10px] font-extrabold px-1.5 py-0.5 align-middle">{CHANNEL_ICON[job.channel]} {CHANNEL_LABEL[job.channel]}</span>}
                             {job.title}
                             {jStatus === 'pending' && jTs(job) >= Date.now() - 3600000 && <span className="ml-2 rounded bg-primary text-white text-[10px] px-1.5 py-0.5 align-middle">MỚI</span>}
                             {jStatus === 'rejected' && (job.rejectionReasons?.length || job.rejectionNote) && (
@@ -863,12 +866,7 @@ export default function AdminDashboardPage() {
                   placeholder="🔎 Tìm tên, mã số thuế, ngành…"
                   className="tvl-input !w-[320px] max-w-full"
                 />
-                <select id="c-industry" value={cIndustry} onChange={(e) => { setCIndustry(e.target.value); setCLimit(50); }} className="tvl-input !w-auto">
-                  <option value="">Tất cả ngành</option>
-                  {companyIndustries.map((i) => (
-                    <option key={i} value={i}>{i}</option>
-                  ))}
-                </select>
+                <Combobox id="c-industry" ariaLabel="Ngành" className="min-w-[11rem] w-56" value={cIndustry} options={companyIndustries} allLabel="Tất cả ngành" onChange={(v) => { setCIndustry(v); setCLimit(50); }} />
                 <div className="inline-flex rounded-lg border border-border-strong overflow-hidden font-semibold">
                   {([['all', 'Tất cả'], ['today', `Hôm nay (${newTodayCount})`], ['7d', '7 ngày']] as const).map(([k, l]) => (
                     <button key={k} type="button" onClick={() => { setCRange(k); setCLimit(50); }} aria-pressed={cRange === k} className={`px-3 py-2 ${cRange === k ? 'bg-primary text-white' : 'bg-white text-ink-muted'}`}>{l}</button>
@@ -1066,7 +1064,7 @@ export default function AdminDashboardPage() {
         ) : tab === 'users' ? (
           <PeoplePanel token={token} />
         ) : tab === 'candidates' ? (
-          <CandidatesPanel token={token} />
+          <CandidateGroups token={token} />
         ) : tab === 'audit-log' ? (
           <AuditLogCard token={token} />
         ) : (
@@ -1735,16 +1733,7 @@ function CreateDraftCompanyForm({ token, onCreated }: { token: string; onCreated
         value={form.sourceLabel ?? ''}
         onChange={(e) => setForm((f) => ({ ...f, sourceLabel: e.target.value }))}
       />
-      <select
-        className="tvl-input text-sm"
-        value={form.industry ?? ''}
-        onChange={(e) => setForm((f) => ({ ...f, industry: e.target.value || undefined }))}
-      >
-        <option value="">Ngành nghề…</option>
-        {INDUSTRIES.map((i) => (
-          <option key={i} value={i}>{i}</option>
-        ))}
-      </select>
+      <Combobox ariaLabel="Ngành nghề" inputClassName="text-sm" value={form.industry ?? ''} options={INDUSTRIES} placeholder="Ngành nghề… (gõ để tìm)" onChange={(v) => setForm((f) => ({ ...f, industry: v || undefined }))} />
       <input
         placeholder="Quy mô (VD: 100-499 nhân viên)"
         className="tvl-input text-sm"

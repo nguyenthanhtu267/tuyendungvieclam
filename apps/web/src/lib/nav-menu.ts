@@ -62,9 +62,10 @@ export const JOBS_MEGA_MENU: { columns: NavMenuGroup[][] } = {
       {
         title: 'Lao Động Phổ Thông',
         items: [
-          { label: 'Việc làm công nhân', href: '/lao-dong-pho-thong/viec-lam?loai=cong-nhan' },
-          { label: 'Sinh viên', href: '/lao-dong-pho-thong/viec-lam?loai=sinh-vien' },
-          { label: 'Thực tập sinh', href: '/lao-dong-pho-thong/viec-lam?loai=thuc-tap-sinh' },
+          { label: '🧰 Việc làm công nhân', href: '/lao-dong-pho-thong/viec-lam?loai=cong-nhan' },
+          { label: '🎓 Việc làm sinh viên', href: '/lao-dong-pho-thong/viec-lam?loai=sinh-vien' },
+          { label: '📋 Việc làm thực tập', href: '/lao-dong-pho-thong/viec-lam?loai=thuc-tap-sinh' },
+          { label: '📝 Điền hồ sơ để NTD gọi', href: '/lao-dong-pho-thong?loai=cong-nhan' },
         ],
       },
     ],

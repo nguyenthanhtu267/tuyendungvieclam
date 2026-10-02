@@ -82,7 +82,15 @@ export function useWorkerApply() {
         if (!mine) throw new Error('Bạn chưa có hồ sơ lao động phổ thông — bấm "Điền thông tin" ở khung phía trên.');
         return workersApi.applyMine(token!, jobId, group);
       }
-      if (!creds) throw new Error('Nhập SĐT và ngày sinh đã đăng ký ở khung phía trên để ứng tuyển nhanh.');
+      if (!creds) {
+        try {
+          window.dispatchEvent(new Event('worker-creds-open'));
+          setTimeout(() => document.getElementById('worker-creds')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+        } catch {
+          /* bỏ qua */
+        }
+        throw new Error('Nhập SĐT và ngày sinh đã đăng ký ở khung phía trên để ứng tuyển nhanh (hoặc bấm "Điền ngay" nếu chưa có hồ sơ).');
+      }
       return workersApi.quickApply(jobId, creds.phone, creds.birthDate, group);
     },
     [isCandidate, mine, token, creds],
@@ -110,15 +118,31 @@ export function WorkerCredsBox({ w, slug }: { w: ReturnType<typeof useWorkerAppl
   const [birth, setBirth] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+  // Mở sẵn ô SĐT khi người dùng bấm "Ứng tuyển nhanh" mà chưa xác nhận (trang cuộn tới #worker-creds).
+  useEffect(() => {
+    const fromHash = () => { if (window.location.hash === '#worker-creds') setOpen(true); };
+    const force = () => setOpen(true);
+    fromHash();
+    window.addEventListener('hashchange', fromHash);
+    window.addEventListener('worker-creds-open', force);
+    return () => { window.removeEventListener('hashchange', fromHash); window.removeEventListener('worker-creds-open', force); };
+  }, []);
 
   if (w.isCandidate) {
     if (w.mine === undefined) return null;
     return (
-      <div className="rounded-xl border border-border bg-white p-3 text-[14px] text-ink flex flex-wrap items-center gap-2">
+      <div className="rounded-xl border border-border bg-white p-3 text-[14px] text-ink flex flex-wrap items-center gap-x-2 gap-y-1">
         {w.mine ? (
-          <>Ứng tuyển nhanh bằng hồ sơ: <b>{w.mine.fullName}</b> ({KIND_LABEL[w.mine.kind]}). <Link href={`/lao-dong-pho-thong?loai=${slug}`} className="font-bold text-primary underline">Sửa / làm mới hồ sơ</Link></>
+          <>
+            <span>👋 Chào <b>{w.mine.fullName}</b> · hồ sơ {KIND_LABEL[w.mine.kind].toLowerCase()} {w.mine.isSeeking === false ? <span className="text-warning font-bold">đang tắt tìm việc</span> : <span className="text-success font-bold">đang bật tìm việc</span>} — ứng tuyển nhanh 1 chạm.</span>
+            <Link href={`/lao-dong-pho-thong?loai=${slug}`} className="font-bold text-primary underline">Sửa / làm mới hồ sơ</Link>
+          </>
         ) : (
-          <>Bạn chưa có hồ sơ lao động phổ thông. <Link href={`/lao-dong-pho-thong?loai=${slug}`} className="font-bold text-primary underline">Điền thông tin (1 phút)</Link></>
+          <>
+            <span>📝 <b>Điền thông tin 1 phút</b> để nhà tuyển dụng gần bạn gọi, và ứng tuyển nhanh không cần CV.</span>
+            <Link href={`/lao-dong-pho-thong?loai=${slug}`} className="rounded-lg bg-accent text-white font-bold text-[13px] px-3 py-1.5">Điền ngay</Link>
+          </>
         )}
       </div>
     );
@@ -126,7 +150,7 @@ export function WorkerCredsBox({ w, slug }: { w: ReturnType<typeof useWorkerAppl
   if (w.creds)
     return (
       <div className="rounded-xl border border-border bg-white p-3 text-[14px] text-ink flex flex-wrap items-center gap-2">
-        Ứng tuyển nhanh bằng thông tin của: <b>{w.creds.name}</b> ({w.creds.phone})
+        👋 Ứng tuyển nhanh bằng thông tin của: <b>{w.creds.name}</b> ({w.creds.phone})
         <button type="button" onClick={() => w.save(null)} className="font-bold text-primary underline">Đổi số khác</button>
       </div>
     );
@@ -147,18 +171,26 @@ export function WorkerCredsBox({ w, slug }: { w: ReturnType<typeof useWorkerAppl
       setBusy(false);
     }
   }
+  // Đợt 134 — khung gọn: người mới thấy ngay nút "Điền thông tin"; người đã đăng ký mở ô SĐT + ngày sinh để ứng tuyển nhanh.
   return (
     <div id="worker-creds" className="rounded-xl border border-border bg-white p-3 flex flex-col gap-2">
-      <div className="text-[14.5px] text-ink">
-        <b>Ứng tuyển nhanh không cần CV:</b> nhập số điện thoại và ngày sinh bạn đã đăng ký (để xếp việc gần bạn). Chưa đăng ký?{' '}
-        <Link href={`/lao-dong-pho-thong?loai=${slug}`} className="font-bold text-primary underline">Điền thông tin (1 phút)</Link>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[14px] text-ink">
+        <span>📝 <b>Chưa có hồ sơ?</b> Điền thông tin 1 phút để nhà tuyển dụng gần bạn gọi.</span>
+        <Link href={`/lao-dong-pho-thong?loai=${slug}`} className="rounded-lg bg-accent text-white font-bold text-[13px] px-3 py-1.5">Điền ngay</Link>
       </div>
-      <div className="grid sm:grid-cols-[1fr_1.4fr_auto] gap-2">
-        <input id="wc-phone" aria-label="Số điện thoại" className="tvl-input" inputMode="tel" placeholder="Số điện thoại" value={phone} onChange={(e) => setPhone(e.target.value)} />
-        <DateSelect value={birth} onChange={setBirth} idPrefix="wc-bd" />
-        <button type="button" onClick={confirm} disabled={busy} className="rounded-lg bg-primary text-white font-bold text-[14px] px-4 py-2">Xác nhận</button>
-      </div>
-      {err && <div className="text-[13.5px] text-critical font-bold">{err}</div>}
+      <details className="group" open={open || undefined} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
+        <summary className="cursor-pointer list-none text-[13.5px] font-bold text-primary">
+          Đã đăng ký rồi? Nhập số điện thoại để ứng tuyển nhanh <span className="inline-block transition-transform group-open:rotate-180">▾</span>
+        </summary>
+        <div className="mt-2 flex flex-col gap-2">
+          <div className="grid sm:grid-cols-[1fr_1.4fr_auto] gap-2">
+            <input id="wc-phone" aria-label="Số điện thoại" className="tvl-input" inputMode="tel" placeholder="Số điện thoại" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <DateSelect value={birth} onChange={setBirth} idPrefix="wc-bd" />
+            <button type="button" onClick={confirm} disabled={busy} className="rounded-lg bg-primary text-white font-bold text-[14px] px-4 py-2">Xác nhận</button>
+          </div>
+          {err && <div className="text-[13.5px] text-critical font-bold">{err}</div>}
+        </div>
+      </details>
     </div>
   );
 }

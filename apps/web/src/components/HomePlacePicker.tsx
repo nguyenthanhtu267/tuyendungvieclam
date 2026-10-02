@@ -1,5 +1,6 @@
 'use client';
 
+import { Combobox } from '@/components/ui/Combobox';
 import { useState } from 'react';
 import { PROVINCE_COORDS, nearestProvince, saveHome, useHomePlace, provincesNear } from '@/lib/geo';
 
@@ -29,22 +30,20 @@ export default function HomePlacePicker({ onNearMe }: { onNearMe: (provinces: st
     return (
       <div className="flex items-center gap-2 flex-wrap text-[13.5px]">
         <span className="font-semibold text-ink">📍 Nơi ở của bạn:</span>
-        <select
-          aria-label="Chọn tỉnh nơi ở"
-          className="tvl-input !w-auto !py-1"
+        <Combobox
+          ariaLabel="Chọn tỉnh nơi ở"
+          className="min-w-[11rem] w-52"
+          inputClassName="!py-1"
           value={home?.province ?? ''}
-          onChange={(e) => {
-            if (e.target.value) {
-              saveHome({ province: e.target.value });
+          options={Object.keys(PROVINCE_COORDS)}
+          placeholder="Gõ tên tỉnh/thành…"
+          onChange={(v) => {
+            if (v) {
+              saveHome({ province: v });
               setEditing(false);
             }
           }}
-        >
-          <option value="">Chọn tỉnh/thành</option>
-          {Object.keys(PROVINCE_COORDS).map((p) => (
-            <option key={p}>{p}</option>
-          ))}
-        </select>
+        />
         <button onClick={useGps} className="text-primary font-semibold underline">Dùng vị trí của tôi</button>
         {msg && <span className="text-ink-faint">{msg}</span>}
       </div>

@@ -228,7 +228,8 @@ export default function SiteHeader() {
                   <span className="text-[10px] transition-transform group-open:rotate-180">▾</span>
                 </summary>
                 <div className="pl-3 flex flex-col gap-2.5 pb-2 pt-1">
-                  {JOBS_MEGA_MENU.columns.flat().map((group) => (
+                  {/* Đợt 134 — điện thoại: nhóm "Lao động phổ thông" lên đầu cho dễ thấy */}
+                  {[...JOBS_MEGA_MENU.columns.flat()].sort((a, b) => Number(b.title === 'Lao Động Phổ Thông') - Number(a.title === 'Lao Động Phổ Thông')).map((group) => (
                     <div key={group.title}>
                       <div className="text-[12px] font-extrabold text-primary uppercase tracking-wide mb-1">
                         {group.title}

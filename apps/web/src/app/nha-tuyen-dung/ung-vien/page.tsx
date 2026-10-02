@@ -1,5 +1,6 @@
 'use client';
 
+import { Combobox } from '@/components/ui/Combobox';
 import { ReplyTemplates } from '@/components/ReplyTemplates';
 import InterviewScheduler from '@/components/InterviewScheduler';
 import ApplicantBulkTools from '@/components/ApplicantBulkTools';
@@ -374,13 +375,7 @@ function UngVienPageInner() {
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <h1 className="font-extrabold text-base uppercase tvl-title">{currentJob?.title}</h1>
               <div className="flex items-center gap-2">
-                <select className="tvl-input !w-auto text-sm" value={jobId} onChange={(e) => setJobId(e.target.value)}>
-                  {jobs.map((j) => (
-                    <option key={j.id} value={j.id}>
-                      {j.title} ({formatNumber(j.applicationCount)} hồ sơ)
-                    </option>
-                  ))}
-                </select>
+                <Combobox ariaLabel="Chọn tin tuyển dụng" className="min-w-[14rem] w-72 max-w-full" inputClassName="text-sm" value={jobId} options={jobs.map((j) => ({ value: j.id, label: j.title, hint: `${formatNumber(j.applicationCount)} hồ sơ` }))} placeholder="Gõ để tìm tin…" onChange={(v) => v && setJobId(v)} />
                 <Link href="/nha-tuyen-dung/tin-dang" className="text-xs font-semibold text-primary whitespace-nowrap tvl-title">
                   Quản lý tin
                 </Link>

@@ -103,6 +103,13 @@ export class WorkerProfile {
   @Column({ name: 'is_hidden', default: false })
   isHidden: boolean;
 
+  // Đợt 135 — thẻ + ghi chú nội bộ của Admin (giống hồ sơ văn phòng); người lao động và NTD không thấy.
+  @Column({ name: 'admin_tags', type: 'text', array: true, nullable: true })
+  adminTags?: string[] | null;
+
+  @Column({ name: 'admin_note', type: 'text', nullable: true })
+  adminNote?: string | null;
+
   @Column({ name: 'user_id', type: 'uuid', nullable: true })
   userId?: string | null;
 

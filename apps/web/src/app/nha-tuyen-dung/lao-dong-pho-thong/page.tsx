@@ -1,5 +1,6 @@
 'use client';
 
+import { Combobox } from '@/components/ui/Combobox';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import EmployerHeader from '@/components/EmployerHeader';
@@ -205,19 +206,10 @@ export default function EmployerLaborPage() {
                 <option value="">Tất cả nhóm</option>
                 {(Object.keys(KIND_LABEL) as WorkerKind[]).map((k) => (<option key={k} value={k}>{KIND_LABEL[k]}</option>))}
               </select>
-              <select id="el-prov" aria-label="Tỉnh/thành ứng viên" className="tvl-input !w-auto !py-2" value={province} onChange={(e) => { setProvince(e.target.value); setPage(1); }}>
-                <option value="">Mọi tỉnh/thành</option>
-                {provinces.map((p) => (<option key={p} value={p}>{p}</option>))}
-              </select>
-              <select id="el-group" aria-label="Công việc mong muốn" className="tvl-input !w-auto !py-2 max-w-[220px]" value={group} onChange={(e) => { setGroup(e.target.value); setPage(1); }}>
-                <option value="">Mọi công việc</option>
-                {groups.map((g) => (<option key={g} value={g}>{g}</option>))}
-              </select>
+              <Combobox id="el-prov" ariaLabel="Tỉnh/thành ứng viên" className="min-w-[11rem] flex-1 sm:flex-none sm:w-56" inputClassName="!py-2" value={province} options={provinces} allLabel="Mọi tỉnh/thành" onChange={(v) => { setProvince(v); setPage(1); }} />
+              <Combobox id="el-group" ariaLabel="Công việc mong muốn" className="min-w-[11rem] flex-1 sm:flex-none sm:w-56" inputClassName="!py-2" value={group} options={groups} allLabel="Mọi công việc" onChange={(v) => { setGroup(v); setPage(1); }} />
               <input id="el-q" aria-label="Tên hoặc số điện thoại" className="tvl-input !w-44 !py-2" placeholder="Tên hoặc SĐT" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (setPage(1), load())} />
-              <select id="el-job" aria-label="Xếp hạng theo tin" className="tvl-input !w-auto !py-2 max-w-[240px]" value={jobId} onChange={(e) => { setJobId(e.target.value); setSort(e.target.value ? 'match' : 'near'); setPage(1); }}>
-                <option value="">Xếp hạng theo tin: không</option>
-                {laborJobs.filter((j) => !j.filled).map((j) => (<option key={j.id} value={j.id}>{j.title}</option>))}
-              </select>
+              <Combobox id="el-job" ariaLabel="Xếp hạng theo tin" className="min-w-[12rem] flex-1 sm:flex-none sm:w-64" inputClassName="!py-2" value={jobId} options={laborJobs.filter((j) => !j.filled).map((j) => ({ value: j.id, label: j.title }))} allLabel="Xếp hạng theo tin: không" onChange={(v) => { setJobId(v); setSort(v ? 'match' : 'near'); setPage(1); }} />
               <button type="button" aria-pressed={today} onClick={() => { setToday(!today); setPage(1); }} className={`rounded-lg border px-3 py-2 text-[13.5px] font-extrabold ${today ? 'border-accent bg-accent text-white' : 'border-border-strong bg-white text-ink'}`}>Hôm nay nên gọi</button>
               <div role="radiogroup" aria-label="Sắp xếp" className="flex rounded-lg border border-border-strong overflow-hidden">
                 {([...(jobId ? ([['match', 'Hợp tin nhất']] as const) : []), ['near', 'Gần công ty'], ['recent', 'Mới cập nhật']] as const).map(([k, l]) => (

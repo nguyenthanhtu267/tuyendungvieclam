@@ -1,5 +1,6 @@
 'use client';
 
+import { Combobox } from '@/components/ui/Combobox';
 import { useEffect, useMemo, useState } from 'react';
 import { workersApi } from '@/lib/api';
 
@@ -77,17 +78,15 @@ export function AddressPicker({
     <div className="flex flex-col gap-2">
       <label className="flex flex-col gap-1 text-[14px] font-bold text-ink" htmlFor={`${idPrefix}-prov`}>
         Tỉnh / Thành phố{req}
-        <select
+        <Combobox
           id={`${idPrefix}-prov`}
-          className={`tvl-input font-normal ${hint ? '!border-critical !ring-2 !ring-critical' : ''}`}
+          className={`w-full ${hint ? '[&_input]:!border-critical [&_input]:!ring-2 [&_input]:!ring-critical' : ''}`}
+          inputClassName="font-normal"
           value={value.province}
-          onChange={(e) => onChange({ ...EMPTY_ADDRESS, addressMode: value.addressMode, province: e.target.value })}
-        >
-          <option value="">— Chọn tỉnh/thành —</option>
-          {provinces.map((p) => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
+          options={provinces}
+          placeholder="— Chọn hoặc gõ tên tỉnh/thành —"
+          onChange={(v) => onChange({ ...EMPTY_ADDRESS, addressMode: value.addressMode, province: v })}
+        />
         {hint && <span className="text-[13px] font-bold text-critical">Vui lòng chọn Tỉnh / Thành phố trước, rồi mới chọn được Quận/huyện và Phường/xã.</span>}
       </label>
 
@@ -113,21 +112,31 @@ export function AddressPicker({
         <div className="grid sm:grid-cols-2 gap-2">
           <label className="flex flex-col gap-1 text-[14px] font-bold text-ink" htmlFor={`${idPrefix}-dist`}>
             Quận / Huyện (cũ){req}
-            <select id={`${idPrefix}-dist`} className="tvl-input font-normal" onMouseDown={needProvince} onKeyDown={(e) => { if (!value.province && e.key !== 'Tab') needProvince(e); }} value={value.oldDistrict} onChange={(e) => set({ oldDistrict: e.target.value, oldWard: '' })}>
-              <option value="">{value.province ? '— Chọn quận/huyện —' : '— Chọn tỉnh/thành trước —'}</option>
-              {districts.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
+            <Combobox
+              id={`${idPrefix}-dist`}
+              inputClassName="font-normal"
+              value={value.oldDistrict}
+              options={districts}
+              placeholder={value.province ? '— Chọn hoặc gõ quận/huyện —' : '— Chọn tỉnh/thành trước —'}
+              beforeOpen={() => { if (value.province) return true; needProvince({ preventDefault: () => undefined }); return false; }}
+              onChange={(v) => set({ oldDistrict: v, oldWard: '' })}
+            />
           </label>
           <label className="flex flex-col gap-1 text-[14px] font-bold text-ink" htmlFor={`${idPrefix}-ward`}>
             Phường / Xã (cũ){req}
-            <select id={`${idPrefix}-ward`} className="tvl-input font-normal" onMouseDown={(e) => (value.province ? needDistrict(e) : needProvince(e))} onKeyDown={(e) => { if (!value.oldDistrict && e.key !== 'Tab') (value.province ? needDistrict(e) : needProvince(e)); }} value={value.oldWard} onChange={(e) => set({ oldWard: e.target.value })}>
-              <option value="">{value.oldDistrict ? '— Chọn phường/xã —' : '— Chọn quận/huyện trước —'}</option>
-              {wards.map((w) => (
-                <option key={w} value={w}>{w}</option>
-              ))}
-            </select>
+            <Combobox
+              id={`${idPrefix}-ward`}
+              inputClassName="font-normal"
+              value={value.oldWard}
+              options={wards}
+              placeholder={value.oldDistrict ? '— Chọn hoặc gõ phường/xã —' : '— Chọn quận/huyện trước —'}
+              beforeOpen={() => {
+                if (!value.province) { needProvince({ preventDefault: () => undefined }); return false; }
+                if (!value.oldDistrict) { needDistrict({ preventDefault: () => undefined }); return false; }
+                return true;
+              }}
+              onChange={(v) => set({ oldWard: v })}
+            />
           </label>
         </div>
       ) : (

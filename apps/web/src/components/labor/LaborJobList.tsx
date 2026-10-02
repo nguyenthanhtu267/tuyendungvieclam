@@ -104,6 +104,13 @@ export function LaborJobList({
                 <span>{j.workPlaceText ?? j.provinces.join(', ')}</span>
                 {j.laborGroup && <span className="text-ink-muted">{j.laborGroup}</span>}
               </div>
+              {(j.shiftTags ?? []).length > 0 && (
+                <div className="flex flex-wrap gap-1 text-[12px]">
+                  {(j.shiftTags ?? []).map((x) => (
+                    <span key={x} className="rounded border border-border-strong text-ink-muted font-semibold px-1.5 py-0.5">🕒 {x}</span>
+                  ))}
+                </div>
+              )}
               {j.income && (
                 <div className="text-[13px] text-ink">
                   Ước tính thực nhận <b className="text-success">~{fmtM(j.income.net)}/tháng</b>

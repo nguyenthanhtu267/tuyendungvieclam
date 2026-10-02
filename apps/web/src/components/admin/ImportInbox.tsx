@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { API_URL, ApiError, type JobImportRow, type JobImportData, type MailScanStatus } from '@/lib/api';
 import { adminApi } from '@/lib/api-admin';
 import { SearchSelect } from './SearchSelect';
+import { ChannelChips, CHANNEL_ICON, CHANNEL_LABEL } from '@/components/ChannelChips';
+import { LABOR_GROUPS } from '@/lib/labor';
 import { INDUSTRIES, EXPERIENCE_LEVELS, LEVELS, GENDER_OPTIONS } from '@/lib/catalogs';
 import { formatDate, formatDateTime } from '@/lib/format';
 
@@ -318,6 +320,10 @@ export function ImportInbox({ token }: { token: string }) {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [enriching, setEnriching] = useState<string | null>(null);
+  const [chan, setChan] = useState('');
+  const chanOf = (r: JobImportRow) => r.data?.channel || 'office';
+  const items = (data?.items ?? []).filter((r) => !chan || chanOf(r) === chan);
+  const chanCounts = (data?.items ?? []).reduce<Record<string, number>>((m, r) => { const c = chanOf(r); m[c] = (m[c] ?? 0) + 1; return m; }, {});
   const [bulkProg, setBulkProg] = useState('');
 
   const load = useCallback(async () => {
@@ -458,11 +464,14 @@ export function ImportInbox({ token }: { token: string }) {
         ))}
       </div>
 
-      {tab !== 'published' && data && data.items.length > 0 && (
+      {data && data.items.length > 0 && (
+        <div className="mb-2"><ChannelChips value={chan} onChange={(v) => { setChan(v); setSel(new Set()); }} counts={chanCounts} /></div>
+      )}
+      {tab !== 'published' && data && items.length > 0 && (
         <div className="flex items-center gap-3 mb-2 text-xs flex-wrap">
           <label className="flex items-center gap-1.5 font-semibold cursor-pointer">
-            <input type="checkbox" checked={sel.size === data.items.length} onChange={(e) => setSel(e.target.checked ? new Set(data.items.map((i) => i.id)) : new Set())} />
-            Chọn tất cả ({data.items.length})
+            <input type="checkbox" checked={sel.size === items.length} onChange={(e) => setSel(e.target.checked ? new Set(items.map((i) => i.id)) : new Set())} />
+            Chọn tất cả ({items.length})
           </label>
           {sel.size > 0 && (
             <>
@@ -476,11 +485,11 @@ export function ImportInbox({ token }: { token: string }) {
       )}
       {!data ? (
         <div className="text-xs text-ink-faint py-4">Đang tải…</div>
-      ) : data.items.length === 0 ? (
-        <div className="text-xs text-ink-faint py-4">Chưa có mục nào ở tab này.</div>
+      ) : items.length === 0 ? (
+        <div className="text-xs text-ink-faint py-4">{data.items.length ? 'Không có mục nào thuộc kênh này.' : 'Chưa có mục nào ở tab này.'}</div>
       ) : (
         <ul className="flex flex-col gap-2">
-          {data.items.map((r) => {
+          {items.map((r) => {
             const d = r.data ?? {};
             const mc = r.matchedCompany;
             const badge = r.status === 'failed' ? null : r.status === 'published'
@@ -497,7 +506,10 @@ export function ImportInbox({ token }: { token: string }) {
                 {tab !== 'published' && <input type="checkbox" aria-label="Chọn tin" className="mt-3.5 ml-3" checked={sel.has(r.id)} onChange={() => setSel((p) => { const n = new Set(p); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} />}
                 <button type="button" onClick={() => toggle(r)} className="flex-1 text-left px-3 py-2.5 flex items-start gap-3">
                   <div className="min-w-0 flex-1">
-                    <div className="font-bold text-[13px] truncate">{d.title || '(chưa đọc được chức danh)'}</div>
+                    <div className="font-bold text-[13px] truncate">
+                      {chanOf(r) !== 'office' && <span className="mr-1.5 inline-block rounded bg-warning-tint text-[#7A4A00] text-[10.5px] font-extrabold px-1.5 py-0.5 align-middle">{CHANNEL_ICON[chanOf(r)]} {CHANNEL_LABEL[chanOf(r)]}{d.laborGroup ? ` · ${d.laborGroup}` : ''}</span>}
+                      {d.title || '(chưa đọc được chức danh)'}
+                    </div>
                     <div className="text-[11.5px] text-ink-faint truncate">
                       {d.companyName || '—'}
                       {d.location ? ` · ${d.location}` : ''}
@@ -517,6 +529,14 @@ export function ImportInbox({ token }: { token: string }) {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <label className="flex flex-col gap-1">Chức danh<input className="tvl-input" value={edit.title ?? ''} onChange={(e) => set('title', e.target.value)} /></label>
                         <label className="flex flex-col gap-1">Tên công ty<input className="tvl-input" value={edit.companyName ?? ''} onChange={(e) => set('companyName', e.target.value)} /></label>
+                        <label className="flex flex-col gap-1">Kênh tin
+                          <select className="tvl-input" value={edit.channel || 'office'} onChange={(e) => setEdit((p) => ({ ...p, channel: e.target.value, laborGroup: e.target.value === 'office' ? undefined : p.laborGroup && LABOR_GROUPS[e.target.value as 'worker']?.includes(p.laborGroup) ? p.laborGroup : undefined }))}>
+                            {Object.entries(CHANNEL_LABEL).map(([k, l]) => <option key={k} value={k}>{CHANNEL_ICON[k]} {l}</option>)}
+                          </select>
+                        </label>
+                        {edit.channel && edit.channel !== 'office' ? (
+                          <div className="flex flex-col gap-1"><label htmlFor="imp-group">Nhóm việc (gõ để tìm)</label><SearchSelect id="imp-group" value={edit.laborGroup ?? ''} options={LABOR_GROUPS[edit.channel as 'worker'] ?? []} onChange={(v) => set('laborGroup', v)} /></div>
+                        ) : <div className="hidden sm:block" />}
                         <div className="flex flex-col gap-1"><label htmlFor="imp-industry">Ngành nghề (gõ để tìm)</label><SearchSelect id="imp-industry" value={edit.industry ?? ''} options={INDUSTRIES} onChange={(v) => set('industry', v)} /></div>
                         <label className="flex flex-col gap-1">Địa điểm<input className="tvl-input" value={edit.location ?? ''} onChange={(e) => set('location', e.target.value)} /></label>
                         <label className="flex flex-col gap-1">Lương từ (triệu)<input className="tvl-input" inputMode="numeric" value={edit.salaryMin ?? ''} onChange={(e) => setEdit((p) => ({ ...p, salaryMin: e.target.value ? Number(e.target.value) : undefined }))} /></label>
