@@ -6,6 +6,7 @@ import { formatDate, formatNumber } from '@/lib/format';
 import { KIND_LABEL } from '@/lib/labor';
 import { SourcedEditor } from '@/components/labor/SourcedEditor';
 import { Pager } from './CvSourcingPanel';
+import { SortTh, useSort } from '@/components/ui/SortTh';
 
 // Đợt 136 — Admin "Công nhân · SV · TTS → Thu thập hồ sơ":
 //  1) Thu thập: dán bài Zalo/Facebook hoặc dán bảng Excel → hồ sơ "Nguồn tổng hợp"
@@ -86,6 +87,12 @@ function QueueTab({ token, onChanged }: { token: string; onChanged: () => void }
   }
   const items = data?.items ?? [];
   const allOn = items.length > 0 && items.every((x) => sel.has(x.id));
+  const qs = useSort(items, {
+    name: (r: ShareQueueRow) => r.fullName,
+    jobs: (r: ShareQueueRow) => r.desiredJobs.join(', '),
+    company: (r: ShareQueueRow) => r.company,
+    createdAt: (r: ShareQueueRow) => new Date(r.createdAt),
+  });
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-ink-faint max-w-3xl">
@@ -120,16 +127,16 @@ function QueueTab({ token, onChanged }: { token: string; onChanged: () => void }
             <thead>
               <tr className="text-left text-ink-faint bg-surface-alt">
                 <th className="py-2.5 px-3 w-8"><input type="checkbox" aria-label="Chọn tất cả" checked={allOn} onChange={(e) => setSel(e.target.checked ? new Set(items.map((x) => x.id)) : new Set())} /></th>
-                <th className="py-2.5 px-2 font-semibold">Người lao động</th>
-                <th className="py-2.5 px-2 font-semibold">Việc muốn làm</th>
-                <th className="py-2.5 px-2 font-semibold">NTD nhập</th>
-                <th className="py-2.5 px-2 font-semibold">Ngày nhập</th>
+                <SortTh s={qs} k="name" className="py-2.5 px-2 font-semibold">Người lao động</SortTh>
+                <SortTh s={qs} k="jobs" className="py-2.5 px-2 font-semibold">Việc muốn làm</SortTh>
+                <SortTh s={qs} k="company" className="py-2.5 px-2 font-semibold">NTD nhập</SortTh>
+                <SortTh s={qs} k="createdAt" className="py-2.5 px-2 font-semibold">Ngày nhập</SortTh>
                 <th className="py-2.5 px-3" />
               </tr>
             </thead>
             <tbody>
               {items.length === 0 && (<tr><td colSpan={6} className="text-center text-ink-faint py-8">Không có hồ sơ nào.</td></tr>)}
-              {items.map((r: ShareQueueRow) => (
+              {qs.rows.map((r: ShareQueueRow) => (
                 <tr key={r.id} className="border-t border-border align-top">
                   <td className="py-2.5 px-3"><input type="checkbox" aria-label={`Chọn ${r.fullName}`} checked={sel.has(r.id)} onChange={() => setSel((s) => { const n = new Set(s); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} /></td>
                   <td className="py-2.5 px-2 min-w-[10rem]">
@@ -162,6 +169,12 @@ function QueueTab({ token, onChanged }: { token: string; onChanged: () => void }
 function ViewsTab({ token }: { token: string }) {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<Awaited<ReturnType<typeof workersApi.adminPhoneViews>> | null>(null);
+  const vs = useSort(data?.items, {
+    viewedAt: (v: PhoneViewRow) => new Date(v.viewedAt),
+    company: (v: PhoneViewRow) => v.company,
+    name: (v: PhoneViewRow) => v.fullName,
+    source: (v: PhoneViewRow) => v.sourceLabel,
+  });
   useEffect(() => {
     workersApi.adminPhoneViews(token, { page: String(page) }).then(setData).catch(() => undefined);
   }, [token, page]);
@@ -181,15 +194,15 @@ function ViewsTab({ token }: { token: string }) {
           <table className="w-full text-xs">
             <thead>
               <tr className="text-left text-ink-faint bg-surface-alt">
-                <th className="py-2.5 px-3 font-semibold">Thời gian</th>
-                <th className="py-2.5 px-2 font-semibold">Công ty · tài khoản</th>
-                <th className="py-2.5 px-2 font-semibold">Hồ sơ đã xem số</th>
-                <th className="py-2.5 px-3 font-semibold">Nguồn</th>
+                <SortTh s={vs} k="viewedAt" className="py-2.5 px-3 font-semibold">Thời gian</SortTh>
+                <SortTh s={vs} k="company" className="py-2.5 px-2 font-semibold">Công ty · tài khoản</SortTh>
+                <SortTh s={vs} k="name" className="py-2.5 px-2 font-semibold">Hồ sơ đã xem số</SortTh>
+                <SortTh s={vs} k="source" className="py-2.5 px-3 font-semibold">Nguồn</SortTh>
               </tr>
             </thead>
             <tbody>
               {data?.items.length === 0 && (<tr><td colSpan={4} className="text-center text-ink-faint py-8">Chưa có lượt xem số nào.</td></tr>)}
-              {data?.items.map((v: PhoneViewRow) => (
+              {vs.rows.map((v: PhoneViewRow) => (
                 <tr key={v.id} className="border-t border-border align-top">
                   <td className="py-2.5 px-3 whitespace-nowrap">{new Date(v.viewedAt).toLocaleString('vi-VN')}</td>
                   <td className="py-2.5 px-2 min-w-[10rem]"><div className="font-bold">{v.company ?? '—'}</div><div className="text-ink-faint break-all">{v.userEmail ?? ''}</div></td>

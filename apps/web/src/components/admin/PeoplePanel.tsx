@@ -10,6 +10,7 @@ import { INDUSTRIES, PROVINCES } from '@/lib/catalogs';
 import { Modal } from '@/components/profile/ui';
 import { startImpersonation } from '@/lib/impersonation';
 import { Pager } from './CvSourcingPanel';
+import { SortTh, useSort } from '@/components/ui/SortTh';
 
 // Đợt 18e (26/09/2026) — Admin "Người dùng": sửa được MỌI thông tin của ứng viên, nhà tuyển dụng và quản
 // trị viên. Sửa nhanh ngay tại đây (tài khoản, công ty, thông tin chính của hồ sơ), đặt lại mật khẩu,
@@ -68,6 +69,13 @@ export function PeoplePanel({ token }: { token: string }) {
   }, [load]);
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+  const us = useSort(data?.items, {
+    account: (u) => u.fullName ?? u.email,
+    role: (u) => ROLE_LABEL[u.role] ?? u.role,
+    company: (u) => u.companyName,
+    status: (u) => (STATUS_LABEL[u.status] ?? { label: u.status }).label,
+    createdAt: (u) => (u.createdAt ? new Date(u.createdAt) : null),
+  });
 
   return (
     <div className="flex flex-col gap-3">
@@ -128,11 +136,11 @@ export function PeoplePanel({ token }: { token: string }) {
           <table className="w-full text-xs">
             <thead>
               <tr className="text-left text-ink-faint bg-surface-alt">
-                <th className="py-2.5 px-4 font-semibold">Tài khoản</th>
-                <th className="py-2.5 px-3 font-semibold">Vai trò</th>
-                <th className="py-2.5 px-3 font-semibold">Công ty</th>
-                <th className="py-2.5 px-3 font-semibold">Trạng thái</th>
-                <th className="py-2.5 px-3 font-semibold">Ngày tạo</th>
+                <SortTh s={us} k="account" className="py-2.5 px-4 font-semibold">Tài khoản</SortTh>
+                <SortTh s={us} k="role" className="py-2.5 px-3 font-semibold">Vai trò</SortTh>
+                <SortTh s={us} k="company" className="py-2.5 px-3 font-semibold">Công ty</SortTh>
+                <SortTh s={us} k="status" className="py-2.5 px-3 font-semibold">Trạng thái</SortTh>
+                <SortTh s={us} k="createdAt" className="py-2.5 px-3 font-semibold">Ngày tạo</SortTh>
                 <th className="py-2.5 px-4" />
               </tr>
             </thead>
@@ -144,7 +152,7 @@ export function PeoplePanel({ token }: { token: string }) {
                   </td>
                 </tr>
               )}
-              {data?.items.map((u) => {
+              {us.rows.map((u) => {
                 const st = STATUS_LABEL[u.status] ?? { label: u.status, cls: 'bg-surface-alt text-ink-muted' };
                 return (
                   <tr key={u.id} className="border-t border-border">

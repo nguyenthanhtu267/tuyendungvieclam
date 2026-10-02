@@ -8,6 +8,7 @@ import { APPLICATION_STATUS_LABEL, formatDate, formatNumber, formatSalary } from
 import { PROVINCES } from '@/lib/catalogs';
 import { Modal } from '@/components/profile/ui';
 import { Pager } from './CvSourcingPanel';
+import { SortTh, useSort } from '@/components/ui/SortTh';
 
 // Đợt 18f (26/09/2026) — Admin "Ứng viên": quản lý thông minh MỌI hồ sơ ứng viên, kể cả hồ sơ tự nhập
 // trên web / file CV mà chưa từng gửi cho NTD nào:
@@ -70,6 +71,12 @@ export function CandidatesPanel({ token, embedded = false }: { token: string; em
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
   const hasFilters = Object.values(filters).some((v) => v !== undefined && v !== '');
+  const cs = useSort(data?.items, {
+    name: (c) => c.fullName,
+    tags: (c) => c.tags.join(', '),
+    visibility: (c) => VIS[c.visibility]?.label ?? c.visibility,
+    applications: (c) => c.applicationCount,
+  });
 
   return (
     <div className="flex flex-col gap-3">
@@ -146,10 +153,10 @@ export function CandidatesPanel({ token, embedded = false }: { token: string; em
           <table className="w-full text-xs">
             <thead>
               <tr className="text-left text-ink-faint bg-surface-alt">
-                <th className="py-2.5 px-4 font-semibold">Ứng viên</th>
-                <th className="py-2.5 px-3 font-semibold">Thẻ / ghi chú</th>
-                <th className="py-2.5 px-3 font-semibold">Hồ sơ</th>
-                <th className="py-2.5 px-3 font-semibold text-right">Ứng tuyển</th>
+                <SortTh s={cs} k="name" className="py-2.5 px-4 font-semibold">Ứng viên</SortTh>
+                <SortTh s={cs} k="tags" className="py-2.5 px-3 font-semibold">Thẻ / ghi chú</SortTh>
+                <SortTh s={cs} k="visibility" className="py-2.5 px-3 font-semibold">Hồ sơ</SortTh>
+                <SortTh s={cs} k="applications" align="right" className="py-2.5 px-3 font-semibold">Ứng tuyển</SortTh>
                 <th className="py-2.5 px-4" />
               </tr>
             </thead>
@@ -161,7 +168,7 @@ export function CandidatesPanel({ token, embedded = false }: { token: string; em
                   </td>
                 </tr>
               )}
-              {data?.items.map((c) => (
+              {cs.rows.map((c) => (
                 <tr key={c.id} className="border-t border-border align-top">
                   <td className="py-3 px-4 min-w-[220px]">
                     <div className="font-bold flex items-center gap-1.5 flex-wrap">

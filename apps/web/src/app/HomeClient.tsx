@@ -162,14 +162,14 @@ export default function HomeClient({ initial }: { initial: HomeBundle | null }) 
                   {t('home.searchButton')}
                 </button>
               </div>
-              <div className="flex items-center gap-2 flex-wrap text-[11.5px]">
-                <span className="text-ink-faint">{t('home.featured')}</span>
+              <div className="flex items-center gap-1.5 flex-wrap text-[12px]">
+                <span className="text-ink-faint shrink-0">{t('home.featured')}</span>
                 {['Hà Nội', 'Bắc Ninh', 'Đà Nẵng', 'Hồ Chí Minh'].map((p) => (
                   <button
                     key={p}
                     type="button"
                     onClick={() => router.push(`/viec-lam?provinces=${encodeURIComponent(p)}`)}
-                    className="font-semibold px-2.5 py-1 rounded-full border border-border-strong text-ink-muted hover:border-primary hover:text-primary transition-colors"
+                    className="grow text-center font-semibold px-2.5 py-1.5 rounded-full border border-border-strong text-ink-muted hover:border-primary hover:text-primary transition-colors"
                   >
                     {p}
                   </button>
@@ -177,7 +177,7 @@ export default function HomeClient({ initial }: { initial: HomeBundle | null }) 
                 <button
                   type="button"
                   onClick={() => router.push('/viec-lam?urgentOnly=1')}
-                  className="font-semibold px-2.5 py-1 rounded-full border border-critical/40 text-critical hover:border-critical transition-colors"
+                  className="grow text-center font-semibold px-2.5 py-1.5 rounded-full border border-critical/40 text-critical hover:border-critical transition-colors"
                 >
                   {t('home.urgentJobs')}
                 </button>
@@ -185,7 +185,7 @@ export default function HomeClient({ initial }: { initial: HomeBundle | null }) 
                   type="button"
                   onClick={() => router.push('/viec-lam?salaryTier=50')}
                   title="Việc làm lương từ 50 triệu trở lên"
-                  className="font-semibold px-2.5 py-1 rounded-full border border-[#C99A00] bg-[#FFD84D] text-[#5A3A00] hover:brightness-95 transition-colors"
+                  className="grow text-center font-semibold px-2.5 py-1.5 rounded-full border border-[#C99A00] bg-[#FFD84D] text-[#5A3A00] hover:brightness-95 transition-colors"
                 >
                   ★ Cao cấp
                 </button>

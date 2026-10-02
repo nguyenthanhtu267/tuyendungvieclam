@@ -7,6 +7,7 @@ import { AD_SLOT_DEFS } from '@/lib/ad-slots';
 import { formatNumber } from '@/lib/format';
 import { AdBanner } from '@/components/ads/AdBanner';
 import { AdEditor, reachableSlots } from './AdEditor';
+import { SortTh, useSort } from '@/components/ui/SortTh';
 
 // Đợt 24 (29/09/2026) — Admin "📢 Banner quảng cáo": công tắc chung, danh sách chiến dịch (xem trước, trạng thái,
 // hiệu quả 30 ngày), bật/tắt từng KHU VỰC, và biểu đồ lượt hiển thị theo ngày.
@@ -87,13 +88,29 @@ export function AdsPanel({ token }: { token: string }) {
     return { v, c };
   }, [stats]);
 
+  const slotRows = useMemo(
+    () =>
+      AD_SLOT_DEFS.map((s) => ({
+        s,
+        cov: (rows ?? []).filter((r) => r.status === 'running' && reachableSlots(r).some((x) => x.id === s.id)).length,
+        v: slotStats.get(s.id)?.v ?? 0,
+        c: slotStats.get(s.id)?.c ?? 0,
+      })),
+    [rows, slotStats],
+  );
+  const slotSort = useSort(slotRows, {
+    page: (r) => `${r.s.page} ${r.s.label}`,
+    size: (r) => r.s.size,
+    devices: (r) => (r.s.devices === 'all' ? 'Mọi thiết bị' : r.s.devices === 'desktop' ? 'Máy tính' : 'Điện thoại'),
+    running: (r) => r.cov,
+    stats: (r) => r.v,
+  });
+
   if (!rows || !settings) {
     return <div className="text-center text-ink-faint text-sm py-16">{err ?? 'Đang tải…'}</div>;
   }
 
   const running = rows.filter((r) => r.status === 'running');
-  // Khu vực đang có ít nhất 1 chiến dịch chạy.
-  const coverage = (slot: string) => running.filter((r) => reachableSlots(r).some((s) => s.id === slot)).length;
   const maxDay = Math.max(1, ...(stats?.daily ?? []).map((d) => d.impressions));
 
   return (
@@ -253,19 +270,17 @@ export function AdsPanel({ token }: { token: string }) {
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-ink-faint bg-surface-alt">
-                  <th className="py-2.5 px-4 font-semibold">Trang · vị trí</th>
-                  <th className="py-2.5 px-3 font-semibold">Khổ</th>
-                  <th className="py-2.5 px-3 font-semibold">Thiết bị</th>
-                  <th className="py-2.5 px-3 font-semibold text-right">Đang chạy</th>
-                  <th className="py-2.5 px-3 font-semibold text-right">Hiển thị · Bấm (30 ngày)</th>
+                  <SortTh s={slotSort} k="page" className="py-2.5 px-4 font-semibold">Trang · vị trí</SortTh>
+                  <SortTh s={slotSort} k="size" className="py-2.5 px-3 font-semibold">Khổ</SortTh>
+                  <SortTh s={slotSort} k="devices" className="py-2.5 px-3 font-semibold">Thiết bị</SortTh>
+                  <SortTh s={slotSort} k="running" align="right" className="py-2.5 px-3 font-semibold">Đang chạy</SortTh>
+                  <SortTh s={slotSort} k="stats" align="right" className="py-2.5 px-3 font-semibold">Hiển thị · Bấm (30 ngày)</SortTh>
                   <th className="py-2.5 px-4 font-semibold text-right">Bật</th>
                 </tr>
               </thead>
               <tbody>
-                {AD_SLOT_DEFS.map((s) => {
+                {slotSort.rows.map(({ s, cov, v, c }) => {
                   const on = !settings.disabledSlots.includes(s.id);
-                  const st = slotStats.get(s.id);
-                  const cov = coverage(s.id);
                   return (
                     <tr key={s.id} className="border-t border-border">
                       <td className="py-2.5 px-4">
@@ -278,7 +293,7 @@ export function AdsPanel({ token }: { token: string }) {
                       </td>
                       <td className={`py-2.5 px-3 text-right tabular-nums ${cov ? '' : 'text-ink-faint'}`}>{cov || 'trống'}</td>
                       <td className="py-2.5 px-3 text-right tabular-nums whitespace-nowrap">
-                        {formatNumber(st?.v ?? 0)} · {formatNumber(st?.c ?? 0)}
+                        {formatNumber(v)} · {formatNumber(c)}
                       </td>
                       <td className="py-2.5 px-4 text-right">
                         <input

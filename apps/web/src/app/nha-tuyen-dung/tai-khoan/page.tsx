@@ -10,6 +10,7 @@ import ChangePasswordCard from '@/components/ChangePasswordCard';
 import FacebookConnectCard from '@/components/FacebookConnectCard';
 import PasswordInput from '@/components/PasswordInput';
 import { CompanyLogo } from '@/components/CompanyLogo';
+import { SortTh, useSort } from '@/components/ui/SortTh';
 
 const LEGAL_DOC_MAX_BYTES = 3 * 1024 * 1024;
 
@@ -550,6 +551,12 @@ function TeamCard({
   onSaved: () => Promise<void>;
   onToast: (msg: string) => void;
 }) {
+  const teamSort = useSort(team, {
+    name: (m) => m.user.fullName,
+    email: (m) => m.user.email,
+    type: (m) => (m.type === 'main' ? 'Tài khoản Chính' : 'Tài khoản Phụ'),
+    createdAt: (m) => m.createdAt,
+  });
   const [showForm, setShowForm] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -651,15 +658,15 @@ function TeamCard({
           <table className="w-full text-xs">
             <thead>
               <tr className="text-left text-ink-faint bg-surface-alt">
-                <th className="py-2.5 px-4 font-semibold">Họ tên</th>
-                <th className="py-2.5 px-3 font-semibold">Email</th>
-                <th className="py-2.5 px-3 font-semibold">Vai trò</th>
-                <th className="py-2.5 px-3 font-semibold">Ngày thêm</th>
+                <SortTh s={teamSort} k="name" className="py-2.5 px-4 font-semibold">Họ tên</SortTh>
+                <SortTh s={teamSort} k="email" className="py-2.5 px-3 font-semibold">Email</SortTh>
+                <SortTh s={teamSort} k="type" className="py-2.5 px-3 font-semibold">Vai trò</SortTh>
+                <SortTh s={teamSort} k="createdAt" className="py-2.5 px-3 font-semibold">Ngày thêm</SortTh>
                 <th className="py-2.5 px-4 font-semibold text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody>
-              {team.map((m) => (
+              {teamSort.rows.map((m) => (
                 <tr key={m.id} className="border-t border-border">
                   <td className="py-3 px-4 font-bold">{m.user.fullName ?? '—'}</td>
                   <td className="py-3 px-3 text-ink-faint">{m.user.email}</td>

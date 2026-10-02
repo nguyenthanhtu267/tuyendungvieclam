@@ -10,6 +10,7 @@ import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatN
 import { AdSlot } from '@/components/ads/AdSlot';
 import EmployerSmartCards from '@/components/EmployerSmartCards';
 import EmployerFunnelPanel from '@/components/EmployerFunnelPanel';
+import { SortTh, useSort } from '@/components/ui/SortTh';
 
 const JOB_STATUS_LABEL: Record<string, string> = {
   draft: 'Nháp',
@@ -33,6 +34,11 @@ export default function EmployerDashboardPage() {
   const [dashboard, setDashboard] = useState<EmployerDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [health, setHealth] = useState<JobHealthItem[]>([]);
+  const jobSort = useSort(dashboard?.recentJobs, {
+    title: (j) => j.title,
+    status: (j) => JOB_STATUS_LABEL[j.approvalStatus ?? 'approved'],
+    apps: (j) => j.applicationCount,
+  });
 
   useEffect(() => {
     if (!token || !me || !me.role.startsWith('employer')) return;
@@ -139,13 +145,13 @@ export default function EmployerDashboardPage() {
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="text-ink-faint text-left border-b border-border">
-                          <th className="py-2 font-semibold">Vị trí</th>
-                          <th className="py-2 font-semibold">Trạng thái</th>
-                          <th className="py-2 font-semibold text-right">Hồ sơ</th>
+                          <SortTh s={jobSort} k="title" className="py-2 font-semibold">Vị trí</SortTh>
+                          <SortTh s={jobSort} k="status" className="py-2 font-semibold">Trạng thái</SortTh>
+                          <SortTh s={jobSort} k="apps" align="right" className="py-2 font-semibold">Hồ sơ</SortTh>
                         </tr>
                       </thead>
                       <tbody>
-                        {dashboard.recentJobs.map((job) => (
+                        {jobSort.rows.map((job) => (
                           <tr key={job.id} className="border-b border-border last:border-0">
                             <td className="py-2.5 font-semibold">{job.title}</td>
                             <td className="py-2.5">

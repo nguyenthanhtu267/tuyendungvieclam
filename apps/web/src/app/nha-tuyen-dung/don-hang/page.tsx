@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import EmployerHeader from '@/components/EmployerHeader';
 import { useAuth } from '@/lib/auth-context';
 import { employerApi, ApiError, type ServicePackage, type Order, type PaymentMethod } from '@/lib/api';
+import { SortTh, useSort } from '@/components/ui/SortTh';
 import { formatCurrency, formatDate, ORDER_STATUS_LABEL, ORDER_STATUS_CLASS, PAYMENT_METHOD_LABEL } from '@/lib/format';
 
 const NAV_ITEMS = [
@@ -45,6 +46,15 @@ export default function DonHangPage() {
   const [tab, setTab] = useState('packages');
   const [packages, setPackages] = useState<ServicePackage[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const orderSort = useSort(orders, {
+    id: (o) => o.id.slice(0, 8),
+    pkg: (o) => o.servicePackage?.name,
+    qty: (o) => o.quantity,
+    remaining: (o) => o.remaining,
+    method: (o) => PAYMENT_METHOD_LABEL[o.paymentMethod] ?? o.paymentMethod,
+    expiresAt: (o) => o.expiresAt,
+    status: (o) => ORDER_STATUS_LABEL[o.status],
+  });
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('contract_vat');
@@ -221,17 +231,17 @@ export default function DonHangPage() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-left text-ink-faint bg-surface-alt">
-                      <th className="py-2.5 px-4 font-semibold">Số đơn</th>
-                      <th className="py-2.5 px-3 font-semibold">Gói dịch vụ</th>
-                      <th className="py-2.5 px-3 font-semibold">Số lượng</th>
-                      <th className="py-2.5 px-3 font-semibold">Còn lại</th>
-                      <th className="py-2.5 px-3 font-semibold">Phương thức</th>
-                      <th className="py-2.5 px-3 font-semibold">Hết hạn</th>
-                      <th className="py-2.5 px-4 font-semibold">Tình trạng</th>
+                      <SortTh s={orderSort} k="id" className="py-2.5 px-4 font-semibold">Số đơn</SortTh>
+                      <SortTh s={orderSort} k="pkg" className="py-2.5 px-3 font-semibold">Gói dịch vụ</SortTh>
+                      <SortTh s={orderSort} k="qty" className="py-2.5 px-3 font-semibold">Số lượng</SortTh>
+                      <SortTh s={orderSort} k="remaining" className="py-2.5 px-3 font-semibold">Còn lại</SortTh>
+                      <SortTh s={orderSort} k="method" className="py-2.5 px-3 font-semibold">Phương thức</SortTh>
+                      <SortTh s={orderSort} k="expiresAt" className="py-2.5 px-3 font-semibold">Hết hạn</SortTh>
+                      <SortTh s={orderSort} k="status" className="py-2.5 px-4 font-semibold">Tình trạng</SortTh>
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map((o) => (
+                    {orderSort.rows.map((o) => (
                       <tr key={o.id} className="border-t border-border">
                         <td className="py-3 px-4 tabular-nums font-semibold">{o.id.slice(0, 8)}</td>
                         <td className="py-3 px-3">{o.servicePackage?.name ?? '—'}</td>

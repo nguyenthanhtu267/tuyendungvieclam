@@ -16,6 +16,7 @@ import { CompanyLogo } from '@/components/CompanyLogo';
 import { isRichTextEmpty } from '@/lib/richtext';
 import { JobWizardSteps, JOB_WIZARD_INITIAL, type JobWizardFormState } from '@/components/JobWizardForm';
 import { INDUSTRIES, PROVINCES } from '@/lib/catalogs';
+import { SortTh, useSort } from '@/components/ui/SortTh';
 
 // Đợt 93 — mỗi tab Admin nạp RIÊNG khi được mở (trước đây cả 9 bảng ~230KB JS tải ngay khi vào trang). Có `loading` riêng để
 // không làm ranh giới Suspense ở trên cùng hiện lại khung xương (xem DeferredWidgets).
@@ -232,6 +233,23 @@ export default function AdminDashboardPage() {
     return `${Math.floor(h / 24)} ngày trước`;
   }
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
+  const os = useSort(pendingOrders, {
+    company: (o) => o.company?.name,
+    pkg: (o) => o.servicePackage?.name,
+    amount: (o) => o.servicePackage?.price,
+    method: (o) => PAYMENT_METHOD_LABEL[o.paymentMethod] ?? o.paymentMethod,
+    date: (o) => new Date(o.createdAt),
+  });
+  const js = useSort(shownJobs, {
+    title: (j) => j.title,
+    company: (j) => j.company?.name,
+    industry: (j) => j.industry,
+    salary: (j) => j.salaryMax ?? j.salaryMin,
+    date: (j) => jTs(j),
+  });
+  const cs2 = useSort(shownCompanies, {
+    industry: (c) => c.industry,
+  });
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const hasLoadedRef = useRef(false);
@@ -631,11 +649,11 @@ export default function AdminDashboardPage() {
                           />
                         </th>
                         <th className="py-2.5 px-3 font-semibold">Logo</th>
-                        <th className="py-2.5 px-4 font-semibold">Tin đăng</th>
-                        <th className="py-2.5 px-3 font-semibold">Công ty</th>
-                        <th className="py-2.5 px-3 font-semibold">Ngành</th>
-                        <th className="py-2.5 px-3 font-semibold">Mức lương</th>
-                        <th className="py-2.5 px-3 font-semibold whitespace-nowrap">{jStatus === 'pending' ? 'Gửi lúc' : 'Cập nhật'}</th>
+                        <SortTh s={js} k="title" className="py-2.5 px-4 font-semibold">Tin đăng</SortTh>
+                        <SortTh s={js} k="company" className="py-2.5 px-3 font-semibold">Công ty</SortTh>
+                        <SortTh s={js} k="industry" className="py-2.5 px-3 font-semibold">Ngành</SortTh>
+                        <SortTh s={js} k="salary" className="py-2.5 px-3 font-semibold">Mức lương</SortTh>
+                        <SortTh s={js} k="date" className="py-2.5 px-3 font-semibold whitespace-nowrap">{jStatus === 'pending' ? 'Gửi lúc' : 'Cập nhật'}</SortTh>
                         <th className="py-2.5 px-4 font-semibold text-right">Thao tác</th>
                       </tr>
                     </thead>
@@ -643,7 +661,7 @@ export default function AdminDashboardPage() {
                       {shownJobs.length === 0 && (
                         <tr><td colSpan={9} className="py-10 text-center text-ink-faint">Không có tin nào khớp bộ lọc.</td></tr>
                       )}
-                      {shownJobs.slice(0, jLimit).map((job) => {
+                      {js.rows.slice(0, jLimit).map((job) => {
                         const scan = scanJobContent(job.title, job.description, job.requirements);
                         return (
                         <tr key={job.id} className="border-t border-border align-top">
@@ -896,7 +914,7 @@ export default function AdminDashboardPage() {
                         <th className="py-2.5 px-3 font-semibold">Logo</th>
                         <th className="py-2.5 px-4 font-semibold"><button type="button" onClick={() => sortBy('name')}>Tên công ty{sortMark('name')}</button></th>
                         <th className="py-2.5 px-3 font-semibold"><button type="button" onClick={() => sortBy('tax')}>Mã số thuế{sortMark('tax')}</button></th>
-                        <th className="py-2.5 px-3 font-semibold">Ngành nghề</th>
+                        <SortTh s={cs2} k="industry" className="py-2.5 px-3 font-semibold">Ngành nghề</SortTh>
                         <th className="py-2.5 px-3 font-semibold whitespace-nowrap"><button type="button" onClick={() => sortBy('date')}>Ngày đăng ký{sortMark('date')}</button></th>
                         <th className="py-2.5 px-4 font-semibold text-right">Thao tác</th>
                       </tr>
@@ -905,7 +923,7 @@ export default function AdminDashboardPage() {
                       {shownCompanies.length === 0 && (
                         <tr><td colSpan={8} className="py-10 text-center text-ink-faint">Không có công ty nào khớp bộ lọc.</td></tr>
                       )}
-                      {shownCompanies.slice(0, cLimit).map((c) => (
+                      {cs2.rows.slice(0, cLimit).map((c) => (
                         <Fragment key={c.id}>
                         <tr className="border-t border-border">
                           <td className="py-3 px-3">
@@ -1026,16 +1044,16 @@ export default function AdminDashboardPage() {
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="text-left text-ink-faint bg-surface-alt">
-                        <th className="py-2.5 px-4 font-semibold">Công ty</th>
-                        <th className="py-2.5 px-3 font-semibold">Gói dịch vụ</th>
-                        <th className="py-2.5 px-3 font-semibold">Số tiền</th>
-                        <th className="py-2.5 px-3 font-semibold">Phương thức</th>
-                        <th className="py-2.5 px-3 font-semibold">Ngày đặt</th>
+                        <SortTh s={os} k="company" className="py-2.5 px-4 font-semibold">Công ty</SortTh>
+                        <SortTh s={os} k="pkg" className="py-2.5 px-3 font-semibold">Gói dịch vụ</SortTh>
+                        <SortTh s={os} k="amount" className="py-2.5 px-3 font-semibold">Số tiền</SortTh>
+                        <SortTh s={os} k="method" className="py-2.5 px-3 font-semibold">Phương thức</SortTh>
+                        <SortTh s={os} k="date" className="py-2.5 px-3 font-semibold">Ngày đặt</SortTh>
                         <th className="py-2.5 px-4 font-semibold text-right">Thao tác</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {pendingOrders.map((o) => (
+                      {os.rows.map((o) => (
                         <tr key={o.id} className="border-t border-border">
                           <td className="py-3 px-4 font-bold">{o.company?.name ?? '—'}</td>
                           <td className="py-3 px-3">{o.servicePackage?.name ?? '—'}</td>
@@ -1225,15 +1243,21 @@ function FeaturedEmployersCard({ token }: { token: string }) {
       sort.key === 'date' ? ((a.createdAt ? +new Date(a.createdAt) : 0) - (b.createdAt ? +new Date(b.createdAt) : 0)) * m : a.name.localeCompare(b.name, 'vi') * m,
     );
   })();
-  const shown = rows.slice(0, limit);
-  const mark = (k: 'date' | 'name') => (sort.key === k ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '');
-  const sortBy = (k: 'date' | 'name') => setSort((s) => (s.key === k ? { key: k, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: k, dir: k === 'date' ? 'desc' : 'asc' }));
-  const allSel = shown.length > 0 && shown.every((c) => sel.has(c.id));
   const STATUS_VI: Record<string, { t: string; cls: string }> = {
     approved: { t: 'Đã duyệt', cls: 'bg-success-tint text-success' },
     pending: { t: 'Chờ duyệt', cls: 'bg-warning-tint text-[#7A4A00]' },
     rejected: { t: 'Từ chối', cls: 'bg-critical-tint text-critical' },
   };
+  const fs = useSort(rows, {
+    tax: (c) => c.taxCode,
+    industry: (c) => c.industry,
+    jobs: (c) => c.jobCount ?? 0,
+    status: (c) => STATUS_VI[c.approvalStatus ?? '']?.t,
+  });
+  const shown = fs.rows.slice(0, limit);
+  const mark = (k: 'date' | 'name') => (sort.key === k ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '');
+  const sortBy = (k: 'date' | 'name') => setSort((s) => (s.key === k ? { key: k, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: k, dir: k === 'date' ? 'desc' : 'asc' }));
+  const allSel = shown.length > 0 && shown.every((c) => sel.has(c.id));
   const isNew = (c: Company) => !!c.createdAt && Date.now() - new Date(c.createdAt).getTime() < 86400000;
 
   return (
@@ -1303,10 +1327,10 @@ function FeaturedEmployersCard({ token }: { token: string }) {
                   </th>
                   <th className="py-2.5 px-3 font-semibold">Logo</th>
                   <th className="py-2.5 px-4 font-semibold"><button type="button" onClick={() => sortBy('name')}>Tên công ty{mark('name')}</button></th>
-                  <th className="py-2.5 px-3 font-semibold">Mã số thuế</th>
-                  <th className="py-2.5 px-3 font-semibold">Ngành nghề</th>
-                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Tin đang tuyển</th>
-                  <th className="py-2.5 px-3 font-semibold">Trạng thái duyệt</th>
+                  <SortTh s={fs} k="tax" className="py-2.5 px-3 font-semibold">Mã số thuế</SortTh>
+                  <SortTh s={fs} k="industry" className="py-2.5 px-3 font-semibold">Ngành nghề</SortTh>
+                  <SortTh s={fs} k="jobs" className="py-2.5 px-3 font-semibold whitespace-nowrap">Tin đang tuyển</SortTh>
+                  <SortTh s={fs} k="status" className="py-2.5 px-3 font-semibold">Trạng thái duyệt</SortTh>
                   <th className="py-2.5 px-3 font-semibold whitespace-nowrap"><button type="button" onClick={() => sortBy('date')}>Ngày đăng ký{mark('date')}</button></th>
                   <th className="py-2.5 px-4 font-semibold text-right">Thao tác</th>
                 </tr>
@@ -1480,7 +1504,15 @@ function SourcedCompaniesCard({ token }: { token: string }) {
   const [q, setQ] = useState('');
   const [claimedFilter, setClaimedFilter] = useState<'unclaimed' | 'claimed' | 'all'>('unclaimed');
   const [companies, setCompanies] = useState<Company[] | null>(null);
-  const [newestFirst, setNewestFirst] = useState(true);
+  const cs = useSort(companies, {
+    name: (c) => c.name,
+    source: (c) => c.sourceLabel,
+    industry: (c) => c.industry,
+    website: (c) => c.website,
+    createdAt: (c) => (c.createdAt ? new Date(c.createdAt) : null),
+    jobs: (c) => c.jobCount ?? 0,
+    status: (c) => (c.claimedAt ? 1 : 0),
+  }, { key: 'createdAt', dir: 'desc' });
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -1608,22 +1640,18 @@ function SourcedCompaniesCard({ token }: { token: string }) {
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-ink-faint bg-surface-alt">
-                  <th className="py-2.5 px-4 font-semibold">Tên công ty</th>
-                  <th className="py-2.5 px-3 font-semibold">Nguồn</th>
-                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap">
-                    <button type="button" onClick={() => setNewestFirst((v) => !v)} className="font-semibold hover:text-primary" title="Bấm để đổi thứ tự">
-                      Ngày thêm {newestFirst ? '↓' : '↑'}
-                    </button>
-                  </th>
-                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Số tin đăng</th>
-                  <th className="py-2.5 px-3 font-semibold">Trạng thái</th>
+                  <SortTh s={cs} k="name" className="py-2.5 px-4 font-semibold">Tên công ty</SortTh>
+                  <SortTh s={cs} k="industry" className="py-2.5 px-3 font-semibold">Ngành nghề</SortTh>
+                  <SortTh s={cs} k="website" className="py-2.5 px-3 font-semibold">Website</SortTh>
+                  <SortTh s={cs} k="source" className="py-2.5 px-3 font-semibold">Nguồn</SortTh>
+                  <SortTh s={cs} k="createdAt" className="py-2.5 px-3 font-semibold">Ngày thêm</SortTh>
+                  <SortTh s={cs} k="jobs" className="py-2.5 px-3 font-semibold">Số tin đăng</SortTh>
+                  <SortTh s={cs} k="status" className="py-2.5 px-3 font-semibold">Trạng thái</SortTh>
                   <th className="py-2.5 px-4 font-semibold text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
-                {[...companies]
-                  .sort((a, b) => (new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime()) * (newestFirst ? -1 : 1))
-                  .map((c) => (
+                {cs.rows.map((c) => (
                   <tr key={c.id} className="border-t border-border align-top">
                     <td className="py-3 px-4 font-bold">
                       <div className="flex items-center gap-2">
@@ -1632,6 +1660,16 @@ function SourcedCompaniesCard({ token }: { token: string }) {
                           {c.name}
                         </a>
                       </div>
+                    </td>
+                    <td className="py-3 px-3 text-ink-muted max-w-[11rem]">{c.industry || '—'}</td>
+                    <td className="py-3 px-3 max-w-[12rem] truncate">
+                      {c.website ? (
+                        <a href={/^https?:\/\//i.test(c.website) ? c.website : `https://${c.website}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" title={c.website}>
+                          {c.website.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '')}
+                        </a>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td className="py-3 px-3 text-ink-faint">{c.sourceLabel ?? '—'}</td>
                     <td className="py-3 px-3 text-ink-muted whitespace-nowrap tabular-nums" title={c.createdAt ? formatDateTime(c.createdAt) : ''}>{c.createdAt ? formatDate(c.createdAt) : '—'}</td>
@@ -2959,6 +2997,12 @@ function AuditLogCard({ token }: { token: string }) {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<{ items: AdminAuditLogEntry[]; page: number; totalPages: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const as = useSort(data?.items, {
+    time: (r) => new Date(r.createdAt),
+    admin: (r) => r.adminEmail,
+    action: (r) => AUDIT_ACTION_LABEL[r.action] ?? r.action,
+    desc: (r) => r.description,
+  });
 
   useEffect(() => {
     setLoading(true);
@@ -2986,14 +3030,14 @@ function AuditLogCard({ token }: { token: string }) {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-left text-ink-faint bg-surface-alt">
-                    <th className="py-2.5 px-4 font-semibold">Thời gian</th>
-                    <th className="py-2.5 px-3 font-semibold">Admin</th>
-                    <th className="py-2.5 px-3 font-semibold">Hành động</th>
-                    <th className="py-2.5 px-3 font-semibold">Chi tiết</th>
+                    <SortTh s={as} k="time" className="py-2.5 px-4 font-semibold">Thời gian</SortTh>
+                    <SortTh s={as} k="admin" className="py-2.5 px-3 font-semibold">Admin</SortTh>
+                    <SortTh s={as} k="action" className="py-2.5 px-3 font-semibold">Hành động</SortTh>
+                    <SortTh s={as} k="desc" className="py-2.5 px-3 font-semibold">Chi tiết</SortTh>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.items.map((row) => (
+                  {as.rows.map((row) => (
                     <tr key={row.id} className="border-t border-border align-top">
                       <td className="py-3 px-4 tabular-nums whitespace-nowrap">{formatDateTime(row.createdAt)}</td>
                       <td className="py-3 px-3 text-ink-faint whitespace-nowrap">{row.adminEmail}</td>

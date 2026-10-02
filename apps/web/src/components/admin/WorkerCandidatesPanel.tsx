@@ -9,6 +9,7 @@ import { Combobox } from '@/components/ui/Combobox';
 import { Modal } from '@/components/profile/ui';
 import { Pager } from './CvSourcingPanel';
 import { WorkerSourcingPanel } from './WorkerSourcingPanel';
+import { SortTh, useSort } from '@/components/ui/SortTh';
 
 // Đợt 135 — Admin "Ứng viên → Công nhân · SV · TTS": quản lý hồ sơ lao động phổ thông với cùng bộ chức năng như hồ sơ
 // văn phòng: tìm (tên/SĐT/việc muốn làm/ghi chú, gõ không dấu), lọc, thẻ + ghi chú nội bộ, gợi ý tin gần nơi ở,
@@ -20,6 +21,13 @@ export function WorkerCandidatesPanel({ token, onCounts }: { token: string; onCo
   const [qInput, setQInput] = useState('');
   const [page, setPage] = useState(1);
   const [data, setData] = useState<Awaited<ReturnType<typeof workersApi.adminList>> | null>(null);
+  const ws = useSort(data?.items, {
+    name: (w: AdminWorkerRow) => w.fullName,
+    jobs: (w: AdminWorkerRow) => w.desiredJobs.join(', '),
+    tags: (w: AdminWorkerRow) => w.tags.join(', '),
+    status: (w: AdminWorkerRow) => (w.isHidden ? 'Đã ẩn' : w.isSeeking ? 'Đang tìm việc' : 'Tạm dừng'),
+    apps: (w: AdminWorkerRow) => w.applications,
+  });
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -128,11 +136,11 @@ export function WorkerCandidatesPanel({ token, onCounts }: { token: string; onCo
           <table className="w-full text-xs">
             <thead>
               <tr className="text-left text-ink-faint bg-surface-alt">
-                <th className="py-2.5 px-4 font-semibold">Người lao động</th>
-                <th className="py-2.5 px-3 font-semibold">Việc muốn làm · ca</th>
-                <th className="py-2.5 px-3 font-semibold">Thẻ / ghi chú</th>
-                <th className="py-2.5 px-3 font-semibold">Trạng thái</th>
-                <th className="py-2.5 px-3 font-semibold text-right">Ứng tuyển · NTD gọi</th>
+                <SortTh s={ws} k="name" className="py-2.5 px-4 font-semibold">Người lao động</SortTh>
+                <SortTh s={ws} k="jobs" className="py-2.5 px-3 font-semibold">Việc muốn làm · ca</SortTh>
+                <SortTh s={ws} k="tags" className="py-2.5 px-3 font-semibold">Thẻ / ghi chú</SortTh>
+                <SortTh s={ws} k="status" className="py-2.5 px-3 font-semibold">Trạng thái</SortTh>
+                <SortTh s={ws} k="apps" align="right" className="py-2.5 px-3 font-semibold">Ứng tuyển · NTD gọi</SortTh>
                 <th className="py-2.5 px-4" />
               </tr>
             </thead>
@@ -142,7 +150,7 @@ export function WorkerCandidatesPanel({ token, onCounts }: { token: string; onCo
                   <td colSpan={6} className="text-center text-ink-faint py-10">Không có hồ sơ nào phù hợp.</td>
                 </tr>
               )}
-              {data?.items.map((w: AdminWorkerRow) => (
+              {ws.rows.map((w: AdminWorkerRow) => (
                 <tr key={w.id} className="border-t border-border align-top">
                   <td className="py-3 px-4 min-w-[200px]">
                     <div className="font-bold flex items-center gap-1.5 flex-wrap">

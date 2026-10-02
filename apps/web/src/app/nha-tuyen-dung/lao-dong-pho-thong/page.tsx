@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth-context';
 import { SourcedEditor } from '@/components/labor/SourcedEditor';
 import { workersApi, type StockRow, type TrustInfo, type DropoutRow, type EmployerLaborJob, type SupplyRow, type WorkerAppRow, type WorkerKind, type WorkerSearchItem } from '@/lib/api';
 import Link from '@/components/SmartLink';
+import { SortTh, useSort } from '@/components/ui/SortTh';
 import { TrustBadge } from '@/components/labor/LaborJobList';
 import { callScript } from '@/lib/labor-extra';
 import { CERT_LABEL, EXPERIENCE_LABEL, HOURS_LABEL, ageOfBirth, CALL_LABEL, CALL_STATUS, GENDER_LABEL, KIND_LABEL, LABOR_GROUPS, ago, fmtDateTime, placeText, slotText } from '@/lib/labor';
@@ -57,6 +58,30 @@ export default function EmployerLaborPage() {
   const [ivMsg, setIvMsg] = useState('');
   const [showList, setShowList] = useState(false);
   const [myTrust, setMyTrust] = useState<TrustInfo | null>(null);
+  const appSort = useSort(apps, {
+    createdAt: (a) => a.createdAt,
+    jobTitle: (a) => a.jobTitle,
+    fullName: (a) => a.fullName,
+    phone: (a) => a.phone,
+    area: (a) => [a.newWard ?? a.oldDistrict, a.province].filter(Boolean).join(', '),
+    status: (a) => a.status,
+  });
+  const distSort = useSort(supply?.districts, {
+    district: (d) => d.district,
+    total: (d) => d.total,
+    worker: (d) => d.worker,
+    student: (d) => d.student,
+    intern: (d) => d.intern,
+    housing: (d) => d.housing,
+    shuttle: (d) => d.shuttle,
+  });
+  const dropSort = useSort(supply?.dropout, {
+    group: (d) => d.group,
+    hired: (d) => d.hired,
+    noShow: (d) => d.noShow,
+    rate: (d) => d.rate,
+    extraPct: (d) => d.extraPct,
+  });
 
   useEffect(() => {
     if (me === null) router.replace('/dang-nhap?next=/nha-tuyen-dung/lao-dong-pho-thong');
@@ -408,11 +433,11 @@ export default function EmployerLaborPage() {
               <table className="w-full text-[14px]">
                 <thead>
                   <tr className="text-left text-ink-muted border-b border-border">
-                    <th className="p-2 w-8"><input type="checkbox" aria-label="Chọn tất cả" className="w-4 h-4" checked={sel.length > 0 && sel.length === apps.length} onChange={(e) => setSel(e.target.checked ? apps.map((a) => a.id) : [])} /></th><th className="p-2">Thời gian</th><th className="p-2">Tin tuyển</th><th className="p-2">Ứng viên</th><th className="p-2">Điện thoại</th><th className="p-2">Khu vực</th><th className="p-2">Trạng thái</th>
+                    <th className="p-2 w-8"><input type="checkbox" aria-label="Chọn tất cả" className="w-4 h-4" checked={sel.length > 0 && sel.length === apps.length} onChange={(e) => setSel(e.target.checked ? apps.map((a) => a.id) : [])} /></th><SortTh s={appSort} k="createdAt" className="p-2">Thời gian</SortTh><SortTh s={appSort} k="jobTitle" className="p-2">Tin tuyển</SortTh><SortTh s={appSort} k="fullName" className="p-2">Ứng viên</SortTh><SortTh s={appSort} k="phone" className="p-2">Điện thoại</SortTh><SortTh s={appSort} k="area" className="p-2">Khu vực</SortTh><SortTh s={appSort} k="status" className="p-2">Trạng thái</SortTh>
                   </tr>
                 </thead>
                 <tbody>
-                  {apps.map((a) => (
+                  {appSort.rows.map((a) => (
                     <tr key={a.id} className={`border-b border-border ${a.seenAt ? '' : 'font-bold'}`}>
                       <td className="p-2"><input type="checkbox" aria-label={`Chọn ${a.fullName}`} className="w-4 h-4" checked={sel.includes(a.id)} onChange={(e) => setSel((l) => (e.target.checked ? [...l, a.id] : l.filter((x) => x !== a.id)))} /></td>
                       <td className="p-2 whitespace-nowrap">{fmtDateTime(a.createdAt)}</td>
@@ -473,11 +498,11 @@ export default function EmployerLaborPage() {
               <div className="rounded-xl border border-border bg-white p-3 overflow-x-auto">
                 <table className="w-full text-[14px]">
                   <thead>
-                    <tr className="text-left text-ink-muted"><th className="p-1.5">Quận/huyện</th><th className="p-1.5 w-[45%]">Số người đang tìm việc</th><th className="p-1.5">Công nhân</th><th className="p-1.5">SV</th><th className="p-1.5">TTS</th><th className="p-1.5">Cần chỗ ở</th><th className="p-1.5">Cần xe</th></tr>
+                    <tr className="text-left text-ink-muted"><SortTh s={distSort} k="district" className="p-1.5">Quận/huyện</SortTh><SortTh s={distSort} k="total" className="p-1.5 w-[45%]">Số người đang tìm việc</SortTh><SortTh s={distSort} k="worker" className="p-1.5">Công nhân</SortTh><SortTh s={distSort} k="student" className="p-1.5">SV</SortTh><SortTh s={distSort} k="intern" className="p-1.5">TTS</SortTh><SortTh s={distSort} k="housing" className="p-1.5">Cần chỗ ở</SortTh><SortTh s={distSort} k="shuttle" className="p-1.5">Cần xe</SortTh></tr>
                   </thead>
                   <tbody>
-                    {supply.districts.map((d) => {
-                      const max = supply.districts[0].total || 1;
+                    {distSort.rows.map((d) => {
+                      const max = Math.max(...supply.districts.map((x) => x.total), 1);
                       return (
                         <tr key={d.district} className="border-t border-border">
                           <td className="p-1.5 font-bold">{d.district}</td>
@@ -516,9 +541,9 @@ export default function EmployerLaborPage() {
               <div className="rounded-xl border border-border bg-white p-3 text-[14px] text-ink overflow-x-auto">
                 <div className="font-extrabold">Tỷ lệ nhận việc nhưng không đi làm (toàn hệ thống, ẩn danh)</div>
                 <table className="w-full text-[13.5px] mt-1">
-                  <thead><tr className="text-left text-ink-muted"><th className="p-1.5">Nhóm việc</th><th className="p-1.5">Đi làm</th><th className="p-1.5">Không đi làm</th><th className="p-1.5">Tỷ lệ bỏ</th><th className="p-1.5">Nên tuyển dư</th></tr></thead>
+                  <thead><tr className="text-left text-ink-muted"><SortTh s={dropSort} k="group" className="p-1.5">Nhóm việc</SortTh><SortTh s={dropSort} k="hired" className="p-1.5">Đi làm</SortTh><SortTh s={dropSort} k="noShow" className="p-1.5">Không đi làm</SortTh><SortTh s={dropSort} k="rate" className="p-1.5">Tỷ lệ bỏ</SortTh><SortTh s={dropSort} k="extraPct" className="p-1.5">Nên tuyển dư</SortTh></tr></thead>
                   <tbody>
-                    {supply.dropout.map((d) => (
+                    {dropSort.rows.map((d) => (
                       <tr key={d.group} className="border-t border-border"><td className="p-1.5 font-bold">{d.group}</td><td className="p-1.5 tabular-nums">{d.hired}</td><td className="p-1.5 tabular-nums">{d.noShow}</td><td className={`p-1.5 tabular-nums font-bold ${d.rate >= 30 ? 'text-critical' : ''}`}>{d.rate}%</td><td className="p-1.5 tabular-nums">+{d.extraPct}%</td></tr>
                     ))}
                   </tbody>

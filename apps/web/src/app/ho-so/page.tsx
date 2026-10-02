@@ -35,6 +35,7 @@ import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatS
 import ChangePasswordCard from '@/components/ChangePasswordCard';
 import { AdSlot } from '@/components/ads/AdSlot';
 import { setSavedCount } from '@/lib/saved-count';
+import { SortTh, useSort } from '@/components/ui/SortTh';
 
 // Đợt 12m (21/09/2026) — hiển thị lại tiêu chí "Tìm kiếm đã lưu" và dựng lại URL /viec-lam tương
 // ứng (đối xứng với cách viec-lam/page.tsx đọc query params thành filters).
@@ -104,6 +105,12 @@ export default function MyCenterPage() {
     }
   }, [savedJobs, me]);
   const [applications, setApplications] = useState<Application[]>([]);
+  const appSort = useSort(applications, {
+    title: (a) => a.jobPosting.title,
+    company: (a) => a.jobPosting.company.name,
+    appliedAt: (a) => a.appliedAt,
+    status: (a) => APPLICATION_STATUS_LABEL[a.status] ?? a.status,
+  });
   const [appView, setAppView] = useState<'board' | 'table'>('board');
   const [bulkOpen, setBulkOpen] = useState(false);
   const [blocked, setBlocked] = useState<BlockedCompany[]>([]);
@@ -307,15 +314,15 @@ export default function MyCenterPage() {
                     <table className="w-full text-[12px]">
                       <thead>
                         <tr className="text-left text-ink-faint border-b border-border">
-                          <th className="py-2 px-1 font-semibold">Vị trí</th>
-                          <th className="py-2 px-1 font-semibold">Công ty</th>
-                          <th className="py-2 px-1 font-semibold">Ngày nộp</th>
-                          <th className="py-2 px-1 font-semibold">Trạng thái</th>
+                          <SortTh s={appSort} k="title" className="py-2 px-1 font-semibold">Vị trí</SortTh>
+                          <SortTh s={appSort} k="company" className="py-2 px-1 font-semibold">Công ty</SortTh>
+                          <SortTh s={appSort} k="appliedAt" className="py-2 px-1 font-semibold">Ngày nộp</SortTh>
+                          <SortTh s={appSort} k="status" className="py-2 px-1 font-semibold">Trạng thái</SortTh>
                           <th className="py-2 px-1 font-semibold"></th>
                         </tr>
                       </thead>
                       <tbody>
-                        {applications.map((a) => (
+                        {appSort.rows.map((a) => (
                           <tr key={a.id} className="border-b border-border last:border-0">
                             <td className="py-2 px-1 font-semibold">
                               <Link href={`/viec-lam/${a.jobPostingId}`} className="hover:text-primary">

@@ -8,6 +8,7 @@ import { ChannelChips, CHANNEL_ICON, CHANNEL_LABEL } from '@/components/ChannelC
 import { LABOR_GROUPS } from '@/lib/labor';
 import { INDUSTRIES, EXPERIENCE_LEVELS, LEVELS, GENDER_OPTIONS } from '@/lib/catalogs';
 import { formatDate, formatDateTime } from '@/lib/format';
+import { SortTh, useSort } from '@/components/ui/SortTh';
 
 // Đợt 119 — "Hộp nhập tin từ link": dán nhiều link tin tuyển dụng → web đọc sẵn tin + công ty → Admin xem lại rồi bấm Đăng.
 // Công ty mới: tự tạo hồ sơ + tài khoản nháp. Công ty đã có (nguồn ngoài): thêm vào công ty đó. Công ty đã có chủ thật: báo họ nhận.
@@ -323,6 +324,16 @@ export function ImportInbox({ token }: { token: string }) {
   const [chan, setChan] = useState('');
   const chanOf = (r: JobImportRow) => r.data?.channel || 'office';
   const items = (data?.items ?? []).filter((r) => !chan || chanOf(r) === chan);
+  // Đợt 144 — bấm tiêu đề cột để sắp xếp (↕ tăng/giảm/bỏ).
+  const ss = useSort(items, {
+    title: (r) => r.data?.title,
+    company: (r) => r.data?.companyName,
+    location: (r) => r.data?.location,
+    salary: (r) => r.data?.salaryMax ?? r.data?.salaryMin,
+    source: (r) => host(r.sourceUrl),
+    createdAt: (r) => new Date(r.createdAt),
+    badge: (r) => r.matchedCompany?.name ?? (r.status === 'failed' ? r.note : '~'),
+  });
   const chanCounts = (data?.items ?? []).reduce<Record<string, number>>((m, r) => { const c = chanOf(r); m[c] = (m[c] ?? 0) + 1; return m; }, {});
   const [bulkProg, setBulkProg] = useState('');
 
@@ -494,17 +505,17 @@ export function ImportInbox({ token }: { token: string }) {
             <tr className="bg-surface-alt text-left text-[11.5px] font-bold text-ink-muted uppercase tracking-wide">
               {tab !== 'published' && <th className="w-9 px-2 py-2" aria-label="Chọn" />}
               <th className="w-10 px-2 py-2 text-right">STT</th>
-              <th className="px-2 py-2">Chức danh</th>
-              <th className="px-2 py-2">Công ty</th>
-              <th className="px-2 py-2">Địa điểm</th>
-              <th className="px-2 py-2 whitespace-nowrap">Lương (triệu)</th>
-              <th className="px-2 py-2">Nguồn</th>
-              <th className="px-2 py-2 whitespace-nowrap">Ngày nhập</th>
-              <th className="px-2 py-2">{tab === 'failed' ? 'Lý do' : 'Xử lý công ty'}</th>
+              <SortTh s={ss} k="title" className="px-2 py-2">Chức danh</SortTh>
+              <SortTh s={ss} k="company" className="px-2 py-2">Công ty</SortTh>
+              <SortTh s={ss} k="location" className="px-2 py-2">Địa điểm</SortTh>
+              <SortTh s={ss} k="salary" className="px-2 py-2">Lương (triệu)</SortTh>
+              <SortTh s={ss} k="source" className="px-2 py-2">Nguồn</SortTh>
+              <SortTh s={ss} k="createdAt" className="px-2 py-2">Ngày nhập</SortTh>
+              <SortTh s={ss} k="badge" className="px-2 py-2">{tab === 'failed' ? 'Lý do' : 'Xử lý công ty'}</SortTh>
               <th className="w-8 px-2 py-2" aria-label="Mở" />
             </tr>
           </thead>
-          {items.map((r) => {
+          {ss.rows.map((r) => {
             const d = r.data ?? {};
             const mc = r.matchedCompany;
             const badge = r.status === 'failed' ? null : r.status === 'published'
@@ -516,7 +527,7 @@ export function ImportInbox({ token }: { token: string }) {
               : { t: 'Công ty mới (tạo hồ sơ nháp)', c: 'bg-primary-tint text-primary' };
             const canPublish = r.status === 'pending' || r.status === 'failed';
             const cols = (tab !== 'published' ? 1 : 0) + 9;
-            const idx = items.indexOf(r) + 1;
+            const idx = ss.rows.indexOf(r) + 1;
             return (
               <tbody key={r.id} className="border-t border-border">
                 <tr className={`cursor-pointer align-top hover:bg-surface-alt ${open === r.id ? 'bg-surface-alt' : ''}`} onClick={() => toggle(r)}>

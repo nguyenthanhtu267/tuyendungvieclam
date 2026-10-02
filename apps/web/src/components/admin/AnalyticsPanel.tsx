@@ -7,6 +7,7 @@ import { adminAnalyticsApi } from '@/lib/api-admin';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { BarList, ColumnChart, Kpi, LineChart, SERIES, WeekHourGrid, fmtDay, fmtDuration, pct } from './analytics/charts';
 import { VitalsCard } from './VitalsCard';
+import { SortTh, useSort, type SortApi } from '@/components/ui/SortTh';
 
 // Đợt 19 (26/09/2026) — Admin "🔎 Phân tích truy cập": toàn bộ là dữ liệu THẬT (theo yêu cầu người dùng
 // "trong admin toàn bộ là dữ liệu thật hoàn toàn"): lượt xem, người xem, thời gian ở lại, độ cuộn, mọi
@@ -254,17 +255,35 @@ function ModeNote({ mode, retentionStart, clamped }: { mode: 'raw' | 'daily'; re
   return null;
 }
 
-function Table({ head, children, minW = 640 }: { head: React.ReactNode[]; children: React.ReactNode; minW?: number }) {
+function Table({
+  head,
+  children,
+  minW = 640,
+  sort,
+  sortKeys,
+}: {
+  head: React.ReactNode[];
+  children: React.ReactNode;
+  minW?: number;
+  sort?: SortApi;
+  sortKeys?: (string | null)[];
+}) {
   return (
     <div className="overflow-x-auto -mx-1">
       <table className="w-full text-[12px] border-collapse" style={{ minWidth: minW }}>
         <thead>
           <tr className="text-left text-[11px] text-ink-faint border-b border-border">
-            {head.map((h, i) => (
-              <th key={i} className={`py-1.5 px-1 font-semibold ${i ? 'text-right' : ''}`}>
-                {h}
-              </th>
-            ))}
+            {head.map((h, i) =>
+              sort && sortKeys?.[i] ? (
+                <SortTh key={i} s={sort} k={sortKeys[i] as string} align={i ? 'right' : 'left'} className="py-1.5 px-1 font-semibold">
+                  {h}
+                </SortTh>
+              ) : (
+                <th key={i} className={`py-1.5 px-1 font-semibold ${i ? 'text-right' : ''}`}>
+                  {h}
+                </th>
+              ),
+            )}
           </tr>
         </thead>
         <tbody className="tabular-nums">{children}</tbody>
@@ -415,6 +434,15 @@ function Overview({ d }: { d: AnalyticsOverview }) {
   const p = d.prevKpis;
   const prevLabel = `${fmtDay(d.prevRange.from)}–${fmtDay(d.prevRange.to)}`;
   const empty = k.views === 0 && k.sessions === 0;
+  const pagesSort = useSort(d.topPages, {
+    route: (r) => routeName(r.route),
+    views: (r) => r.views,
+    visitors: (r) => r.visitors,
+    avgTimeMs: (r) => r.avgTimeMs,
+    avgScroll: (r) => r.avgScroll,
+    entries: (r) => r.entries,
+    exitRate: (r) => r.exitRate,
+  });
   return (
     <div className="flex flex-col gap-4">
       <ModeNote mode={d.range.mode} retentionStart={d.range.retentionStart} />
@@ -473,8 +501,12 @@ function Overview({ d }: { d: AnalyticsOverview }) {
       </div>
 
       <Card title="Trang được xem nhiều nhất" hint="Thời gian ở lại = lúc tab đang mở trước mắt; Cuộn = trung bình người xem cuộn tới bao nhiêu % trang">
-        <Table head={['Trang', 'Lượt xem', 'Người xem', 'Ở lại TB', 'Cuộn TB', 'Vào web từ đây', 'Tỷ lệ rời web']}>
-          {d.topPages.map((r) => (
+        <Table
+          head={['Trang', 'Lượt xem', 'Người xem', 'Ở lại TB', 'Cuộn TB', 'Vào web từ đây', 'Tỷ lệ rời web']}
+          sort={pagesSort}
+          sortKeys={['route', 'views', 'visitors', 'avgTimeMs', 'avgScroll', 'entries', 'exitRate']}
+        >
+          {pagesSort.rows.map((r) => (
             <tr key={r.route}>
               <td className={td}>
                 <RouteCell route={r.route} />
@@ -547,6 +579,12 @@ function ContentView({ token, from, to }: { token: string; from: string; to: str
 
 function Content({ d }: { d: AnalyticsContent }) {
   const [sort, setSort] = useState<JobSort>('views');
+  const searchSort = useSort(d.searches, {
+    q: (s) => s.q,
+    count: (s) => s.count,
+    visitors: (s) => s.visitors,
+    zero: (s) => s.zero,
+  });
   const jobs = useMemo(() => [...d.jobs].sort((a, b) => (b[sort] as number) - (a[sort] as number)), [d.jobs, sort]);
   const f = d.funnel;
   const steps = [
@@ -662,8 +700,8 @@ function Content({ d }: { d: AnalyticsContent }) {
           />
         </Card>
         <Card title="Từ khoá tìm việc phổ biến">
-          <Table head={['Từ khoá', 'Lượt tìm', 'Người tìm', 'Không ra kết quả']} minW={360}>
-            {d.searches.map((s) => (
+          <Table head={['Từ khoá', 'Lượt tìm', 'Người tìm', 'Không ra kết quả']} minW={360} sort={searchSort} sortKeys={['q', 'count', 'visitors', 'zero']}>
+            {searchSort.rows.map((s) => (
               <tr key={s.q}>
                 <td className={td}>{s.q}</td>
                 <td className={tdr}>{formatNumber(s.count)}</td>
@@ -724,6 +762,19 @@ function BehaviorView({ token, from, to }: { token: string; from: string; to: st
 }
 
 function Behavior({ d }: { d: AnalyticsBehavior }) {
+  const pathSort = useSort(d.paths, {
+    from: (p) => routeName(p.from),
+    to: (p) => routeName(p.to),
+    count: (p) => p.count,
+  });
+  const userSort = useSort(d.topUsers, {
+    email: (u) => u.email,
+    role: (u) => ROLE_LABEL[u.role] ?? u.role,
+    views: (u) => u.views,
+    sessions: (u) => u.sessions,
+    totalTimeMs: (u) => u.totalTimeMs,
+    lastSeen: (u) => (u.lastSeen ? new Date(u.lastSeen) : null),
+  });
   return (
     <div className="flex flex-col gap-4">
       <ModeNote mode="raw" retentionStart={d.range.retentionStart} clamped={d.range.clamped} />
@@ -786,8 +837,8 @@ function Behavior({ d }: { d: AnalyticsBehavior }) {
       </div>
 
       <Card title="Đường đi phổ biến" hint="Từ trang này người xem đi tiếp sang trang nào">
-        <Table head={['Từ trang', 'Sang trang', 'Số lần']} minW={520}>
-          {d.paths.map((p, i) => (
+        <Table head={['Từ trang', 'Sang trang', 'Số lần']} minW={520} sort={pathSort} sortKeys={['from', 'to', 'count']}>
+          {pathSort.rows.map((p, i) => (
             <tr key={i}>
               <td className={td}>{routeName(p.from)}</td>
               <td className={tdr}>→ {routeName(p.to)}</td>
@@ -817,8 +868,13 @@ function Behavior({ d }: { d: AnalyticsBehavior }) {
       </div>
 
       <Card title="Tài khoản hoạt động nhiều nhất" hint={`${pct(d.loggedInSessionRate, 0)} số phiên có đăng nhập`}>
-        <Table head={['Tài khoản', 'Loại', 'Lượt xem', 'Phiên', 'Tổng thời gian', 'Lần cuối']} minW={640}>
-          {d.topUsers.map((u) => (
+        <Table
+          head={['Tài khoản', 'Loại', 'Lượt xem', 'Phiên', 'Tổng thời gian', 'Lần cuối']}
+          minW={640}
+          sort={userSort}
+          sortKeys={['email', 'role', 'views', 'sessions', 'totalTimeMs', 'lastSeen']}
+        >
+          {userSort.rows.map((u) => (
             <tr key={u.userId}>
               <td className={td}>{u.email}</td>
               <td className={tdr}>{ROLE_LABEL[u.role] ?? u.role}</td>

@@ -25,6 +25,7 @@ import {
   smartApi6,
   type ApplicantFlags,
 } from '@/lib/api';
+import { SortTh, useSort } from '@/components/ui/SortTh';
 import { APPLICATION_STATUS_CLASS, APPLICATION_STATUS_LABEL, formatDate, formatNumber } from '@/lib/format';
 
 const STATUS_TABS: { value: ApplicationStatus | 'all'; label: string }[] = [
@@ -353,6 +354,21 @@ function UngVienPageInner() {
     }
   }
 
+  // Thứ tự mặc định (độ phù hợp / sàng lọc) — bấm tiêu đề cột để sắp lại theo cột.
+  const orderedApplicants = (() => {
+    const base = view === 'active' && sortBest ? [...applicants].sort((a, b) => (adjScore(b.id) ?? -1) - (adjScore(a.id) ?? -1)) : applicants;
+    if (view !== 'active' || !flagInfo?.hasScreening || !pushFail) return base;
+    const bad = (id: string) => (flagInfo.screening[id] ?? 0) > 0;
+    return [...base.filter((a) => !bad(a.id)), ...base.filter((a) => bad(a.id))];
+  })();
+  const appSort = useSort(orderedApplicants, {
+    appliedAt: (a) => a.appliedAt,
+    rating: (a) => a.rating,
+    folder: (a) => a.folder,
+    status: (a) => APPLICATION_STATUS_LABEL[a.status],
+    cv: (a) => (a.cv.fileUrl ? 'Xem CV' : a.cv.externalLinkUrl ? 'Xem CV (Drive)' : a.cv.type === 'template' ? 'Hồ sơ trực tuyến' : null),
+  });
+
   if (!me || !me.role.startsWith('employer')) return null;
 
   const currentJob = jobs.find((j) => j.id === jobId);
@@ -595,23 +611,18 @@ function UngVienPageInner() {
                             </button>
                           )}
                         </th>
-                        <th className="py-2.5 px-3 font-semibold">Ngày nộp</th>
-                        {view === 'active' && <th className="py-2.5 px-3 font-semibold">Đánh giá</th>}
-                        {view === 'active' && <th className="py-2.5 px-3 font-semibold">Thư mục</th>}
-                        {view === 'active' && <th className="py-2.5 px-3 font-semibold">Trạng thái</th>}
-                        <th className="py-2.5 px-3 font-semibold">CV</th>
+                        <SortTh s={appSort} k="appliedAt" className="py-2.5 px-3 font-semibold">Ngày nộp</SortTh>
+                        {view === 'active' && <SortTh s={appSort} k="rating" className="py-2.5 px-3 font-semibold">Đánh giá</SortTh>}
+                        {view === 'active' && <SortTh s={appSort} k="folder" className="py-2.5 px-3 font-semibold">Thư mục</SortTh>}
+                        {view === 'active' && <SortTh s={appSort} k="status" className="py-2.5 px-3 font-semibold">Trạng thái</SortTh>}
+                        <SortTh s={appSort} k="cv" className="py-2.5 px-3 font-semibold">CV</SortTh>
                         <th className="py-2.5 px-4 font-semibold text-right">
                           {view === 'active' ? 'Cập nhật / Xoá' : 'Khôi phục / Xoá vĩnh viễn'}
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {(() => {
-                        const base = view === 'active' && sortBest ? [...applicants].sort((a, b) => (adjScore(b.id) ?? -1) - (adjScore(a.id) ?? -1)) : applicants;
-                        if (view !== 'active' || !flagInfo?.hasScreening || !pushFail) return base;
-                        const bad = (id: string) => (flagInfo.screening[id] ?? 0) > 0;
-                        return [...base.filter((a) => !bad(a.id)), ...base.filter((a) => bad(a.id))];
-                      })().map((app) => (
+                      {appSort.rows.map((app) => (
                         <tr key={app.id} className="border-t border-border align-top">
                           {view === 'active' && (
                             <td className="py-3 pl-4 pr-0">

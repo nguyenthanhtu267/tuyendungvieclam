@@ -9,6 +9,7 @@ import { employerApi, type JobImportData, type EmployerJob, type EmployerJobStat
 import { EMPLOYER_JOB_STATUS_CLASS, EMPLOYER_JOB_STATUS_LABEL, formatDate, formatNumber } from '@/lib/format';
 import { jobShareUrl, openFacebookShare } from '@/lib/social';
 import { AdSlot } from '@/components/ads/AdSlot';
+import { SortTh, useSort } from '@/components/ui/SortTh';
 
 // Đợt 11b — Mục #4 ATS: trang quản lý tin đăng của NTD, 4 tab trạng thái (đang đăng/chờ đăng/
 // tạm ngưng/hết hạn) + số lượng từng trạng thái, thao tác tạm ngưng/đăng lại/nhân bản tin.
@@ -28,6 +29,15 @@ export default function TinDangPage() {
   const { me, token } = useAuth();
   const [tab, setTab] = useState<EmployerJobStatus | 'all'>('all');
   const [jobs, setJobs] = useState<EmployerJob[]>([]);
+  const jobSort = useSort(jobs, {
+    title: (j) => j.title,
+    createdAt: (j) => j.createdAt,
+    deadline: (j) => j.deadline,
+    status: (j) => EMPLOYER_JOB_STATUS_LABEL[j.employerStatus ?? 'khac'],
+    views: (j) => j.viewCount ?? 0,
+    apps: (j) => j.applicationCount,
+    conv: (j) => (j.viewCount ? j.applicationCount / j.viewCount : null),
+  });
   const [counts, setCounts] = useState<EmployerJobStatusCounts | null>(null);
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<string | null>(null);
@@ -190,18 +200,18 @@ export default function TinDangPage() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-left text-ink-faint bg-surface-alt">
-                    <th className="py-2.5 px-4 font-semibold">Vị trí</th>
-                    <th className="py-2.5 px-3 font-semibold">Ngày đăng</th>
-                    <th className="py-2.5 px-3 font-semibold">Hạn nộp</th>
-                    <th className="py-2.5 px-3 font-semibold">Trạng thái</th>
-                    <th className="py-2.5 px-3 font-semibold text-right">Lượt xem</th>
-                    <th className="py-2.5 px-3 font-semibold text-right">Hồ sơ</th>
-                    <th className="py-2.5 px-3 font-semibold text-right">Tỷ lệ chuyển đổi</th>
+                    <SortTh s={jobSort} k="title" className="py-2.5 px-4 font-semibold">Vị trí</SortTh>
+                    <SortTh s={jobSort} k="createdAt" className="py-2.5 px-3 font-semibold">Ngày đăng</SortTh>
+                    <SortTh s={jobSort} k="deadline" className="py-2.5 px-3 font-semibold">Hạn nộp</SortTh>
+                    <SortTh s={jobSort} k="status" className="py-2.5 px-3 font-semibold">Trạng thái</SortTh>
+                    <SortTh s={jobSort} k="views" align="right" className="py-2.5 px-3 font-semibold">Lượt xem</SortTh>
+                    <SortTh s={jobSort} k="apps" align="right" className="py-2.5 px-3 font-semibold">Hồ sơ</SortTh>
+                    <SortTh s={jobSort} k="conv" align="right" className="py-2.5 px-3 font-semibold">Tỷ lệ chuyển đổi</SortTh>
                     <th className="py-2.5 px-4 font-semibold text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {jobs.map((job) => {
+                  {jobSort.rows.map((job) => {
                     const status = job.employerStatus ?? 'khac';
                     const canPauseResume = status === 'dang_dang' || status === 'tam_ngung';
                     return (

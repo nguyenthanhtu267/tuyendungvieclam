@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { adminAnalyticsApi } from '@/lib/api-admin';
+import { SortTh, useSort } from '@/components/ui/SortTh';
 
 // Đợt 93 — tốc độ THẬT từ máy người xem (không phải giả lập). Màu: xanh = đạt mục tiêu Google, vàng = cần cải thiện, đỏ = chậm.
 type Rows = Awaited<ReturnType<typeof adminAnalyticsApi.vitals>>;
@@ -24,6 +25,15 @@ export function VitalsCard({ token }: { token: string }) {
       off = true;
     };
   }, [token, days]);
+  const vs = useSort(data?.items, {
+    path: (r) => r.path,
+    device: (r) => (r.device === 'mobile' ? 'Điện thoại' : 'Máy tính'),
+    samples: (r) => r.samples,
+    lcp: (r) => r.lcpMs,
+    cls: (r) => r.cls,
+    inp: (r) => r.inpMs,
+    ttfb: (r) => r.ttfbMs,
+  });
   return (
     <section className="rounded-xl bg-white border border-border p-4" data-testid="vitals-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -42,17 +52,17 @@ export function VitalsCard({ token }: { token: string }) {
           <table className="w-full text-[12.5px]">
             <thead>
               <tr className="text-left text-ink-muted border-b border-border">
-                <th className="py-1 pr-2">Trang</th>
-                <th className="pr-2">Máy</th>
-                <th className="pr-2 text-right">Lượt</th>
-                <th className="pr-2 text-right">LCP</th>
-                <th className="pr-2 text-right">CLS</th>
-                <th className="pr-2 text-right">INP</th>
-                <th className="text-right">TTFB</th>
+                <SortTh s={vs} k="path" className="py-1 pr-2">Trang</SortTh>
+                <SortTh s={vs} k="device" className="pr-2">Máy</SortTh>
+                <SortTh s={vs} k="samples" align="right" className="pr-2">Lượt</SortTh>
+                <SortTh s={vs} k="lcp" align="right" className="pr-2">LCP</SortTh>
+                <SortTh s={vs} k="cls" align="right" className="pr-2">CLS</SortTh>
+                <SortTh s={vs} k="inp" align="right" className="pr-2">INP</SortTh>
+                <SortTh s={vs} k="ttfb" align="right">TTFB</SortTh>
               </tr>
             </thead>
             <tbody>
-              {data.items.map((r) => (
+              {vs.rows.map((r) => (
                 <tr key={r.path + r.device} className="border-b border-border/60">
                   <td className="py-1 pr-2 font-mono text-[12px]">{r.path}</td>
                   <td className="pr-2">{r.device === 'mobile' ? 'Điện thoại' : 'Máy tính'}</td>

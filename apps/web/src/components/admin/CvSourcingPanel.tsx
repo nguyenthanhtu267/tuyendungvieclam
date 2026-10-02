@@ -7,6 +7,7 @@ import { formatDate, formatDateTime, formatNumber } from '@/lib/format';
 import { Modal } from '@/components/profile/ui';
 import { CandidateDraftForm } from '@/components/cv/CandidateDraftForm';
 import { CvFileContent } from '@/components/cv/CvFileContent';
+import { SortTh, useSort } from '@/components/ui/SortTh';
 
 // Đợt 18c (26/09/2026) — Admin "Nguồn ngoài → CV ứng viên":
 //  1. Hàng chờ chia sẻ: mọi CV ứng viên đã nộp cho 1 NTD (+ CV NTD tự nhập) → Admin duyệt thủ công hoặc
@@ -182,6 +183,12 @@ function QueueView({ token, onChanged }: { token: string; onChanged: () => void 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
   const ids = data?.items.map((i) => i.id) ?? [];
   const allChecked = ids.length > 0 && ids.every((id) => selected.has(id));
+  const qs = useSort(data?.items, {
+    name: (c) => c.fullName,
+    company: (c) => c.companyName,
+    real: (c) => REAL_STATE[c.realProfileState].label,
+    date: (c) => (c.lastAppliedAt ? new Date(c.lastAppliedAt) : null),
+  });
 
   return (
     <div className="flex flex-col gap-3">
@@ -261,10 +268,10 @@ function QueueView({ token, onChanged }: { token: string; onChanged: () => void 
                     />
                   </th>
                 )}
-                <th className="py-2.5 px-4 font-semibold">Ứng viên</th>
-                <th className="py-2.5 px-3 font-semibold">Nộp cho / vị trí</th>
-                <th className="py-2.5 px-3 font-semibold">Hồ sơ thật</th>
-                <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Ngày nộp</th>
+                <SortTh s={qs} k="name" className="py-2.5 px-4 font-semibold">Ứng viên</SortTh>
+                <SortTh s={qs} k="company" className="py-2.5 px-3 font-semibold">Nộp cho / vị trí</SortTh>
+                <SortTh s={qs} k="real" className="py-2.5 px-3 font-semibold">Hồ sơ thật</SortTh>
+                <SortTh s={qs} k="date" className="py-2.5 px-3 font-semibold whitespace-nowrap">Ngày nộp</SortTh>
                 <th className="py-2.5 px-4 font-semibold text-right">Thao tác</th>
               </tr>
             </thead>
@@ -276,7 +283,7 @@ function QueueView({ token, onChanged }: { token: string; onChanged: () => void 
                   </td>
                 </tr>
               )}
-              {data?.items.map((c) => {
+              {qs.rows.map((c) => {
                 const st = REAL_STATE[c.realProfileState];
                 return (
                   <tr key={c.id} className="border-t border-border align-top">
@@ -531,6 +538,13 @@ function SourcedProfilesView({ token, onChanged }: { token: string; onChanged: (
   }
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+  const ps = useSort(data?.items, {
+    name: (p) => p.fullName,
+    contact: (p) => p.phone ?? p.email,
+    source: (p) => p.sourceLabel,
+    unlock: (p) => p.unlockCount,
+    createdAt: (p) => (p.createdAt ? new Date(p.createdAt) : null),
+  });
 
   return (
     <div className="flex flex-col gap-3">
@@ -555,11 +569,11 @@ function SourcedProfilesView({ token, onChanged }: { token: string; onChanged: (
           <table className="w-full text-xs">
             <thead>
               <tr className="text-left text-ink-faint bg-surface-alt">
-                <th className="py-2.5 px-4 font-semibold">Hồ sơ</th>
-                <th className="py-2.5 px-3 font-semibold">Liên hệ</th>
-                <th className="py-2.5 px-3 font-semibold">Nguồn</th>
-                <th className="py-2.5 px-3 font-semibold text-right">Lượt mở khoá</th>
-                <th className="py-2.5 px-3 font-semibold">Ngày tạo</th>
+                <SortTh s={ps} k="name" className="py-2.5 px-4 font-semibold">Hồ sơ</SortTh>
+                <SortTh s={ps} k="contact" className="py-2.5 px-3 font-semibold">Liên hệ</SortTh>
+                <SortTh s={ps} k="source" className="py-2.5 px-3 font-semibold">Nguồn</SortTh>
+                <SortTh s={ps} k="unlock" align="right" className="py-2.5 px-3 font-semibold">Lượt mở khoá</SortTh>
+                <SortTh s={ps} k="createdAt" className="py-2.5 px-3 font-semibold">Ngày tạo</SortTh>
                 <th className="py-2.5 px-4" />
               </tr>
             </thead>
@@ -571,7 +585,7 @@ function SourcedProfilesView({ token, onChanged }: { token: string; onChanged: (
                   </td>
                 </tr>
               )}
-              {data?.items.map((p) => (
+              {ps.rows.map((p) => (
                 <tr key={p.id} className="border-t border-border align-top">
                   <td className="py-3 px-4">
                     <div className="font-bold">{p.fullName}</div>
