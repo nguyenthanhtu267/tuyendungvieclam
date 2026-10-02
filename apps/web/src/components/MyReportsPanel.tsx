@@ -16,7 +16,7 @@ export default function MyReportsPanel() {
   if (!items.length) return null;
   return (
     <details className="rounded-xl border border-border bg-white">
-      <summary className="cursor-pointer px-4 py-3 font-bold text-[14.5px] text-ink">Báo cáo tin của bạn ({items.length})</summary>
+      <summary className="cursor-pointer px-4 py-3 font-bold text-[14.5px] text-ink">Góp ý về tin của bạn ({items.length})</summary>
       <ul className="px-4 pb-3 flex flex-col gap-2">
         {items.map((r) => (
           <li key={r.id} className="rounded-lg border border-border px-3 py-2 text-[13.5px] text-ink">

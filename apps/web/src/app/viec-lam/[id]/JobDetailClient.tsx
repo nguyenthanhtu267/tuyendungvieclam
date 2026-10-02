@@ -756,13 +756,12 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
                   </div>
 
                   {/* Đợt 129 — đọc hết tin rồi không phải cuộn lên: nút nộp đơn nhắc lại ở cuối tin (cùng hành vi thông minh với nút trên banner). */}
-                  <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
-                    <ReportJobButton jobId={job.id} />
+                  <div className="mt-5">
                     <button
                       type="button"
                       disabled={applyState === 'submitting' || applyState === 'done'}
                       onClick={onApplyTap}
-                      className="tvl-btn-accent !w-auto px-6 !h-11 disabled:opacity-70 max-sm:flex-1"
+                      className="tvl-btn-accent !w-full !h-12 text-[15px] disabled:opacity-70"
                     >
                       {applyLabel}
                     </button>
@@ -788,6 +787,10 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
                   {/* Đợt 132 — các nút Gọi · Zalo · Chia sẻ · Ghim chuyển xuống cuối nội dung, ngay sau Job tags (banner đầu trang gọn hơn). */}
                   <div className="mt-5">
                     <JobQuickActions jobId={job.id} title={job.title} company={job.company.name} phone={job.contactPhone} light />
+                  </div>
+                  {/* Đợt 140 — góp ý về tin: dòng nhỏ, nhẹ nhàng, nằm cuối cùng sau nút nộp đơn và Chia sẻ/Ghim. */}
+                  <div className="mt-3">
+                    <ReportJobButton jobId={job.id} />
                   </div>
 
                   {/* Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc) NTD nhập khi đăng

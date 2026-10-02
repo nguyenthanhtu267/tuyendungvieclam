@@ -8,6 +8,7 @@ import { Suspense, useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from '@/components/SmartLink';
 import EmployerHeader from '@/components/EmployerHeader';
+import EmployerSectionTabs from '@/components/EmployerSectionTabs';
 import { RichTextView } from '@/components/RichTextView';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -360,6 +361,7 @@ function UngVienPageInner() {
   return (
     <main className="min-h-screen">
       <EmployerHeader />
+      <EmployerSectionTabs />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col gap-4">
         {loadingJobs ? (
           <div className="text-center text-ink-faint py-10 text-sm">Đang tải…</div>

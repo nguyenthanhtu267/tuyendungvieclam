@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import Link from '@/components/SmartLink';
 import { SourcedCandidateBadge } from '@/components/SourcedBadge';
 import EmployerHeader from '@/components/EmployerHeader';
+import EmployerSectionTabs from '@/components/EmployerSectionTabs';
 import { useAuth } from '@/lib/auth-context';
 import {
   cvSearchApi,
@@ -201,6 +202,7 @@ export default function TimHoSoPage() {
   return (
     <main className="min-h-screen">
       <EmployerHeader />
+      <EmployerSectionTabs />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6 flex flex-col gap-3">
         {/* Đợt 24 — banner đầu trang Tìm hồ sơ của NTD. */}
         <AdSlot slot="employer-search" />

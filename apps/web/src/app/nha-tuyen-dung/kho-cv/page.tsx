@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from '@/components/SmartLink';
 import EmployerHeader from '@/components/EmployerHeader';
+import EmployerSectionTabs from '@/components/EmployerSectionTabs';
 import { useAuth } from '@/lib/auth-context';
 import {
   cvArchiveApi,
@@ -126,6 +127,7 @@ export default function KhoCvPage() {
   return (
     <main className="min-h-screen">
       <EmployerHeader />
+      <EmployerSectionTabs />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col gap-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex-1 min-w-[240px]">

@@ -93,7 +93,7 @@ export function LaborApplyPanel({ job, inviteCode }: { job: JobPosting; inviteCo
       {card?.trust && <div><TrustBadge t={card.trust} /></div>}
       {wageWarn.length > 0 && (
         <div role="alert" className="rounded-lg border border-critical bg-critical-tint px-3 py-2 text-[13.5px] font-bold text-critical">
-          Cảnh báo lương: {wageWarn.join('; ')}. Mức thấp hơn lương tối thiểu là trái luật — hãy hỏi rõ nhà tuyển dụng hoặc báo cáo tin.
+          Cảnh báo lương: {wageWarn.join('; ')}. Mức thấp hơn lương tối thiểu là trái luật — hãy hỏi rõ nhà tuyển dụng hoặc góp ý về tin.
         </div>
       )}
       <div className="grid md:grid-cols-2 gap-2 text-[14px] text-ink">
@@ -181,7 +181,7 @@ export function LaborApplyPanel({ job, inviteCode }: { job: JobPosting; inviteCo
       {res?.groupCode && <GroupInvite jobId={job.id} title={job.title} code={res.groupCode} size={res.groupSize ?? 1} />}
       <div className="border-t border-border pt-2">
         {!rep.open ? (
-          <button type="button" onClick={() => setRep({ ...rep, open: true })} className="text-[13px] font-bold text-ink underline">Báo cáo tin này (thu phí, giữ giấy tờ, sai sự thật…)</button>
+          <button type="button" onClick={() => setRep({ ...rep, open: true })} className="text-[13px] font-bold text-ink underline">Góp ý về tin này (thông tin chưa đúng, có thu phí…)</button>
         ) : rep.done ? (
           <div className="text-[13.5px] font-bold text-success">Cảm ơn bạn. Quản trị viên sẽ kiểm tra tin này.</div>
         ) : (

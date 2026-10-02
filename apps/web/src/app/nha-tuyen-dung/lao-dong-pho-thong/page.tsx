@@ -4,6 +4,7 @@ import { Combobox } from '@/components/ui/Combobox';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import EmployerHeader from '@/components/EmployerHeader';
+import EmployerSectionTabs from '@/components/EmployerSectionTabs';
 import { AddressPicker, EMPTY_ADDRESS, type AddressValue } from '@/components/labor/AddressPicker';
 import { useAuth } from '@/lib/auth-context';
 import { SourcedEditor } from '@/components/labor/SourcedEditor';
@@ -199,6 +200,7 @@ export default function EmployerLaborPage() {
   return (
     <main className="min-h-screen">
       <EmployerHeader />
+      <EmployerSectionTabs />
       <div className="max-w-6xl mx-3 sm:mx-auto my-3 flex flex-col gap-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h1 className="tvl-title font-extrabold text-[20px] text-ink">Tìm công nhân, sinh viên, thực tập sinh</h1>

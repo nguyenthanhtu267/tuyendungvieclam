@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { parseNaturalQuery, nlToParams } from '@/lib/nl-search';
+import { Combobox } from '@/components/ui/Combobox';
+import { PROVINCE_COORDS } from '@/lib/geo';
 import AskAnswerBox from '@/components/AskAnswerBox';
 import { RefreshReminder } from '@/components/labor/RefreshReminder';
 import SiteHeader from '@/components/SiteHeader';
@@ -44,6 +46,7 @@ export default function HomeClient({ initial }: { initial: HomeBundle | null }) 
   const { me } = useAuth();
   const { t } = useLanguage();
   const [keyword, setKeyword] = useState('');
+  const [place, setPlace] = useState('');
   const [jobs, setJobs] = useState<JobPosting[] | null>(initial?.jobs ?? null);
   const [facets, setFacets] = useState<JobFacets | null>(initial?.facets ?? null);
   const [featured, setFeatured] = useState<FeaturedEmployer[] | null>(initial?.featured ?? null);
@@ -107,6 +110,8 @@ export default function HomeClient({ initial }: { initial: HomeBundle | null }) 
     e.preventDefault();
     rememberSearch(keyword);
     const params = nlToParams(parseNaturalQuery(keyword).filters);
+    // Đợt 139 — tỉnh/thành chọn ngay cạnh nút tìm; nếu có chọn thì ưu tiên hơn tỉnh tự tách từ câu gõ.
+    if (place) params.set('provinces', place);
     router.push(`/viec-lam${params.toString() ? `?${params}` : ''}`);
   }
 
@@ -144,8 +149,16 @@ export default function HomeClient({ initial }: { initial: HomeBundle | null }) 
               </div>
               {<SearchHints q={keyword} onPick={(v) => { setKeyword(v); rememberSearch(v); }} />}
               <AskAnswerBox text={keyword} />
-              <div className="flex gap-3 flex-wrap">
-                <button type="submit" className="tvl-btn-accent !w-auto px-6">
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 items-center">
+                <Combobox
+                  ariaLabel="Chọn tỉnh/thành để tìm việc"
+                  className="min-w-0"
+                  value={place}
+                  options={Object.keys(PROVINCE_COORDS)}
+                  placeholder="Toàn quốc"
+                  onChange={(v) => setPlace(v || '')}
+                />
+                <button type="submit" className="tvl-btn-accent !w-full min-w-0 px-3">
                   {t('home.searchButton')}
                 </button>
               </div>

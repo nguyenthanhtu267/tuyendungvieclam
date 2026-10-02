@@ -7,16 +7,32 @@ import { useAuth } from '@/lib/auth-context';
 import { NavDropdown } from '@/components/nav/NavDropdown';
 import { NotificationBell } from '@/components/NotificationBell';
 
-const NAV_LINKS = [
-  { href: '/nha-tuyen-dung/dashboard', label: 'Dashboard', enabled: true },
-  { href: '/nha-tuyen-dung/dang-tin', label: 'Đăng Tuyển', enabled: true },
-  { href: '/nha-tuyen-dung/tin-dang', label: 'Quản Lý Tin', enabled: true },
-  { href: '/nha-tuyen-dung/ung-vien', label: 'Ứng Viên', enabled: true },
-  // Đợt 18a (26/09/2026) — Kho CV: mọi CV ứng viên đã nộp, lưu vĩnh viễn, tìm lại được.
-  { href: '/nha-tuyen-dung/kho-cv', label: 'Kho CV', enabled: true },
-  { href: '/nha-tuyen-dung/tim-ho-so', label: 'Tìm CV', enabled: true },
-  // Đợt 79 — tìm công nhân / sinh viên / thực tập sinh (kênh lao động phổ thông)
-  { href: '/nha-tuyen-dung/lao-dong-pho-thong', label: 'Công Nhân/SV', enabled: true },
+// Đợt 138 — gọn lại từ 7 mục còn 5: 4 mục tách rời (Ứng Viên, Kho CV, Tìm CV, Công Nhân/SV) được gom
+// theo đúng việc nhà tuyển dụng muốn làm: (1) xem người ĐÃ ứng tuyển / đã lưu → "Ứng Viên";
+// (2) chủ động đi TÌM người → "Tìm Hồ Sơ" (văn phòng hoặc công nhân/sinh viên/thực tập). Địa chỉ
+// các trang giữ nguyên, không chức năng nào bị bỏ.
+type NavItem = { href: string; label: string };
+export const EMPLOYER_CANDIDATE_GROUPS: { label: string; items: NavItem[] }[] = [
+  {
+    label: 'Ứng Viên',
+    items: [
+      { href: '/nha-tuyen-dung/ung-vien', label: 'Đơn ứng tuyển' },
+      { href: '/nha-tuyen-dung/kho-cv', label: 'Kho CV' },
+    ],
+  },
+  {
+    label: 'Tìm Hồ Sơ',
+    items: [
+      { href: '/nha-tuyen-dung/tim-ho-so', label: 'Văn phòng' },
+      { href: '/nha-tuyen-dung/lao-dong-pho-thong', label: 'Công nhân · SV · Thực tập' },
+    ],
+  },
+];
+
+const NAV_LINKS: NavItem[] = [
+  { href: '/nha-tuyen-dung/dashboard', label: 'Dashboard' },
+  { href: '/nha-tuyen-dung/dang-tin', label: 'Đăng Tuyển' },
+  { href: '/nha-tuyen-dung/tin-dang', label: 'Quản Lý Tin' },
 ];
 
 // Đợt 11 — gom "Tài Khoản" thành dropdown (Thông tin công ty, Đơn hàng, Đăng xuất) + thêm nút xanh
@@ -51,23 +67,37 @@ export default function EmployerHeader() {
       </Link>
 
       <nav className="hidden lg:flex items-center gap-5 text-[13px] font-semibold flex-1">
-        {NAV_LINKS.map((link) =>
-          link.enabled ? (
-            <Link
-              key={link.label}
-              href={link.href}
-              className={
-                pathname?.startsWith(link.href) ? 'text-white' : 'text-white/95 hover:text-white transition-colors'
-              }
-            >
-              {link.label}
-            </Link>
-          ) : (
-            <span key={link.label} className="text-white/80 cursor-default" title="Sắp ra mắt">
-              {link.label}
-            </span>
-          ),
-        )}
+        {NAV_LINKS.slice(0, 3).map((link) => (
+          <Link
+            key={link.label}
+            href={link.href}
+            className={pathname?.startsWith(link.href) ? 'text-white' : 'text-white/95 hover:text-white transition-colors'}
+          >
+            {link.label}
+          </Link>
+        ))}
+        {EMPLOYER_CANDIDATE_GROUPS.map((g) => (
+          <NavDropdown
+            key={g.label}
+            trigger={
+              <span className={g.items.some((i) => pathname?.startsWith(i.href)) ? 'text-white' : 'text-white/95'}>{g.label}</span>
+            }
+            triggerClassName="!border-b-0 !text-white !text-[15px] !font-semibold px-0"
+            panelClassName="w-56 p-2 text-ink"
+          >
+            {g.items.map((i) => (
+              <Link
+                key={i.href}
+                href={i.href}
+                className={`block truncate px-3 py-2 text-[12.3px] font-semibold rounded-lg hover:bg-surface-alt ${
+                  pathname?.startsWith(i.href) ? 'text-primary' : 'text-ink-muted hover:text-primary'
+                }`}
+              >
+                {i.label}
+              </Link>
+            ))}
+          </NavDropdown>
+        ))}
       </nav>
       <div className="flex-1 lg:hidden" />
 
@@ -138,7 +168,7 @@ export default function EmployerHeader() {
             </div>
             <div className="flex flex-col p-3 gap-0.5 text-sm font-semibold">
               {me && <div className="px-3 py-2 text-[11px] text-ink-faint truncate">{me.email}</div>}
-              {NAV_LINKS.filter((l) => l.enabled).map((link) => (
+              {NAV_LINKS.map((link) => (
                 <Link
                   key={link.label}
                   href={link.href}
@@ -149,6 +179,23 @@ export default function EmployerHeader() {
                 >
                   {link.label}
                 </Link>
+              ))}
+              {EMPLOYER_CANDIDATE_GROUPS.map((g) => (
+                <div key={g.label} className="mt-1.5">
+                  <div className="px-3 pt-1 pb-0.5 text-[11px] font-bold uppercase tracking-wide text-ink-faint">{g.label}</div>
+                  {g.items.map((i) => (
+                    <Link
+                      key={i.href}
+                      href={i.href}
+                      onClick={() => setDrawerOpen(false)}
+                      className={`block px-3 py-2.5 rounded-lg ${
+                        pathname?.startsWith(i.href) ? 'bg-primary/10 text-primary' : 'text-ink hover:bg-surface-alt'
+                      }`}
+                    >
+                      {i.label}
+                    </Link>
+                  ))}
+                </div>
               ))}
               <div className="border-t border-border my-2" />
               {ACCOUNT_MENU.map((item) => (
