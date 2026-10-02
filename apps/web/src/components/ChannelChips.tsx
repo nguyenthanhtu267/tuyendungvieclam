@@ -11,7 +11,7 @@ export function ChannelChips({ value, onChange, counts }: { value: string; onCha
     <div role="radiogroup" aria-label="Kênh tin" className="flex items-center gap-1.5 flex-wrap text-[12px]">
       <span className="text-ink-faint font-semibold">Kênh:</span>
       {items.map(([k, l]) => {
-        const n = k ? counts?.[k] ?? 0 : total;
+        const n = counts ? (k ? counts[k] ?? 0 : total) : undefined;
         if (k && counts && !n && value !== k) return null;
         return (
           <button key={k || 'all'} type="button" role="radio" aria-checked={value === k} onClick={() => onChange(k)} className={`rounded-full border px-2.5 py-1 font-bold ${value === k ? 'border-primary bg-primary text-white' : 'border-border-strong bg-white text-ink'}`}>

@@ -8,11 +8,12 @@ import { PROVINCES } from '@/lib/catalogs';
 import { Combobox } from '@/components/ui/Combobox';
 import { Modal } from '@/components/profile/ui';
 import { Pager } from './CvSourcingPanel';
+import { WorkerSourcingPanel } from './WorkerSourcingPanel';
 
 // Đợt 135 — Admin "Ứng viên → Công nhân · SV · TTS": quản lý hồ sơ lao động phổ thông với cùng bộ chức năng như hồ sơ
 // văn phòng: tìm (tên/SĐT/việc muốn làm/ghi chú, gõ không dấu), lọc, thẻ + ghi chú nội bộ, gợi ý tin gần nơi ở,
 // mời ứng tuyển, ẩn/hiện hồ sơ, xem lịch sử ứng tuyển + sổ gọi điện của NTD.
-type Q = { q?: string; kind?: string; province?: string; group?: string; shift?: string; seeking?: string; hidden?: string; account?: string; tag?: string; stale?: string; sort?: string };
+type Q = { source?: string; q?: string; kind?: string; province?: string; group?: string; shift?: string; seeking?: string; hidden?: string; account?: string; tag?: string; stale?: string; sort?: string };
 
 export function WorkerCandidatesPanel({ token, onCounts }: { token: string; onCounts?: (n: number) => void }) {
   const [f, setFilters] = useState<Q>({});
@@ -22,6 +23,7 @@ export function WorkerCandidatesPanel({ token, onCounts }: { token: string; onCo
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [collect, setCollect] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -62,6 +64,17 @@ export function WorkerCandidatesPanel({ token, onCounts }: { token: string; onCo
         Hồ sơ công nhân, sinh viên, thực tập sinh tự điền trên web (không cần tài khoản — khoá theo số điện thoại). Lọc nhanh, gắn thẻ & ghi chú nội bộ,
         xem gợi ý việc gần nơi ở và mời ứng tuyển.
       </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" aria-expanded={collect} onClick={() => setCollect((v) => !v)} className={`rounded-lg px-3.5 py-2 text-sm font-bold border ${collect ? 'bg-primary text-white border-primary' : 'bg-white text-primary border-primary'}`}>
+          {collect ? '▾ Thu thập hồ sơ (đang mở)' : '＋ Thu thập hồ sơ: dán bài / dán bảng / hàng chờ'}
+        </button>
+        {data?.sourceCounts && (
+          <span className="text-xs text-ink-faint">
+            Tự điền {formatNumber(data.sourceCounts.self ?? 0)} · Nguồn tổng hợp {formatNumber(data.sourceCounts.sourced ?? 0)} · NTD tự nhập {formatNumber(data.sourceCounts.ntd ?? 0)}
+          </span>
+        )}
+      </div>
+      {collect && <WorkerSourcingPanel token={token} onSaved={() => load().catch(() => undefined)} />}
       <div role="tablist" className="flex gap-1.5 flex-wrap text-xs">
         {([['', 'Tất cả'], ['worker', 'Công nhân'], ['student', 'Sinh viên'], ['intern', 'Thực tập sinh']] as const).map(([k, l]) => (
           <button key={k || 'all'} type="button" role="tab" aria-selected={(f.kind ?? '') === k} onClick={() => setF('kind', k)} className={`rounded-full border px-3 py-1.5 font-bold ${(f.kind ?? '') === k ? 'border-primary bg-primary text-white' : 'border-border-strong bg-white text-ink'}`}>
@@ -77,6 +90,12 @@ export function WorkerCandidatesPanel({ token, onCounts }: { token: string; onCo
         <select className={sel} value={f.shift ?? ''} onChange={(e) => setF('shift', e.target.value)} aria-label="Ca làm">
           <option value="">Mọi ca làm</option>
           {SHIFTS.map((s) => (<option key={s} value={s}>{s}</option>))}
+        </select>
+        <select className={sel} value={f.source ?? ''} onChange={(e) => setF('source', e.target.value)} aria-label="Nguồn hồ sơ">
+          <option value="">Mọi nguồn hồ sơ</option>
+          <option value="self">Người lao động tự điền</option>
+          <option value="sourced">Nguồn tổng hợp (Admin/NTD thu thập)</option>
+          <option value="ntd">NTD tự nhập (kho riêng)</option>
         </select>
         <select className={sel} value={f.seeking ?? ''} onChange={(e) => setF('seeking', e.target.value)} aria-label="Đang tìm việc">
           <option value="">Đang tìm & tạm dừng</option>
@@ -130,8 +149,10 @@ export function WorkerCandidatesPanel({ token, onCounts }: { token: string; onCo
                       {w.fullName}
                       <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-primary-tint text-primary">{KIND_LABEL[w.kind]}</span>
                       {w.hasAccount && <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-success-tint text-success">Có tài khoản</span>}
+                      {w.isSourced && <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-warning-tint text-ink" title={w.sourceLabel ?? ''}>Nguồn tổng hợp</span>}
+                      {w.shareStatus && <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-info-tint text-info">{w.ownerCompany ? `${w.ownerCompany} · ` : ''}{w.shareStatus === 'shared' ? 'đã chia sẻ' : w.shareStatus === 'dismissed' ? 'bỏ qua' : 'chờ chia sẻ'}</span>}
                     </div>
-                    <div className="text-ink-faint">{[w.phone, `${GENDER_LABEL[w.gender] ?? ''} ${w.age} tuổi`.trim(), w.place && w.place !== 'Chưa rõ quận/huyện' ? `${w.place}, ${w.province}` : w.province].filter(Boolean).join(' · ')}</div>
+                    <div className="text-ink-faint">{[w.phone, `${GENDER_LABEL[w.gender] ?? ''} ${w.age} tuổi`.trim(), w.isSourced && w.sourceLabel ? `nguồn: ${w.sourceLabel}` : '', w.place && w.place !== 'Chưa rõ quận/huyện' ? `${w.place}, ${w.province}` : w.province].filter(Boolean).join(' · ')}</div>
                   </td>
                   <td className="py-3 px-3 max-w-[220px]">
                     <div>{w.desiredJobs.join(', ') || '—'}</div>
@@ -230,7 +251,7 @@ function WorkerModal({ token, id, onClose, onChanged }: { token: string; id: str
             <div className="text-primary font-bold text-[13px]">{KIND_LABEL[p.kind]} · {p.desiredJobs.join(', ') || 'chưa chọn việc muốn làm'}</div>
             <div className="text-ink-muted">
               <a href={`tel:${p.phone}`} className="font-bold text-ink">{p.phone}</a>
-              {p.relativePhone ? ` · Người thân: ${p.relativePhone}` : ''} · {GENDER_LABEL[p.gender] ?? ''} · sinh {formatDate(p.birthDate)}
+              {p.relativePhone ? ` · Người thân: ${p.relativePhone}` : ''} · {GENDER_LABEL[p.gender] ?? ''} · {p.birthDate ? `sinh ${formatDate(p.birthDate)}` : p.birthYear ? `sinh năm ${p.birthYear}` : 'chưa rõ năm sinh'}
             </div>
             <div className="text-ink-muted">📍 {placeText(p)}{p.addressDetail ? ` — ${p.addressDetail}` : ''}{p.radiusKm ? ` · muốn làm trong ${p.radiusKm} km` : ''}</div>
             {p.shifts.length > 0 && <div>🕒 Ca có thể làm: {p.shifts.join(', ')}</div>}
@@ -240,6 +261,7 @@ function WorkerModal({ token, id, onClose, onChanged }: { token: string; id: str
               {p.isSeeking ? 'Đang tìm việc' : 'Tạm dừng tìm việc'} · làm mới {formatDate(p.refreshedAt)} · đăng ký {formatDate(p.createdAt)} · {p.hasAccount ? 'có tài khoản' : 'chưa có tài khoản'}
               {p.isHidden && ' · ĐANG BỊ ẨN'}
             </div>
+            {p.isSourced && <div className="text-ink"><b>Nguồn tổng hợp</b>{p.sourceLabel ? ` — ${p.sourceLabel}` : ''}{p.shareStatus ? ` · kho riêng của một NTD (${p.shareStatus === 'shared' ? 'đã chia sẻ' : p.shareStatus === 'dismissed' ? 'bỏ qua' : 'chờ chia sẻ'})` : ''}</div>}
             {p.warnings && p.warnings.length > 0 && <div className="text-warning font-semibold">⚠ {p.warnings.join(' · ')}</div>}
           </div>
 
@@ -355,6 +377,22 @@ function WorkerModal({ token, id, onClose, onChanged }: { token: string; id: str
             >
               {p.isHidden ? 'Hiện lại hồ sơ' : 'Ẩn hồ sơ (vi phạm / ảo)'}
             </button>
+            {p.isSourced && (
+              <button
+                disabled={!!busy}
+                onClick={() => {
+                  if (!window.confirm(`Gỡ hẳn hồ sơ nguồn tổng hợp “${p.fullName}”? (xoá cả sổ gọi và ghi chú của NTD về người này)`)) return;
+                  run('del', async () => {
+                    await workersApi.adminDeleteSourced(token, id);
+                    onClose();
+                    return 'Đã gỡ hồ sơ.';
+                  });
+                }}
+                className="text-[11px] font-bold rounded-md px-3 py-1.5 border border-critical text-critical"
+              >
+                Gỡ hẳn hồ sơ nguồn tổng hợp
+              </button>
+            )}
           </div>
         </div>
       )}

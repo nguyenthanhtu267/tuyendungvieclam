@@ -1,5 +1,5 @@
 // Đợt 84 — trường mở rộng riêng cho công nhân / sinh viên / thực tập sinh: làm sạch dữ liệu + đối chiếu yêu cầu.
-import { CERTS, EXPERIENCE, LaborKind, ageOf, slotsFor } from './labor-groups';
+import { CERTS, EXPERIENCE, LaborKind, ageOf, effBirth, slotsFor } from './labor-groups';
 import { minWageOf } from './min-wage';
 
 const fold = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -108,7 +108,7 @@ const CERT_LABEL: Record<string, string> = { a1: 'Bằng A1', b2: 'Bằng B2', c
 
 export type Fit = { ok: string[]; missing: string[]; hint: string[]; percent: number | null };
 type FitJob = { channel?: string; laborExtra?: JobExtra | null; laborSchedule?: string[] | null };
-type FitProfile = { kind: string; birthDate: string | Date; extra?: ProfileExtra | null; availability?: string[] | null; major?: string | null };
+type FitProfile = { kind: string; birthDate?: string | Date | null; birthYear?: number | null; extra?: ProfileExtra | null; availability?: string[] | null; major?: string | null };
 
 /** Đối chiếu yêu cầu của tin với hồ sơ — chỉ dựa trên thông tin có thật, không suy đoán. */
 export function fitOf(job: FitJob, p: FitProfile, third = false): Fit {
@@ -118,7 +118,7 @@ export function fitOf(job: FitJob, p: FitProfile, third = false): Fit {
   const e = job.laborExtra ?? {};
   const x = p.extra ?? {};
   if (job.channel === 'worker') {
-    const age = ageOf(p.birthDate);
+    const age = ageOf(effBirth(p));
     if (e.ageMin || e.ageMax) {
       if ((e.ageMin && age < e.ageMin) || (e.ageMax && age > e.ageMax)) missing.push(`Tin cần tuổi ${e.ageMin ?? '…'}–${e.ageMax ?? '…'} (bạn ${age} tuổi)`);
       else ok.push('Đúng độ tuổi');

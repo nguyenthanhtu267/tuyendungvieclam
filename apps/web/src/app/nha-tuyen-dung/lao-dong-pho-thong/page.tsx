@@ -1,12 +1,13 @@
 'use client';
 
 import { Combobox } from '@/components/ui/Combobox';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import EmployerHeader from '@/components/EmployerHeader';
 import { AddressPicker, EMPTY_ADDRESS, type AddressValue } from '@/components/labor/AddressPicker';
 import { useAuth } from '@/lib/auth-context';
-import { workersApi, type TrustInfo, type DropoutRow, type EmployerLaborJob, type SupplyRow, type WorkerAppRow, type WorkerKind, type WorkerSearchItem } from '@/lib/api';
+import { SourcedEditor } from '@/components/labor/SourcedEditor';
+import { workersApi, type StockRow, type TrustInfo, type DropoutRow, type EmployerLaborJob, type SupplyRow, type WorkerAppRow, type WorkerKind, type WorkerSearchItem } from '@/lib/api';
 import Link from '@/components/SmartLink';
 import { TrustBadge } from '@/components/labor/LaborJobList';
 import { callScript } from '@/lib/labor-extra';
@@ -27,7 +28,7 @@ function readOrigin(): Origin | null {
 export default function EmployerLaborPage() {
   const { me, token } = useAuth();
   const router = useRouter();
-  const [tab, setTab] = useState<'search' | 'apps' | 'supply'>('search');
+  const [tab, setTab] = useState<'search' | 'apps' | 'supply' | 'stock'>('search');
   const [callStatus, setCallStatus] = useState('');
   const [needs, setNeeds] = useState('');
   const [laborJobs, setLaborJobs] = useState<EmployerLaborJob[]>([]);
@@ -172,6 +173,18 @@ export default function EmployerLaborPage() {
       setErr((e as Error).message);
     }
   }
+  const [revealMsg, setRevealMsg] = useState('');
+  async function reveal(item: WorkerSearchItem) {
+    if (!token) return;
+    setRevealMsg('');
+    try {
+      const r = await workersApi.revealPhone(token, item.id);
+      setData((d) => d && { ...d, items: d.items.map((x) => (x.id === item.id ? { ...x, phone: r.phone, phoneMasked: false } : x)) });
+      if (r.used != null) setRevealMsg(`Đã xem ${r.used}/${r.limit} số trong 24 giờ qua.`);
+    } catch (e) {
+      setRevealMsg((e as Error).message);
+    }
+  }
   async function delNote(item: WorkerSearchItem, noteId: string) {
     if (!token) return;
     await workersApi.delNote(token, noteId).catch(() => undefined);
@@ -190,8 +203,8 @@ export default function EmployerLaborPage() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h1 className="tvl-title font-extrabold text-[20px] text-ink">Tìm công nhân, sinh viên, thực tập sinh</h1>
           <Link href="/nha-tuyen-dung/phieu-nhan-xet-thuc-tap" className="rounded-lg border border-border-strong bg-white font-bold text-[13px] px-2.5 py-1.5 text-ink">Phiếu nhận xét thực tập (in)</Link>
-          <div role="tablist" className="flex gap-1.5">
-            {([['search', 'Tìm ứng viên'], ['apps', `Ứng tuyển vào tin của bạn${apps?.some((a) => !a.seenAt) ? ` (${apps.filter((a) => !a.seenAt).length} mới)` : ''}`], ['supply', 'Nguồn lao động quanh công ty']] as const).map(([k, l]) => (
+          <div role="tablist" className="grid grid-cols-2 sm:flex gap-1.5">
+            {([['search', 'Tìm ứng viên'], ['apps', `Ứng tuyển vào tin của bạn${apps?.some((a) => !a.seenAt) ? ` (${apps.filter((a) => !a.seenAt).length} mới)` : ''}`], ['supply', 'Nguồn lao động quanh công ty'], ['stock', 'Kho người lao động của tôi']] as const).map(([k, l]) => (
               <button key={k} role="tab" aria-selected={tab === k} type="button" onClick={() => setTab(k)} className={`rounded-lg border px-3 py-1.5 text-[14px] font-bold ${tab === k ? 'border-primary bg-primary text-white' : 'border-border-strong bg-white text-ink'}`}>
                 {l}
               </button>
@@ -298,9 +311,10 @@ export default function EmployerLaborPage() {
             ) : (
               <>
                 <div className="text-[13.5px] text-ink"><span className="tvl-title !py-0.5">{data.total} ứng viên</span></div>
+                {revealMsg && <div role="status" className="rounded-lg bg-info-tint text-info text-[13.5px] font-bold px-3 py-2">{revealMsg}</div>}
                 <div className="grid lg:grid-cols-2 gap-2">
                   {data.items.map((w) => (
-                    <WorkerCard key={w.id} w={w} onNote={note} onDelNote={delNote} onCall={setCall} jobs={laborJobs} />
+                    <WorkerCard key={w.id} w={w} onNote={note} onDelNote={delNote} onCall={setCall} onReveal={reveal} jobs={laborJobs} />
                   ))}
                 </div>
                 {data.totalPages > 1 && (
@@ -441,6 +455,8 @@ export default function EmployerLaborPage() {
             )}
           </div>
         )}
+        {tab === 'stock' && token && <StockTab token={token} />}
+
         {tab === 'supply' && (
           <div className="flex flex-col gap-2">
             <div className="rounded-xl border border-border bg-white p-3 text-[14px] text-ink">
@@ -521,9 +537,10 @@ export default function EmployerLaborPage() {
 }
 
 function WorkerCard({
-  w, onNote, onDelNote, onCall, jobs,
+  w, onNote, onDelNote, onCall, onReveal, jobs,
 }: {
   w: WorkerSearchItem;
+  onReveal: (w: WorkerSearchItem) => void;
   onNote: (w: WorkerSearchItem, k: 'hired' | 'note', t?: string) => void;
   onDelNote: (w: WorkerSearchItem, id: string) => void;
   onCall: (w: WorkerSearchItem, status: string, jobId?: string | null) => void;
@@ -536,7 +553,11 @@ function WorkerCard({
     <article className="rounded-xl border border-border bg-white p-3 flex flex-col gap-1.5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <div className="font-extrabold text-[16px] text-ink">{w.fullName}</div>
+          <div className="font-extrabold text-[16px] text-ink flex flex-wrap items-center gap-1.5">
+            {w.fullName}
+            {w.sourceLabel && !w.mine && <span className="rounded bg-warning-tint border border-warning px-1.5 py-0.5 text-[11.5px] font-bold text-ink" title="Hồ sơ do hệ thống tổng hợp, chưa phải người lao động tự điền">Nguồn tổng hợp</span>}
+            {w.mine && <span className="rounded bg-primary-tint px-1.5 py-0.5 text-[11.5px] font-bold text-primary">Hồ sơ của công ty bạn</span>}
+          </div>
           <div className="text-[13.5px] text-ink">{GENDER_LABEL[w.gender]} · {w.age} tuổi · <b>{KIND_LABEL[w.kind]}</b>{!w.isSeeking && <span className="text-critical font-bold"> · Tạm dừng tìm việc</span>}</div>
         </div>
         {w.distance && (
@@ -586,8 +607,17 @@ function WorkerCard({
       )}
       {(w.school || w.major) && <div className="text-[13.5px] text-ink">{[w.school, w.major].filter(Boolean).join(' · ')}</div>}
       <div className="flex flex-wrap items-center gap-2">
-        <a href={`tel:${w.phone}`} className="rounded-lg bg-accent text-white font-extrabold text-[14px] px-3 py-1.5">Gọi {w.phone}</a>
-        <a href={`https://zalo.me/${w.phone}`} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-border-strong bg-white font-bold text-[13.5px] px-2.5 py-1.5 text-ink">Zalo</a>
+        {w.phoneMasked ? (
+          <>
+            <span className="rounded-lg border border-border-strong bg-surface-alt font-extrabold text-[14px] px-3 py-1.5 text-ink tabular-nums">{w.phone}</span>
+            <button type="button" onClick={() => onReveal(w)} className="rounded-lg bg-accent text-white font-extrabold text-[14px] px-3 py-1.5">Xem số</button>
+          </>
+        ) : (
+          <>
+            <a href={`tel:${w.phone}`} className="rounded-lg bg-accent text-white font-extrabold text-[14px] px-3 py-1.5">Gọi {w.phone}</a>
+            <a href={`https://zalo.me/${w.phone}`} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-border-strong bg-white font-bold text-[13.5px] px-2.5 py-1.5 text-ink">Zalo</a>
+          </>
+        )}
         {w.relativePhone && <a href={`tel:${w.relativePhone}`} className="text-[13.5px] text-ink">Người thân: <b className="text-primary">{w.relativePhone}</b></a>}
       </div>
       {w.availability.length > 0 && <div className="text-[13px] text-ink"><b>Lịch rảnh:</b> {slotText(w.availability)}</div>}
@@ -662,5 +692,69 @@ function WorkerCard({
         )}
       </div>
     </article>
+  );
+}
+
+// Đợt 136 — "Kho người lao động của tôi": công ty tự nhập hồ sơ người lao động đã gặp/đã có số (dán bài hoặc dán bảng).
+// Chỉ công ty bạn thấy; Admin có thể chia sẻ cho NTD khác (khi đó hiện nhãn "Nguồn tổng hợp" và số được che).
+function StockTab({ token }: { token: string }) {
+  const [data, setData] = useState<{ items: StockRow[]; total: number; totalPages: number } | null>(null);
+  const [page, setPage] = useState(1);
+  const [q, setQ] = useState('');
+  const [msg, setMsg] = useState('');
+  const api = useMemo(() => workersApi.employerSourcing(token), [token]);
+  const load = useCallback(() => {
+    workersApi.myStock(token, { page: String(page), q: q.trim() || undefined }).then(setData).catch(() => undefined);
+  }, [token, page, q]);
+  useEffect(() => {
+    const t = setTimeout(load, q ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [load, q]);
+  async function del(id: string) {
+    setMsg('');
+    try {
+      await workersApi.deleteStock(token, id);
+      load();
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+  const SHARE: Record<string, string> = { pending: 'Chỉ công ty bạn thấy', shared: 'Admin đã chia sẻ cho NTD khác', dismissed: 'Chỉ công ty bạn thấy' };
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="rounded-xl border border-border bg-white p-3 sm:p-4">
+        <h2 className="font-extrabold text-[16px] text-ink mb-2">Thêm người lao động vào kho</h2>
+        <SourcedEditor api={api} onSaved={() => { setPage(1); load(); }} intro="Dán bài tìm việc người ta gửi (Zalo/Facebook) hoặc dán bảng Excel. Hệ thống tự tách tên, SĐT, nơi ở, việc muốn làm; bạn xem lại rồi lưu. Người đã có hồ sơ trên web thì không tạo bản sao — hãy tìm họ ở tab “Tìm ứng viên”." />
+      </div>
+      <div className="rounded-xl border border-border bg-white p-3 sm:p-4 flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-extrabold text-[16px] text-ink">Hồ sơ công ty bạn đã nhập{data ? ` (${data.total})` : ''}</h2>
+          <input aria-label="Tìm trong kho" className="tvl-input !w-52 !py-2" placeholder="Tên hoặc SĐT" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+        </div>
+        {msg && <div role="alert" className="rounded-lg bg-critical-tint text-critical text-[13.5px] font-bold px-3 py-2">{msg}</div>}
+        {data?.items.length === 0 && <div className="text-ink-muted text-[14px] py-6 text-center">Kho đang trống. Hãy thêm người lao động ở khung bên trên.</div>}
+        <ul className="grid lg:grid-cols-2 gap-2">
+          {data?.items.map((r) => (
+            <li key={r.id} className="rounded-lg border border-border p-2.5 flex flex-col gap-1 min-w-0">
+              <div className="font-extrabold text-[15px] text-ink break-words">{r.fullName} <span className="font-normal text-ink-muted text-[13px]">· {KIND_LABEL[r.kind]}{r.birthYear ? ` · sinh ${r.birthYear}` : ''}</span></div>
+              <div className="text-[13.5px] text-ink">{[r.oldDistrict, r.province].filter(Boolean).join(', ')} · Muốn làm: {r.desiredJobs.join(', ') || '—'}</div>
+              <div className="flex flex-wrap items-center gap-2 text-[13px]">
+                <a href={`tel:${r.phone}`} className="rounded-lg bg-accent text-white font-extrabold px-2.5 py-1">Gọi {r.phone}</a>
+                <a href={`https://zalo.me/${r.phone}`} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-border-strong bg-white font-bold px-2.5 py-1 text-ink">Zalo</a>
+                <span className="text-ink-muted">{SHARE[r.shareStatus] ?? ''}</span>
+                {r.shareStatus !== 'shared' && <button type="button" onClick={() => del(r.id)} className="ml-auto text-critical font-bold">Xoá</button>}
+              </div>
+            </li>
+          ))}
+        </ul>
+        {data && data.totalPages > 1 && (
+          <div className="flex justify-center gap-2">
+            <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="rounded-lg border border-border-strong bg-white px-3 py-1.5 font-bold disabled:text-ink-faint">‹ Trước</button>
+            <span className="rounded-lg bg-white px-3 py-1.5 font-bold">{page}/{data.totalPages}</span>
+            <button type="button" disabled={page >= data.totalPages} onClick={() => setPage(page + 1)} className="rounded-lg border border-border-strong bg-white px-3 py-1.5 font-bold disabled:text-ink-faint">Sau ›</button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

@@ -435,7 +435,7 @@ export default function AdminDashboardPage() {
     // Đợt 18 (26/09/2026) — sửa lỗi: "grid" không khai báo cột trên điện thoại (cột chỉ khai báo từ
     // "md:") khiến sidebar + nội dung bị ép nằm CÙNG 1 hàng và tràn ngang trang trên màn hình hẹp.
     // Xếp chồng dọc (flex-col) trên điện thoại, chỉ chia 2 cột từ md trở lên.
-    <main className="min-h-screen bg-bg flex flex-col md:grid md:grid-cols-[200px_1fr]">
+    <main className="min-h-screen bg-bg flex flex-col md:grid md:grid-cols-[200px_minmax(0,1fr)]">
       <aside className="bg-primary-dark text-white p-3 flex flex-col gap-1 md:min-h-screen">
         <div className="flex items-center justify-between px-2 pt-1.5 pb-3.5">
           <span className="font-extrabold text-sm">⚙ Admin Console</span>
@@ -460,7 +460,7 @@ export default function AdminDashboardPage() {
         </button>
       </aside>
 
-      <div className="px-4 sm:px-6 lg:px-10 py-6">
+      <div className="px-4 sm:px-6 lg:px-10 py-6 min-w-0">
         {loading ? (
           <div className="text-center text-ink-faint py-10 text-sm">Đang tải…</div>
         ) : tab === 'overview' ? (

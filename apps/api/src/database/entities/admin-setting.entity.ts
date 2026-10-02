@@ -109,6 +109,13 @@ export class AdminSetting {
   @Column({ name: 'bg_auto_hours', type: 'int', default: 2 })
   bgAutoHours: number;
 
+  // Đợt 136 — tự chia sẻ hồ sơ lao động NTD tự nhập sau 15 phút (chỉ hồ sơ tạo SAU lúc bật)
+  @Column({ name: 'worker_auto_share_enabled', type: 'boolean', default: false })
+  workerAutoShareEnabled: boolean;
+
+  @Column({ name: 'worker_auto_share_enabled_at', type: 'timestamp', nullable: true })
+  workerAutoShareEnabledAt?: Date | null;
+
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }

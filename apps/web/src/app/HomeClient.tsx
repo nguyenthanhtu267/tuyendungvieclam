@@ -90,7 +90,7 @@ export default function HomeClient({ initial }: { initial: HomeBundle | null }) 
       .then((res) => setJobs(res.items))
       .catch(() => setJobs([]));
     jobsApi
-      .facets()
+      .facets({ channel: 'all' })
       .then(setFacets)
       .catch(() => setFacets(null));
     jobsApi
@@ -103,28 +103,8 @@ export default function HomeClient({ initial }: { initial: HomeBundle | null }) 
       .catch(() => setStats(null));
   }, []);
 
-  // Đợt 134 — nút chuyển "Văn phòng | Công nhân" trên khung tìm kiếm (nhớ lựa chọn trên máy này).
-  const [mode, setModeState] = useState<'office' | 'worker'>('office');
-  useEffect(() => {
-    try {
-      if (localStorage.getItem('tvl_home_mode') === 'worker') setModeState('worker');
-    } catch {
-      /* bỏ qua */
-    }
-  }, []);
-  const setMode = (m: 'office' | 'worker') => {
-    setModeState(m);
-    try {
-      localStorage.setItem('tvl_home_mode', m);
-    } catch {
-      /* bỏ qua */
-    }
-  };
-  const workerUrl = (q: string) => `/lao-dong-pho-thong/viec-lam?loai=cong-nhan${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ''}`;
-
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    if (mode === 'worker') return void router.push(workerUrl(keyword));
     rememberSearch(keyword);
     const params = nlToParams(parseNaturalQuery(keyword).filters);
     router.push(`/viec-lam${params.toString() ? `?${params}` : ''}`);
@@ -138,49 +118,35 @@ export default function HomeClient({ initial }: { initial: HomeBundle | null }) 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-1.5 pb-3">
         {/* Đợt 80 — nhắc người lao động làm mới thông tin (chỉ hiện khi máy này từng đăng ký và quá 7 ngày) */}
         <div className="empty:hidden mb-1.5"><RefreshReminder /></div>
-        <div className="grid md:grid-cols-2 gap-2 items-stretch">
+        <div className="grid grid-cols-[minmax(0,1fr)] md:grid-cols-2 gap-2 items-stretch">
           <div className="rounded-2xl border border-border bg-white px-6 py-3 flex flex-col gap-2 justify-center">
             <div className="text-xs font-bold text-primary uppercase tracking-wide">
               {facets ? `${formatNumber(facets.total)} ${t('home.eyebrowJobsToday')}` : t('home.eyebrowLoading')}
             </div>
-            <h1 className="text-2xl sm:text-[26px] font-extrabold leading-snug text-balance">
-              {t('home.heading1')}
-              <br />
-              {t('home.heading2')}
+            <h1 className="text-[clamp(1.1rem,5.6vw,1.65rem)] font-extrabold leading-snug whitespace-nowrap">
+              {t('home.heading1')} {t('home.heading2')}
             </h1>
             <form onSubmit={handleSearch} className="flex flex-col gap-3">
-              <div role="radiogroup" aria-label="Loại việc" className="grid grid-cols-2 rounded-xl border border-border-strong overflow-hidden text-[14px] font-extrabold">
-                <button type="button" role="radio" aria-checked={mode === 'office'} onClick={() => setMode('office')} className={`py-2 ${mode === 'office' ? 'bg-primary text-white' : 'bg-white text-ink'}`}>💼 Văn phòng</button>
-                <button type="button" role="radio" aria-checked={mode === 'worker'} onClick={() => setMode('worker')} className={`py-2 ${mode === 'worker' ? 'bg-primary text-white' : 'bg-white text-ink'}`}>🧰 Công nhân · Lao động</button>
-              </div>
               <div className="flex gap-2">
                 <input
                   className="tvl-input"
-                  placeholder={mode === 'worker' ? 'Gõ công việc: may, đứng máy, bốc xếp, phụ kho…' : t('home.searchPlaceholder')}
+                  placeholder={t('home.searchPlaceholder')}
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                 />
                 <VoiceSearchButton
                   onText={(text) => {
                     setKeyword(text);
-                    if (mode === 'worker') return void router.push(workerUrl(text));
                     const params = nlToParams(parseNaturalQuery(text).filters);
                     router.push(`/viec-lam${params.toString() ? `?${params}` : ''}`);
                   }}
                 />
               </div>
-              {mode === 'office' && <SearchHints q={keyword} onPick={(v) => { setKeyword(v); rememberSearch(v); }} />}
-              {mode === 'office' && <AskAnswerBox text={keyword} />}
+              {<SearchHints q={keyword} onPick={(v) => { setKeyword(v); rememberSearch(v); }} />}
+              <AskAnswerBox text={keyword} />
               <div className="flex gap-3 flex-wrap">
                 <button type="submit" className="tvl-btn-accent !w-auto px-6">
                   {t('home.searchButton')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => router.push(mode === 'worker' ? '/lao-dong-pho-thong/viec-lam?loai=cong-nhan' : '/viec-lam')}
-                  className="tvl-btn-ghost !w-auto px-5"
-                >
-                  {t('home.advancedSearch')}
                 </button>
               </div>
               <div className="flex items-center gap-2 flex-wrap text-[11.5px]">
@@ -214,15 +180,15 @@ export default function HomeClient({ initial }: { initial: HomeBundle | null }) 
               {/* Đợt 79 — 3 lối vào kênh lao động phổ thông (không bắt buộc đăng nhập) */}
               <div className="grid grid-cols-2 sm:grid-cols-[1.9fr_1fr_1fr] gap-1.5">
                 <a
-                  href="/lao-dong-pho-thong/viec-lam?loai=cong-nhan"
+                  href="/viec-lam?channel=worker"
                   className="col-span-2 sm:col-span-1 rounded-lg border-2 border-[#C8102E] bg-[#FFD84D] text-[#C8102E] font-extrabold uppercase text-[14px] sm:text-[15px] text-center px-2 py-2 hover:bg-[#FFCC1A] leading-tight"
                 >
                   Dành riêng tuyển công nhân
                 </a>
-                <a href="/lao-dong-pho-thong/viec-lam?loai=sinh-vien" className="rounded-lg border-2 border-border-strong bg-white text-ink font-extrabold uppercase text-[13px] text-center px-1.5 py-2 hover:border-primary hover:text-primary leading-tight">
+                <a href="/viec-lam?channel=student" className="rounded-lg border-2 border-border-strong bg-white text-ink font-extrabold uppercase text-[13px] text-center px-1.5 py-2 hover:border-primary hover:text-primary leading-tight">
                   Sinh viên
                 </a>
-                <a href="/lao-dong-pho-thong/viec-lam?loai=thuc-tap-sinh" className="rounded-lg border-2 border-border-strong bg-white text-ink font-extrabold uppercase text-[13px] text-center px-1.5 py-2 hover:border-primary hover:text-primary leading-tight">
+                <a href="/viec-lam?channel=intern" className="rounded-lg border-2 border-border-strong bg-white text-ink font-extrabold uppercase text-[13px] text-center px-1.5 py-2 hover:border-primary hover:text-primary leading-tight">
                   Thực tập sinh
                 </a>
               </div>

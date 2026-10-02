@@ -88,7 +88,7 @@ export class ListJobsDto {
 
   // Đợt 79 — kênh tin: mặc định chỉ tin văn phòng; 'labor' = cả 3 kênh phổ thông.
   @IsOptional()
-  @IsIn(['office', 'worker', 'student', 'intern', 'labor'])
+  @IsIn(['office', 'worker', 'student', 'intern', 'labor', 'all'])
   channel?: string;
 
   @IsOptional()

@@ -76,7 +76,7 @@ import { BootModule } from './boot/boot.module';
 import { BgImage } from './database/entities/bg-image.entity';
 import { JobReport } from './database/entities/job-report.entity';
 import { JobImport } from './database/entities/job-import.entity';
-import { WorkerProfile, WorkerNote, WorkerApplication, WorkerContact } from './database/entities/worker-profile.entity';
+import { WorkerProfile, WorkerNote, WorkerApplication, WorkerContact, WorkerPhoneView } from './database/entities/worker-profile.entity';
 import { WorkersModule } from './workers/workers.module';
 
 const entities = [
@@ -133,6 +133,7 @@ const entities = [
   JobImport,
   WorkerProfile,
   WorkerNote,
+  WorkerPhoneView,
   WorkerApplication,
   WorkerContact,
 ];

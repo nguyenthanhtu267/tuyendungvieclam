@@ -2541,7 +2541,7 @@ export interface ProfileExtra { ready?: string; experience?: string; hasBike?: b
 export interface JobExtra { months?: number; allowance?: number; sessions?: number; year?: number; majors?: string; hourlyPay?: number; hours?: number; ageMin?: number; ageMax?: number; docs?: string; health?: boolean; bike?: boolean; certs?: string[]; experience?: string }
 export interface FitResult { ok: string[]; missing: string[]; hint: string[]; percent: number | null; minorUnsafe?: string | null }
 export interface WorkerProfileView {
-  id: string; kind: WorkerKind; fullName: string; phone: string; relativePhone: string | null; gender: string; birthDate: string;
+  id: string; kind: WorkerKind; fullName: string; phone: string; relativePhone: string | null; gender: string; birthDate: string; birthYear?: number | null; isSourced?: boolean;
   province: string; addressMode: 'old' | 'new'; oldDistrict: string | null; oldWard: string | null; newWardCode: string | null; newWard: string | null;
   addressDetail: string | null; lat: number | null; lon: number | null; radiusKm: number | null; desiredJobs: string[]; shifts: string[];
   availability: string[]; school: string | null; major: string | null; needsHousing: boolean; needsShuttle: boolean; isSeeking: boolean; refreshedAt: string; createdAt: string;
@@ -2568,6 +2568,8 @@ export interface TrustInfo { score: number | null; label: string; callRate: numb
 export interface ApplyResult { ok: boolean; already: boolean; missing?: string[]; groupCode?: string | null; groupSize?: number; joinedGroup?: boolean }
 export interface WorkerNoteView { id: string; kind: string; text: string; createdAt: string; mine: boolean }
 export interface WorkerSearchItem extends WorkerProfileView {
+  /** Đợt 136 — hồ sơ nguồn tổng hợp: số bị che tới khi bấm "Xem số"; "mine" = hồ sơ công ty tự nhập */
+  phoneMasked?: boolean; mine?: boolean; sourceLabel?: string | null;
   age: number; distance: Proximity | null; outOfRadius: boolean; notes: WorkerNoteView[]; refreshedAfterHired: boolean; stale: boolean;
   myStatus: { status: string; jobId: string | null; updatedAt: string } | null; competition: number;
   match?: { score: number; reasons: string[] } | null; minor?: boolean; readyNow?: boolean;
@@ -2619,13 +2621,33 @@ function workersCatalog(): Promise<WorkersCatalog> {
   return wcatInflight;
 }
 
+// Đợt 136 — thu thập hồ sơ lao động (dán bài / dán bảng / kho của NTD)
+export interface ParsedWorker {
+  fullName: string | null; phone: string | null; birthYear: number | null; birthDate: string | null; gender: 'male' | 'female' | 'other' | null;
+  province: string | null; oldDistrict: string | null; kind: WorkerKind; desiredJobs: string[]; shifts: string[]; experience: 'none' | 'lt1' | 'gte1' | null;
+  needsHousing: boolean; needsShuttle: boolean; note: string | null; missing: string[];
+}
+export type SourcedRowStatus = 'ok' | 'missing' | 'duplicate' | 'repeat';
+export interface SourcedPreviewRow extends ParsedWorker { row: number; raw: string; status: SourcedRowStatus; existing: { id: string; isSourced: boolean; fullName: string } | null }
+export interface SourcedTablePreview { rows: SourcedPreviewRow[]; headerDetected: boolean; columns: Record<string, number>; summary: { total: number; ok: number; missing: number; duplicate: number; repeat: number } }
+export interface SourcedPostPreview { parsed: ParsedWorker; existing: { id: string; isSourced: boolean; fullName: string } | null }
+export interface SourcedSaveResult { created: number; skipped: { phone: string | null; name: string | null; reason: string }[] }
+export interface SourcingApi {
+  previewPost: (text: string) => Promise<SourcedPostPreview>;
+  previewTable: (text: string) => Promise<SourcedTablePreview>;
+  save: (rows: ParsedWorker[], label?: string) => Promise<SourcedSaveResult>;
+}
+export interface ShareQueueRow { id: string; fullName: string; phone: string; kind: WorkerKind; province: string; oldDistrict: string | null; desiredJobs: string[]; createdAt: string; sharedAt: string | null; shareStatus: string; company: string | null; companyId: string | null; dup: number }
+export interface PhoneViewRow { id: string; viewedAt: string; company: string | null; companyId: string | null; profileId: string | null; fullName: string | null; phone: string | null; sourceLabel: string | null; userEmail: string | null }
+export interface StockRow { id: string; fullName: string; phone: string; kind: WorkerKind; province: string; oldDistrict: string | null; desiredJobs: string[]; shifts: string[]; birthYear: number | null; shareStatus: string; createdAt: string; isSeeking: boolean }
 export interface AdminWorkerRow {
+  isSourced?: boolean; sourceLabel?: string | null; shareStatus?: string | null; ownerCompany?: string | null;
   id: string; kind: WorkerKind; fullName: string; phone: string; gender: string; age: number; province: string; place: string;
   desiredJobs: string[]; shifts: string[]; isSeeking: boolean; isHidden: boolean; hasAccount: boolean; refreshedAt: string; createdAt: string;
   tags: string[]; note: string | null; applications: number; calls: number;
 }
 export interface AdminWorkerDetail {
-  profile: WorkerProfileView & { isHidden: boolean; hasAccount: boolean; tags: string[]; note: string | null };
+  profile: WorkerProfileView & { isSourced?: boolean; sourceLabel?: string | null; shareStatus?: string | null; isHidden: boolean; hasAccount: boolean; tags: string[]; note: string | null };
   applications: { id: string; status: string; createdAt: string; jobId: string; title: string; company: string | null }[];
   calls: { status: string; updatedAt: string; company: string | null; jobTitle: string | null }[];
   notes: { kind: string; text: string; createdAt: string }[];
@@ -2637,7 +2659,7 @@ export const workersApi = {
   districts: (province: string) => request<{ items: string[] }>(`/public/workers/geo/districts?province=${encodeURIComponent(province)}`),
   wards: (province: string, district: string) => request<{ items: string[] }>(`/public/workers/geo/wards?province=${encodeURIComponent(province)}&district=${encodeURIComponent(district)}`),
   newWards: (province: string) => request<{ items: { code: string; name: string }[] }>(`/public/workers/geo/new-wards?province=${encodeURIComponent(province)}`),
-  check: (phone: string) => request<{ valid: boolean; exists: boolean; refreshedAt: string | null }>('/public/workers/check', post({ phone })),
+  check: (phone: string) => request<{ valid: boolean; exists: boolean; sourced?: boolean; refreshedAt: string | null }>('/public/workers/check', post({ phone })),
   verify: (phone: string, birthDate: string) => request<WorkerProfileView>('/public/workers/verify', post({ phone, birthDate })),
   refresh: (phone: string, birthDate: string) => request<WorkerProfileView>('/public/workers/refresh', post({ phone, birthDate })),
   save: (b: WorkerInput) => request<{ updated: boolean; profile: WorkerProfileView }>('/public/workers/profile', post(b)),
@@ -2690,13 +2712,37 @@ export const workersApi = {
   adminStats: (token: string) => request<{ items: { kind: WorkerKind; n: number; fresh: number; hidden: number }[]; apps: number; contacts: number; provinces?: ProvinceBalance[] }>('/admin/workers/stats', { headers: authHeaders(token) }),
   adminSuspicious: (token: string) => request<{ items: SuspiciousWorkerGroup[] }>('/admin/workers/suspicious', { headers: authHeaders(token) }),
   // Đợt 135 — Admin quản lý hồ sơ lao động phổ thông
-  adminList: (token: string, params: Record<string, string | undefined>) => request<{ items: AdminWorkerRow[]; total: number; page: number; totalPages: number; counts: Record<string, number> }>(`/admin/workers/list?${qsOf(params)}`, { headers: authHeaders(token) }),
+  adminList: (token: string, params: Record<string, string | undefined>) => request<{ items: AdminWorkerRow[]; total: number; page: number; totalPages: number; counts: Record<string, number>; sourceCounts?: Record<string, number> }>(`/admin/workers/list?${qsOf(params)}`, { headers: authHeaders(token) }),
   adminTags: (token: string) => request<{ tag: string; count: number }[]>('/admin/workers/tags', { headers: authHeaders(token) }),
   adminDetail: (token: string, id: string) => request<AdminWorkerDetail>(`/admin/workers/${id}/detail`, { headers: authHeaders(token) }),
   adminMeta: (token: string, id: string, b: { tags?: string[]; note?: string | null }) => request<{ ok: boolean; tags: string[]; note: string | null }>(`/admin/workers/${id}/meta`, { method: 'PATCH', body: JSON.stringify(b), headers: authHeaders(token) }),
   adminSuggest: (token: string, id: string) => request<{ id: string; title: string; company: string; distance: string | null; salaryMin: number | null; salaryMax: number | null; matched: boolean; applied: boolean }[]>(`/admin/workers/${id}/suggested-jobs`, { headers: authHeaders(token) }),
   adminInvite: (token: string, id: string, jobId: string) => request<{ ok: boolean; via: 'notification' | 'phone'; phone?: string; message?: string }>(`/admin/workers/${id}/invite`, { method: 'POST', body: JSON.stringify({ jobId }), headers: authHeaders(token) }),
   adminHide: (token: string, id: string, hidden: boolean) => request<{ ok: boolean }>(`/admin/workers/${id}/hide`, { method: 'PATCH', body: JSON.stringify({ hidden }), headers: authHeaders(token) }),
+  // Đợt 136 — thu thập hồ sơ
+  adminSourcing: (token: string): SourcingApi => ({
+    previewPost: (text) => request<SourcedPostPreview>('/admin/workers/sourced/preview-post', post({ text }, token)),
+    previewTable: (text) => request<SourcedTablePreview>('/admin/workers/sourced/preview-table', post({ text }, token)),
+    save: (rows, label) => request<SourcedSaveResult>('/admin/workers/sourced/save', post({ rows, label }, token)),
+  }),
+  employerSourcing: (token: string): SourcingApi => ({
+    previewPost: (text) => request<SourcedPostPreview>('/employer/worker-stock/preview-post', post({ text }, token)),
+    previewTable: (text) => request<SourcedTablePreview>('/employer/worker-stock/preview-table', post({ text }, token)),
+    save: (rows) => request<SourcedSaveResult>('/employer/worker-stock/save', post({ rows }, token)),
+  }),
+  adminDeleteSourced: (token: string, id: string) => request<{ ok: boolean }>(`/admin/workers/sourced/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
+  adminQueue: (token: string, params: Record<string, string | undefined>) =>
+    request<{ items: ShareQueueRow[]; total: number; counts: { pending: number; shared: number; dismissed: number }; page: number; totalPages: number; auto: { enabled: boolean; enabledAt: string | null; minutes: number } }>(`/admin/workers/share-queue?${qsOf(params)}`, { headers: authHeaders(token) }),
+  adminQueueAct: (token: string, ids: string[], action: 'share' | 'dismiss' | 'requeue') => request<{ changed: number }>('/admin/workers/share-queue/act', post({ ids, action }, token)),
+  adminQueueAuto: (token: string, enabled: boolean) => request<{ enabled: boolean; enabledAt: string | null; minutes: number }>('/admin/workers/share-queue/auto', { method: 'PUT', body: JSON.stringify({ enabled }), headers: authHeaders(token) }),
+  adminPhoneViews: (token: string, params: Record<string, string | undefined>) =>
+    request<{ items: PhoneViewRow[]; total: number; page: number; totalPages: number; last24h: { company: string | null; companyId: string | null; n: number }[]; limit: number }>(`/admin/workers/phone-views?${qsOf(params)}`, { headers: authHeaders(token) }),
+  myStock: (token: string, params: Record<string, string | undefined>) => request<{ items: StockRow[]; total: number; page: number; totalPages: number }>(`/employer/worker-stock?${qsOf(params)}`, { headers: authHeaders(token) }),
+  deleteStock: (token: string, id: string) => request<{ ok: boolean }>(`/employer/worker-stock/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
+  revealPhone: (token: string, id: string) => request<{ phone: string; used: number | null; limit: number; logged: boolean }>(`/employer/workers/${id}/reveal-phone`, post({}, token)),
+  phoneQuota: (token: string) => request<{ used: number; limit: number }>('/employer/workers/phone-quota', { headers: authHeaders(token) }),
+  sourcedRequest: (phone: string, birth: string, type: 'remove' | 'claim') =>
+    request<{ done?: 'removed' | 'claimed'; needsAdmin?: boolean; message: string }>('/public/workers/sourced/request', post({ phone, birth, type })),
   seen: (token: string, id: string) => request<{ ok: boolean }>(`/employer/worker-applications/${id}/seen`, { method: 'PATCH', headers: authHeaders(token) }),
 };
 

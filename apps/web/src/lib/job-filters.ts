@@ -21,6 +21,8 @@ export function parseJobFilters(get: (k: string) => string | null): JobListParam
     experienceLevel: get('experienceLevel') ?? undefined,
     urgentOnly: get('urgentOnly') === '1' || undefined,
     featuredEmployerOnly: get('featuredEmployerOnly') === '1' || undefined,
+    // Đợt 137 — mặc định tìm chung mọi kênh; ?channel=office|worker|student|intern để chọn riêng
+    channel: ['office', 'worker', 'student', 'intern'].includes(get('channel') ?? '') ? (get('channel') as string) : 'all',
   };
 }
 export const JOB_PAGE_SIZE = 8;

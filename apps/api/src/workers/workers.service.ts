@@ -5,13 +5,14 @@ import { WorkerApplication, WorkerContact, WorkerNote, WorkerProfile, WorkerKind
 import { JobApprovalStatus, JobPosting } from '../database/entities/job-posting.entity';
 import { CompanyUser } from '../database/entities/company-user.entity';
 import { Company } from '../database/entities/company.entity';
-import { LABOR_GROUPS, PERKS, RADII, SHIFTS, SHIFTS_BY_KIND, SLOTS, estimateIncome, jobShiftTags, minorUnsafeReason, slotsFor, ageOf, LaborKind } from './labor-groups';
+import { LABOR_GROUPS, PERKS, RADII, SHIFTS, SHIFTS_BY_KIND, SLOTS, effBirth, estimateIncome, jobShiftTags, minorUnsafeReason, slotsFor, ageOf, LaborKind } from './labor-groups';
 import { cleanProfileExtra, fitOf, hourlyInfo, profileSanity, ProfileExtra } from './labor-extra';
 import { JobReport } from '../database/entities/job-report.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { unaccentSql } from '../common/sql-unaccent.util';
 import { assessJobRisk, fold, RiskJob } from '../admin/job-risk';
 import { minWageOf, wageWarning } from './min-wage';
+import { maskPhone } from './worker-sourcing.service';
 import { districtLabel, guessProvince, haversineKm, Loc, nearestProvince, provinceCentroid, proximity, resolvePlace } from './vn-geo';
 
 const CALL_STATUSES = ['no_answer', 'callback', 'interview', 'hired', 'rejected', 'no_show'];
@@ -124,7 +125,8 @@ export class WorkersService {
     this.checkLock(phone);
     const p = await this.repo.findOne({ where: { phone } });
     if (!p) throw new NotFoundException('Chưa có thông tin với số điện thoại này.');
-    if (!birthDate || String(birthDate).slice(0, 10) !== String(p.birthDate).slice(0, 10)) {
+    if (p.isSourced && !p.claimedAt) throw new ForbiddenException('Hồ sơ này do hệ thống tổng hợp. Hãy điền thông tin mới để nhận lại hồ sơ.');
+    if (!p.birthDate || !birthDate || String(birthDate).slice(0, 10) !== String(p.birthDate).slice(0, 10)) {
       this.failed(phone);
       throw new ForbiddenException('Ngày sinh không khớp với thông tin đã đăng ký.');
     }
@@ -135,9 +137,11 @@ export class WorkersService {
   async check(phoneRaw: string) {
     const phone = normalizePhone(phoneRaw);
     if (!phone) return { valid: false, exists: false };
-    const p = await this.repo.findOne({ where: { phone }, select: { id: true, refreshedAt: true } });
+    const p = await this.repo.findOne({ where: { phone }, select: { id: true, refreshedAt: true, isSourced: true, claimedAt: true } });
     // Chỉ báo "đã có" — không lộ bất kỳ thông tin cá nhân nào khi chưa xác minh ngày sinh.
-    return { valid: true, exists: !!p, refreshedAt: p?.refreshedAt ?? null };
+    // Hồ sơ nguồn tổng hợp chưa được nhận: người dùng điền lại là nhận hồ sơ (không cần ngày sinh) → coi như chưa có.
+    const unclaimed = !!p && p.isSourced && !p.claimedAt;
+    return { valid: true, exists: !!p && !unclaimed, sourced: unclaimed, refreshedAt: p && !unclaimed ? p.refreshedAt : null };
   }
 
   async verify(phone: string, birthDate: string) {
@@ -203,6 +207,14 @@ export class WorkersService {
     const phone = normalizePhone(b.phone);
     if (!phone) throw new BadRequestException('Số điện thoại không hợp lệ (10 số, bắt đầu bằng 0).');
     const existing = await this.repo.findOne({ where: { phone } });
+    if (existing && existing.isSourced && !existing.claimedAt) {
+      // Người thật điền hồ sơ trùng SĐT với hồ sơ nguồn tổng hợp → hồ sơ trở thành của họ (không tạo bản sao).
+      if (!b.consent) throw new BadRequestException('Vui lòng đồng ý cho nhà tuyển dụng xem thông tin để liên hệ.');
+      this.claimSourced(existing);
+      this.apply(existing, b);
+      await this.repo.save(existing);
+      return { updated: false, profile: this.view(existing) };
+    }
     if (existing) {
       const p = await this.verified(phone, b.verifyBirthDate);
       this.apply(p, b);
@@ -216,6 +228,15 @@ export class WorkersService {
     return { updated: false, profile: this.view(p) };
   }
 
+  /** Hồ sơ nguồn tổng hợp được chính chủ nhận lại: bỏ nhãn, xoá nguồn/chủ sở hữu, công khai bình thường. */
+  private claimSourced(p: WorkerProfile) {
+    p.isSourced = false;
+    p.claimedAt = new Date();
+    p.ownerCompanyId = null;
+    p.shareStatus = null;
+    p.sourceLabel = p.sourceLabel ? `${p.sourceLabel} → đã nhận lại` : 'Đã nhận lại';
+  }
+
   // Ứng viên đã đăng nhập: hồ sơ gắn tài khoản, không cần nhập lại ngày sinh để sửa.
   async getMine(userId: string) {
     const p = await this.repo.findOne({ where: { userId } });
@@ -227,7 +248,12 @@ export class WorkersService {
     if (!phone) throw new BadRequestException('Số điện thoại không hợp lệ (10 số, bắt đầu bằng 0).');
     if (!p) {
       const byPhone = await this.repo.findOne({ where: { phone } });
-      if (byPhone) {
+      if (byPhone && byPhone.isSourced && !byPhone.claimedAt) {
+        if (!b.consent) throw new BadRequestException('Vui lòng đồng ý cho nhà tuyển dụng xem thông tin để liên hệ.');
+        p = byPhone;
+        this.claimSourced(p);
+        p.userId = userId;
+      } else if (byPhone) {
         // SĐT đã đăng ký khi chưa có tài khoản ⇒ cần đúng ngày sinh mới được nhận về tài khoản này.
         if (byPhone.userId && byPhone.userId !== userId) throw new ForbiddenException('Số điện thoại này đã gắn với tài khoản khác.');
         p = await this.verified(phone, b.verifyBirthDate);
@@ -256,14 +282,15 @@ export class WorkersService {
   view(p: WorkerProfile) {
     return {
       id: p.id, kind: p.kind, fullName: p.fullName, phone: p.phone, relativePhone: p.relativePhone ?? null, gender: p.gender,
-      birthDate: String(p.birthDate).slice(0, 10), province: p.province, addressMode: p.addressMode, oldDistrict: p.oldDistrict ?? null,
+      birthDate: p.birthDate ? String(p.birthDate).slice(0, 10) : null, birthYear: p.birthYear ?? (p.birthDate ? +String(p.birthDate).slice(0, 4) : null),
+      isSourced: p.isSourced, province: p.province, addressMode: p.addressMode, oldDistrict: p.oldDistrict ?? null,
       oldWard: p.oldWard ?? null, newWardCode: p.newWardCode ?? null, newWard: p.newWard ?? null, addressDetail: p.addressDetail ?? null,
       lat: p.lat ?? null, lon: p.lon ?? null, radiusKm: p.radiusKm ?? null, desiredJobs: p.desiredJobs ?? [], shifts: p.shifts ?? [],
       availability: p.availability ?? [], school: p.school ?? null, major: p.major ?? null, needsHousing: p.needsHousing, needsShuttle: p.needsShuttle,
       isSeeking: p.isSeeking, refreshedAt: p.refreshedAt, createdAt: p.createdAt,
       examUntil: p.examUntil ? String(p.examUntil).slice(0, 10) : null, examMode: p.examMode ?? null,
       extra: (p.extra ?? null) as ProfileExtra | null,
-      warnings: profileSanity(p.kind as LaborKind, String(p.birthDate).slice(0, 10), p.extra ?? null, p.availability ?? null, p.shifts ?? null),
+      warnings: profileSanity(p.kind as LaborKind, String(effBirth(p)).slice(0, 10), p.extra ?? null, p.availability ?? null, p.shifts ?? null),
     };
   }
 
@@ -483,7 +510,7 @@ export class WorkersService {
   async fitCheck(jobId: string, p: WorkerProfile) {
     const job = await this.jobs.findOne({ where: { id: jobId } });
     if (!job || job.channel === 'office') throw new NotFoundException('Không tìm thấy tin');
-    return { ...fitOf(job, p), minorUnsafe: ageOf(p.birthDate) < 18 ? minorUnsafeReason(job) : null };
+    return { ...fitOf(job, p), minorUnsafe: ageOf(effBirth(p)) < 18 ? minorUnsafeReason(job) : null };
   }
   async fitCheckGuest(jobId: string, phone: string, birthDate: string) {
     return this.fitCheck(jobId, await this.verified(phone, birthDate));
@@ -549,7 +576,7 @@ export class WorkersService {
     const exist = await this.apps.findOne({ where: { profileId: p.id, jobPostingId: jobId } });
     if (exist) return { ok: true, already: true, groupCode: exist.groupCode ?? null, groupSize: await this.groupSize(jobId, exist.groupCode) };
     if (job.filledAt) throw new BadRequestException('Tin này đã tuyển đủ người — bạn xem các tin khác nhé.');
-    if (ageOf(p.birthDate) < 18) {
+    if (ageOf(effBirth(p)) < 18) {
       const why = minorUnsafeReason(job);
       if (why) throw new BadRequestException(`${why}.`);
     }
@@ -615,6 +642,8 @@ export class WorkersService {
     const companyId = await this.companyOf(userId);
     const kind = KINDS.includes(q.kind as WorkerKind) ? q.kind : undefined;
     const qb = this.repo.createQueryBuilder('w').where('w.isHidden = false');
+    // Đợt 136 — hồ sơ NTD tự nhập chỉ công ty đó thấy cho tới khi Admin chia sẻ
+    qb.andWhere(companyId ? "(w.owner_company_id IS NULL OR w.owner_company_id = :myCo OR w.share_status = 'shared')" : "(w.owner_company_id IS NULL OR w.share_status = 'shared')", companyId ? { myCo: companyId } : {});
     if (kind) qb.andWhere('w.kind = :kind', { kind });
     if (q.province) qb.andWhere('w.province = :p', { p: q.province });
     if (q.group) qb.andWhere("(',' || w.desired_jobs || ',') LIKE :g", { g: `%,${q.group},%` });
@@ -623,7 +652,10 @@ export class WorkersService {
       // Đợt 83 — mùa thi: ẩn khỏi tìm kiếm đến hết ngày đã chọn
       qb.andWhere("(w.exam_mode IS DISTINCT FROM 'pause' OR w.exam_until IS NULL OR w.exam_until < CURRENT_DATE)");
     }
-    if (q.q?.trim()) qb.andWhere('(w.fullName ILIKE :t OR w.phone LIKE :t2)', { t: `%${q.q.trim()}%`, t2: `%${q.q.replace(/\D/g, '')}%` });
+    if (q.q?.trim()) {
+      const digits = q.q.replace(/\D/g, '');
+      qb.andWhere(digits.length >= 3 ? '(w.fullName ILIKE :t OR w.phone LIKE :t2)' : 'w.fullName ILIKE :t', { t: `%${q.q.trim()}%`, t2: `%${digits}%` });
+    }
     // Đợt 84 — bộ lọc riêng từng nhóm (đọc từ profile_extra)
     if (q.exp === 'has') qb.andWhere("w.profile_extra ->> 'experience' IN ('lt1','gte1')");
     if (q.exp === 'gte1') qb.andWhere("w.profile_extra ->> 'experience' = 'gte1'");
@@ -690,7 +722,7 @@ export class WorkersService {
       sc += Math.min(20, fit.ok.length * 5);
       for (const m of fit.missing) { sc -= 8; why.push(`Thiếu: ${m.replace(/^Cần /, '').replace(/^Tin ưu tiên /, 'Tin ưu tiên — ')}`); }
       for (const o of fit.ok.slice(0, 2)) why.push(o);
-      if (ageOf(w.birthDate) < 18 && minorUnsafeReason(job)) { sc -= 60; why.push('Chưa đủ 18 tuổi — tin có ca đêm/việc nặng nhọc, không được nhận'); }
+      if (ageOf(effBirth(w)) < 18 && minorUnsafeReason(job)) { sc -= 60; why.push('Chưa đủ 18 tuổi — tin có ca đêm/việc nặng nhọc, không được nhận'); }
       if (job.isUrgent && this.readyNow(w)) { sc += 10; why.push('Đi làm được ngay — tin đang ưu tiên'); }
       const days = (Date.now() - +new Date(w.refreshedAt)) / 864e5;
       if (days <= 7) { sc += 10; why.push('Mới làm mới hồ sơ'); }
@@ -710,6 +742,13 @@ export class WorkersService {
     const contactRows = ids.length ? await this.contacts.find({ where: { profileId: In(ids) } }) : [];
     // Mức cạnh tranh: số công ty KHÁC đã liên hệ / ghi chú trong 7 ngày (ẩn danh)
     const since = Date.now() - 7 * 864e5;
+    // Đợt 136 — hồ sơ nguồn tổng hợp: che số; công ty đã bấm "Xem số" trong 24 giờ thì hiện số
+    const revealed = new Set<string>();
+    const maskIds = slice.filter((x) => x.w.isSourced && x.w.ownerCompanyId !== companyId).map((x) => x.w.id);
+    if (companyId && maskIds.length) {
+      const vr: { pid: string }[] = await this.repo.manager.query(`SELECT DISTINCT profile_id AS pid FROM worker_phone_views WHERE company_id = $1 AND profile_id = ANY($2) AND viewed_at > now() - interval '24 hours'`, [companyId, maskIds]);
+      for (const x of vr) revealed.add(x.pid);
+    }
     const items = slice.map(({ w, prox, stale }) => {
       const ns = noteRows.filter((n) => n.profileId === w.id);
       const lastHired = ns.find((n) => n.kind === 'hired');
@@ -719,10 +758,16 @@ export class WorkersService {
         ...cs.filter((c) => c.companyId !== companyId && +new Date(c.updatedAt) > since).map((c) => c.companyId),
         ...ns.filter((n) => n.companyId && n.companyId !== companyId && +new Date(n.createdAt) > since).map((n) => n.companyId as string),
       ]);
+      const masked = w.isSourced && w.ownerCompanyId !== companyId && !revealed.has(w.id);
+      const v = this.view(w);
       return {
-        ...this.view(w),
-        age: Math.floor((Date.now() - new Date(w.birthDate).getTime()) / (365.25 * 864e5)),
-        minor: ageOf(w.birthDate) < 18,
+        ...v,
+        phone: masked ? maskPhone(w.phone) : v.phone,
+        phoneMasked: masked,
+        mine: !!companyId && w.ownerCompanyId === companyId,
+        sourceLabel: w.isSourced ? 'Nguồn tổng hợp' : null,
+        age: ageOf(effBirth(w)),
+        minor: ageOf(effBirth(w)) < 18,
         readyNow: this.readyNow(w),
         distance: prox,
         outOfRadius: !!(prox && w.radiusKm && prox.km > w.radiusKm),
@@ -874,6 +919,8 @@ export class WorkersService {
       .where('w.isHidden = false')
       .andWhere('w.isSeeking = true')
       .andWhere("w.refreshed_at > now() - interval '45 days'");
+    const myCo = await this.companyOf(userId);
+    qb.andWhere(myCo ? "(w.owner_company_id IS NULL OR w.owner_company_id = :myCo OR w.share_status = 'shared')" : "(w.owner_company_id IS NULL OR w.share_status = 'shared')", myCo ? { myCo } : {});
     if (kind) qb.andWhere('w.kind = :kind', { kind });
     if (q.group) qb.andWhere("(',' || w.desired_jobs || ',') LIKE :g", { g: `%,${q.group},%` });
     const rows = await qb.select(['w.id', 'w.province', 'w.oldDistrict', 'w.newWardCode', 'w.kind', 'w.needsHousing', 'w.needsShuttle', 'w.refreshedAt']).getMany();
@@ -1191,6 +1238,9 @@ export class WorkersService {
     if (q.seeking === '0') qb.andWhere('w.is_seeking = false');
     if (q.hidden === '1') qb.andWhere('w.is_hidden = true');
     else if (q.hidden !== 'all') qb.andWhere('w.is_hidden = false');
+    if (q.source === 'self') qb.andWhere('w.is_sourced = false');
+    if (q.source === 'sourced') qb.andWhere('w.is_sourced = true');
+    if (q.source === 'ntd') qb.andWhere('w.owner_company_id IS NOT NULL');
     if (q.account === '1') qb.andWhere('w.user_id IS NOT NULL');
     if (q.account === '0') qb.andWhere('w.user_id IS NULL');
     if (q.tag) qb.andWhere(':tag = ANY(w.admin_tags)', { tag: q.tag });
@@ -1209,19 +1259,24 @@ export class WorkersService {
     const ids = rows.map((r) => r.id);
     const appN: { pid: string; n: number }[] = ids.length ? await this.repo.manager.query('SELECT profile_id AS pid, COUNT(*)::int AS n FROM worker_applications WHERE profile_id = ANY($1) GROUP BY profile_id', [ids]) : [];
     const callN: { pid: string; n: number }[] = ids.length ? await this.repo.manager.query('SELECT profile_id AS pid, COUNT(*)::int AS n FROM worker_contacts WHERE profile_id = ANY($1) GROUP BY profile_id', [ids]) : [];
+    const ownerIds = Array.from(new Set(rows.map((r) => r.ownerCompanyId).filter((x): x is string => !!x)));
+    const cname = new Map((ownerIds.length ? await this.companies.find({ where: { id: In(ownerIds) }, select: { id: true, name: true } }) : []).map((c) => [c.id, c.name]));
     const am = new Map(appN.map((x) => [x.pid, x.n]));
     const cm = new Map(callN.map((x) => [x.pid, x.n]));
     const counts: { kind: string; n: number }[] = await this.repo.manager.query('SELECT kind, COUNT(*)::int AS n FROM worker_profiles WHERE is_hidden = false GROUP BY kind');
+    const srcCounts: { src: string; n: number }[] = await this.repo.manager.query("SELECT CASE WHEN owner_company_id IS NOT NULL THEN 'ntd' WHEN is_sourced THEN 'sourced' ELSE 'self' END AS src, COUNT(*)::int AS n FROM worker_profiles WHERE is_hidden = false GROUP BY 1");
     return {
       items: rows.map((w) => ({
-        id: w.id, kind: w.kind, fullName: w.fullName, phone: w.phone, gender: w.gender, age: ageOf(String(w.birthDate).slice(0, 10)),
+        id: w.id, kind: w.kind, fullName: w.fullName, phone: w.phone, gender: w.gender, age: ageOf(effBirth(w)),
         province: w.province, place: districtLabel({ province: w.province, oldDistrict: w.oldDistrict, newWardCode: w.newWardCode }),
         desiredJobs: w.desiredJobs ?? [], shifts: w.shifts ?? [], isSeeking: w.isSeeking, isHidden: w.isHidden, hasAccount: !!w.userId,
         refreshedAt: w.refreshedAt, createdAt: w.createdAt, tags: w.adminTags ?? [], note: w.adminNote ?? null,
+        isSourced: w.isSourced, sourceLabel: w.sourceLabel ?? null, shareStatus: w.ownerCompanyId ? w.shareStatus ?? 'pending' : null, ownerCompany: w.ownerCompanyId ? cname.get(w.ownerCompanyId) ?? null : null,
         applications: am.get(w.id) ?? 0, calls: cm.get(w.id) ?? 0,
       })),
       total, page, totalPages: Math.max(1, Math.ceil(total / size)),
       counts: Object.fromEntries(counts.map((c) => [c.kind, c.n])),
+      sourceCounts: Object.fromEntries(srcCounts.map((c) => [c.src, c.n])),
     };
   }
 
@@ -1242,7 +1297,7 @@ export class WorkersService {
        FROM worker_contacts k LEFT JOIN companies c ON c.id = k.company_id LEFT JOIN job_postings j ON j.id = k.job_posting_id
        WHERE k.profile_id = $1 ORDER BY k.updated_at DESC LIMIT 50`, [id]);
     const notes = await this.notes.find({ where: { profileId: id }, order: { createdAt: 'DESC' }, take: 30 });
-    return { profile: { ...this.view(p), isHidden: p.isHidden, hasAccount: !!p.userId, tags: p.adminTags ?? [], note: p.adminNote ?? null }, applications: apps, calls, notes: notes.map((n) => ({ kind: n.kind, text: n.text, createdAt: n.createdAt })) };
+    return { profile: { ...this.view(p), isSourced: p.isSourced, sourceLabel: p.sourceLabel ?? null, shareStatus: p.ownerCompanyId ? p.shareStatus ?? 'pending' : null, isHidden: p.isHidden, hasAccount: !!p.userId, tags: p.adminTags ?? [], note: p.adminNote ?? null }, applications: apps, calls, notes: notes.map((n) => ({ kind: n.kind, text: n.text, createdAt: n.createdAt })) };
   }
 
   async adminSetMeta(id: string, b: { tags?: string[]; note?: string | null }) {
@@ -1301,6 +1356,7 @@ export class WorkersService {
     // 2) Cùng họ tên + ngày sinh nhưng khác số điện thoại
     const byNameBirth = new Map<string, typeof all>();
     for (const p of all) {
+      if (!p.birthDate) continue;
       const k = `${fold(p.fullName)}|${String(p.birthDate).slice(0, 10)}`;
       byNameBirth.set(k, [...(byNameBirth.get(k) ?? []), p]);
     }

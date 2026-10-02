@@ -136,7 +136,9 @@ export function parseNaturalQuery(input: string): NlResult {
 
   // Phần còn lại là từ khoá: dùng lại chữ gốc (có dấu) của người dùng, bỏ các cụm đã hiểu
   const stop = new Set(['tim', 'viec', 'cong', 'can', 'muon', 'tuyen', 'gap', 'moi', 'nhat', 'hom', 'nay', 'tuan', 'lam', 'cho', 'toi', 'nganh', 'part', 'time', 'thuc', 'tap', 'intern', 'thoi', 'vu', 'ban', 'khan', 'dang', 'va', 'la', 'co', 'nao']);
-  const rest = text.split(' ').filter((w) => w && !stop.has(w) && !/^\d+$/.test(w));
+  const tw = text.split(' ');
+  // "công nhân" là từ khoá thật (không phải từ thừa "công" của "công việc")
+  const rest = tw.filter((w, i) => w && (!stop.has(w) || (w === 'cong' && tw[i + 1] === 'nhan')) && !/^\d+$/.test(w));
   const origWords = input.split(/\s+/).filter((w) => rest.includes(fold(w)));
   const q = origWords.join(' ').trim();
   if (q) {

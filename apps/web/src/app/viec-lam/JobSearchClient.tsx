@@ -1,6 +1,6 @@
 'use client';
 
-import { LaborCrossHint } from '@/components/labor/LaborCrossHint';
+import { ChannelChips } from '@/components/ChannelChips';
 import { useMatches } from '@/lib/match';
 import { Fragment, Suspense, useEffect, useRef, useState } from 'react';
 import { JOB_PAGE_SIZE, parseJobFilters } from '@/lib/job-filters';
@@ -353,11 +353,11 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
     const params = new URLSearchParams(searchParams.toString());
     const patched: Record<string, unknown> = { ...filters, ...next };
     if ('provinces' in next && !('district' in next)) patched.district = undefined; // đổi tỉnh → bỏ quận/huyện của tỉnh cũ
-    (['q', 'location', 'provinces', 'district', 'industries', 'salaryTier', 'level', 'postedWithin', 'employmentType', 'experienceLevel', 'urgentOnly', 'featuredEmployerOnly'] as const).forEach(
+    (['q', 'location', 'provinces', 'district', 'industries', 'salaryTier', 'level', 'postedWithin', 'employmentType', 'experienceLevel', 'urgentOnly', 'featuredEmployerOnly', 'channel'] as const).forEach(
       (key) => {
         const v = patched[key];
         params.delete(key);
-        if (v === undefined || v === '' || v === false) return;
+        if (v === undefined || v === '' || v === false || (key === 'channel' && v === 'all')) return;
         if (Array.isArray(v)) {
           if (v.length > 0) params.set(key, v.join(','));
           return;
@@ -465,7 +465,15 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
 
         <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_280px] gap-5 mt-2 items-start">
           <div className="min-w-0">
-            <LaborCrossHint q={filters.q} />
+            {/* Đợt 137 — MỘT luồng tìm việc: mặc định tìm chung văn phòng + công nhân + sinh viên + thực tập; chip để thu hẹp. */}
+            <div className="mb-3 flex flex-col gap-1.5">
+              <ChannelChips value={filters.channel && filters.channel !== 'all' ? filters.channel : ''} onChange={(v) => updateParams({ channel: v || 'all' })} />
+              {filters.channel && ['worker', 'student', 'intern'].includes(filters.channel) && (
+                <a href={`/lao-dong-pho-thong/viec-lam?loai=${filters.channel === 'worker' ? 'cong-nhan' : filters.channel === 'student' ? 'sinh-vien' : 'thuc-tap-sinh'}${filters.q ? `&q=${encodeURIComponent(filters.q)}` : ''}`} className="text-[12.5px] font-bold text-primary underline">
+                  Lọc thêm theo ca làm, gần nhà, KTX / xe đưa đón → trang việc {filters.channel === 'worker' ? 'công nhân' : filters.channel === 'student' ? 'sinh viên' : 'thực tập'}
+                </a>
+              )}
+            </div>
             <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
               <div className="flex items-center gap-x-3 gap-y-1 flex-wrap min-w-0 flex-1">
                 {/* Đợt 91 — tiêu đề luôn chiếm riêng 1 dòng trên điện thoại: trước đây chữ tiêu đề đổi ("Đang tìm..." → "1.286 Tất cả việc làm") làm 2 nút lọc bên cạnh nhảy xuống dòng dưới → giật bố cục. */}

@@ -88,7 +88,10 @@ export class JobsService {
 
   private applyFilters(qb: SelectQueryBuilder<JobPosting>, query: ListJobsDto) {
     // Đợt 79 — tách kênh: danh sách việc làm văn phòng không lẫn tin công nhân/SV/thực tập.
-    if (query.channel === 'labor') qb.andWhere("job.channel IN ('worker','student','intern')");
+    // Đợt 137 — 'all' = tìm chung cả 2 nhóm (văn phòng + công nhân/sinh viên/thực tập)
+    if (query.channel === 'all') {
+      /* không lọc kênh */
+    } else if (query.channel === 'labor') qb.andWhere("job.channel IN ('worker','student','intern')");
     else qb.andWhere('job.channel = :channel', { channel: query.channel ?? 'office' });
     if (query.laborGroup) qb.andWhere('job.laborGroup = :laborGroup', { laborGroup: query.laborGroup });
     if (query.q) {

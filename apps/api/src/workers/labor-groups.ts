@@ -60,6 +60,9 @@ export function minorUnsafeReason(j: { laborGroup?: string | null; title?: strin
   if (/ca dem|lam dem|nang nhoc|doc hai|bốc vác|boc vac/.test(t)) return 'Tin nêu ca đêm/việc nặng nhọc — người chưa đủ 18 tuổi không được làm';
   return null;
 }
+/** Ngày sinh dùng để tính tuổi: ngày thật → giữa năm sinh → mặc định 30 tuổi (hồ sơ nguồn tổng hợp có thể thiếu). */
+export const effBirth = (p: { birthDate?: string | Date | null; birthYear?: number | null }): string | Date =>
+  p.birthDate ? p.birthDate : p.birthYear ? `${p.birthYear}-07-01` : `${new Date().getFullYear() - 30}-07-01`;
 export const ageOf = (birth: string | Date) => Math.floor((Date.now() - new Date(birth).getTime()) / (365.25 * 864e5));
 
 /** Đợt 134 — suy ra ca làm của một tin (để lọc "Ca làm" và hiện nhãn): từ lưới ca cần người + chữ trong tiêu đề/mô tả + giờ làm đêm. */

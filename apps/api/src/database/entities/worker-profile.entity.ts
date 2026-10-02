@@ -27,8 +27,12 @@ export class WorkerProfile {
   @Column({ type: 'varchar', length: 6 })
   gender: string; // male | female | other
 
-  @Column({ name: 'birth_date', type: 'date' })
+  // Đợt 136 — hồ sơ nguồn tổng hợp có thể chỉ biết năm sinh (hoặc không biết) nên cho phép trống.
+  @Column({ name: 'birth_date', type: 'date', nullable: true })
   birthDate: string; // YYYY-MM-DD
+
+  @Column({ name: 'birth_year', type: 'int', nullable: true })
+  birthYear?: number | null;
 
   // Tỉnh theo danh mục 63 tỉnh của web (khớp bộ lọc tin tuyển dụng)
   @Column({ type: 'varchar', length: 60 })
@@ -112,6 +116,28 @@ export class WorkerProfile {
 
   @Column({ name: 'user_id', type: 'uuid', nullable: true })
   userId?: string | null;
+
+  // Đợt 136 — hồ sơ do Admin / NTD thu thập (không phải người lao động tự điền). Nhãn công khai "Nguồn tổng hợp".
+  @Column({ name: 'is_sourced', default: false })
+  isSourced: boolean;
+
+  // Nguồn nội bộ (Zalo/Facebook/Excel/NTD…) — chỉ Admin thấy
+  @Column({ name: 'source_label', type: 'varchar', length: 120, nullable: true })
+  sourceLabel?: string | null;
+
+  @Column({ name: 'claimed_at', type: 'timestamp', nullable: true })
+  claimedAt?: Date | null;
+
+  // Hồ sơ NTD tự nhập: chỉ công ty này thấy cho tới khi Admin chia sẻ (share_status = shared)
+  @Column({ name: 'owner_company_id', type: 'uuid', nullable: true })
+  ownerCompanyId?: string | null;
+
+  // pending (chờ duyệt) | shared | dismissed — chỉ dùng cho hồ sơ có owner_company_id
+  @Column({ name: 'share_status', type: 'varchar', length: 10, nullable: true })
+  shareStatus?: string | null;
+
+  @Column({ name: 'shared_at', type: 'timestamp', nullable: true })
+  sharedAt?: Date | null;
 
   // Mốc "làm mới" để NTD biết thông tin còn mới — sắp xếp theo mốc này
   @Column({ name: 'refreshed_at', type: 'timestamp', default: () => 'now()' })
@@ -221,4 +247,24 @@ export class WorkerContact {
 
   @Column({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
+}
+
+// Đợt 136 — nhật ký NTD bấm "Xem số" trên hồ sơ nguồn tổng hợp (giới hạn lượt/ngày/công ty).
+@Entity({ name: 'worker_phone_views' })
+@Index('IDX_worker_phone_views_company', ['companyId', 'viewedAt'])
+export class WorkerPhoneView {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ name: 'company_id', type: 'uuid' })
+  companyId: string;
+
+  @Column({ name: 'profile_id', type: 'uuid' })
+  profileId: string;
+
+  @Column({ name: 'user_id', type: 'uuid', nullable: true })
+  userId?: string | null;
+
+  @CreateDateColumn({ name: 'viewed_at' })
+  viewedAt: Date;
 }
