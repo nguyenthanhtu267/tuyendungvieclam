@@ -1060,6 +1060,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         approvalStatus: CompanyApprovalStatus.APPROVED,
         isAdminSourced: true,
         sourceLabel: dto.sourceLabel?.trim() || undefined,
+        sourceUrl: /^https?:\/\//i.test(dto.sourceUrl ?? '') ? dto.sourceUrl!.trim().slice(0, 500) : undefined,
       }),
     );
 

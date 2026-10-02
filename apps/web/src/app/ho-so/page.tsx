@@ -188,9 +188,48 @@ export default function MyCenterPage() {
     setTimeout(() => setToast(null), 3000);
   }
 
-  function scrollTo(id: string) {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Đợt 146 — thanh điều hướng thật sự dùng được: bấm là cuộn + ghi #phần lên địa chỉ; mở thẳng /ho-so#applications cũng cuộn tới đúng phần;
+  // mục đang xem sáng lên; điện thoại có thanh chọn phần ngang.
+  const [activeId, setActiveId] = useState('overview');
+  function scrollTo(id: string, push = true) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setActiveId(id);
+    if (push) {
+      try { window.history.replaceState(null, '', `#${id}`); } catch { /* bỏ qua */ }
+    }
   }
+  const ready = !!(me && profile && token);
+  useEffect(() => {
+    if (!ready) return;
+    const go = () => {
+      const id = decodeURIComponent(window.location.hash.replace('#', ''));
+      if (id && document.getElementById(id)) setTimeout(() => scrollTo(id, false), 250);
+    };
+    go();
+    window.addEventListener('hashchange', go);
+    return () => window.removeEventListener('hashchange', go);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
+  useEffect(() => {
+    if (!ready || typeof IntersectionObserver === 'undefined') return;
+    const els = NAV_ITEMS.map((n) => document.getElementById(n.id)).filter(Boolean) as HTMLElement[];
+    const io = new IntersectionObserver(
+      (entries) => {
+        const vis = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        if (vis) setActiveId(vis.target.id);
+      },
+      { rootMargin: '-80px 0px -60% 0px', threshold: 0 },
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [ready]);
+  const navCount: Record<string, number | undefined> = {
+    cvs: undefined,
+    suggestions: suggestions?.length,
+    applications: applications.length,
+  };
 
   if (me === undefined || (me && loading && !profile)) {
     return (
@@ -216,15 +255,30 @@ export default function MyCenterPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-6">
         {/* Đợt 24 — banner đầu trang My Center của ứng viên. */}
         <AdSlot slot="candidate-top" className="mb-3" />
-        <div className="grid md:grid-cols-[210px_1fr] gap-5 items-start">
+        <nav aria-label="Các phần của trang" className="md:hidden sticky top-14 z-20 -mx-4 px-4 py-2 mb-3 bg-bg/95 backdrop-blur flex gap-1.5 overflow-x-auto">
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => scrollTo(item.id)}
+              aria-current={activeId === item.id ? 'true' : undefined}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-[12px] font-bold whitespace-nowrap ${activeId === item.id ? 'border-primary bg-primary text-white' : 'border-border-strong bg-white text-ink'}`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        <div className="grid md:grid-cols-[210px_minmax(0,1fr)] gap-5 items-start">
           <nav className="hidden md:flex flex-col gap-1 rounded-xl border border-border bg-white p-2.5 sticky top-20">
             {NAV_ITEMS.map((item) => (
               <button
                 key={item.id}
                 onClick={() => scrollTo(item.id)}
-                className="text-left text-[12.5px] font-semibold px-3 py-2 rounded-lg hover:bg-surface-alt text-ink-muted hover:text-ink transition-colors"
+                aria-current={activeId === item.id ? 'true' : undefined}
+                className={`text-left text-[12.5px] font-semibold px-3 py-2 rounded-lg transition-colors flex items-center justify-between gap-2 ${activeId === item.id ? 'bg-primary-tint text-primary' : 'hover:bg-surface-alt text-ink-muted hover:text-ink'}`}
               >
-                {item.label}
+                <span>{item.label}</span>
+                {navCount[item.id] ? <span className="text-[10.5px] font-bold rounded-full bg-white border border-border px-1.5 text-ink-muted">{navCount[item.id]}</span> : null}
               </button>
             ))}
           </nav>
@@ -259,16 +313,19 @@ export default function MyCenterPage() {
                 <span className="text-[11px] text-ink-faint">Theo ngành, địa điểm, cấp bậc... trong hồ sơ</span>
               </div>
               {!hasSuggestionInputs && (
-                <div className="text-[12.5px] text-ink-muted py-3">
-                  Điền &ldquo;Vị trí mong muốn&rdquo;, ngành nghề, địa điểm... ở phần Quản lý hồ sơ để nhận gợi ý
-                  việc làm phù hợp.
+                <div className="text-[12.5px] text-ink-muted py-3 flex flex-wrap items-center gap-2">
+                  <span>Điền &ldquo;Vị trí mong muốn&rdquo;, ngành nghề, địa điểm... ở phần Quản lý hồ sơ để nhận gợi ý việc làm phù hợp.</span>
+                  <button type="button" onClick={() => scrollTo('overview')} className="tvl-btn-ghost !w-auto px-3 py-1.5 text-xs">Điền mong muốn ngay</button>
                 </div>
               )}
               {hasSuggestionInputs && suggestions === null && (
                 <div className="text-[12.5px] text-ink-faint py-3">Đang tải gợi ý...</div>
               )}
               {hasSuggestionInputs && suggestions?.length === 0 && (
-                <div className="text-[12.5px] text-ink-faint py-3">Chưa có việc làm phù hợp với hồ sơ của bạn lúc này.</div>
+                <div className="text-[12.5px] text-ink-faint py-3 flex flex-wrap items-center gap-2">
+                  <span>Chưa có việc làm phù hợp với hồ sơ của bạn lúc này. Thử mở rộng địa điểm hoặc ngành mong muốn.</span>
+                  <Link href="/viec-lam" className="tvl-btn-ghost !w-auto px-3 py-1.5 text-xs">Tìm tất cả việc làm</Link>
+                </div>
               )}
               <div className="flex flex-col">
                 {suggestions?.map((job) => (

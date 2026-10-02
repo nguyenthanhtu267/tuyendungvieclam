@@ -1,5 +1,7 @@
 'use client';
 
+import { BulkLogoSuggest } from '@/components/admin/BulkLogoSuggest';
+import { SourceLink } from '@/components/ui/SourceLink';
 import { ChannelChips, CHANNEL_ICON, CHANNEL_LABEL } from '@/components/ChannelChips';
 import { Combobox } from '@/components/ui/Combobox';
 import CompanyVerifyBox from '@/components/admin/CompanyVerifyBox';
@@ -9,7 +11,7 @@ import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth-context';
 import { ApiError, type AdminDashboard, type JobPosting, type Company, type Order, type AdminStatsPoint, type AdminAuditLogEntry, type CreateDraftCompanyPayload, type DraftAccountInfo, type CompanyClaimRequestRow, type CompanyClaimRequestStatus, type CreateJobPayload, type ExtractJobUrlResult } from '@/lib/api';
 import { adminApi } from '@/lib/api-admin';
-import { formatDate, formatDateTime, formatSalary, formatCurrency, formatNumber, normalizeSalaryAmount, PAYMENT_METHOD_LABEL } from '@/lib/format';
+import { formatDate, formatSalary, formatCurrency, formatNumber, normalizeSalaryAmount, PAYMENT_METHOD_LABEL, formatTimeDate } from '@/lib/format';
 import ChangePasswordCard from '@/components/ChangePasswordCard';
 import { scanJobContent } from '@/lib/content-moderation';
 import { CompanyLogo } from '@/components/CompanyLogo';
@@ -21,6 +23,7 @@ import { SortTh, useSort } from '@/components/ui/SortTh';
 // Đợt 93 — mỗi tab Admin nạp RIÊNG khi được mở (trước đây cả 9 bảng ~230KB JS tải ngay khi vào trang). Có `loading` riêng để
 // không làm ranh giới Suspense ở trên cùng hiện lại khung xương (xem DeferredWidgets).
 const PanelLoading = () => <div className="p-6 text-[14px] text-ink-muted">Đang tải…</div>;
+const SourcesPanel = dynamic(() => import('@/components/admin/SourcesPanel').then((m) => m.SourcesPanel), { ssr: false, loading: PanelLoading });
 const ImportInbox = dynamic(() => import('@/components/admin/ImportInbox').then((m) => m.ImportInbox), { ssr: false, loading: PanelLoading });
 const CvSourcingPanel = dynamic(() => import('@/components/admin/CvSourcingPanel').then((m) => m.CvSourcingPanel), { ssr: false, loading: PanelLoading });
 const PeoplePanel = dynamic(() => import('@/components/admin/PeoplePanel').then((m) => m.PeoplePanel), { ssr: false, loading: PanelLoading });
@@ -455,9 +458,12 @@ export default function AdminDashboardPage() {
     // Xếp chồng dọc (flex-col) trên điện thoại, chỉ chia 2 cột từ md trở lên.
     <main className="min-h-screen bg-bg flex flex-col md:grid md:grid-cols-[200px_minmax(0,1fr)]">
       <aside className="bg-primary-dark text-white p-3 flex flex-col gap-1 md:min-h-screen">
-        <div className="flex items-center justify-between px-2 pt-1.5 pb-3.5">
-          <span className="font-extrabold text-sm">⚙ Admin Console</span>
-          <a href="/" className="text-[11.5px] font-bold text-white/95 border border-white/40 rounded-full px-2.5 py-1">← Trang chủ</a>
+        <div className="flex flex-col items-start gap-2 px-2 pt-1.5 pb-3.5">
+          <span className="font-extrabold text-sm whitespace-nowrap">⚙ Admin Console</span>
+          {/* Đợt 146 — một dòng, mũi tên đứng trước chữ, căn trái thẳng hàng với tiêu đề (trước đây chữ "Trang / chủ" bị rớt dòng lệch). */}
+          <a href="/" className="inline-flex items-center gap-1 whitespace-nowrap text-[11.5px] font-bold text-white/95 border border-white/40 rounded-full px-2.5 py-1 hover:bg-white/10">
+            <span aria-hidden>←</span> Trang chủ
+          </a>
         </div>
         {NAV_ITEMS.map((item) => (
           <button
@@ -502,7 +508,7 @@ export default function AdminDashboardPage() {
                         <span className="font-bold">{job.title}</span>
                         <span className="text-ink-faint"> · {job.company?.name}</span>
                       </div>
-                      <span className="text-ink-faint">{formatDate(job.createdAt)}</span>
+                      <span className="text-ink-faint">{formatTimeDate(job.createdAt)}</span>
                     </div>
                   ))}
                 </div>
@@ -747,8 +753,8 @@ export default function AdminDashboardPage() {
                           <td className="py-3 px-3 text-ink-faint">{job.company?.name}</td>
                           <td className="py-3 px-3 text-ink-faint">{job.industry ?? '—'}</td>
                           <td className="py-3 px-3 tabular-nums">{formatSalary(job.salaryMin, job.salaryMax)}</td>
-                          <td className="py-3 px-3 tabular-nums whitespace-nowrap" title={formatDateTime((job.updatedAt ?? job.createdAt) as string)}>
-                            {formatDate(job.updatedAt ?? job.createdAt)}
+                          <td className="py-3 px-3 tabular-nums whitespace-nowrap" title={formatTimeDate((job.updatedAt ?? job.createdAt) as string)}>
+                            {formatTimeDate(job.updatedAt ?? job.createdAt)}
                             <div className="text-[10.5px] text-ink-faint">{jAgeText(job)}</div>
                           </td>
                           <td className="py-3 px-4 text-right whitespace-nowrap">
@@ -830,16 +836,23 @@ export default function AdminDashboardPage() {
           <>
             <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
               <h1 className="font-bold text-base">Duyệt công ty</h1>
-              {selectedCompanyIds.size > 0 && cStatus !== 'approved' && (
-                <div className="flex items-center gap-2 text-xs">
+              {selectedCompanyIds.size > 0 && (
+                <div className="flex items-center gap-2 text-xs flex-wrap">
                   <span className="text-ink-faint font-semibold">Đã chọn {selectedCompanyIds.size}</span>
-                  <button
+                  {token && (
+                    <BulkLogoSuggest
+                      token={token}
+                      companies={shownCompanies.filter((c) => selectedCompanyIds.has(c.id))}
+                      onSave={async (id, url) => { patchCompanyRow(await adminApi.updateCompanyLogo(token, id, url)); }}
+                    />
+                  )}
+                  {cStatus !== 'approved' && <button
                     disabled={bulkBusy}
                     onClick={() => handleBulkCompanyDecision('approve')}
                     className="font-bold rounded-md bg-success-tint text-success px-2.5 py-1.5 disabled:opacity-50"
                   >
                     {cStatus === 'rejected' ? 'Duyệt lại tất cả đã chọn' : 'Duyệt tất cả đã chọn'}
-                  </button>
+                  </button>}
                   {cStatus === 'pending' && (
                     <button
                       disabled={bulkBusy}
@@ -905,7 +918,6 @@ export default function AdminDashboardPage() {
                       <tr className="text-left text-ink-faint bg-surface-alt">
                         <th className="py-2.5 px-3 w-8">
                           <input
-                            hidden={cStatus === 'approved'}
                             type="checkbox"
                             checked={shownCompanies.length > 0 && shownCompanies.every((c) => selectedCompanyIds.has(c.id))}
                             onChange={toggleAllCompaniesSelected}
@@ -928,7 +940,6 @@ export default function AdminDashboardPage() {
                         <tr className="border-t border-border">
                           <td className="py-3 px-3">
                             <input
-                              hidden={cStatus === 'approved'}
                               type="checkbox"
                               checked={selectedCompanyIds.has(c.id)}
                               onChange={() => toggleCompanySelected(c.id)}
@@ -945,8 +956,8 @@ export default function AdminDashboardPage() {
                           </td>
                           <td className="py-3 px-3 tabular-nums">{c.taxCode}</td>
                           <td className="py-3 px-3 text-ink-faint">{c.industry ?? '—'}</td>
-                          <td className="py-3 px-3 whitespace-nowrap tabular-nums" title={c.createdAt ? formatDateTime(c.createdAt) : ''}>
-                            {c.createdAt ? formatDate(c.createdAt) : '—'}
+                          <td className="py-3 px-3 whitespace-nowrap tabular-nums" title={c.createdAt ? formatTimeDate(c.createdAt) : ''}>
+                            {c.createdAt ? formatTimeDate(c.createdAt) : '—'}
                             <div className="text-[10.5px] text-ink-faint">{ageText(c.createdAt)}</div>
                           </td>
                           <td className="py-3 px-4 text-right whitespace-nowrap">
@@ -1061,7 +1072,7 @@ export default function AdminDashboardPage() {
                             {o.servicePackage ? formatCurrency(o.servicePackage.price) : '—'}
                           </td>
                           <td className="py-3 px-3">{PAYMENT_METHOD_LABEL[o.paymentMethod] ?? o.paymentMethod}</td>
-                          <td className="py-3 px-3 tabular-nums whitespace-nowrap">{formatDate(o.createdAt)}</td>
+                          <td className="py-3 px-3 tabular-nums whitespace-nowrap">{formatTimeDate(o.createdAt)}</td>
                           <td className="py-3 px-4 text-right whitespace-nowrap">
                             <button
                               disabled={busyId === o.id}
@@ -1124,7 +1135,7 @@ function SourcedTabs({ token }: { token: string }) {
           </button>
         ))}
       </div>
-      {sub === 'companies' ? <><ImportInbox token={token} /><SourcedCompaniesCard token={token} /></> : <CvSourcingPanel token={token} />}
+      {sub === 'companies' ? <><SourcesPanel token={token} /><ImportInbox token={token} /><SourcedCompaniesCard token={token} /></> : <CvSourcingPanel token={token} />}
     </div>
   );
 }
@@ -1267,6 +1278,7 @@ function FeaturedEmployersCard({ token }: { token: string }) {
         {sel.size > 0 && (
           <div className="flex items-center gap-2 text-xs">
             <span className="text-ink-faint font-semibold">Đã chọn {sel.size}</span>
+            <BulkLogoSuggest token={token} companies={rows.filter((c) => sel.has(c.id))} onSave={async (id, url) => { patchRow(await adminApi.updateCompanyLogo(token, id, url)); }} />
             <button disabled={bulkBusy} onClick={() => bulk(true)} className="font-bold rounded-md bg-success-tint text-success px-2.5 py-1.5 disabled:opacity-50">⭐ Đánh dấu yêu thích tất cả đã chọn</button>
             <button disabled={bulkBusy} onClick={() => bulk(false)} className="font-bold rounded-md bg-critical-tint text-critical px-2.5 py-1.5 disabled:opacity-50">Bỏ đánh dấu tất cả đã chọn</button>
           </div>
@@ -1363,8 +1375,8 @@ function FeaturedEmployersCard({ token }: { token: string }) {
                         {STATUS_VI[c.approvalStatus ?? '']?.t ?? '—'}
                       </span>
                     </td>
-                    <td className="py-3 px-3 whitespace-nowrap tabular-nums" title={c.createdAt ? formatDateTime(c.createdAt) : ''}>
-                      {c.createdAt ? formatDate(c.createdAt) : '—'}
+                    <td className="py-3 px-3 whitespace-nowrap tabular-nums" title={c.createdAt ? formatTimeDate(c.createdAt) : ''}>
+                      {c.createdAt ? formatTimeDate(c.createdAt) : '—'}
                     </td>
                     <td className="py-3 px-4 text-right whitespace-nowrap">
                       <button
@@ -1514,6 +1526,7 @@ function SourcedCompaniesCard({ token }: { token: string }) {
     status: (c) => (c.claimedAt ? 1 : 0),
   }, { key: 'createdAt', dir: 'desc' });
   const [loading, setLoading] = useState(false);
+  const [logoSel, setLogoSel] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [claimRequests, setClaimRequests] = useState<CompanyClaimRequestRow[] | null>(null);
@@ -1636,10 +1649,27 @@ function SourcedCompaniesCard({ token }: { token: string }) {
         <div className="text-center text-ink-faint text-sm py-10">Chưa có công ty nguồn ngoài nào.</div>
       ) : (
         <div className="rounded-xl bg-white border border-border overflow-hidden">
+          {logoSel.size > 0 && (
+            <div className="flex items-center gap-2 flex-wrap text-xs px-3 py-2 border-b border-border bg-surface-alt">
+              <span className="text-ink-faint font-semibold">Đã chọn {logoSel.size}</span>
+              <BulkLogoSuggest
+                token={token}
+                companies={(companies ?? []).filter((c) => logoSel.has(c.id))}
+                onSave={async (id, url) => {
+                  const u = await adminApi.updateCompanyLogo(token, id, url);
+                  setCompanies((cur) => (cur ?? []).map((x) => (x.id === id ? { ...x, logoUrl: u.logoUrl } : x)));
+                }}
+              />
+              <button type="button" onClick={() => setLogoSel(new Set())} className="font-bold text-primary underline">Bỏ chọn</button>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-ink-faint bg-surface-alt">
+                  <th className="py-2.5 px-3 w-8">
+                    <input type="checkbox" aria-label="Chọn tất cả" checked={cs.rows.length > 0 && cs.rows.every((c) => logoSel.has(c.id))} onChange={() => setLogoSel((p) => (cs.rows.every((c) => p.has(c.id)) ? new Set() : new Set(cs.rows.map((c) => c.id))))} />
+                  </th>
                   <SortTh s={cs} k="name" className="py-2.5 px-4 font-semibold">Tên công ty</SortTh>
                   <SortTh s={cs} k="industry" className="py-2.5 px-3 font-semibold">Ngành nghề</SortTh>
                   <SortTh s={cs} k="website" className="py-2.5 px-3 font-semibold">Website</SortTh>
@@ -1653,6 +1683,9 @@ function SourcedCompaniesCard({ token }: { token: string }) {
               <tbody>
                 {cs.rows.map((c) => (
                   <tr key={c.id} className="border-t border-border align-top">
+                    <td className="py-3 px-3">
+                      <input type="checkbox" aria-label={`Chọn ${c.name}`} checked={logoSel.has(c.id)} onChange={() => setLogoSel((p) => { const n = new Set(p); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); return n; })} />
+                    </td>
                     <td className="py-3 px-4 font-bold">
                       <div className="flex items-center gap-2">
                         <CompanyLogo name={c.name} logoUrl={c.logoUrl} size={24} className="text-[9px] shrink-0" />
@@ -1671,8 +1704,8 @@ function SourcedCompaniesCard({ token }: { token: string }) {
                         '—'
                       )}
                     </td>
-                    <td className="py-3 px-3 text-ink-faint">{c.sourceLabel ?? '—'}</td>
-                    <td className="py-3 px-3 text-ink-muted whitespace-nowrap tabular-nums" title={c.createdAt ? formatDateTime(c.createdAt) : ''}>{c.createdAt ? formatDate(c.createdAt) : '—'}</td>
+                    <td className="py-3 px-3 text-ink-faint">{c.sourceUrl ? <SourceLink url={c.sourceUrl} /> : c.sourceLabel ?? '—'}</td>
+                    <td className="py-3 px-3 text-ink-muted whitespace-nowrap tabular-nums" title={c.createdAt ? formatTimeDate(c.createdAt) : ''}>{c.createdAt ? formatTimeDate(c.createdAt) : '—'}</td>
                     <td className="py-3 px-3 tabular-nums font-bold">{c.jobCount ?? 0}</td>
                     <td className="py-3 px-3">
                       {c.claimedAt ? (
@@ -1961,9 +1994,9 @@ function CompanyDetailPanel({
         ) : (
           <>
             <div className="text-xs text-ink-faint mb-3">
-              Nguồn: {data.company.sourceLabel ?? '—'} ·{' '}
+              Nguồn: {data.company.sourceUrl ? <SourceLink url={data.company.sourceUrl} /> : data.company.sourceLabel ?? '—'} ·{' '}
               {data.company.claimedAt ? (
-                <span className="text-success font-semibold">✓ Đã xác thực ({formatDate(data.company.claimedAt)})</span>
+                <span className="text-success font-semibold">✓ Đã xác thực ({formatTimeDate(data.company.claimedAt)})</span>
               ) : (
                 <span className="text-warning font-semibold">⚠ Chưa xác thực</span>
               )}
@@ -3039,7 +3072,7 @@ function AuditLogCard({ token }: { token: string }) {
                 <tbody>
                   {as.rows.map((row) => (
                     <tr key={row.id} className="border-t border-border align-top">
-                      <td className="py-3 px-4 tabular-nums whitespace-nowrap">{formatDateTime(row.createdAt)}</td>
+                      <td className="py-3 px-4 tabular-nums whitespace-nowrap">{formatTimeDate(row.createdAt)}</td>
                       <td className="py-3 px-3 text-ink-faint whitespace-nowrap">{row.adminEmail}</td>
                       <td className="py-3 px-3 font-bold whitespace-nowrap">
                         {AUDIT_ACTION_LABEL[row.action] ?? row.action}

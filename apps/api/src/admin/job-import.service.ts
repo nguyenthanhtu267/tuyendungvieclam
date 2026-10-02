@@ -94,7 +94,7 @@ export class JobImportService {
   }
 
   // Một link: đọc → so khớp công ty → lưu hàng chờ. quiet=true (quét email): link không đọc được thì KHÔNG lưu (đa số là link quảng cáo/hủy đăng ký).
-  async addOne(raw: string, opts: { quiet?: boolean; note?: string } = {}): Promise<{ url: string; result: 'new' | 'duplicate' | 'failed'; id?: string; message?: string }> {
+  async addOne(raw: string, opts: { quiet?: boolean; note?: string; meta?: Record<string, unknown> } = {}): Promise<{ url: string; result: 'new' | 'duplicate' | 'failed'; id?: string; message?: string }> {
     let url: string;
     try {
       await assertPublicHttpUrl(raw);
@@ -144,7 +144,7 @@ export class JobImportService {
       }
     }
     if (!ex.found && opts.quiet) return { url: finalUrl, result: 'failed', message: ex.warning };
-    const data = { ...(ex.data as Record<string, unknown>), ...(finalUrl !== url ? { rawUrl: url } : {}) };
+    const data = { ...(ex.data as Record<string, unknown>), ...(finalUrl !== url ? { rawUrl: url } : {}), ...(opts.meta ?? {}) };
     const match = ex.found ? await this.matchCompany(ex.data.companyName, ex.data.companyWebsite) : null;
     const row = await this.repo.save(
       this.repo.create({
@@ -255,6 +255,7 @@ export class JobImportService {
         logoUrl: d.companyLogo || undefined,
         industry: d.industry || undefined,
         sourceLabel: host ? `Tổng hợp từ ${host}` : undefined,
+        sourceUrl: row.sourceUrl,
       });
       company = created.company;
     }
@@ -324,6 +325,7 @@ export class JobImportService {
     const rows = await this.repo
       .createQueryBuilder('i')
       .where("i.status = 'pending'")
+      .andWhere("COALESCE(i.data->>'noAuto', 'false') <> 'true'")
       .andWhere("i.createdAt >= :since AND i.createdAt <= now() - make_interval(mins => :m)", { since, m: Math.round(minutes) })
       .orderBy('i.createdAt', 'ASC')
       .take(15)

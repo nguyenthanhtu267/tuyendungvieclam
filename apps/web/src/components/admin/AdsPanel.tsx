@@ -1,5 +1,6 @@
 'use client';
 
+import { formatTimeDate } from '@/lib/format';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiError, type AdCampaignRow, type AdStats } from '@/lib/api';
 import { adminAdsApi } from '@/lib/api-admin';
@@ -25,7 +26,7 @@ function pct(clicks: number, views: number) {
 }
 
 function fmtDate(iso: string | null) {
-  return iso ? new Date(iso).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : null;
+  return iso ? formatTimeDate(iso) : null;
 }
 
 export function AdsPanel({ token }: { token: string }) {

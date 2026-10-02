@@ -1,5 +1,7 @@
 'use client';
 
+import { WorkerCredsBox, useWorkerApply } from '@/components/labor/WorkerCreds';
+import { KIND_SLUG } from '@/lib/labor';
 import { ChannelChips } from '@/components/ChannelChips';
 import { useMatches } from '@/lib/match';
 import { Fragment, Suspense, useEffect, useRef, useState } from 'react';
@@ -474,6 +476,9 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
                 </a>
               )}
             </div>
+            {filters.channel && ['worker', 'student', 'intern'].includes(filters.channel) && (
+              <LaborFillBlock channel={filters.channel as 'worker' | 'student' | 'intern'} empty={!loading && !(listErr && !listErr.stale) && result?.items.length === 0} />
+            )}
             <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
               <div className="flex items-center gap-x-3 gap-y-1 flex-wrap min-w-0 flex-1">
                 {/* Đợt 91 — tiêu đề luôn chiếm riêng 1 dòng trên điện thoại: trước đây chữ tiêu đề đổi ("Đang tìm..." → "1.286 Tất cả việc làm") làm 2 nút lọc bên cạnh nhảy xuống dòng dưới → giật bố cục. */}
@@ -817,5 +822,22 @@ export default function JobSearchClient({ initial, initialFacets }: { initial: {
     <Suspense fallback={null}>
       <JobSearchPage initial={initial} initialFacets={initialFacets} />
     </Suspense>
+  );
+}
+
+
+// Đợt 145 — chọn kênh Công nhân / Sinh viên / Thực tập: luôn có khối "điền hồ sơ" ngay trên danh sách, dù có hay không có tin.
+function LaborFillBlock({ channel, empty }: { channel: 'worker' | 'student' | 'intern'; empty?: boolean }) {
+  const w = useWorkerApply();
+  const name = channel === 'worker' ? 'công nhân' : channel === 'student' ? 'sinh viên' : 'thực tập sinh';
+  return (
+    <div className="mb-3 flex flex-col gap-2">
+      {empty && (
+        <div className="rounded-xl border border-border bg-white p-4 text-[14px] text-ink">
+          <b>Chưa có tin {name} khớp bộ lọc hiện tại.</b> Hãy để lại hồ sơ 1 phút — khi có tin phù hợp, nhà tuyển dụng gần bạn sẽ gọi trực tiếp, bạn không cần quay lại tìm.
+        </div>
+      )}
+      <WorkerCredsBox w={w} slug={KIND_SLUG[channel]} />
+    </div>
   );
 }

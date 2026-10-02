@@ -1,0 +1,336 @@
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { JobSource, JobSourceKind } from '../database/entities/job-source.entity';
+import { JobImport } from '../database/entities/job-import.entity';
+import { JobPosting } from '../database/entities/job-posting.entity';
+import { JobImportService, normalizeSourceUrl } from './job-import.service';
+import { ADAPTERS, adapterById, detectSource, fetchHtml, sleep } from '../common/job-sources.util';
+import { normalizeSearchText } from '../common/search-text.util';
+
+// Đợt 147 — quét "Nguồn theo dõi". Mỗi lần chạy (cron ngoài / nút Quét ngay / bộ hẹn giờ trong máy chủ):
+//   1) Đọc danh sách: vòng đầu đọc hết các trang; các vòng sau (mỗi ~20 giờ) dừng sớm khi gặp trang toàn tin cũ.
+//   2) Tin mới → hàng đợi `queue` (đã loại trùng với Hộp nhập tin và tin đã đăng).
+//   3) Lấy tối đa BATCH tin từ hàng đợi → "Hộp nhập tin từ link" (Chờ xem). Phần còn lại để lần sau — chạy được trên Render miễn phí.
+const EVERY_MS = 10 * 60 * 1000;
+const REDISCOVER_MS = 20 * 60 * 60 * 1000;
+const PAGES_PER_RUN = 6;
+const BATCH = 20;
+const PAGE_DELAY_MS = 900;
+const JOB_DELAY_MS = 600;
+const RUN_BUDGET_MS = 110_000;
+const MAX_QUEUE = 3000;
+
+@Injectable()
+export class JobSourceService implements OnModuleInit, OnModuleDestroy {
+  private readonly log = new Logger(JobSourceService.name);
+  private timer?: ReturnType<typeof setInterval>;
+  private running = false;
+  private runningId: string | null = null;
+
+  constructor(
+    @InjectRepository(JobSource) private readonly repo: Repository<JobSource>,
+    @InjectRepository(JobImport) private readonly impRepo: Repository<JobImport>,
+    @InjectRepository(JobPosting) private readonly jobRepo: Repository<JobPosting>,
+    private readonly imports: JobImportService,
+  ) {}
+
+  onModuleInit() {
+    if (process.env.NODE_ENV === 'test') return;
+    this.timer = setInterval(() => {
+      this.runDue().catch(() => undefined);
+    }, EVERY_MS);
+  }
+  onModuleDestroy() {
+    if (this.timer) clearInterval(this.timer);
+  }
+
+  sites() {
+    return ADAPTERS.map((a) => ({ id: a.id, name: a.name, canSearch: !!a.searchUrl }));
+  }
+
+  async list() {
+    const rows = await this.repo.find({ order: { createdAt: 'DESC' } });
+    return {
+      running: this.running,
+      runningId: this.runningId,
+      cronKeySet: !!process.env.MAIL_CRON_KEY,
+      items: rows.map((r) => ({ ...r, queue: undefined, queued: (r.queue ?? []).length })),
+    };
+  }
+
+  // Đọc thử một link (chưa lưu): cho Admin thấy đọc được bao nhiêu tin trước khi thêm.
+  async preview(raw: string) {
+    const d = this.detect(raw);
+    const { html, finalUrl } = await this.fetchOrFail(d.listingUrl);
+    const p = d.adapter.parseList(html, finalUrl);
+    return {
+      site: d.site,
+      siteName: d.adapter.name,
+      kind: d.kind,
+      listingUrl: d.listingUrl,
+      label: this.labelFor(d.kind, p.title, d.label),
+      found: p.jobs.length,
+      total: p.total ?? null,
+      lastPage: p.lastPage ?? null,
+      sample: p.jobs.slice(0, 5),
+      trusted: d.site !== 'generic',
+      warning: p.jobs.length ? undefined : 'Không thấy link tin nào trong trang này — có thể trang chặn truy cập tự động hoặc cần bộ đọc riêng cho trang này.',
+    };
+  }
+
+  // Lỗi tải trang nguồn → báo 400 kèm lý do tiếng Việt (không để lộ thành lỗi máy chủ 500).
+  private async fetchOrFail(url: string) {
+    try {
+      return await fetchHtml(url);
+    } catch (e) {
+      throw new BadRequestException((e as Error).message || 'Không tải được trang nguồn');
+    }
+  }
+
+  private detect(raw: string) {
+    try {
+      return detectSource(raw);
+    } catch {
+      throw new BadRequestException('Link không hợp lệ');
+    }
+  }
+
+  private labelFor(kind: JobSourceKind, title?: string, hint?: string): string {
+    const t = (title || hint || '').replace(/\s+/g, ' ').trim();
+    const prefix = kind === 'company' ? 'Công ty' : kind === 'category' ? 'Ngành' : kind === 'keyword' ? 'Từ khoá' : 'Danh sách';
+    return (t ? `${prefix}: ${t}` : prefix).slice(0, 200);
+  }
+
+  async add(raw: string, opts: { autoPublish?: boolean; label?: string; maxPages?: number } = {}) {
+    const d = this.detect(raw);
+    // Đọc trang 1 để kiểm tra đọc được + lấy tên + tổng số tin; không đọc được thì vẫn cho thêm nhưng báo cảnh báo.
+    let title: string | undefined;
+    let total: number | undefined;
+    let warning: string | undefined;
+    try {
+      const { html, finalUrl } = await fetchHtml(d.listingUrl);
+      const p = d.adapter.parseList(html, finalUrl);
+      title = p.title;
+      total = p.total;
+      if (!p.jobs.length) warning = 'Đã lưu nhưng chưa thấy link tin nào trong trang này.';
+    } catch (e) {
+      warning = `Đã lưu nhưng lần đọc thử bị lỗi: ${(e as Error).message}`;
+    }
+    const url = d.listingUrl;
+    const exist = await this.repo.findOne({ where: { url } });
+    if (exist) throw new BadRequestException(`Nguồn này đã có: ${exist.label}`);
+    const row = await this.repo.save(
+      this.repo.create({
+        kind: d.kind,
+        site: d.site,
+        label: (opts.label?.trim() || this.labelFor(d.kind, title, d.label)).slice(0, 200),
+        url,
+        originalUrl: raw.trim() === url ? null : raw.trim(),
+        autoPublish: !!opts.autoPublish,
+        maxPages: Math.min(200, Math.max(1, Math.floor(opts.maxPages || 40))),
+        siteTotal: total ?? null,
+        queue: [],
+        cursorPage: 1,
+        discoveredAt: new Date(),
+        lastError: warning ?? null,
+      }),
+    );
+    return { item: row, warning };
+  }
+
+  async update(id: string, patch: { enabled?: boolean; autoPublish?: boolean; label?: string; maxPages?: number }) {
+    const r = await this.get(id);
+    if (typeof patch.enabled === 'boolean') r.enabled = patch.enabled;
+    if (typeof patch.autoPublish === 'boolean') r.autoPublish = patch.autoPublish;
+    if (patch.label?.trim()) r.label = patch.label.trim().slice(0, 200);
+    if (patch.maxPages) r.maxPages = Math.min(200, Math.max(1, Math.floor(patch.maxPages)));
+    return this.repo.save(r);
+  }
+
+  async setSiteEnabled(site: string, enabled: boolean) {
+    const res = await this.repo.update({ site }, { enabled });
+    return { updated: res.affected ?? 0 };
+  }
+
+  async remove(id: string) {
+    const r = await this.get(id);
+    await this.repo.delete(r.id);
+    return { ok: true };
+  }
+
+  private async get(id: string) {
+    const r = await this.repo.findOne({ where: { id } });
+    if (!r) throw new NotFoundException('Không tìm thấy nguồn theo dõi');
+    return r;
+  }
+
+  // Tìm công ty theo tên trên trang nguồn: trả về vài công ty khớp để Admin bấm chọn (không tự chọn thay Admin).
+  async searchCompany(site: string, q: string) {
+    const name = (q || '').trim();
+    if (name.length < 2) throw new BadRequestException('Nhập ít nhất 2 ký tự tên công ty');
+    const ad = adapterById(site);
+    if (!ad.searchUrl) throw new BadRequestException('Trang này chưa hỗ trợ tìm theo tên — hãy dán link công ty.');
+    const { html, finalUrl } = await this.fetchOrFail(ad.searchUrl(name));
+    const p = ad.parseList(html, finalUrl);
+    const tokens = normalizeSearchText(name).split(/\s+/).filter((t) => t.length > 1);
+    const score = (n: string) => {
+      const x = normalizeSearchText(n);
+      return tokens.filter((t) => x.includes(t)).length;
+    };
+    const items = p.employers
+      .map((e) => ({ ...e, score: score(e.name) }))
+      .filter((e) => e.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10)
+      .map((e) => {
+        const d = this.detect(e.url);
+        return { name: e.name, url: e.url, listingUrl: d.listingUrl };
+      });
+    return {
+      items,
+      note: items.length ? undefined : 'Không thấy công ty nào khớp tên này trên trang nguồn (công ty có thể chưa đăng tin). Thử tên ngắn hơn, hoặc dán link công ty.',
+    };
+  }
+
+  // ---- Quét ----
+  private async known(urls: string[]): Promise<Set<string>> {
+    if (!urls.length) return new Set();
+    const out = new Set<string>();
+    const imp: { u: string }[] = await this.impRepo.query(
+      `SELECT source_url AS u FROM job_imports WHERE source_url = ANY($1) UNION SELECT data->>'rawUrl' AS u FROM job_imports WHERE data->>'rawUrl' = ANY($1)`,
+      [urls],
+    );
+    for (const r of imp) out.add(r.u);
+    const jobs: { u: string }[] = await this.jobRepo.query(`SELECT source_url AS u FROM job_postings WHERE source_url = ANY($1)`, [urls]);
+    for (const r of jobs) out.add(r.u);
+    return out;
+  }
+
+  private norm(u: string): string {
+    try {
+      return normalizeSourceUrl(u);
+    } catch {
+      return u;
+    }
+  }
+
+  /** Quét một nguồn: đọc danh sách (tối đa PAGES_PER_RUN trang) rồi nhập một lô từ hàng đợi. */
+  async runSource(id: string, deadline = Date.now() + RUN_BUDGET_MS, force = false): Promise<{ id: string; found: number; added: number; queued: number; error?: string }> {
+    const src = await this.get(id);
+    const ad = adapterById(src.site);
+    let found = 0;
+    let added = 0;
+    let error: string | undefined;
+    const queue = new Set<string>(src.queue ?? []);
+    try {
+      // Bắt đầu vòng đọc mới khi đã xong vòng trước và quá ~20 giờ.
+      if (src.cursorPage === 0 && (force || !src.discoveredAt || Date.now() - src.discoveredAt.getTime() >= REDISCOVER_MS)) {
+        src.cursorPage = 1;
+        src.discoveredAt = new Date();
+      }
+      let pages = 0;
+      let nextLinks = new Map<number, string>();
+      while (src.cursorPage > 0 && pages < PAGES_PER_RUN && Date.now() < deadline) {
+        const page = src.cursorPage;
+        const pageUrl = nextLinks.get(page) ?? ad.pageUrl(src.url, page);
+        const { html, finalUrl } = await fetchHtml(pageUrl);
+        const p = ad.parseList(html, finalUrl);
+        pages++;
+        for (const [n, l] of p.pageLinks) nextLinks.set(n, l);
+        if (p.total) src.siteTotal = p.total;
+        const urls = Array.from(new Set(p.jobs.map((u) => this.norm(u))));
+        const known = await this.known(urls);
+        const fresh = urls.filter((u) => !known.has(u) && !queue.has(u));
+        found += urls.length;
+        for (const u of fresh) if (queue.size < MAX_QUEUE) queue.add(u);
+        src.totalFound += fresh.length;
+        const noJobs = urls.length === 0;
+        const allOld = fresh.length === 0 && src.cyclesDone > 0; // vòng sau: gặp trang toàn tin cũ → dừng sớm (danh sách xếp mới nhất trước)
+        const lastKnown = p.lastPage ? page >= p.lastPage && !nextLinks.has(page + 1) : false;
+        if (noJobs || allOld || lastKnown || page >= src.maxPages) {
+          src.cursorPage = 0;
+          src.cyclesDone += 1;
+        } else {
+          src.cursorPage = page + 1;
+        }
+        if (src.cursorPage > 0) await sleep(PAGE_DELAY_MS);
+      }
+
+      // Nhập một lô từ hàng đợi.
+      const batch = Array.from(queue).slice(0, BATCH);
+      for (const u of batch) {
+        if (Date.now() >= deadline) break;
+        queue.delete(u);
+        try {
+          const r = await this.imports.addOne(u, {
+            quiet: true,
+            note: `Nguồn theo dõi: ${src.label}`,
+            meta: { sourceId: src.id, ...(src.autoPublish ? {} : { noAuto: true }) },
+          });
+          if (r.result === 'new') added++;
+        } catch {
+          /* bỏ qua tin lỗi, vòng đọc sau sẽ thấy lại nếu còn */
+        }
+        await sleep(JOB_DELAY_MS);
+      }
+      src.lastError = null;
+    } catch (e) {
+      error = (e as Error).message;
+      src.lastError = error.slice(0, 500);
+    }
+    src.queue = Array.from(queue);
+    src.lastAdded = added;
+    src.totalAdded += added;
+    src.lastScanAt = new Date();
+    await this.repo.save(src);
+    return { id: src.id, found, added, queued: src.queue.length, error };
+  }
+
+  /** Nguồn nào cần chạy: đang đọc dở, còn hàng đợi, hoặc đã quá ~20 giờ kể từ vòng đọc trước. */
+  private async dueIds(): Promise<string[]> {
+    const rows = await this.repo.find({ where: { enabled: true }, order: { lastScanAt: 'ASC' } });
+    return rows
+      .filter((r) => r.cursorPage > 0 || (r.queue ?? []).length > 0 || !r.discoveredAt || Date.now() - r.discoveredAt.getTime() >= REDISCOVER_MS)
+      .map((r) => r.id);
+  }
+
+  async runDue(): Promise<{ sources: number; added: number }> {
+    if (this.running) return { sources: 0, added: 0 };
+    this.running = true;
+    const deadline = Date.now() + RUN_BUDGET_MS;
+    let n = 0;
+    let added = 0;
+    try {
+      for (const id of await this.dueIds()) {
+        if (Date.now() >= deadline) break;
+        this.runningId = id;
+        const r = await this.runSource(id, deadline).catch((e) => ({ added: 0, error: String(e) }));
+        added += r.added ?? 0;
+        n++;
+      }
+    } finally {
+      this.running = false;
+      this.runningId = null;
+    }
+    return { sources: n, added };
+  }
+
+  /** Chạy nền (trả về ngay). `id` có giá trị thì chỉ quét nguồn đó, kể cả khi chưa tới hạn. */
+  start(id?: string): { started: boolean; reason?: string } {
+    if (this.running) return { started: false, reason: 'Đang quét, vui lòng chờ.' };
+    if (id) {
+      this.running = true;
+      this.runningId = id;
+      this.runSource(id, Date.now() + RUN_BUDGET_MS, true)
+        .catch(() => undefined)
+        .finally(() => {
+          this.running = false;
+          this.runningId = null;
+        });
+      return { started: true };
+    }
+    this.runDue().catch(() => undefined);
+    return { started: true };
+  }
+}

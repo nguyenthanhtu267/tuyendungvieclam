@@ -28,6 +28,7 @@ import { ClaimCompanyDto } from './dto/claim-company.dto';
 import { ResolveClaimRequestDto } from './dto/resolve-claim-request.dto';
 import { JobImportService } from './job-import.service';
 import { MailScanService } from './mail-scan.service';
+import { JobSourceService } from './job-source.service';
 import { ExtractJobUrlDto } from './dto/extract-job-url.dto';
 import { UpdatePromoBadgeDto } from './dto/promo-badge.dto';
 
@@ -50,6 +51,7 @@ export class AdminController {
     private readonly adminService: AdminService,
     private readonly imports: JobImportService,
     private readonly mailScan: MailScanService,
+    private readonly sources: JobSourceService,
   ) {}
 
   @Get('dashboard')
@@ -233,6 +235,57 @@ export class AdminController {
   }
 
   // Đợt 120 — tự đọc email thông báo việc làm.
+  // Đợt 147 — Nguồn theo dõi (công ty / ngành nghề / từ khoá của trang tuyển dụng), quét tự động mỗi ngày.
+  @Get('job-sources')
+  sourcesList() {
+    return this.sources.list();
+  }
+
+  @Get('job-sources/sites')
+  sourcesSites() {
+    return this.sources.sites();
+  }
+
+  @Post('job-sources/preview')
+  sourcesPreview(@Body('url') url: string) {
+    return this.sources.preview(String(url || ''));
+  }
+
+  @Get('job-sources/search-company')
+  sourcesSearchCompany(@Query('site') site: string, @Query('q') q: string) {
+    return this.sources.searchCompany(String(site || 'careerviet'), String(q || ''));
+  }
+
+  @Post('job-sources')
+  sourcesAdd(@Body() b: { url: string; autoPublish?: boolean; label?: string; maxPages?: number }) {
+    return this.sources.add(String(b?.url || ''), { autoPublish: !!b?.autoPublish, label: b?.label, maxPages: b?.maxPages });
+  }
+
+  @Post('job-sources/run')
+  sourcesRunAll() {
+    return this.sources.start();
+  }
+
+  @Post('job-sources/site-enabled')
+  sourcesSiteEnabled(@Body() b: { site: string; enabled: boolean }) {
+    return this.sources.setSiteEnabled(String(b?.site || ''), !!b?.enabled);
+  }
+
+  @Post('job-sources/:id/run')
+  sourcesRun(@Param('id') id: string) {
+    return this.sources.start(id);
+  }
+
+  @Patch('job-sources/:id')
+  sourcesUpdate(@Param('id') id: string, @Body() b: { enabled?: boolean; autoPublish?: boolean; label?: string; maxPages?: number }) {
+    return this.sources.update(id, b ?? {});
+  }
+
+  @Delete('job-sources/:id')
+  sourcesRemove(@Param('id') id: string) {
+    return this.sources.remove(id);
+  }
+
   @Get('mail-scan')
   mailScanStatus() {
     return this.mailScan.status();
@@ -540,12 +593,33 @@ export class AdminController {
 // Bảo vệ bằng khoá bí mật MAIL_CRON_KEY (biến môi trường), sai khoá thì báo 404 như không tồn tại.
 @Controller('public/mail-scan')
 export class MailScanCronController {
-  constructor(private readonly mailScan: MailScanService) {}
+  constructor(
+    private readonly mailScan: MailScanService,
+    private readonly sources: JobSourceService,
+  ) {}
 
   @Get('run')
   run(@Query('key') key?: string) {
     if (!this.mailScan.checkCronKey(key)) throw new NotFoundException();
     this.mailScan.autoPublishTick().catch(() => undefined);
+    // Đợt 147 — cùng một lần gọi định kỳ cũng quét các "Nguồn theo dõi" đến hạn (khỏi cần tạo thêm cron).
+    this.sources.start();
     return this.mailScan.start();
+  }
+}
+
+// Đợt 147 — địa chỉ riêng chỉ để quét Nguồn theo dõi (dùng cùng khoá MAIL_CRON_KEY).
+@Controller('public/source-scan')
+export class SourceScanCronController {
+  constructor(
+    private readonly mailScan: MailScanService,
+    private readonly sources: JobSourceService,
+  ) {}
+
+  @Get('run')
+  run(@Query('key') key?: string) {
+    if (!this.mailScan.checkCronKey(key)) throw new NotFoundException();
+    this.mailScan.autoPublishTick().catch(() => undefined);
+    return this.sources.start();
   }
 }

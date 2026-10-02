@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { workersApi, type WorkerJobCard, type ApplyResult, type JobPosting, type LaborIncome, type WorkerKind } from '@/lib/api';
 import { KIND_LABEL, KIND_SLUG, PERK_LABEL, fmtM, slotText } from '@/lib/labor';
 import { ShareButtons } from './ShareButtons';
 import { GroupInvite } from './GroupInvite';
-import { WorkerCredsBox, useWorkerApply, whoOf } from './WorkerCreds';
+import { APPLY_BTN, WorkerCredsBox, fillHref, useWorkerApply, whoOf } from './WorkerCreds';
 import { LaborJobList, TrustBadge, introText } from './LaborJobList';
 import { interviewChecklist } from '@/lib/labor-extra';
 import { useSavedJobs } from './saved';
@@ -17,6 +18,7 @@ import { AnswerTips, FitBox, extraLines } from './JobExtraBlocks';
 export function LaborApplyPanel({ job, inviteCode }: { job: JobPosting; inviteCode?: string }) {
   const channel = job.channel as WorkerKind;
   const w = useWorkerApply();
+  const router = useRouter();
   const [msg, setMsg] = useState('');
   const [res, setRes] = useState<ApplyResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -36,6 +38,11 @@ export function LaborApplyPanel({ job, inviteCode }: { job: JobPosting; inviteCo
 
   async function go() {
     setMsg('');
+    // Đợt 145 — chưa có hồ sơ: mở form điền hồ sơ (điền xong tự nộp đơn cho tin này rồi quay lại).
+    if (!w.ready && !(w.isCandidate && w.mine === undefined)) {
+      router.push(fillHref(KIND_SLUG[channel], job.id));
+      return;
+    }
     setBusy(true);
     try {
       const r = await w.apply(job.id, invite?.valid ? inviteCode : undefined);
@@ -53,6 +60,14 @@ export function LaborApplyPanel({ job, inviteCode }: { job: JobPosting; inviteCo
       setBusy(false);
     }
   }
+  // Nút NỘP ĐƠN ỨNG TUYỂN ở cuối tin (JobDetailClient) bắn sự kiện này để dùng chung đúng một luồng.
+  const goRef = useRef(go);
+  goRef.current = go;
+  useEffect(() => {
+    const h = () => void goRef.current();
+    window.addEventListener('labor-apply-go', h);
+    return () => window.removeEventListener('labor-apply-go', h);
+  }, []);
   const who = whoOf(w);
   async function copyIntro() {
     if (!who) return;
@@ -141,14 +156,14 @@ export function LaborApplyPanel({ job, inviteCode }: { job: JobPosting; inviteCo
         </div>
       )}
 
-      {!filled && <WorkerCredsBox w={w} slug={KIND_SLUG[channel]} />}
+      {!filled && <WorkerCredsBox w={w} slug={KIND_SLUG[channel]} jobId={job.id} hideFill />}
       {!filled && <FitBox jobId={job.id} w={w} />}
       <div className="flex flex-wrap items-center gap-2">
         {filled ? (
           <span className="rounded-lg bg-surface-alt border border-border-strong font-extrabold text-ink px-4 py-2">Tin đã tuyển đủ người</span>
         ) : (
-          <button type="button" onClick={go} disabled={busy || !!res || !w.ready} className="tvl-btn-accent !w-auto px-6 disabled:!bg-ink-faint">
-            {res ? 'Đã ứng tuyển ✓' : busy ? 'Đang gửi…' : 'Ứng tuyển ngay'}
+          <button type="button" onClick={go} disabled={busy || !!res || (w.isCandidate && w.mine === undefined)} className={APPLY_BTN}>
+            {res ? 'Đã ứng tuyển ✓' : busy ? 'Đang gửi…' : 'Nộp đơn ứng tuyển'}
           </button>
         )}
         <button type="button" aria-pressed={saved.has(job.id)} onClick={() => saved.toggle(job.id)} className={`rounded-lg border font-bold text-[14px] px-3 py-2 ${saved.has(job.id) ? 'border-critical bg-critical-tint text-critical' : 'border-border-strong bg-white text-ink'}`}>

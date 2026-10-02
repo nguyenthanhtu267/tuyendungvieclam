@@ -227,6 +227,7 @@ export interface Company {
   // thực" khi isAdminSourced && !claimedAt (xem CompanyBadge trong components/CompanyLogo.tsx).
   isAdminSourced?: boolean;
   sourceLabel?: string;
+  sourceUrl?: string;
   claimedAt?: string;
   // Đợt 17 — chỉ có ở AdminApi.listSourcedCompanies() (số tin của công ty này, mọi trạng thái).
   jobCount?: number;
@@ -2823,4 +2824,17 @@ export interface MailScanStatus {
   running: boolean;
   lastAt: string | null;
   last: { at: string; mails: number; links: number; added: number; duplicates: number; skipped: number; error?: string } | null;
+}
+
+// Đợt 147 — Nguồn theo dõi (công ty / ngành nghề / từ khoá của trang tuyển dụng).
+export interface JobSourceRow {
+  id: string; kind: 'company' | 'category' | 'keyword' | 'list'; site: string; label: string; url: string; originalUrl?: string | null;
+  enabled: boolean; autoPublish: boolean; maxPages: number; cursorPage: number; cyclesDone: number; siteTotal?: number | null;
+  totalFound: number; totalAdded: number; lastAdded: number; lastScanAt?: string | null; discoveredAt?: string | null; lastError?: string | null;
+  createdAt: string; queued?: number;
+}
+export interface JobSourceList { running: boolean; runningId: string | null; cronKeySet: boolean; items: JobSourceRow[] }
+export interface JobSourcePreview {
+  site: string; siteName: string; kind: JobSourceRow['kind']; listingUrl: string; label: string; found: number; total: number | null;
+  lastPage: number | null; sample: string[]; trusted: boolean; warning?: string;
 }

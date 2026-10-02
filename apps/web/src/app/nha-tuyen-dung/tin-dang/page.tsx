@@ -1,5 +1,6 @@
 'use client';
 
+import { SourceLink } from '@/components/ui/SourceLink';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from '@/components/SmartLink';
@@ -141,7 +142,7 @@ export default function TinDangPage() {
                     <div className="text-[11.5px] text-ink-faint truncate">
                       {g.data.location ?? ''}
                       {g.data.salaryMin != null || g.data.salaryMax != null ? ` · ${g.data.salaryMin ?? '?'}–${g.data.salaryMax ?? '?'} triệu` : ''}
-                      <a href={g.sourceUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-primary font-semibold hover:underline">↗ Xem nguồn</a>
+                      <SourceLink url={g.sourceUrl} className="ml-2" />
                     </div>
                   </div>
                   <button type="button" disabled={suggBusy === g.id} onClick={() => handleSugg(g.id, true)} className="tvl-btn-primary !w-auto px-4 disabled:opacity-50">Nhận &amp; đăng</button>

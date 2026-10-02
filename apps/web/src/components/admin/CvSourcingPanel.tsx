@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, type CvCardDraftResponse, type CvQueueResponse, type CvShareStatus, type ProfileRequestRow, type RealProfileState, type SourcedProfileRow } from '@/lib/api';
 import { adminSourcingApi } from '@/lib/api-admin';
-import { formatDate, formatDateTime, formatNumber } from '@/lib/format';
+import { formatNumber, formatTimeDate } from '@/lib/format';
 import { Modal } from '@/components/profile/ui';
 import { CandidateDraftForm } from '@/components/cv/CandidateDraftForm';
 import { CvFileContent } from '@/components/cv/CvFileContent';
@@ -73,7 +73,7 @@ export function CvSourcingPanel({ token }: { token: string }) {
             Bật thì CV ứng viên nộp cho 1 NTD sẽ tự đăng lại thành hồ sơ “Nguồn tổng hợp” cho NTD khác sau 15 phút nếu Admin chưa
             duyệt/bỏ qua. Chỉ áp dụng cho CV nộp <b>sau lúc bật</b>. Công ty nhận CV gốc không thấy bản sao; ứng viên đã chặn công ty nào
             thì bản sao cũng chặn công ty đó.
-            {auto?.enabled && auto.enabledAt && <> Đang bật từ {formatDateTime(auto.enabledAt)}.</>}
+            {auto?.enabled && auto.enabledAt && <> Đang bật từ {formatTimeDate(auto.enabledAt)}.</>}
           </div>
         </div>
         <button
@@ -329,9 +329,9 @@ function QueueView({ token, onChanged }: { token: string; onChanged: () => void 
                       </span>
                     </td>
                     <td className="py-3 px-3 tabular-nums whitespace-nowrap">
-                      {formatDate(c.lastAppliedAt)}
+                      {formatTimeDate(c.lastAppliedAt)}
                       {c.shareDecidedAt && status !== 'pending' && (
-                        <div className="text-ink-faint">xử lý {formatDate(c.shareDecidedAt)}</div>
+                        <div className="text-ink-faint">xử lý {formatTimeDate(c.shareDecidedAt)}</div>
                       )}
                     </td>
                     <td className="py-3 px-4 text-right whitespace-nowrap">
@@ -600,7 +600,7 @@ function SourcedProfilesView({ token, onChanged }: { token: string; onChanged: (
                   </td>
                   <td className="py-3 px-3 text-ink-muted max-w-[240px] break-words">{p.sourceLabel ?? '—'}</td>
                   <td className="py-3 px-3 text-right tabular-nums">{formatNumber(p.unlockCount)}</td>
-                  <td className="py-3 px-3 tabular-nums whitespace-nowrap">{formatDate(p.createdAt)}</td>
+                  <td className="py-3 px-3 tabular-nums whitespace-nowrap">{formatTimeDate(p.createdAt)}</td>
                   <td className="py-3 px-4 text-right">
                     <button
                       disabled={busy === p.id}
@@ -731,7 +731,7 @@ function RequestsView({ token, onChanged }: { token: string; onChanged: () => vo
               {r.email}
               {r.phone ? ` · ${r.phone}` : ''}
             </span>
-            <span className="text-ink-faint ml-auto">{formatDateTime(r.createdAt)}</span>
+            <span className="text-ink-faint ml-auto">{formatTimeDate(r.createdAt)}</span>
           </div>
           {r.note && <div className="text-ink-muted italic">&quot;{r.note}&quot;</div>}
           {r.adminNote && status !== 'pending' && <div className="text-ink-faint">Ghi chú xử lý: {r.adminNote}</div>}

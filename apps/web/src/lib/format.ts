@@ -86,6 +86,18 @@ export function formatDateTime(dateStr?: string): string {
   return `${d.toLocaleDateString('vi-VN')} ${d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
+// Đợt 146 — Admin: giờ:phút ĐỨNG TRƯỚC ngày (VD "14:30 02/10/2026"), luôn theo giờ Việt Nam (UTC+7),
+// để cột ngày sắp xếp/đọc theo thời điểm chính xác.
+export function formatTimeDate(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return String(dateStr);
+  const tz = 'Asia/Ho_Chi_Minh';
+  const time = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz });
+  const day = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: tz });
+  return `${time} ${day}`;
+}
+
 // Đợt 14 (25/09/2026) — mục 5 danh sách lỗi: khối "mini dashboard" mới ở hero trang chủ cần hiện
 // "hoạt động gần đây" (tin mới đăng/cập nhật) theo kiểu thời gian tương đối ("5 phút trước") cho
 // cảm giác sống động hơn là ngày tháng tĩnh — formatDate()/formatDateTime() đã có nhưng không phù

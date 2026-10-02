@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, workersApi, type AdminWorkerDetail, type AdminWorkerRow, type WorkerKind } from '@/lib/api';
-import { formatDate, formatNumber, formatSalary } from '@/lib/format';
+import { formatDate, formatNumber, formatSalary, formatTimeDate } from '@/lib/format';
 import { CALL_LABEL, GENDER_LABEL, KIND_LABEL, LABOR_GROUPS, SHIFTS, placeText } from '@/lib/labor';
 import { PROVINCES } from '@/lib/catalogs';
 import { Combobox } from '@/components/ui/Combobox';
@@ -16,6 +16,11 @@ import { SortTh, useSort } from '@/components/ui/SortTh';
 // mời ứng tuyển, ẩn/hiện hồ sơ, xem lịch sử ứng tuyển + sổ gọi điện của NTD.
 type Q = { source?: string; q?: string; kind?: string; province?: string; group?: string; shift?: string; seeking?: string; hidden?: string; account?: string; tag?: string; stale?: string; sort?: string };
 
+const WCOLS: [string, string][] = [
+  ['phone', 'Điện thoại'], ['kind', 'Nhóm'], ['age', 'Tuổi · giới tính'], ['place', 'Nơi ở'], ['jobs', 'Việc muốn làm · ca'], ['status', 'Trạng thái'],
+  ['source', 'Nguồn'], ['apps', 'Số đơn'], ['calls', 'NTD gọi'], ['refreshedAt', 'Làm mới'], ['createdAt', 'Đăng ký'], ['tags', 'Thẻ / ghi chú'],
+];
+
 export function WorkerCandidatesPanel({ token, onCounts }: { token: string; onCounts?: (n: number) => void }) {
   const [f, setFilters] = useState<Q>({});
   const [qInput, setQInput] = useState('');
@@ -27,7 +32,27 @@ export function WorkerCandidatesPanel({ token, onCounts }: { token: string; onCo
     tags: (w: AdminWorkerRow) => w.tags.join(', '),
     status: (w: AdminWorkerRow) => (w.isHidden ? 'Đã ẩn' : w.isSeeking ? 'Đang tìm việc' : 'Tạm dừng'),
     apps: (w: AdminWorkerRow) => w.applications,
+    phone: (w: AdminWorkerRow) => w.phone,
+    kind: (w: AdminWorkerRow) => KIND_LABEL[w.kind],
+    age: (w: AdminWorkerRow) => w.age,
+    place: (w: AdminWorkerRow) => `${w.province} ${w.place}`,
+    source: (w: AdminWorkerRow) => (w.isSourced ? w.sourceLabel ?? 'Nguồn tổng hợp' : 'Tự đăng ký'),
+    calls: (w: AdminWorkerRow) => w.calls,
+    refreshedAt: (w: AdminWorkerRow) => new Date(w.refreshedAt),
+    createdAt: (w: AdminWorkerRow) => new Date(w.createdAt),
   });
+  // Đợt 146 — tách cột + chọn cột hiển thị (nhớ trong trình duyệt).
+  const [hidden, setHidden] = useState<string[]>([]);
+  useEffect(() => {
+    try { setHidden(JSON.parse(localStorage.getItem('tvl_admin_worker_cols') ?? '[]')); } catch { /* bỏ qua */ }
+  }, []);
+  const toggleCol = (k: string) =>
+    setHidden((h) => {
+      const n = h.includes(k) ? h.filter((x) => x !== k) : [...h, k];
+      try { localStorage.setItem('tvl_admin_worker_cols', JSON.stringify(n)); } catch { /* bỏ qua */ }
+      return n;
+    });
+  const show = (k: string) => !hidden.includes(k);
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -130,62 +155,98 @@ export function WorkerCandidatesPanel({ token, onCounts }: { token: string; onCo
           <button type="button" onClick={() => { setFilters({}); setQInput(''); setPage(1); }} className="text-xs font-bold text-primary underline">Xoá lọc</button>
         )}
       </div>
-      <div className="text-xs text-ink-faint">{data ? `${formatNumber(data.total)} hồ sơ` : ''}</div>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="text-xs text-ink-faint">{data ? `${formatNumber(data.total)} hồ sơ` : ''}</div>
+        <details className="relative text-xs">
+          <summary className="cursor-pointer list-none rounded-lg border border-border-strong bg-white px-2.5 py-1 font-bold text-ink">▦ Cột hiển thị</summary>
+          <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-border bg-white p-2 shadow-lg grid gap-1">
+            {WCOLS.map(([k, l]) => (
+              <label key={k} className="flex items-center gap-2 font-semibold text-ink">
+                <input type="checkbox" checked={show(k)} onChange={() => toggleCol(k)} /> {l}
+              </label>
+            ))}
+          </div>
+        </details>
+      </div>
       <div className="rounded-xl bg-white border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-ink-faint bg-surface-alt">
-                <SortTh s={ws} k="name" className="py-2.5 px-4 font-semibold">Người lao động</SortTh>
-                <SortTh s={ws} k="jobs" className="py-2.5 px-3 font-semibold">Việc muốn làm · ca</SortTh>
-                <SortTh s={ws} k="tags" className="py-2.5 px-3 font-semibold">Thẻ / ghi chú</SortTh>
-                <SortTh s={ws} k="status" className="py-2.5 px-3 font-semibold">Trạng thái</SortTh>
-                <SortTh s={ws} k="apps" align="right" className="py-2.5 px-3 font-semibold">Ứng tuyển · NTD gọi</SortTh>
-                <th className="py-2.5 px-4" />
+              <tr className="text-left text-ink-faint bg-surface-alt whitespace-nowrap">
+                <SortTh s={ws} k="name" className="py-2.5 px-3 font-semibold sticky left-0 z-10 bg-surface-alt">Người lao động</SortTh>
+                {show('phone') && <SortTh s={ws} k="phone" className="py-2.5 px-3 font-semibold">Điện thoại</SortTh>}
+                {show('kind') && <SortTh s={ws} k="kind" className="py-2.5 px-3 font-semibold">Nhóm</SortTh>}
+                {show('age') && <SortTh s={ws} k="age" align="right" className="py-2.5 px-3 font-semibold">Tuổi</SortTh>}
+                {show('place') && <SortTh s={ws} k="place" className="py-2.5 px-3 font-semibold">Nơi ở</SortTh>}
+                {show('jobs') && <SortTh s={ws} k="jobs" className="py-2.5 px-3 font-semibold">Việc muốn làm · ca</SortTh>}
+                {show('status') && <SortTh s={ws} k="status" className="py-2.5 px-3 font-semibold">Trạng thái</SortTh>}
+                {show('source') && <SortTh s={ws} k="source" className="py-2.5 px-3 font-semibold">Nguồn</SortTh>}
+                {show('apps') && <SortTh s={ws} k="apps" align="right" className="py-2.5 px-3 font-semibold">Số đơn</SortTh>}
+                {show('calls') && <SortTh s={ws} k="calls" align="right" className="py-2.5 px-3 font-semibold">NTD gọi</SortTh>}
+                {show('refreshedAt') && <SortTh s={ws} k="refreshedAt" className="py-2.5 px-3 font-semibold">Làm mới</SortTh>}
+                {show('createdAt') && <SortTh s={ws} k="createdAt" className="py-2.5 px-3 font-semibold">Đăng ký</SortTh>}
+                {show('tags') && <SortTh s={ws} k="tags" className="py-2.5 px-3 font-semibold">Thẻ / ghi chú</SortTh>}
+                <th className="py-2.5 px-3" />
               </tr>
             </thead>
             <tbody className={loading ? 'opacity-60' : ''}>
               {data?.items.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center text-ink-faint py-10">Không có hồ sơ nào phù hợp.</td>
+                  <td colSpan={14} className="text-center text-ink-faint py-10">Không có hồ sơ nào phù hợp.</td>
                 </tr>
               )}
               {ws.rows.map((w: AdminWorkerRow) => (
-                <tr key={w.id} className="border-t border-border align-top">
-                  <td className="py-3 px-4 min-w-[200px]">
+                <tr key={w.id} className="border-t border-border align-top group">
+                  <td className="py-3 px-3 min-w-[170px] sticky left-0 z-10 bg-white group-hover:bg-surface-alt">
                     <div className="font-bold flex items-center gap-1.5 flex-wrap">
                       {w.fullName}
-                      <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-primary-tint text-primary">{KIND_LABEL[w.kind]}</span>
                       {w.hasAccount && <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-success-tint text-success">Có tài khoản</span>}
-                      {w.isSourced && <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-warning-tint text-ink" title={w.sourceLabel ?? ''}>Nguồn tổng hợp</span>}
-                      {w.shareStatus && <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-info-tint text-info">{w.ownerCompany ? `${w.ownerCompany} · ` : ''}{w.shareStatus === 'shared' ? 'đã chia sẻ' : w.shareStatus === 'dismissed' ? 'bỏ qua' : 'chờ chia sẻ'}</span>}
                     </div>
-                    <div className="text-ink-faint">{[w.phone, `${GENDER_LABEL[w.gender] ?? ''} ${w.age} tuổi`.trim(), w.isSourced && w.sourceLabel ? `nguồn: ${w.sourceLabel}` : '', w.place && w.place !== 'Chưa rõ quận/huyện' ? `${w.place}, ${w.province}` : w.province].filter(Boolean).join(' · ')}</div>
                   </td>
-                  <td className="py-3 px-3 max-w-[220px]">
-                    <div>{w.desiredJobs.join(', ') || '—'}</div>
-                    {w.shifts.length > 0 && <div className="text-ink-faint">🕒 {w.shifts.join(', ')}</div>}
-                  </td>
-                  <td className="py-3 px-3 max-w-[200px]">
-                    <div className="flex flex-wrap gap-1">
-                      {w.tags.map((t) => (<span key={t} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-info-tint text-info">{t}</span>))}
-                    </div>
-                    {w.note && <div className="text-ink-faint mt-1 line-clamp-2">📝 {w.note}</div>}
-                  </td>
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    {w.isHidden ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-critical-tint text-critical">Đã ẩn</span>
-                    ) : w.isSeeking ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-success-tint text-success">Đang tìm việc</span>
-                    ) : (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-alt text-ink-muted">Tạm dừng</span>
-                    )}
-                    <div className="text-ink-faint mt-1">Làm mới {formatDate(w.refreshedAt)}</div>
-                  </td>
-                  <td className="py-3 px-3 text-right tabular-nums whitespace-nowrap">
-                    <span className="font-bold">{formatNumber(w.applications)}</span> · {formatNumber(w.calls)}
-                  </td>
-                  <td className="py-3 px-4 text-right">
+                  {show('phone') && <td className="py-3 px-3 whitespace-nowrap tabular-nums">{w.phone}</td>}
+                  {show('kind') && <td className="py-3 px-3 whitespace-nowrap"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary-tint text-primary">{KIND_LABEL[w.kind]}</span></td>}
+                  {show('age') && <td className="py-3 px-3 text-right tabular-nums whitespace-nowrap">{w.age ? `${w.age} · ${GENDER_LABEL[w.gender] ?? ''}`.replace(/ · $/, '') : '—'}</td>}
+                  {show('place') && <td className="py-3 px-3 min-w-[130px]">{w.place && w.place !== 'Chưa rõ quận/huyện' ? `${w.place}, ${w.province}` : w.province}</td>}
+                  {show('jobs') && (
+                    <td className="py-3 px-3 min-w-[150px] max-w-[220px]">
+                      <div>{w.desiredJobs.join(', ') || '—'}</div>
+                      {w.shifts.length > 0 && <div className="text-ink-faint">🕒 {w.shifts.join(', ')}</div>}
+                    </td>
+                  )}
+                  {show('status') && (
+                    <td className="py-3 px-3 whitespace-nowrap">
+                      {w.isHidden ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-critical-tint text-critical">Đã ẩn</span>
+                      ) : w.isSeeking ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-success-tint text-success">Đang tìm việc</span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-alt text-ink-muted">Tạm dừng</span>
+                      )}
+                    </td>
+                  )}
+                  {show('source') && (
+                    <td className="py-3 px-3 min-w-[110px]">
+                      {w.isSourced ? (
+                        <>
+                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-warning-tint text-ink" title={w.sourceLabel ?? ''}>Nguồn tổng hợp</span>
+                          {w.shareStatus && <div className="text-ink-faint mt-1">{w.ownerCompany ? `${w.ownerCompany} · ` : ''}{w.shareStatus === 'shared' ? 'đã chia sẻ' : w.shareStatus === 'dismissed' ? 'bỏ qua' : 'chờ chia sẻ'}</div>}
+                        </>
+                      ) : 'Tự đăng ký'}
+                    </td>
+                  )}
+                  {show('apps') && <td className="py-3 px-3 text-right tabular-nums font-bold">{formatNumber(w.applications)}</td>}
+                  {show('calls') && <td className="py-3 px-3 text-right tabular-nums">{formatNumber(w.calls)}</td>}
+                  {show('refreshedAt') && <td className="py-3 px-3 whitespace-nowrap tabular-nums text-ink-muted">{formatTimeDate(w.refreshedAt)}</td>}
+                  {show('createdAt') && <td className="py-3 px-3 whitespace-nowrap tabular-nums text-ink-muted">{formatTimeDate(w.createdAt)}</td>}
+                  {show('tags') && (
+                    <td className="py-3 px-3 min-w-[130px] max-w-[200px]">
+                      <div className="flex flex-wrap gap-1">
+                        {w.tags.map((t) => (<span key={t} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-info-tint text-info">{t}</span>))}
+                      </div>
+                      {w.note && <div className="text-ink-faint mt-1 line-clamp-2">📝 {w.note}</div>}
+                    </td>
+                  )}
+                  <td className="py-3 px-3 text-right">
                     <button onClick={() => setOpenId(w.id)} className="text-[11px] font-bold rounded-md bg-primary text-white px-3 py-1.5">Xem</button>
                   </td>
                 </tr>
@@ -266,7 +327,7 @@ function WorkerModal({ token, id, onClose, onChanged }: { token: string; id: str
             {(p.needsHousing || p.needsShuttle) && <div>Cần: {[p.needsHousing && 'chỗ ở', p.needsShuttle && 'xe đưa đón'].filter(Boolean).join(', ')}</div>}
             {p.school && <div>Trường: {p.school}{p.major ? ` · ${p.major}` : ''}</div>}
             <div className="text-ink-faint">
-              {p.isSeeking ? 'Đang tìm việc' : 'Tạm dừng tìm việc'} · làm mới {formatDate(p.refreshedAt)} · đăng ký {formatDate(p.createdAt)} · {p.hasAccount ? 'có tài khoản' : 'chưa có tài khoản'}
+              {p.isSeeking ? 'Đang tìm việc' : 'Tạm dừng tìm việc'} · làm mới {formatTimeDate(p.refreshedAt)} · đăng ký {formatTimeDate(p.createdAt)} · {p.hasAccount ? 'có tài khoản' : 'chưa có tài khoản'}
               {p.isHidden && ' · ĐANG BỊ ẨN'}
             </div>
             {p.isSourced && <div className="text-ink"><b>Nguồn tổng hợp</b>{p.sourceLabel ? ` — ${p.sourceLabel}` : ''}{p.shareStatus ? ` · kho riêng của một NTD (${p.shareStatus === 'shared' ? 'đã chia sẻ' : p.shareStatus === 'dismissed' ? 'bỏ qua' : 'chờ chia sẻ'})` : ''}</div>}
@@ -348,7 +409,7 @@ function WorkerModal({ token, id, onClose, onChanged }: { token: string; id: str
               d.applications.map((a) => (
                 <div key={a.id} className="flex justify-between gap-2">
                   <span><a href={`/viec-lam/${a.jobId}`} target="_blank" rel="noreferrer" className="font-bold hover:text-primary">{a.title}</a> — {a.company ?? '—'}</span>
-                  <span className="text-ink-faint whitespace-nowrap">{CALL_LABEL[a.status] ?? a.status} · {formatDate(a.createdAt)}</span>
+                  <span className="text-ink-faint whitespace-nowrap">{CALL_LABEL[a.status] ?? a.status} · {formatTimeDate(a.createdAt)}</span>
                 </div>
               ))
             )}
@@ -362,7 +423,7 @@ function WorkerModal({ token, id, onClose, onChanged }: { token: string; id: str
               d.calls.map((c, i) => (
                 <div key={i} className="flex justify-between gap-2">
                   <span><b>{c.company ?? '—'}</b>{c.jobTitle ? ` — ${c.jobTitle}` : ''}</span>
-                  <span className="text-ink-faint whitespace-nowrap">{CALL_LABEL[c.status] ?? c.status} · {formatDate(c.updatedAt)}</span>
+                  <span className="text-ink-faint whitespace-nowrap">{CALL_LABEL[c.status] ?? c.status} · {formatTimeDate(c.updatedAt)}</span>
                 </div>
               ))
             )}

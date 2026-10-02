@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, type StorageStatus } from '@/lib/api';
 import { adminStorageApi } from '@/lib/api-admin';
-import { formatDateTime, formatNumber } from '@/lib/format';
+import { formatNumber, formatTimeDate } from '@/lib/format';
 import { useAuth } from '@/lib/auth-context';
 
 // Đợt 20 (27/09/2026) — Admin "🗄️ Lưu trữ file": kết nối Google Drive của chủ web để lưu mọi file tải lên
@@ -150,7 +150,7 @@ export function StoragePanel({ token }: { token: string }) {
             {st.connected ? (
               <div className="text-[12px] text-success mt-0.5">
                 ✓ Đã kết nối {st.accountEmail ? <b>{st.accountEmail}</b> : ''}
-                {st.connectedAt ? <span className="text-ink-faint"> · từ {formatDateTime(st.connectedAt)}</span> : null}
+                {st.connectedAt ? <span className="text-ink-faint"> · từ {formatTimeDate(st.connectedAt)}</span> : null}
               </div>
             ) : (
               <div className="text-[12px] text-ink-muted mt-0.5">Chưa kết nối — file mới vẫn lưu trong cơ sở dữ liệu như trước.</div>

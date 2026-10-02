@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { ApiError, type AdminPersonDetail, type AdminPersonRow, type ProfileVisibility } from '@/lib/api';
 import { adminApi, adminPeopleApi } from '@/lib/api-admin';
-import { formatDate, formatNumber } from '@/lib/format';
+import { formatNumber, formatTimeDate } from '@/lib/format';
 import { INDUSTRIES, PROVINCES } from '@/lib/catalogs';
 import { Modal } from '@/components/profile/ui';
 import { startImpersonation } from '@/lib/impersonation';
@@ -166,7 +166,7 @@ export function PeoplePanel({ token }: { token: string }) {
                     <td className="py-3 px-3">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${st.cls}`}>{st.label}</span>
                     </td>
-                    <td className="py-3 px-3 tabular-nums whitespace-nowrap">{formatDate(u.createdAt)}</td>
+                    <td className="py-3 px-3 tabular-nums whitespace-nowrap">{formatTimeDate(u.createdAt)}</td>
                     <td className="py-3 px-4 text-right">
                       <button
                         onClick={() => setOpenId(u.id)}
@@ -387,7 +387,7 @@ function PersonModal({
             </div>
             <div className="flex items-center justify-between mt-2 text-ink-faint">
               <span>
-                {ROLE_LABEL[d.user.role] ?? d.user.role} · tạo ngày {formatDate(d.user.createdAt)}
+                {ROLE_LABEL[d.user.role] ?? d.user.role} · tạo ngày {formatTimeDate(d.user.createdAt)}
               </span>
               <button
                 disabled={!!busy || (!!isAdminTarget && !iAmAdmin)}

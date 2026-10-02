@@ -34,4 +34,10 @@ export class CreateDraftCompanyDto {
   @IsString()
   @MaxLength(200)
   sourceLabel?: string;
+
+  // Đợt 145 — link gốc của nguồn để bấm "Nguồn tại đây".
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  sourceUrl?: string;
 }

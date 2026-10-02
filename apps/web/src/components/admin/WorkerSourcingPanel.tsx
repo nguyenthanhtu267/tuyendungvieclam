@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiError, workersApi, type PhoneViewRow, type ShareQueueRow } from '@/lib/api';
-import { formatDate, formatNumber } from '@/lib/format';
+import { formatNumber, formatTimeDate } from '@/lib/format';
 import { KIND_LABEL } from '@/lib/labor';
 import { SourcedEditor } from '@/components/labor/SourcedEditor';
 import { Pager } from './CvSourcingPanel';
@@ -103,7 +103,7 @@ function QueueTab({ token, onChanged }: { token: string; onChanged: () => void }
           <input type="checkbox" checked={!!data?.auto.enabled} disabled={busy || !data} onChange={(e) => toggleAuto(e.target.checked)} />
           Tự động chia sẻ sau {data?.auto.minutes ?? 15} phút
         </label>
-        <span className="text-xs text-ink-faint">{data?.auto.enabled ? `Đang bật${data.auto.enabledAt ? ` từ ${formatDate(data.auto.enabledAt)}` : ''} — chỉ áp dụng hồ sơ tạo SAU lúc bật.` : 'Đang tắt — bạn duyệt tay.'}</span>
+        <span className="text-xs text-ink-faint">{data?.auto.enabled ? `Đang bật${data.auto.enabledAt ? ` từ ${formatTimeDate(data.auto.enabledAt)}` : ''} — chỉ áp dụng hồ sơ tạo SAU lúc bật.` : 'Đang tắt — bạn duyệt tay.'}</span>
       </div>
       <div role="tablist" className="flex gap-1.5 flex-wrap text-xs">
         {([['pending', 'Chờ duyệt'], ['shared', 'Đã chia sẻ'], ['dismissed', 'Bỏ qua']] as const).map(([k, l]) => (
@@ -145,7 +145,7 @@ function QueueTab({ token, onChanged }: { token: string; onChanged: () => void }
                   </td>
                   <td className="py-2.5 px-2 max-w-[14rem]">{r.desiredJobs.join(', ') || '—'}</td>
                   <td className="py-2.5 px-2 min-w-[8rem]">{r.company ?? '—'}</td>
-                  <td className="py-2.5 px-2 whitespace-nowrap text-ink-faint">{formatDate(r.createdAt)}</td>
+                  <td className="py-2.5 px-2 whitespace-nowrap text-ink-faint">{formatTimeDate(r.createdAt)}</td>
                   <td className="py-2.5 px-3 text-right whitespace-nowrap">
                     {status === 'pending' && (
                       <>
@@ -204,7 +204,7 @@ function ViewsTab({ token }: { token: string }) {
               {data?.items.length === 0 && (<tr><td colSpan={4} className="text-center text-ink-faint py-8">Chưa có lượt xem số nào.</td></tr>)}
               {vs.rows.map((v: PhoneViewRow) => (
                 <tr key={v.id} className="border-t border-border align-top">
-                  <td className="py-2.5 px-3 whitespace-nowrap">{new Date(v.viewedAt).toLocaleString('vi-VN')}</td>
+                  <td className="py-2.5 px-3 whitespace-nowrap">{formatTimeDate(v.viewedAt)}</td>
                   <td className="py-2.5 px-2 min-w-[10rem]"><div className="font-bold">{v.company ?? '—'}</div><div className="text-ink-faint break-all">{v.userEmail ?? ''}</div></td>
                   <td className="py-2.5 px-2 min-w-[10rem]">{v.fullName ?? '(đã gỡ)'} <span className="text-ink-faint">· {v.phone ?? ''}</span></td>
                   <td className="py-2.5 px-3 text-ink-faint">{v.sourceLabel ?? '—'}</td>

@@ -135,6 +135,10 @@ export class Company {
   @Column({ name: 'source_label', nullable: true })
   sourceLabel?: string;
 
+  // Đợt 145 — link gốc của nguồn (trang tin/công ty đã đọc) để bấm "Nguồn tại đây" khi cần đối chiếu.
+  @Column({ name: 'source_url', type: 'varchar', length: 500, nullable: true })
+  sourceUrl?: string;
+
   // Thời điểm công ty thật "nhận lại" tài khoản — null nghĩa là vẫn đang ở trạng thái "chưa xác thực".
   @Column({ name: 'claimed_at', type: 'timestamp', nullable: true })
   claimedAt?: Date;

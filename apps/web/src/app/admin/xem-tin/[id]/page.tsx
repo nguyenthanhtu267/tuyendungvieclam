@@ -13,7 +13,7 @@ import { useAuth } from '@/lib/auth-context';
 import { RichTextView } from '@/components/RichTextView';
 import { ApiError, type JobPosting } from '@/lib/api';
 import { adminApi } from '@/lib/api-admin';
-import { formatDate, formatSalary } from '@/lib/format';
+import { formatDate, formatSalary, formatTimeDate } from '@/lib/format';
 import { benefitsRichTextValue } from '@/lib/richtext';
 import { scanJobContent } from '@/lib/content-moderation';
 import { JOB_REJECTION_REASONS } from '@/lib/catalogs';
@@ -156,7 +156,7 @@ export default function AdminJobReviewPage() {
                   edit={job && !done ? <BlockEditLink jobId={params.id} step={2} /> : undefined}
                 />
                 <Detail label="👥 Số lượng" value={String(job.headcount)} />
-                <Detail label="🕒 Gửi lúc" value={formatDate(job.createdAt)} />
+                <Detail label="🕒 Gửi lúc" value={formatTimeDate(job.createdAt)} />
               </div>
 
               <div className="mb-4">

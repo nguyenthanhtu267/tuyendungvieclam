@@ -4,7 +4,7 @@ import { Combobox } from '@/components/ui/Combobox';
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, type AdminCandidateDetail, type AdminCandidateQuery, type AdminCandidateRow, type ProfileVisibility, type SuggestedJob } from '@/lib/api';
 import { adminCandidatesApi } from '@/lib/api-admin';
-import { APPLICATION_STATUS_LABEL, formatDate, formatNumber, formatSalary } from '@/lib/format';
+import { APPLICATION_STATUS_LABEL, formatNumber, formatSalary, formatTimeDate } from '@/lib/format';
 import { PROVINCES } from '@/lib/catalogs';
 import { Modal } from '@/components/profile/ui';
 import { Pager } from './CvSourcingPanel';
@@ -23,6 +23,12 @@ const VIS: Record<ProfileVisibility, { label: string; cls: string }> = {
   urgent: { label: 'Tìm việc gấp', cls: 'bg-accent/10 text-accent' },
   locked: { label: 'Khoá', cls: 'bg-critical-tint text-critical' },
 };
+
+const COLS: [string, string][] = [
+  ['phone', 'Điện thoại'], ['email', 'Email'], ['position', 'Chức danh'], ['province', 'Tỉnh/TP'], ['exp', 'Kinh nghiệm'],
+  ['completion', 'Hoàn thiện'], ['visibility', 'Chế độ hồ sơ'], ['account', 'Tài khoản'], ['applications', 'Số đơn'],
+  ['lastApplied', 'Ứng tuyển gần nhất'], ['updatedAt', 'Cập nhật'], ['tags', 'Thẻ / ghi chú'],
+];
 
 export function CandidatesPanel({ token, embedded = false }: { token: string; embedded?: boolean }) {
   const [filters, setFilters] = useState<AdminCandidateQuery>({});
@@ -76,7 +82,28 @@ export function CandidatesPanel({ token, embedded = false }: { token: string; em
     tags: (c) => c.tags.join(', '),
     visibility: (c) => VIS[c.visibility]?.label ?? c.visibility,
     applications: (c) => c.applicationCount,
+    phone: (c) => c.phone,
+    email: (c) => c.contactEmail ?? c.email,
+    position: (c) => c.profileTitle ?? c.desiredPosition,
+    province: (c) => c.province,
+    exp: (c) => c.yearsOfExperience,
+    completion: (c) => c.completionPercent,
+    account: (c) => (c.userStatus === 'suspended' ? 'Bị khoá' : 'Hoạt động'),
+    lastApplied: (c) => (c.lastAppliedAt ? new Date(c.lastAppliedAt) : null),
+    updatedAt: (c) => (c.updatedAt ? new Date(c.updatedAt) : null),
   });
+  // Đợt 146 — chọn cột hiển thị (nhớ trong trình duyệt); mặc định hiện đủ các cột chính.
+  const [hidden, setHidden] = useState<string[]>([]);
+  useEffect(() => {
+    try { setHidden(JSON.parse(localStorage.getItem('tvl_admin_cand_cols') ?? '[]')); } catch { /* bỏ qua */ }
+  }, []);
+  const toggleCol = (k: string) =>
+    setHidden((h) => {
+      const n = h.includes(k) ? h.filter((x) => x !== k) : [...h, k];
+      try { localStorage.setItem('tvl_admin_cand_cols', JSON.stringify(n)); } catch { /* bỏ qua */ }
+      return n;
+    });
+  const show = (k: string) => !hidden.includes(k);
 
   return (
     <div className="flex flex-col gap-3">
@@ -147,67 +174,98 @@ export function CandidatesPanel({ token, embedded = false }: { token: string; em
           </button>
         )}
       </div>
-      <div className="text-xs text-ink-faint">{data ? `${formatNumber(data.total)} hồ sơ` : ''}</div>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="text-xs text-ink-faint">{data ? `${formatNumber(data.total)} hồ sơ` : ''}</div>
+        <details className="relative text-xs">
+          <summary className="cursor-pointer list-none rounded-lg border border-border-strong bg-white px-2.5 py-1 font-bold text-ink">▦ Cột hiển thị</summary>
+          <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-border bg-white p-2 shadow-lg grid gap-1">
+            {COLS.map(([k, l]) => (
+              <label key={k} className="flex items-center gap-2 font-semibold text-ink">
+                <input type="checkbox" checked={show(k)} onChange={() => toggleCol(k)} /> {l}
+              </label>
+            ))}
+          </div>
+        </details>
+      </div>
       <div className="rounded-xl bg-white border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-ink-faint bg-surface-alt">
-                <SortTh s={cs} k="name" className="py-2.5 px-4 font-semibold">Ứng viên</SortTh>
-                <SortTh s={cs} k="tags" className="py-2.5 px-3 font-semibold">Thẻ / ghi chú</SortTh>
-                <SortTh s={cs} k="visibility" className="py-2.5 px-3 font-semibold">Hồ sơ</SortTh>
-                <SortTh s={cs} k="applications" align="right" className="py-2.5 px-3 font-semibold">Ứng tuyển</SortTh>
-                <th className="py-2.5 px-4" />
+              <tr className="text-left text-ink-faint bg-surface-alt whitespace-nowrap">
+                <SortTh s={cs} k="name" className="py-2.5 px-3 font-semibold sticky left-0 z-10 bg-surface-alt">Ứng viên</SortTh>
+                {show('phone') && <SortTh s={cs} k="phone" className="py-2.5 px-3 font-semibold">Điện thoại</SortTh>}
+                {show('email') && <SortTh s={cs} k="email" className="py-2.5 px-3 font-semibold">Email</SortTh>}
+                {show('position') && <SortTh s={cs} k="position" className="py-2.5 px-3 font-semibold">Chức danh</SortTh>}
+                {show('province') && <SortTh s={cs} k="province" className="py-2.5 px-3 font-semibold">Tỉnh/TP</SortTh>}
+                {show('exp') && <SortTh s={cs} k="exp" align="right" className="py-2.5 px-3 font-semibold">Kinh nghiệm</SortTh>}
+                {show('completion') && <SortTh s={cs} k="completion" align="right" className="py-2.5 px-3 font-semibold">Hoàn thiện</SortTh>}
+                {show('visibility') && <SortTh s={cs} k="visibility" className="py-2.5 px-3 font-semibold">Hồ sơ</SortTh>}
+                {show('account') && <SortTh s={cs} k="account" className="py-2.5 px-3 font-semibold">Tài khoản</SortTh>}
+                {show('applications') && <SortTh s={cs} k="applications" align="right" className="py-2.5 px-3 font-semibold">Số đơn</SortTh>}
+                {show('lastApplied') && <SortTh s={cs} k="lastApplied" className="py-2.5 px-3 font-semibold">Ứng tuyển gần nhất</SortTh>}
+                {show('updatedAt') && <SortTh s={cs} k="updatedAt" className="py-2.5 px-3 font-semibold">Cập nhật</SortTh>}
+                {show('tags') && <SortTh s={cs} k="tags" className="py-2.5 px-3 font-semibold">Thẻ / ghi chú</SortTh>}
+                <th className="py-2.5 px-3" />
               </tr>
             </thead>
             <tbody className={loading ? 'opacity-60' : ''}>
               {data?.items.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="text-center text-ink-faint py-10">
+                  <td colSpan={14} className="text-center text-ink-faint py-10">
                     Không có hồ sơ nào phù hợp.
                   </td>
                 </tr>
               )}
               {cs.rows.map((c) => (
-                <tr key={c.id} className="border-t border-border align-top">
-                  <td className="py-3 px-4 min-w-[220px]">
+                <tr key={c.id} className="border-t border-border align-top group">
+                  <td className="py-3 px-3 min-w-[170px] sticky left-0 z-10 bg-white group-hover:bg-surface-alt">
                     <div className="font-bold flex items-center gap-1.5 flex-wrap">
                       {c.fullName}
                       {c.isAdminSourced && (
                         <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-warning-tint text-warning">Nguồn tổng hợp</span>
                       )}
-                      {c.userStatus === 'suspended' && (
-                        <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-critical-tint text-critical">TK bị khoá</span>
+                    </div>
+                  </td>
+                  {show('phone') && <td className="py-3 px-3 whitespace-nowrap tabular-nums">{c.phone ?? '—'}</td>}
+                  {show('email') && <td className="py-3 px-3 whitespace-nowrap">{c.contactEmail ?? c.email ?? "—"}</td>}
+                  {show('position') && <td className="py-3 px-3 min-w-[150px] text-primary font-semibold">{c.profileTitle ?? c.desiredPosition ?? 'Chưa có chức danh'}</td>}
+                  {show('province') && <td className="py-3 px-3 whitespace-nowrap">{c.province ?? '—'}</td>}
+                  {show('exp') && <td className="py-3 px-3 text-right tabular-nums whitespace-nowrap">{c.yearsOfExperience != null ? `${c.yearsOfExperience} năm` : '—'}</td>}
+                  {show('completion') && (
+                    <td className="py-3 px-3 text-right tabular-nums whitespace-nowrap">
+                      <span className={`font-bold ${c.completionPercent >= 80 ? 'text-success' : c.completionPercent >= 50 ? 'text-ink' : 'text-warning'}`}>{formatNumber(c.completionPercent)}%</span>
+                    </td>
+                  )}
+                  {show('visibility') && (
+                    <td className="py-3 px-3 whitespace-nowrap">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${VIS[c.visibility]?.cls ?? ''}`}>
+                        {VIS[c.visibility]?.label ?? c.visibility}
+                      </span>
+                    </td>
+                  )}
+                  {show('account') && (
+                    <td className="py-3 px-3 whitespace-nowrap">
+                      {c.userStatus === 'suspended' ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-critical-tint text-critical">Bị khoá</span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-success-tint text-success">Hoạt động</span>
                       )}
-                    </div>
-                    <div className="text-primary font-semibold">{c.profileTitle ?? c.desiredPosition ?? 'Chưa có chức danh'}</div>
-                    <div className="text-ink-faint">
-                      {[c.phone, c.contactEmail ?? c.email, c.province, c.yearsOfExperience != null ? `${c.yearsOfExperience} năm KN` : null]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </div>
-                  </td>
-                  <td className="py-3 px-3 max-w-[220px]">
-                    <div className="flex flex-wrap gap-1">
-                      {c.tags.map((t) => (
-                        <span key={t} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-info-tint text-info">
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                    {c.note && <div className="text-ink-faint mt-1 line-clamp-2">📝 {c.note}</div>}
-                  </td>
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${VIS[c.visibility]?.cls ?? ''}`}>
-                      {VIS[c.visibility]?.label ?? c.visibility}
-                    </span>
-                    <div className="text-ink-faint mt-1">Hoàn thiện {formatNumber(c.completionPercent)}%</div>
-                  </td>
-                  <td className="py-3 px-3 text-right tabular-nums whitespace-nowrap">
-                    <div className="font-bold">{formatNumber(c.applicationCount)}</div>
-                    {c.lastAppliedAt && <div className="text-ink-faint">{formatDate(c.lastAppliedAt)}</div>}
-                  </td>
-                  <td className="py-3 px-4 text-right">
+                    </td>
+                  )}
+                  {show('applications') && <td className="py-3 px-3 text-right tabular-nums font-bold">{formatNumber(c.applicationCount)}</td>}
+                  {show('lastApplied') && <td className="py-3 px-3 whitespace-nowrap tabular-nums text-ink-muted">{c.lastAppliedAt ? formatTimeDate(c.lastAppliedAt) : '—'}</td>}
+                  {show('updatedAt') && <td className="py-3 px-3 whitespace-nowrap tabular-nums text-ink-muted">{c.updatedAt ? formatTimeDate(c.updatedAt) : '—'}</td>}
+                  {show('tags') && (
+                    <td className="py-3 px-3 min-w-[140px] max-w-[220px]">
+                      <div className="flex flex-wrap gap-1">
+                        {c.tags.map((t) => (
+                          <span key={t} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-info-tint text-info">{t}</span>
+                        ))}
+                      </div>
+                      {c.note && <div className="text-ink-faint mt-1 line-clamp-2">📝 {c.note}</div>}
+                    </td>
+                  )}
+                  <td className="py-3 px-3 text-right">
                     <button onClick={() => setOpenId(c.id)} className="text-[11px] font-bold rounded-md bg-primary text-white px-3 py-1.5">
                       Xem
                     </button>
@@ -298,9 +356,9 @@ function CandidateModal({ token, id, onClose, onChanged }: { token: string; id: 
                   .join(' · ')}
               </div>
               <div className="text-ink-faint">
-                {VIS[d.visibility]?.label} · hoàn thiện {formatNumber(d.completionPercent)}% · cập nhật {formatDate(d.updatedAt)}
+                {VIS[d.visibility]?.label} · hoàn thiện {formatNumber(d.completionPercent)}% · cập nhật {formatTimeDate(d.updatedAt)}
                 {d.isAdminSourced && ` · Nguồn tổng hợp (${d.sourceLabel ?? '—'})`}
-                {d.claimedAt && ` · Đã được người thật nhận lại ${formatDate(d.claimedAt)}`}
+                {d.claimedAt && ` · Đã được người thật nhận lại ${formatTimeDate(d.claimedAt)}`}
               </div>
               {s.experiences.length > 0 && (
                 <div className="mt-1">
@@ -403,7 +461,7 @@ function CandidateModal({ token, id, onClose, onChanged }: { token: string; id: 
                     <b>{a.jobTitle}</b> — {a.companyName}
                   </span>
                   <span className="text-ink-faint whitespace-nowrap">
-                    {APPLICATION_STATUS_LABEL[a.status] ?? a.status} · {formatDate(a.appliedAt)}
+                    {APPLICATION_STATUS_LABEL[a.status] ?? a.status} · {formatTimeDate(a.appliedAt)}
                   </span>
                 </div>
               ))

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from '@/components/SmartLink';
 import { ApiError, type AnalyticsBehavior, type AnalyticsContent, type AnalyticsDimRow, type AnalyticsHeatmap, type AnalyticsOverview, type AnalyticsRealtime } from '@/lib/api';
 import { adminAnalyticsApi } from '@/lib/api-admin';
-import { formatDateTime, formatNumber } from '@/lib/format';
+import { formatNumber, formatTimeDate } from '@/lib/format';
 import { BarList, ColumnChart, Kpi, LineChart, SERIES, WeekHourGrid, fmtDay, fmtDuration, pct } from './analytics/charts';
 import { VitalsCard } from './VitalsCard';
 import { SortTh, useSort, type SortApi } from '@/components/ui/SortTh';
@@ -378,7 +378,7 @@ function RealtimeCard({ token }: { token: string }) {
           {rt.recentActions.length === 0 && <li className="py-2 text-ink-faint">Chưa có hành động nào.</li>}
           {rt.recentActions.map((a, i) => (
             <li key={i} className="py-1.5 flex flex-wrap gap-x-2">
-              <span className="text-ink-faint tabular-nums">{formatDateTime(a.at)}</span>
+              <span className="text-ink-faint tabular-nums">{formatTimeDate(a.at)}</span>
               <b className="text-ink">{EVENT_LABEL[a.type] ?? a.type}</b>
               <span className="text-ink-muted">
                 {a.jobTitle ? `· ${a.jobTitle}` : a.companyName ? `· ${a.companyName}` : ''}
@@ -881,7 +881,7 @@ function Behavior({ d }: { d: AnalyticsBehavior }) {
               <td className={tdr}>{formatNumber(u.views)}</td>
               <td className={tdr}>{formatNumber(u.sessions)}</td>
               <td className={tdr}>{fmtDuration(u.totalTimeMs)}</td>
-              <td className={tdr}>{formatDateTime(u.lastSeen)}</td>
+              <td className={tdr}>{formatTimeDate(u.lastSeen)}</td>
             </tr>
           ))}
           {!d.topUsers.length && (

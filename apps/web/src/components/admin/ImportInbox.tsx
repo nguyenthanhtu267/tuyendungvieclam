@@ -1,5 +1,6 @@
 'use client';
 
+import { SourceLink } from '@/components/ui/SourceLink';
 import { useCallback, useEffect, useState } from 'react';
 import { API_URL, ApiError, type JobImportRow, type JobImportData, type MailScanStatus } from '@/lib/api';
 import { adminApi } from '@/lib/api-admin';
@@ -7,7 +8,7 @@ import { SearchSelect } from './SearchSelect';
 import { ChannelChips, CHANNEL_ICON, CHANNEL_LABEL } from '@/components/ChannelChips';
 import { LABOR_GROUPS } from '@/lib/labor';
 import { INDUSTRIES, EXPERIENCE_LEVELS, LEVELS, GENDER_OPTIONS } from '@/lib/catalogs';
-import { formatDate, formatDateTime } from '@/lib/format';
+import { formatTimeDate } from '@/lib/format';
 import { SortTh, useSort } from '@/components/ui/SortTh';
 
 // Đợt 119 — "Hộp nhập tin từ link": dán nhiều link tin tuyển dụng → web đọc sẵn tin + công ty → Admin xem lại rồi bấm Đăng.
@@ -176,7 +177,7 @@ function MailAutoPanel({ token, onNewItems }: { token: string; onNewItems: () =>
           {st.senders.length ? <div>Chỉ đọc thư từ: <b>{st.senders.join(', ')}</b></div> : <div>Đọc mọi thư trong các nhãn đã chọn (INBOX là cả hộp thư đến — nên bỏ tick INBOX).</div>}
           {last ? (
             <>
-              {' · '}Lần quét gần nhất {formatDateTime(last.at)}:{' '}
+              {' · '}Lần quét gần nhất {formatTimeDate(last.at)}:{' '}
               {last.error ? <span className="text-critical font-semibold">lỗi — {last.error}</span> : <>{last.mails} thư, {last.links} link, <b>{last.added} tin mới</b>, {last.duplicates} trùng, {last.skipped} bỏ qua</>}
             </>
           ) : ' · chưa quét lần nào'}
@@ -544,8 +545,8 @@ export function ImportInbox({ token }: { token: string }) {
                   <td className="px-2 py-2 max-w-[16rem]">{d.companyName || '—'}</td>
                   <td className="px-2 py-2 max-w-[11rem]">{d.location || '—'}</td>
                   <td className="px-2 py-2 whitespace-nowrap tabular-nums">{d.salaryMin != null || d.salaryMax != null ? `${d.salaryMin ?? '?'}–${d.salaryMax ?? '?'}` : '—'}</td>
-                  <td className="px-2 py-2 text-ink-muted">{host(r.sourceUrl)}</td>
-                  <td className="px-2 py-2 whitespace-nowrap tabular-nums text-ink-muted">{formatDate(r.createdAt)}</td>
+                  <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}><SourceLink url={r.sourceUrl} /></td>
+                  <td className="px-2 py-2 whitespace-nowrap tabular-nums text-ink-muted">{formatTimeDate(r.createdAt)}</td>
                   <td className="px-2 py-2 max-w-[16rem]">
                     {badge && <span title={badge.t} className={`inline-block text-[11px] font-bold rounded-md px-2 py-0.5 ${badge.c}`}>{badge.t}</span>}
                     {r.status === 'failed' && <span className="text-[11px] text-critical">{r.note || 'Không đọc được'}</span>}
@@ -554,7 +555,7 @@ export function ImportInbox({ token }: { token: string }) {
                 </tr>
                 {open === r.id && (
                   <tr><td colSpan={cols} className="p-0"><div className="border-t border-border p-3 flex flex-col gap-2 text-xs">
-                    <a href={r.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary font-semibold hover:underline break-all">↗ Mở link gốc để đối chiếu</a>
+                    <div><SourceLink url={r.sourceUrl} label="Nguồn tại đây — mở trang gốc để đối chiếu" /></div>
                     {canPublish ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <label className="flex flex-col gap-1">Chức danh<input className="tvl-input" value={edit.title ?? ''} onChange={(e) => set('title', e.target.value)} /></label>

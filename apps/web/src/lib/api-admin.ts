@@ -1,6 +1,6 @@
 // Đợt 93 — các nhóm API CHỈ Admin dùng, tách khỏi lib/api.ts để khách/ứng viên/nhà tuyển dụng không phải tải mã này.
 import { API_URL, ApiError, qs, request, requestForm, authHeaders } from './api';
-import type { MailScanStatus, JobImportRow, AdCampaignInput, AdCampaignRow, AdStats, AdminAuditLogResponse, AdminCandidateDetail, AdminCandidateQuery, AdminCandidateRow, AdminDashboard, AdminPersonDetail, AdminPersonRow, AdminStatsPoint, AnalyticsBehavior, AnalyticsContent, AnalyticsHeatmap, AnalyticsOverview, AnalyticsRealtime, BulkActionResult, CandidateDraft, ClaimCompanyPayload, Company, CompanyClaimRequestRow, CompanyClaimRequestStatus, CreateDraftCompanyPayload, CreateJobPayload, CvCardDraftResponse, CvQueueResponse, CvShareStatus, DraftAccountInfo, ExtractJobUrlResult, ImpersonateResult, JobPosting, Order, ProfileRequestRow, ProfileVisibility, PromoBadgeSetting, SourcedProfileRow, StorageStatus, SuggestedJob } from './api';
+import type { JobSourceList, JobSourcePreview, JobSourceRow, MailScanStatus, JobImportRow, AdCampaignInput, AdCampaignRow, AdStats, AdminAuditLogResponse, AdminCandidateDetail, AdminCandidateQuery, AdminCandidateRow, AdminDashboard, AdminPersonDetail, AdminPersonRow, AdminStatsPoint, AnalyticsBehavior, AnalyticsContent, AnalyticsHeatmap, AnalyticsOverview, AnalyticsRealtime, BulkActionResult, CandidateDraft, ClaimCompanyPayload, Company, CompanyClaimRequestRow, CompanyClaimRequestStatus, CreateDraftCompanyPayload, CreateJobPayload, CvCardDraftResponse, CvQueueResponse, CvShareStatus, DraftAccountInfo, ExtractJobUrlResult, ImpersonateResult, JobPosting, Order, ProfileRequestRow, ProfileVisibility, PromoBadgeSetting, SourcedProfileRow, StorageStatus, SuggestedJob } from './api';
 import type { BgImage, BgSetting } from './bg-themes';
 export const adminApi = {
   getBackground: (token: string) => request<BgSetting>('/admin/settings/background', { headers: authHeaders(token) }),
@@ -191,6 +191,22 @@ export const adminApi = {
       body: JSON.stringify(dto),
     }),
   // Đợt 120 — tự đọc email thông báo việc làm.
+  // Đợt 147 — Nguồn theo dõi (công ty / ngành nghề / từ khoá), quét tự động mỗi ngày.
+  sourcesList: (token: string) => request<JobSourceList>('/admin/job-sources', { headers: authHeaders(token) }),
+  sourcesSites: (token: string) => request<{ id: string; name: string; canSearch: boolean }[]>('/admin/job-sources/sites', { headers: authHeaders(token) }),
+  sourcesPreview: (token: string, url: string) =>
+    request<JobSourcePreview>('/admin/job-sources/preview', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ url }) }),
+  sourcesSearchCompany: (token: string, site: string, q: string) =>
+    request<{ items: { name: string; url: string; listingUrl: string }[]; note?: string }>(`/admin/job-sources/search-company?site=${encodeURIComponent(site)}&q=${encodeURIComponent(q)}`, { headers: authHeaders(token) }),
+  sourcesAdd: (token: string, b: { url: string; autoPublish?: boolean; label?: string; maxPages?: number }) =>
+    request<{ item: JobSourceRow; warning?: string }>('/admin/job-sources', { method: 'POST', headers: authHeaders(token), body: JSON.stringify(b) }),
+  sourcesUpdate: (token: string, id: string, b: { enabled?: boolean; autoPublish?: boolean; label?: string; maxPages?: number }) =>
+    request<JobSourceRow>(`/admin/job-sources/${id}`, { method: 'PATCH', headers: authHeaders(token), body: JSON.stringify(b) }),
+  sourcesRemove: (token: string, id: string) => request<{ ok: boolean }>(`/admin/job-sources/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
+  sourcesRun: (token: string, id?: string) =>
+    request<{ started: boolean; reason?: string }>(id ? `/admin/job-sources/${id}/run` : '/admin/job-sources/run', { method: 'POST', headers: authHeaders(token) }),
+  sourcesSiteEnabled: (token: string, site: string, enabled: boolean) =>
+    request<{ updated: number }>('/admin/job-sources/site-enabled', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ site, enabled }) }),
   mailScanStatus: (token: string) => request<MailScanStatus>('/admin/mail-scan', { headers: authHeaders(token) }),
   mailScanNow: (token: string, days?: number) => request<{ started: boolean; reason?: string }>('/admin/mail-scan', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ days }) }),
   mailScanLabels: (token: string, account = 1) => request<{ items: { path: string; selected: boolean }[]; error?: string }>(`/admin/mail-scan/labels?account=${account}`, { headers: authHeaders(token) }),

@@ -369,10 +369,15 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
   // khi đã chọn sẵn CV/hồ sơ trực tuyến và tin không có câu hỏi sàng lọc thì nút đổi thành "Xác nhận nộp" — 1 chạm là xong.
   const quickReady = applyOpen && !isLabor && !!me && (useOnlineProfile || !!selectedCvId) && !(job.screeningQuestions ?? []).length;
   const applyLabel =
-    applyState === 'done' ? '✓ Đã nộp hồ sơ' : applyState === 'submitting' ? 'Đang nộp…' : quickReady ? '⚡ Xác nhận nộp hồ sơ' : 'Nộp Đơn Ứng Tuyển';
+    applyState === 'done' ? '✓ Đã nộp hồ sơ' : applyState === 'submitting' ? 'Đang nộp…' : quickReady ? '⚡ Xác nhận nộp hồ sơ' : 'NỘP ĐƠN ỨNG TUYỂN';
   function onApplyTap() {
     if (quickReady) return void submitApply();
-    if (isLabor) return void document.getElementById('labor-apply')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (isLabor) {
+      // Đợt 145 — dùng chung luồng của khối lao động: có hồ sơ thì nộp luôn, chưa có thì mở form điền rồi tự nộp.
+      document.getElementById('labor-apply')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      window.dispatchEvent(new Event('labor-apply-go'));
+      return;
+    }
     handleApplyClick().then(() => setTimeout(() => document.getElementById('apply-block')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150));
   }
   return (

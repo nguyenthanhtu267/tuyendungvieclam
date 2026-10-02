@@ -89,7 +89,7 @@ export function useWorkerApply() {
         } catch {
           /* bỏ qua */
         }
-        throw new Error('Nhập SĐT và ngày sinh đã đăng ký ở khung phía trên để ứng tuyển nhanh (hoặc bấm "Điền ngay" nếu chưa có hồ sơ).');
+        throw new Error('Nhập SĐT và ngày sinh đã đăng ký ở khung phía trên để ứng tuyển nhanh (hoặc bấm "Nộp đơn ứng tuyển" để điền hồ sơ nếu chưa có).');
       }
       return workersApi.quickApply(jobId, creds.phone, creds.birthDate, group);
     },
@@ -113,7 +113,12 @@ export function whoOf(w: ReturnType<typeof useWorkerApply>) {
   };
 }
 
-export function WorkerCredsBox({ w, slug }: { w: ReturnType<typeof useWorkerApply>; slug: string }) {
+/** Đợt 145 — một kiểu nút duy nhất cho mọi chỗ nộp đơn (cùng cỡ với nút ở cuối tin): NỘP ĐƠN ỨNG TUYỂN. */
+export const APPLY_BTN = 'tvl-btn-accent !w-full sm:!w-80 !h-12 text-[15px] shrink-0 uppercase disabled:opacity-70';
+/** Địa chỉ trang điền hồ sơ; có `jobId` thì điền xong tự nộp đơn cho tin đó rồi quay lại. */
+export const fillHref = (slug: string, jobId?: string) => `/lao-dong-pho-thong?loai=${slug}${jobId ? `&ungtuyen=${jobId}` : ''}`;
+
+export function WorkerCredsBox({ w, slug, jobId, hideFill }: { w: ReturnType<typeof useWorkerApply>; slug: string; jobId?: string; hideFill?: boolean }) {
   const [phone, setPhone] = useState('');
   const [birth, setBirth] = useState('');
   const [err, setErr] = useState('');
@@ -141,7 +146,7 @@ export function WorkerCredsBox({ w, slug }: { w: ReturnType<typeof useWorkerAppl
         ) : (
           <>
             <span>📝 <b>Điền thông tin 1 phút</b> để nhà tuyển dụng gần bạn gọi, và ứng tuyển nhanh không cần CV.</span>
-            <Link href={`/lao-dong-pho-thong?loai=${slug}`} className="rounded-lg bg-accent text-white font-bold text-[13px] px-3 py-1.5">Điền ngay</Link>
+            {!hideFill && <Link href={fillHref(slug, jobId)} className={`${APPLY_BTN} inline-flex items-center justify-center`}>Nộp đơn ứng tuyển</Link>}
           </>
         )}
       </div>
@@ -175,8 +180,8 @@ export function WorkerCredsBox({ w, slug }: { w: ReturnType<typeof useWorkerAppl
   return (
     <div id="worker-creds" className="rounded-xl border border-border bg-white p-3 flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[14px] text-ink">
-        <span>📝 <b>Chưa có hồ sơ?</b> Điền thông tin 1 phút để nhà tuyển dụng gần bạn gọi.</span>
-        <Link href={`/lao-dong-pho-thong?loai=${slug}`} className="rounded-lg bg-accent text-white font-bold text-[13px] px-3 py-1.5">Điền ngay</Link>
+        <span>📝 <b>Chưa có hồ sơ?</b> Điền thông tin 1 phút để nhà tuyển dụng gần bạn gọi{jobId ? ' — điền xong hệ thống tự nộp đơn cho tin này' : ''}.</span>
+        {!hideFill && <Link href={fillHref(slug, jobId)} className={`${APPLY_BTN} inline-flex items-center justify-center`}>Nộp đơn ứng tuyển</Link>}
       </div>
       <details className="group" open={open || undefined} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
         <summary className="cursor-pointer list-none text-[13.5px] font-bold text-primary">

@@ -77,7 +77,7 @@ function Completeness({ f }: { f: FormState }) {
 type PhoneStatus = 'idle' | 'checking' | 'new' | 'exists' | 'verified';
 
 // Đợt 79 — form "Dành riêng tuyển công nhân / Sinh viên / Thực tập sinh" (không bắt buộc đăng nhập).
-export function WorkerForm({ initialKind }: { initialKind: WorkerKind }) {
+export function WorkerForm({ initialKind, applyJobId }: { initialKind: WorkerKind; applyJobId?: string }) {
   const { me, token } = useAuth();
   const isCandidate = me?.role === 'candidate' && !!token;
   const [f, setF] = useState<FormState>(blank(initialKind));
@@ -91,6 +91,7 @@ export function WorkerForm({ initialKind }: { initialKind: WorkerKind }) {
   const [jobs, setJobs] = useState<WorkerJobCard[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [autoApply, setAutoApply] = useState<{ ok: boolean; text: string } | null>(null);
   const [geoMsg, setGeoMsg] = useState('');
   const [freeText, setFreeText] = useState('');
   const guessed = guessGroups(freeText, f.kind).filter((g) => !f.desiredJobs.includes(g));
@@ -227,6 +228,15 @@ export function WorkerForm({ initialKind }: { initialKind: WorkerKind }) {
         rememberWorker(r.profile, r.profile.birthDate);
       }
       loadJobs(r.profile);
+      // Đợt 145 — đến từ nút "NỘP ĐƠN ỨNG TUYỂN" của một tin: lưu hồ sơ xong tự nộp đơn cho tin đó.
+      if (applyJobId) {
+        try {
+          const ar = isCandidate ? await workersApi.applyMine(token!, applyJobId) : await workersApi.quickApply(applyJobId, r.profile.phone, r.profile.birthDate);
+          setAutoApply({ ok: true, text: ar.already ? 'Bạn đã nộp đơn cho tin này trước đó. Nhà tuyển dụng sẽ gọi cho bạn.' : 'Đã nộp đơn ứng tuyển! Nhà tuyển dụng sẽ gọi vào số điện thoại của bạn.' });
+        } catch (e3) {
+          setAutoApply({ ok: false, text: `Hồ sơ đã lưu nhưng chưa nộp được đơn: ${(e3 as Error).message}. Bạn có thể quay lại tin và bấm NỘP ĐƠN ỨNG TUYỂN.` });
+        }
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e2) {
       const msg = (e2 as Error).message;
@@ -244,6 +254,12 @@ export function WorkerForm({ initialKind }: { initialKind: WorkerKind }) {
       <div className="flex flex-col gap-3">
         <section className="rounded-xl border-2 border-success bg-white p-4 flex flex-col gap-2">
           <h2 className="font-extrabold text-[18px] text-success">Thông tin của bạn đã sẵn sàng để nhà tuyển dụng liên hệ</h2>
+          {autoApply && (
+            <div role="status" className={`rounded-lg border px-3 py-2 text-[14px] font-bold ${autoApply.ok ? 'border-success bg-success-tint text-success' : 'border-critical bg-critical-tint text-critical'}`}>
+              {autoApply.text}{' '}
+              {applyJobId && <Link href={`/viec-lam/${applyJobId}`} className="underline text-primary">Quay lại tin tuyển dụng</Link>}
+            </div>
+          )}
           <p className="text-[14.5px] text-ink">
             <b>{saved.fullName}</b> · {KIND_LABEL[saved.kind]} · {saved.phone} · cập nhật lúc <b>{fmtDateTime(saved.refreshedAt)}</b>
           </p>

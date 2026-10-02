@@ -12,7 +12,7 @@ const HEAD: Record<string, { t: string; d: string }> = {
 };
 
 // Đợt 79 — trang đăng ký tìm việc lao động phổ thông (công nhân / sinh viên / thực tập sinh), không bắt buộc đăng nhập.
-export default function LaborRegisterPage({ searchParams }: { searchParams: { loai?: string } }) {
+export default function LaborRegisterPage({ searchParams }: { searchParams: { loai?: string; ungtuyen?: string } }) {
   const kind = SLUG_KIND[searchParams.loai ?? ''] ?? 'worker';
   const h = HEAD[kind];
   return (
@@ -22,12 +22,13 @@ export default function LaborRegisterPage({ searchParams }: { searchParams: { lo
         <section className={`rounded-xl border p-4 ${kind === 'worker' ? 'border-warning bg-[#FFD84D]' : 'border-border bg-white'}`}>
           <h1 className={`font-extrabold text-[22px] sm:text-[26px] uppercase ${kind === 'worker' ? 'text-[#C8102E]' : 'text-ink'}`}>{h.t}</h1>
           <p className="text-[15px] text-ink mt-1">{h.d}</p>
+          {searchParams.ungtuyen && <p className="text-[14px] font-bold text-primary mt-1">Điền xong, hệ thống sẽ tự nộp đơn ứng tuyển cho tin bạn vừa chọn.</p>}
           <p className="text-[13.5px] text-ink mt-1">
             Đã đăng ký rồi? Cứ nhập lại số điện thoại — hệ thống sẽ báo và cho bạn <b>sửa</b> hoặc <b>làm mới</b> thông tin.{' '}
             <Link href={`/lao-dong-pho-thong/viec-lam?loai=${searchParams.loai ?? 'cong-nhan'}`} className="font-bold text-primary underline">Xem việc đang tuyển</Link>
           </p>
         </section>
-        <WorkerForm initialKind={kind} />
+        <WorkerForm initialKind={kind} applyJobId={/^[0-9a-f-]{36}$/i.test(searchParams.ungtuyen ?? '') ? searchParams.ungtuyen : undefined} />
       </div>
     </main>
   );
