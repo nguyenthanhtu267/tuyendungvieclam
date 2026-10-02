@@ -488,42 +488,61 @@ export function ImportInbox({ token }: { token: string }) {
       ) : items.length === 0 ? (
         <div className="text-xs text-ink-faint py-4">{data.items.length ? 'Không có mục nào thuộc kênh này.' : 'Chưa có mục nào ở tab này.'}</div>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full min-w-[900px] text-[12.5px] border-collapse">
+          <thead>
+            <tr className="bg-surface-alt text-left text-[11.5px] font-bold text-ink-muted uppercase tracking-wide">
+              {tab !== 'published' && <th className="w-9 px-2 py-2" aria-label="Chọn" />}
+              <th className="w-10 px-2 py-2 text-right">STT</th>
+              <th className="px-2 py-2">Chức danh</th>
+              <th className="px-2 py-2">Công ty</th>
+              <th className="px-2 py-2">Địa điểm</th>
+              <th className="px-2 py-2 whitespace-nowrap">Lương (triệu)</th>
+              <th className="px-2 py-2">Nguồn</th>
+              <th className="px-2 py-2 whitespace-nowrap">Ngày nhập</th>
+              <th className="px-2 py-2">{tab === 'failed' ? 'Lý do' : 'Xử lý công ty'}</th>
+              <th className="w-8 px-2 py-2" aria-label="Mở" />
+            </tr>
+          </thead>
           {items.map((r) => {
             const d = r.data ?? {};
             const mc = r.matchedCompany;
             const badge = r.status === 'failed' ? null : r.status === 'published'
-              ? { t: `Đã đăng ở công ty: ${mc?.name ?? '—'}`, c: 'bg-success-tint text-success' }
+              ? { t: `Đã đăng: ${mc?.name ?? '—'}`, c: 'bg-success-tint text-success' }
               : mc?.name
               ? r.companyHasOwner
-                ? { t: `Công ty đã có chủ: ${mc.name}`, c: 'bg-critical-tint text-critical' }
-                : { t: `Thêm vào công ty có sẵn: ${mc.name}`, c: 'bg-success-tint text-success' }
-              : { t: 'Công ty mới — sẽ tạo hồ sơ + tài khoản nháp', c: 'bg-primary-tint text-primary' };
+                ? { t: `Đã có chủ: ${mc.name}`, c: 'bg-critical-tint text-critical' }
+                : { t: `Thêm vào: ${mc.name}`, c: 'bg-success-tint text-success' }
+              : { t: 'Công ty mới (tạo hồ sơ nháp)', c: 'bg-primary-tint text-primary' };
             const canPublish = r.status === 'pending' || r.status === 'failed';
+            const cols = (tab !== 'published' ? 1 : 0) + 9;
+            const idx = items.indexOf(r) + 1;
             return (
-              <li key={r.id} className="rounded-lg border border-border">
-                <div className="flex items-start">
-                {tab !== 'published' && <input type="checkbox" aria-label="Chọn tin" className="mt-3.5 ml-3" checked={sel.has(r.id)} onChange={() => setSel((p) => { const n = new Set(p); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} />}
-                <button type="button" onClick={() => toggle(r)} className="flex-1 text-left px-3 py-2.5 flex items-start gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-bold text-[13px] truncate">
-                      {chanOf(r) !== 'office' && <span className="mr-1.5 inline-block rounded bg-warning-tint text-[#7A4A00] text-[10.5px] font-extrabold px-1.5 py-0.5 align-middle">{CHANNEL_ICON[chanOf(r)]} {CHANNEL_LABEL[chanOf(r)]}{d.laborGroup ? ` · ${d.laborGroup}` : ''}</span>}
-                      {d.title || '(chưa đọc được chức danh)'}
-                    </div>
-                    <div className="text-[11.5px] text-ink-faint truncate">
-                      {d.companyName || '—'}
-                      {d.location ? ` · ${d.location}` : ''}
-                      {d.salaryMin != null || d.salaryMax != null ? ` · ${d.salaryMin ?? '?'}–${d.salaryMax ?? '?'} triệu` : ''}
-                      {` · ${host(r.sourceUrl)} · ${formatDate(r.createdAt)}`}
-                    </div>
-                    {badge && <span className={`inline-block mt-1 text-[10.5px] font-bold rounded-full px-2 py-0.5 ${badge.c}`}>{badge.t}</span>}
-                    {r.status === 'failed' && r.note && <div className="text-[11px] text-critical mt-1">{r.note}</div>}
-                  </div>
-                  <span className="text-ink-faint text-xs">{open === r.id ? '▲' : '▼'}</span>
-                </button>
-                </div>
+              <tbody key={r.id} className="border-t border-border">
+                <tr className={`cursor-pointer align-top hover:bg-surface-alt ${open === r.id ? 'bg-surface-alt' : ''}`} onClick={() => toggle(r)}>
+                  {tab !== 'published' && (
+                    <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" aria-label="Chọn tin" checked={sel.has(r.id)} onChange={() => setSel((p) => { const n = new Set(p); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} />
+                    </td>
+                  )}
+                  <td className="px-2 py-2 text-right text-ink-faint tabular-nums">{idx}</td>
+                  <td className="px-2 py-2 font-bold max-w-[22rem]">
+                    {chanOf(r) !== 'office' && <span className="mr-1.5 inline-block rounded bg-warning-tint text-[#7A4A00] text-[10.5px] font-extrabold px-1.5 py-0.5 align-middle">{CHANNEL_ICON[chanOf(r)]} {CHANNEL_LABEL[chanOf(r)]}{d.laborGroup ? ` · ${d.laborGroup}` : ''}</span>}
+                    {d.title || '(chưa đọc được chức danh)'}
+                  </td>
+                  <td className="px-2 py-2 max-w-[16rem]">{d.companyName || '—'}</td>
+                  <td className="px-2 py-2 max-w-[11rem]">{d.location || '—'}</td>
+                  <td className="px-2 py-2 whitespace-nowrap tabular-nums">{d.salaryMin != null || d.salaryMax != null ? `${d.salaryMin ?? '?'}–${d.salaryMax ?? '?'}` : '—'}</td>
+                  <td className="px-2 py-2 text-ink-muted">{host(r.sourceUrl)}</td>
+                  <td className="px-2 py-2 whitespace-nowrap tabular-nums text-ink-muted">{formatDate(r.createdAt)}</td>
+                  <td className="px-2 py-2 max-w-[16rem]">
+                    {badge && <span title={badge.t} className={`inline-block text-[11px] font-bold rounded-md px-2 py-0.5 ${badge.c}`}>{badge.t}</span>}
+                    {r.status === 'failed' && <span className="text-[11px] text-critical">{r.note || 'Không đọc được'}</span>}
+                  </td>
+                  <td className="px-2 py-2 text-ink-faint text-xs">{open === r.id ? '▲' : '▼'}</td>
+                </tr>
                 {open === r.id && (
-                  <div className="border-t border-border p-3 flex flex-col gap-2 text-xs">
+                  <tr><td colSpan={cols} className="p-0"><div className="border-t border-border p-3 flex flex-col gap-2 text-xs">
                     <a href={r.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary font-semibold hover:underline break-all">↗ Mở link gốc để đối chiếu</a>
                     {canPublish ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -587,11 +606,13 @@ export function ImportInbox({ token }: { token: string }) {
                       {['pending', 'failed', 'owner_review'].includes(r.status) && <button type="button" disabled={rowBusy === r.id} onClick={() => act(r, 'skip')} className="tvl-btn-ghost !w-auto px-4">Bỏ qua</button>}
                     </div>
                   </div>
+                  </td></tr>
                 )}
-              </li>
+              </tbody>
             );
           })}
-        </ul>
+        </table>
+        </div>
       )}
     </div>
     </>

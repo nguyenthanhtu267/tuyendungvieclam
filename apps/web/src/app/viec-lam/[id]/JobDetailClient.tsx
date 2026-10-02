@@ -756,17 +756,6 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
                   </div>
 
                   {/* Đợt 129 — đọc hết tin rồi không phải cuộn lên: nút nộp đơn nhắc lại ở cuối tin (cùng hành vi thông minh với nút trên banner). */}
-                  <div className="mt-5">
-                    <button
-                      type="button"
-                      disabled={applyState === 'submitting' || applyState === 'done'}
-                      onClick={onApplyTap}
-                      className="tvl-btn-accent !w-full !h-12 text-[15px] disabled:opacity-70"
-                    >
-                      {applyLabel}
-                    </button>
-                  </div>
-
                   {/* Đợt 12v (21/09/2026) — "JOB TAGS / SKILLS": thẻ từ khoá/kỹ năng NTD tự nhập khi
                       đăng tin (theo ảnh mẫu người dùng gửi), chỉ hiện khi tin có ít nhất 1 tag. */}
                   {job.tags && job.tags.length > 0 && (
@@ -788,9 +777,17 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
                   <div className="mt-5">
                     <JobQuickActions jobId={job.id} title={job.title} company={job.company.name} phone={job.contactPhone} light />
                   </div>
-                  {/* Đợt 140 — góp ý về tin: dòng nhỏ, nhẹ nhàng, nằm cuối cùng sau nút nộp đơn và Chia sẻ/Ghim. */}
-                  <div className="mt-3">
+                  {/* Đợt 141 — hàng cuối tin: góp ý (trái) · nút Nộp Đơn Ứng Tuyển (phải, rộng ~1/3 khung; điện thoại: nút rộng hết, xếp dưới). Nút vẫn "thông minh" như đợt 118. */}
+                  <div className="mt-3 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
                     <ReportJobButton jobId={job.id} />
+                    <button
+                      type="button"
+                      disabled={applyState === 'submitting' || applyState === 'done'}
+                      onClick={onApplyTap}
+                      className="tvl-btn-accent !w-full sm:!w-80 !h-12 text-[15px] shrink-0 disabled:opacity-70"
+                    >
+                      {applyLabel}
+                    </button>
                   </div>
 
                   {/* Đợt 12aa (24/09/2026) — "Thông tin liên hệ" (không bắt buộc) NTD nhập khi đăng
