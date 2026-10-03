@@ -468,6 +468,28 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
     return () => io.disconnect();
   }, [lastPage, hasMore, loading, moreLoading, result]);
 
+  // Đợt 150 — dự phòng: một số trình duyệt/ứng dụng nhúng không báo IntersectionObserver ổn định → thêm bộ nghe cuộn.
+  useEffect(() => {
+    let raf = 0;
+    const check = () => {
+      raf = 0;
+      const el = sentinel.current;
+      if (!el || autoLoaded.current >= AUTO_PAGES || blockAutoLoad()) return;
+      if (el.getBoundingClientRect().top < window.innerHeight + 700) void loadMoreRef.current();
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(check);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    onScroll();
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [lastPage, hasMore, moreLoading, result]);
+
   const heading = qInput ? `Kết quả tìm kiếm cho "${qInput}"` : 'Tất cả việc làm';
 
   return (

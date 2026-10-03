@@ -39,6 +39,10 @@ export class JobSource {
   @Column({ name: 'max_pages', type: 'int', default: 40 })
   maxPages: number;
 
+  // Đợt 150 — trang kế tiếp khi Admin bấm "Quét trang tiếp" thủ công (độc lập với vòng quét tự động).
+  @Column({ name: 'manual_page', type: 'int', default: 1 })
+  manualPage: number;
+
   // Hàng đợi link tin đã thấy nhưng chưa nhập (xử lý dần theo lô).
   @Column({ type: 'jsonb', default: () => "'[]'" })
   queue: string[];

@@ -19,6 +19,7 @@ import { isRichTextEmpty } from '@/lib/richtext';
 import { JobWizardSteps, JOB_WIZARD_INITIAL, type JobWizardFormState } from '@/components/JobWizardForm';
 import { INDUSTRIES, PROVINCES } from '@/lib/catalogs';
 import { SortTh, useSort } from '@/components/ui/SortTh';
+import { MailCenter } from '@/components/admin/MailCenter';
 
 // Đợt 93 — mỗi tab Admin nạp RIÊNG khi được mở (trước đây cả 9 bảng ~230KB JS tải ngay khi vào trang). Có `loading` riêng để
 // không làm ranh giới Suspense ở trên cùng hiện lại khung xương (xem DeferredWidgets).
@@ -49,6 +50,8 @@ const NAV_ITEMS = [
   { id: 'featured', label: '🌟 DN yêu thích' },
   // Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp" (mô hình "labeled aggregator").
   { id: 'sourced', label: '🏷️ Nguồn ngoài' },
+  // Đợt 150 — Hộp thư: thư hỗ trợ, mẫu email, danh sách email, chiến dịch.
+  { id: 'mailbox', label: '✉️ Hộp thư' },
   // Đợt 19 (26/09/2026) — phân tích truy cập THẬT: lượt xem, thời gian ở lại, click, nguồn, bản đồ nhiệt.
   { id: 'analytics', label: '🔎 Phân tích truy cập' },
   { id: 'stats', label: '📈 Thống kê' },
@@ -1025,6 +1028,8 @@ export default function AdminDashboardPage() {
           <FeaturedEmployersCard token={token} />
         ) : tab === 'sourced' ? (
           <SourcedTabs token={token} />
+        ) : tab === 'mailbox' ? (
+          <MailCenter token={token} />
         ) : tab === 'ads' ? (
           <AdsPanel token={token} />
         ) : tab === 'quality' ? (
@@ -1799,7 +1804,7 @@ function CreateDraftCompanyForm({ token, onCreated }: { token: string; onCreated
         onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
       />
       <input
-        placeholder="Nguồn (VD: Tổng hợp từ careerviet.vn)"
+        placeholder="Nguồn (VD: Tổng hợp từ trang tuyển dụng)"
         className="tvl-input text-sm sm:col-span-2"
         value={form.sourceLabel ?? ''}
         onChange={(e) => setForm((f) => ({ ...f, sourceLabel: e.target.value }))}

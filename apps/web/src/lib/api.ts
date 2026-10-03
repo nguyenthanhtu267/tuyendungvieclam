@@ -2829,7 +2829,7 @@ export interface MailScanStatus {
 // Đợt 147 — Nguồn theo dõi (công ty / ngành nghề / từ khoá của trang tuyển dụng).
 export interface JobSourceRow {
   id: string; kind: 'company' | 'category' | 'keyword' | 'list'; site: string; label: string; url: string; originalUrl?: string | null;
-  enabled: boolean; autoPublish: boolean; maxPages: number; cursorPage: number; cyclesDone: number; siteTotal?: number | null;
+  enabled: boolean; autoPublish: boolean; maxPages: number; cursorPage: number; manualPage?: number; cyclesDone: number; siteTotal?: number | null;
   totalFound: number; totalAdded: number; lastAdded: number; lastScanAt?: string | null; discoveredAt?: string | null; lastError?: string | null;
   createdAt: string; queued?: number;
 }
@@ -2838,3 +2838,11 @@ export interface JobSourcePreview {
   site: string; siteName: string; kind: JobSourceRow['kind']; listingUrl: string; label: string; found: number; total: number | null;
   lastPage: number | null; sample: string[]; trusted: boolean; warning?: string;
 }
+
+// Đợt 150 — Hộp thư (admin)
+export interface MailStatus { address: string | null; imapReady: boolean; smtpReady: boolean; fresh: number; total: number; syncing: boolean }
+export interface MailMsgRow { id: string; fromName?: string | null; fromEmail: string; subject: string; preview: string; status: 'new' | 'replied' | 'closed'; receivedAt: string; repliedAt?: string | null }
+export interface MailMsgFull { id: string; fromName?: string | null; fromEmail: string; subject: string; body: string; status: string; receivedAt: string; replies: { id: string; subject: string; body: string; at: string }[] }
+export interface MailTemplate { id: string; kind: 'reply' | 'system' | 'promo'; name: string; subject: string; body: string; updatedAt: string }
+export interface MailContact { id: string; email: string; name?: string | null; company?: string | null; source: string; status: 'active' | 'unsubscribed'; createdAt: string }
+export interface MailCampaign { id: string; name: string; subject: string; body: string; sourceFilter?: string | null; status: 'draft' | 'approved' | 'sent'; sentCount: number; remaining: number; createdAt: string; lastSentAt?: string | null }

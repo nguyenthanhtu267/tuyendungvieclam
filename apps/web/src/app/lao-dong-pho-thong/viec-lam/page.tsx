@@ -105,6 +105,29 @@ function LaborJobsInner() {
     return () => io.disconnect();
   }, [data, page, moreBusy, acc.length]);
 
+  // Đợt 150 — dự phòng bằng bộ nghe cuộn (khi IntersectionObserver không báo).
+  useEffect(() => {
+    if (!data || page >= data.totalPages) return;
+    let raf = 0;
+    const check = () => {
+      raf = 0;
+      const el = sentinel.current;
+      if (!el || moreBusy || autoPages.current >= 6 || blockAutoLoad()) return;
+      if (el.getBoundingClientRect().top < window.innerHeight + 700) {
+        autoPages.current += 1;
+        setPage((p) => p + 1);
+      }
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(check);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [data, page, moreBusy, acc.length]);
+
   const savedKey = saved.ids.join(',');
   useEffect(() => {
     if (!showSaved) return;

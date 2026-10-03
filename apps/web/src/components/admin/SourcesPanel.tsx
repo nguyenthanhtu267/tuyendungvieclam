@@ -10,7 +10,6 @@ import { SourceLink } from '@/components/ui/SourceLink';
 // Đợt 147 — "Nguồn theo dõi": dán link công ty / ngành nghề / từ khoá của một trang tuyển dụng (hoặc gõ tên công ty để tìm),
 // hệ thống đọc hết tin, đưa vào "Hộp nhập tin từ link" (Chờ xem) và tự quét lại mỗi ngày để lấy tin mới.
 const KIND_LABEL: Record<string, string> = { company: 'Công ty', category: 'Ngành nghề', keyword: 'Từ khoá', list: 'Danh sách' };
-const SITE_LABEL: Record<string, string> = { careerviet: 'CareerViet', generic: 'Trang khác' };
 
 function errText(e: unknown) {
   return e instanceof ApiError ? e.message : (e as Error)?.message || 'Có lỗi xảy ra';
@@ -24,7 +23,9 @@ export function SourcesPanel({ token }: { token: string }) {
   const [mode, setMode] = useState<'link' | 'name'>('link');
   const [url, setUrl] = useState('');
   const [name, setName] = useState('');
-  const [site, setSite] = useState('careerviet');
+  const [site, setSite] = useState('');
+  const [manual, setManual] = useState(true);
+  const [stepping, setStepping] = useState<string | null>(null);
   const [sites, setSites] = useState<{ id: string; name: string; canSearch: boolean }[]>([]);
   const [prev, setPrev] = useState<JobSourcePreview | null>(null);
   const [found, setFound] = useState<{ name: string; url: string; listingUrl: string }[] | null>(null);
@@ -48,7 +49,7 @@ export function SourcesPanel({ token }: { token: string }) {
 
   useEffect(() => {
     load();
-    adminApi.sourcesSites(token).then(setSites).catch(() => undefined);
+    adminApi.sourcesSites(token).then((s) => { setSites(s); setSite((cur) => cur || s.find((x) => x.canSearch)?.id || ''); }).catch(() => undefined);
   }, [load, token]);
 
   // Đang quét thì tự làm mới số liệu mỗi 4 giây.
@@ -60,9 +61,10 @@ export function SourcesPanel({ token }: { token: string }) {
     };
   }, [running, load]);
 
+  const SL = (id: string) => sites.find((x) => x.id === id)?.name ?? (id === 'generic' ? 'Trang khác' : id);
   const ss = useSort(rows, {
     label: (r: JobSourceRow) => r.label,
-    site: (r: JobSourceRow) => SITE_LABEL[r.site] ?? r.site,
+    site: (r: JobSourceRow) => SL(r.site),
     kind: (r: JobSourceRow) => KIND_LABEL[r.kind],
     total: (r: JobSourceRow) => r.siteTotal,
     found: (r: JobSourceRow) => r.totalFound,
@@ -88,7 +90,7 @@ export function SourcesPanel({ token }: { token: string }) {
     setMsg(null);
     setBusy(true);
     try {
-      const r = await adminApi.sourcesAdd(token, { url: u.trim(), autoPublish: autoPub });
+      const r = await adminApi.sourcesAdd(token, { url: u.trim(), autoPublish: autoPub, maxPages: manual ? 1 : undefined });
       setMsg({ ok: !r.warning, text: r.warning ? `${r.item.label} — ${r.warning}` : `Đã thêm "${r.item.label}". Hệ thống sẽ đọc danh sách và nhập dần vào Hộp nhập tin (bấm "Quét ngay" để bắt đầu liền).` });
       setPrev(null);
       setUrl('');
@@ -124,6 +126,23 @@ export function SourcesPanel({ token }: { token: string }) {
       setTimeout(load, 1500);
     } catch (e) {
       setMsg({ ok: false, text: errText(e) });
+    }
+  }
+  async function step(r: JobSourceRow, reset = false) {
+    setMsg(null);
+    setStepping(r.id);
+    try {
+      const x = await adminApi.sourcesStep(token, r.id, { reset });
+      setMsg(
+        x.reset
+          ? { ok: true, text: `Đã đưa "${r.label}" về trang 1.` }
+          : { ok: true, text: `Trang ${x.page}: thấy ${x.found} tin, nhập mới ${x.added}${x.already ? `, đã có sẵn ${x.already}` : ''}. ${x.hasNext ? `Bấm "Quét trang ${x.page + 1}" để đi tiếp.` : 'Đã hết trang — lần bấm sau quay lại trang 1.'}` },
+      );
+      await load();
+    } catch (e) {
+      setMsg({ ok: false, text: errText(e) });
+    } finally {
+      setStepping(null);
     }
   }
   async function patch(id: string, b: { enabled?: boolean; autoPublish?: boolean }) {
@@ -186,19 +205,22 @@ export function SourcesPanel({ token }: { token: string }) {
             </div>
             {mode === 'link' ? (
               <div className="flex gap-2 flex-wrap">
-                <input id="src-url" aria-label="Link nguồn" className={`${inp} flex-1 min-w-[16rem]`} placeholder="Dán link công ty, ngành nghề hoặc từ khoá (VD careerviet.vn/viec-lam/nhan-su-c22-vi.html)" value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && url.trim()) doPreview(url); }} />
+                <input id="src-url" aria-label="Link nguồn" className={`${inp} flex-1 min-w-[16rem]`} placeholder="Dán link công ty, ngành nghề hoặc từ khoá của bất kỳ trang tuyển dụng nào" value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && url.trim()) doPreview(url); }} />
                 <button type="button" disabled={busy || !url.trim()} onClick={() => doPreview(url)} className="rounded-md bg-info-tint text-info font-bold text-xs px-3 py-2 disabled:opacity-50">{busy ? 'Đang đọc…' : 'Đọc thử'}</button>
                 <button type="button" disabled={busy || !url.trim()} onClick={() => doAdd(url)} className="rounded-md bg-success-tint text-success font-bold text-xs px-3 py-2 disabled:opacity-50">Thêm luôn</button>
               </div>
             ) : (
               <div className="flex gap-2 flex-wrap">
                 <select id="src-site" aria-label="Trang tuyển dụng" className={`${inp} !w-auto`} value={site} onChange={(e) => setSite(e.target.value)}>
-                  {(sites.length ? sites : [{ id: 'careerviet', name: 'CareerViet', canSearch: true }]).filter((s) => s.canSearch).map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                  {sites.filter((s) => s.canSearch).map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
                 </select>
-                <input id="src-name" aria-label="Tên công ty" className={`${inp} flex-1 min-w-[14rem]`} placeholder="Tên công ty (VD: VPBank)" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim().length > 1) doSearch(); }} />
-                <button type="button" disabled={busy || name.trim().length < 2} onClick={doSearch} className="rounded-md bg-info-tint text-info font-bold text-xs px-3 py-2 disabled:opacity-50">{busy ? 'Đang tìm…' : '🔎 Tìm'}</button>
+                <input id="src-name" aria-label="Tên công ty" className={`${inp} flex-1 min-w-[14rem]`} placeholder="Tên công ty cần tìm" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim().length > 1) doSearch(); }} />
+                <button type="button" disabled={busy || name.trim().length < 2 || !site} onClick={doSearch} className="rounded-md bg-info-tint text-info font-bold text-xs px-3 py-2 disabled:opacity-50">{busy ? 'Đang tìm…' : '🔎 Tìm'}</button>
               </div>
             )}
+            <label className="inline-flex items-center gap-2 text-xs font-semibold text-ink-muted">
+              <input type="checkbox" checked={manual} onChange={(e) => setManual(e.target.checked)} /> Tôi quét từng trang bằng tay: tự động chỉ đọc trang đầu, các trang sau bấm &ldquo;Quét trang tiếp&rdquo; ở bảng bên dưới
+            </label>
             <label className="inline-flex items-center gap-2 text-xs font-semibold text-ink-muted">
               <input type="checkbox" checked={autoPub} onChange={(e) => setAutoPub(e.target.checked)} /> Cho phép tự đăng (theo chế độ &ldquo;tự đăng 15/30 phút&rdquo; của Hộp nhập tin) — mặc định để Chờ xem
             </label>
@@ -258,7 +280,7 @@ export function SourcesPanel({ token }: { token: string }) {
                           <div className="font-bold break-words">{r.label}</div>
                           <SourceLink url={r.originalUrl || r.url} />
                         </td>
-                        <td className="py-2.5 px-3 whitespace-nowrap">{SITE_LABEL[r.site] ?? r.site}</td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">{SL(r.site)}</td>
                         <td className="py-2.5 px-3 whitespace-nowrap">{KIND_LABEL[r.kind]}</td>
                         <td className="py-2.5 px-3 text-right tabular-nums">{r.siteTotal != null ? formatNumber(r.siteTotal) : '—'}</td>
                         <td className="py-2.5 px-3 text-right tabular-nums">{formatNumber(r.totalFound)}</td>
@@ -270,6 +292,8 @@ export function SourcesPanel({ token }: { token: string }) {
                         <td className="py-2.5 px-3"><input type="checkbox" aria-label={`Bật theo dõi ${r.label}`} checked={r.enabled} onChange={(e) => patch(r.id, { enabled: e.target.checked })} /></td>
                         <td className="py-2.5 px-3"><input type="checkbox" aria-label={`Cho tự đăng ${r.label}`} checked={r.autoPublish} onChange={(e) => patch(r.id, { autoPublish: e.target.checked })} /></td>
                         <td className="py-2.5 px-3 whitespace-nowrap text-right">
+                          <button type="button" disabled={running || stepping === r.id} onClick={() => step(r)} className="mr-1.5 rounded-md bg-success-tint text-success font-bold px-2.5 py-1.5 disabled:opacity-50">{stepping === r.id ? 'Đang quét…' : `Quét trang ${r.manualPage ?? 1} ▶`}</button>
+                          {(r.manualPage ?? 1) > 1 && <button type="button" disabled={running} onClick={() => step(r, true)} title="Đưa về trang 1" className="mr-1.5 rounded-md border border-border-strong bg-white font-bold px-2 py-1.5">↺ Trang 1</button>}
                           <button type="button" disabled={running} onClick={() => runNow(r.id)} className="mr-1.5 rounded-md bg-primary-tint text-primary font-bold px-2.5 py-1.5 disabled:opacity-50">Quét ngay</button>
                           <button type="button" onClick={() => remove(r)} className="rounded-md bg-critical-tint text-critical font-bold px-2.5 py-1.5">Xoá</button>
                         </td>
@@ -283,8 +307,8 @@ export function SourcesPanel({ token }: { token: string }) {
                   <span className="text-ink-faint font-semibold">Bật/tắt cả trang:</span>
                   {siteIds.map((s) => (
                     <span key={s} className="inline-flex gap-1">
-                      <button type="button" onClick={() => siteSwitch(s, true)} className="rounded-md border border-border-strong bg-white font-bold px-2 py-1">Bật {SITE_LABEL[s] ?? s}</button>
-                      <button type="button" onClick={() => siteSwitch(s, false)} className="rounded-md border border-border-strong bg-white font-bold px-2 py-1 text-critical">Tắt {SITE_LABEL[s] ?? s}</button>
+                      <button type="button" onClick={() => siteSwitch(s, true)} className="rounded-md border border-border-strong bg-white font-bold px-2 py-1">Bật {SL(s)}</button>
+                      <button type="button" onClick={() => siteSwitch(s, false)} className="rounded-md border border-border-strong bg-white font-bold px-2 py-1 text-critical">Tắt {SL(s)}</button>
                     </span>
                   ))}
                 </div>

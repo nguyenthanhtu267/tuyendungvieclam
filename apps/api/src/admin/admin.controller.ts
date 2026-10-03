@@ -9,7 +9,9 @@ import {
   Post,
   Query,
   UseGuards,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -29,6 +31,7 @@ import { ResolveClaimRequestDto } from './dto/resolve-claim-request.dto';
 import { JobImportService } from './job-import.service';
 import { MailScanService } from './mail-scan.service';
 import { JobSourceService } from './job-source.service';
+import { SupportMailService } from './support-mail.service';
 import { ExtractJobUrlDto } from './dto/extract-job-url.dto';
 import { UpdatePromoBadgeDto } from './dto/promo-badge.dto';
 
@@ -52,6 +55,7 @@ export class AdminController {
     private readonly imports: JobImportService,
     private readonly mailScan: MailScanService,
     private readonly sources: JobSourceService,
+    private readonly support: SupportMailService,
   ) {}
 
   @Get('dashboard')
@@ -276,6 +280,11 @@ export class AdminController {
     return this.sources.start(id);
   }
 
+  @Post('job-sources/:id/step')
+  sourcesStep(@Param('id') id: string, @Body() b: { reset?: boolean; page?: number }) {
+    return this.sources.stepSource(id, { reset: !!b?.reset, page: b?.page });
+  }
+
   @Patch('job-sources/:id')
   sourcesUpdate(@Param('id') id: string, @Body() b: { enabled?: boolean; autoPublish?: boolean; label?: string; maxPages?: number }) {
     return this.sources.update(id, b ?? {});
@@ -284,6 +293,104 @@ export class AdminController {
   @Delete('job-sources/:id')
   sourcesRemove(@Param('id') id: string) {
     return this.sources.remove(id);
+  }
+
+  // ===== Đợt 150 — Hộp thư (thư hỗ trợ, mẫu email, danh sách email, chiến dịch) =====
+  @Get('mail/status')
+  mailStatus() {
+    return this.support.status();
+  }
+  @Post('mail/sync')
+  mailSync() {
+    return this.support.sync();
+  }
+  @Get('mail/inbox')
+  mailInbox(@Query('status') status?: string, @Query('q') q?: string) {
+    return this.support.inbox(status, q);
+  }
+  @Get('mail/messages/:id')
+  mailMessage(@Param('id') id: string) {
+    return this.support.message(id);
+  }
+  @Patch('mail/messages/:id')
+  mailSetStatus(@Param('id') id: string, @Body('status') status: string) {
+    return this.support.setStatus(id, String(status));
+  }
+  @Delete('mail/messages/:id')
+  mailRemove(@Param('id') id: string) {
+    return this.support.removeMessage(id);
+  }
+  @Post('mail/messages/:id/reply')
+  mailReply(@Param('id') id: string, @Body() b: { subject?: string; body: string }) {
+    return this.support.reply(id, String(b?.subject || ''), String(b?.body || ''));
+  }
+  @Get('mail/templates')
+  mailTemplates() {
+    return this.support.templates();
+  }
+  @Post('mail/templates')
+  mailTemplateNew(@Body() b: { kind?: string; name: string; subject: string; body: string }) {
+    return this.support.saveTemplate(undefined, b);
+  }
+  @Patch('mail/templates/:id')
+  mailTemplateSave(@Param('id') id: string, @Body() b: { kind?: string; name: string; subject: string; body: string }) {
+    return this.support.saveTemplate(id, b);
+  }
+  @Post('mail/templates/:id/reset')
+  mailTemplateReset(@Param('id') id: string) {
+    return this.support.resetTemplate(id);
+  }
+  @Delete('mail/templates/:id')
+  mailTemplateRemove(@Param('id') id: string) {
+    return this.support.removeTemplate(id);
+  }
+  @Get('mail/contacts')
+  mailContacts(@Query('q') q?: string, @Query('status') status?: string, @Query('source') source?: string) {
+    return this.support.contacts(q, status, source);
+  }
+  @Post('mail/contacts')
+  mailContactsAdd(@Body('text') text: string) {
+    return this.support.addContacts(String(text || ''), 'manual');
+  }
+  @Post('mail/contacts/harvest')
+  mailContactsHarvest(@Body('kind') kind: string) {
+    return this.support.harvest(String(kind || ''));
+  }
+  @Patch('mail/contacts/:id')
+  mailContactStatus(@Param('id') id: string, @Body('status') status: string) {
+    return this.support.setContactStatus(id, String(status));
+  }
+  @Delete('mail/contacts/:id')
+  mailContactRemove(@Param('id') id: string) {
+    return this.support.removeContact(id);
+  }
+  @Get('mail/campaigns')
+  mailCampaigns() {
+    return this.support.campaigns();
+  }
+  @Post('mail/campaigns')
+  mailCampaignNew(@Body() b: { name: string; subject: string; body: string; sourceFilter?: string | null }) {
+    return this.support.saveCampaign(undefined, b);
+  }
+  @Patch('mail/campaigns/:id')
+  mailCampaignSave(@Param('id') id: string, @Body() b: { name: string; subject: string; body: string; sourceFilter?: string | null }) {
+    return this.support.saveCampaign(id, b);
+  }
+  @Post('mail/campaigns/:id/approve')
+  mailCampaignApprove(@Param('id') id: string, @Body('approve') approve: boolean) {
+    return this.support.approveCampaign(id, approve !== false);
+  }
+  @Post('mail/campaigns/:id/test')
+  mailCampaignTest(@Param('id') id: string, @Body('to') to?: string) {
+    return this.support.testCampaign(id, String(to || ''));
+  }
+  @Post('mail/campaigns/:id/send')
+  mailCampaignSend(@Param('id') id: string) {
+    return this.support.sendBatch(id);
+  }
+  @Delete('mail/campaigns/:id')
+  mailCampaignRemove(@Param('id') id: string) {
+    return this.support.removeCampaign(id);
   }
 
   @Get('mail-scan')
@@ -596,6 +703,7 @@ export class MailScanCronController {
   constructor(
     private readonly mailScan: MailScanService,
     private readonly sources: JobSourceService,
+    private readonly support: SupportMailService,
   ) {}
 
   @Get('run')
@@ -604,6 +712,7 @@ export class MailScanCronController {
     this.mailScan.autoPublishTick().catch(() => undefined);
     // Đợt 147 — cùng một lần gọi định kỳ cũng quét các "Nguồn theo dõi" đến hạn (khỏi cần tạo thêm cron).
     this.sources.start();
+    this.support.sync().catch(() => undefined); // Đợt 150 — cũng lấy thư hỗ trợ mới
     return this.mailScan.start();
   }
 }
@@ -621,5 +730,17 @@ export class SourceScanCronController {
     if (!this.mailScan.checkCronKey(key)) throw new NotFoundException();
     this.mailScan.autoPublishTick().catch(() => undefined);
     return this.sources.start();
+  }
+}
+
+// Đợt 150 — liên kết "Hủy nhận thư" trong thư giới thiệu (công khai, kiểm bằng chữ ký).
+@Controller('public/email-unsub')
+export class EmailUnsubController {
+  constructor(private readonly support: SupportMailService) {}
+
+  @Get()
+  async unsub(@Query('e') e: string, @Query('t') t: string, @Res() res: Response) {
+    const html = await this.support.unsubscribe(String(e || ''), String(t || ''));
+    res.type('html').send(html);
   }
 }

@@ -1,6 +1,6 @@
 // Đợt 93 — các nhóm API CHỈ Admin dùng, tách khỏi lib/api.ts để khách/ứng viên/nhà tuyển dụng không phải tải mã này.
 import { API_URL, ApiError, qs, request, requestForm, authHeaders } from './api';
-import type { JobSourceList, JobSourcePreview, JobSourceRow, MailScanStatus, JobImportRow, AdCampaignInput, AdCampaignRow, AdStats, AdminAuditLogResponse, AdminCandidateDetail, AdminCandidateQuery, AdminCandidateRow, AdminDashboard, AdminPersonDetail, AdminPersonRow, AdminStatsPoint, AnalyticsBehavior, AnalyticsContent, AnalyticsHeatmap, AnalyticsOverview, AnalyticsRealtime, BulkActionResult, CandidateDraft, ClaimCompanyPayload, Company, CompanyClaimRequestRow, CompanyClaimRequestStatus, CreateDraftCompanyPayload, CreateJobPayload, CvCardDraftResponse, CvQueueResponse, CvShareStatus, DraftAccountInfo, ExtractJobUrlResult, ImpersonateResult, JobPosting, Order, ProfileRequestRow, ProfileVisibility, PromoBadgeSetting, SourcedProfileRow, StorageStatus, SuggestedJob } from './api';
+import type { MailStatus, MailMsgRow, MailMsgFull, MailTemplate, MailContact, MailCampaign, JobSourceList, JobSourcePreview, JobSourceRow, MailScanStatus, JobImportRow, AdCampaignInput, AdCampaignRow, AdStats, AdminAuditLogResponse, AdminCandidateDetail, AdminCandidateQuery, AdminCandidateRow, AdminDashboard, AdminPersonDetail, AdminPersonRow, AdminStatsPoint, AnalyticsBehavior, AnalyticsContent, AnalyticsHeatmap, AnalyticsOverview, AnalyticsRealtime, BulkActionResult, CandidateDraft, ClaimCompanyPayload, Company, CompanyClaimRequestRow, CompanyClaimRequestStatus, CreateDraftCompanyPayload, CreateJobPayload, CvCardDraftResponse, CvQueueResponse, CvShareStatus, DraftAccountInfo, ExtractJobUrlResult, ImpersonateResult, JobPosting, Order, ProfileRequestRow, ProfileVisibility, PromoBadgeSetting, SourcedProfileRow, StorageStatus, SuggestedJob } from './api';
 import type { BgImage, BgSetting } from './bg-themes';
 export const adminApi = {
   getBackground: (token: string) => request<BgSetting>('/admin/settings/background', { headers: authHeaders(token) }),
@@ -205,6 +205,43 @@ export const adminApi = {
   sourcesRemove: (token: string, id: string) => request<{ ok: boolean }>(`/admin/job-sources/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
   sourcesRun: (token: string, id?: string) =>
     request<{ started: boolean; reason?: string }>(id ? `/admin/job-sources/${id}/run` : '/admin/job-sources/run', { method: 'POST', headers: authHeaders(token) }),
+  // Đợt 150 — Hộp thư
+  sourcesStep: (token: string, id: string, b: { reset?: boolean; page?: number } = {}) =>
+    request<{ page: number; found: number; added: number; hasNext: boolean; already?: number; reset?: boolean }>(`/admin/job-sources/${id}/step`, { method: 'POST', headers: authHeaders(token), body: JSON.stringify(b) }),
+  mailStatus: (token: string) => request<MailStatus>('/admin/mail/status', { headers: authHeaders(token) }),
+  mailSync: (token: string) => request<{ fetched: number; error?: string }>('/admin/mail/sync', { method: 'POST', headers: authHeaders(token) }),
+  mailInbox: (token: string, status = '', q = '') =>
+    request<{ items: MailMsgRow[] }>(`/admin/mail/inbox?status=${encodeURIComponent(status)}&q=${encodeURIComponent(q)}`, { headers: authHeaders(token) }),
+  mailMessage: (token: string, id: string) => request<MailMsgFull>(`/admin/mail/messages/${id}`, { headers: authHeaders(token) }),
+  mailSetStatus: (token: string, id: string, status: string) =>
+    request<{ ok: boolean }>(`/admin/mail/messages/${id}`, { method: 'PATCH', headers: authHeaders(token), body: JSON.stringify({ status }) }),
+  mailRemove: (token: string, id: string) => request<{ ok: boolean }>(`/admin/mail/messages/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
+  mailReply: (token: string, id: string, b: { subject?: string; body: string }) =>
+    request<{ ok: boolean }>(`/admin/mail/messages/${id}/reply`, { method: 'POST', headers: authHeaders(token), body: JSON.stringify(b) }),
+  mailTemplates: (token: string) => request<{ items: MailTemplate[] }>('/admin/mail/templates', { headers: authHeaders(token) }),
+  mailTemplateSave: (token: string, id: string | null, b: { kind: string; name: string; subject: string; body: string }) =>
+    request<{ id: string }>(id ? `/admin/mail/templates/${id}` : '/admin/mail/templates', { method: id ? 'PATCH' : 'POST', headers: authHeaders(token), body: JSON.stringify(b) }),
+  mailTemplateReset: (token: string, id: string) => request<{ ok: boolean }>(`/admin/mail/templates/${id}/reset`, { method: 'POST', headers: authHeaders(token) }),
+  mailTemplateRemove: (token: string, id: string) => request<{ ok: boolean }>(`/admin/mail/templates/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
+  mailContacts: (token: string, q = '', status = '', source = '') =>
+    request<{ items: MailContact[]; total: number; active: number }>(`/admin/mail/contacts?q=${encodeURIComponent(q)}&status=${status}&source=${source}`, { headers: authHeaders(token) }),
+  mailContactsAdd: (token: string, text: string) =>
+    request<{ added: number; skipped: number }>('/admin/mail/contacts', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ text }) }),
+  mailContactsHarvest: (token: string, kind: string) =>
+    request<{ scanned: number; added: number }>('/admin/mail/contacts/harvest', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ kind }) }),
+  mailContactStatus: (token: string, id: string, status: string) =>
+    request<{ ok: boolean }>(`/admin/mail/contacts/${id}`, { method: 'PATCH', headers: authHeaders(token), body: JSON.stringify({ status }) }),
+  mailContactRemove: (token: string, id: string) => request<{ ok: boolean }>(`/admin/mail/contacts/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
+  mailCampaigns: (token: string) => request<{ items: MailCampaign[] }>('/admin/mail/campaigns', { headers: authHeaders(token) }),
+  mailCampaignSave: (token: string, id: string | null, b: { name: string; subject: string; body: string; sourceFilter?: string | null }) =>
+    request<{ id: string }>(id ? `/admin/mail/campaigns/${id}` : '/admin/mail/campaigns', { method: id ? 'PATCH' : 'POST', headers: authHeaders(token), body: JSON.stringify(b) }),
+  mailCampaignApprove: (token: string, id: string, approve: boolean) =>
+    request<{ ok: boolean }>(`/admin/mail/campaigns/${id}/approve`, { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ approve }) }),
+  mailCampaignTest: (token: string, id: string, to = '') =>
+    request<{ ok: boolean; to: string }>(`/admin/mail/campaigns/${id}/test`, { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ to }) }),
+  mailCampaignSend: (token: string, id: string) =>
+    request<{ sent: number; failed: number; remaining: number }>(`/admin/mail/campaigns/${id}/send`, { method: 'POST', headers: authHeaders(token) }),
+  mailCampaignRemove: (token: string, id: string) => request<{ ok: boolean }>(`/admin/mail/campaigns/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
   sourcesSiteEnabled: (token: string, site: string, enabled: boolean) =>
     request<{ updated: number }>('/admin/job-sources/site-enabled', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ site, enabled }) }),
   mailScanStatus: (token: string) => request<MailScanStatus>('/admin/mail-scan', { headers: authHeaders(token) }),

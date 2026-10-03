@@ -287,6 +287,69 @@ export class JobSourceService implements OnModuleInit, OnModuleDestroy {
     return { id: src.id, found, added, queued: src.queue.length, error };
   }
 
+  /**
+   * Đợt 150 — quét THỦ CÔNG từng trang: đọc đúng 1 trang (manualPage), nhập ngay các tin mới của trang đó,
+   * rồi nhớ trang kế. Admin bấm "Quét trang tiếp" để đi tiếp; `reset` đưa về trang 1.
+   */
+  async stepSource(id: string, opts: { reset?: boolean; page?: number } = {}) {
+    if (this.running) throw new BadRequestException('Đang quét, vui lòng chờ xong rồi bấm tiếp.');
+    const src = await this.get(id);
+    if (opts.reset) {
+      src.manualPage = 1;
+      await this.repo.save(src);
+      return { page: 1, found: 0, added: 0, hasNext: true, reset: true };
+    }
+    const ad = adapterById(src.site);
+    const page = Math.max(1, Math.floor(opts.page || src.manualPage || 1));
+    this.running = true;
+    this.runningId = id;
+    try {
+      let pageUrl = ad.pageUrl(src.url, page);
+      if (page > 1) {
+        // Ưu tiên link trang mà chính trang nguồn đưa ra (mẫu đường dẫn mỗi trang một khác).
+        try {
+          const first = await fetchHtml(src.url);
+          const l = ad.parseList(first.html, first.finalUrl).pageLinks.get(page);
+          if (l) pageUrl = l;
+        } catch {
+          /* dùng mẫu mặc định */
+        }
+      }
+      const { html, finalUrl } = await this.fetchOrFail(pageUrl);
+      const p = ad.parseList(html, finalUrl);
+      if (p.total) src.siteTotal = p.total;
+      const urls = Array.from(new Set(p.jobs.map((u) => this.norm(u))));
+      const known = await this.known(urls);
+      const fresh = urls.filter((u) => !known.has(u));
+      let added = 0;
+      for (const u of fresh.slice(0, 40)) {
+        try {
+          const r = await this.imports.addOne(u, {
+            quiet: true,
+            note: `Nguồn theo dõi: ${src.label} (trang ${page})`,
+            meta: { sourceId: src.id, ...(src.autoPublish ? {} : { noAuto: true }) },
+          });
+          if (r.result === 'new') added++;
+        } catch {
+          /* bỏ qua tin lỗi */
+        }
+        await sleep(JOB_DELAY_MS);
+      }
+      const hasNext = urls.length > 0 && !(p.lastPage && page >= p.lastPage && !Array.from(p.pageLinks.keys()).some((n) => n > page));
+      src.manualPage = hasNext ? page + 1 : 1;
+      src.totalFound += fresh.length;
+      src.totalAdded += added;
+      src.lastAdded = added;
+      src.lastScanAt = new Date();
+      src.lastError = null;
+      await this.repo.save(src);
+      return { page, found: urls.length, added, hasNext, already: urls.length - fresh.length };
+    } finally {
+      this.running = false;
+      this.runningId = null;
+    }
+  }
+
   /** Nguồn nào cần chạy: đang đọc dở, còn hàng đợi, hoặc đã quá ~20 giờ kể từ vòng đọc trước. */
   private async dueIds(): Promise<string[]> {
     const rows = await this.repo.find({ where: { enabled: true }, order: { lastScanAt: 'ASC' } });
