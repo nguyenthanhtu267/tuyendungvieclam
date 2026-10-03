@@ -503,6 +503,7 @@ function JobSearchPage({ initial, initialFacets, seed = 0 }: { initial: { key: s
         {/* Đợt 12t (21/09/2026) — gộp ô tìm từ khóa + nút "Tìm" vào chung 1 dòng với Tỉnh/Thành +
             Ngành nghề trong FilterBar (trước đây là 2 khối trắng tách rời, theo yêu cầu người dùng). */}
         <FilterBar
+          resultCount={result?.total}
           value={filters}
           onChange={updateParams}
           onClear={handleClearFilters}

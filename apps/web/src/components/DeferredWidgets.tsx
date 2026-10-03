@@ -15,6 +15,7 @@ const InstallHint = dynamic(() => import('@/components/InstallHint'), { ssr: fal
 const PwaRegister = dynamic(() => import('@/components/PwaRegister'), { ssr: false });
 const ApplyQueueFlusher = dynamic(() => import('@/components/ApplyQueueFlusher'), { ssr: false });
 const TopProgress = dynamic(() => import('@/components/TopProgress'), { ssr: false });
+const KeyboardShortcuts = dynamic(() => import('@/components/KeyboardShortcuts'), { ssr: false });
 const TapTargets = dynamic(() => import('@/components/TapTargets'), { ssr: false });
 const VitalsReporter = dynamic(() => import('@/components/VitalsReporter'), { ssr: false });
 
@@ -52,6 +53,7 @@ export default function DeferredWidgets() {
       <ApplyQueueFlusher />
       <TopProgress />
       <TapTargets />
+      <KeyboardShortcuts />
     </Suspense>
   );
 }

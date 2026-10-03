@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PinsApi } from '@/lib/pins';
+import { rankOptions } from '@/components/ui/Combobox';
+import { dismissKeyboard } from '@/lib/mobile-ui';
+import { haptic } from '@/lib/haptic';
 
 // Đợt 10 — popover lọc nhiều lựa chọn dùng chung cho "Tỉnh, Thành Phố" và "Ngành nghề"
 // (claude/06-spec-tim-kiem-nang-cao.md mục 1): không có nút "Áp dụng", chọn là lọc ngay; ô tìm +
@@ -39,9 +42,25 @@ export function MultiSelectPopover({
   const [query, setQuery] = useState('');
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  // Đợt 163 — điện thoại (<640px): bảng chọn là ngăn kéo từ đáy; chọn 1 mục xong thì thu lại NGAY (hạ bàn phím), muốn chọn tiếp thì mở lại.
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const f = () => setMobile(mq.matches);
+    f();
+    mq.addEventListener('change', f);
+    return () => mq.removeEventListener('change', f);
+  }, []);
+  useEffect(() => {
+    if (!(open && mobile)) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [open, mobile]);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
+      if (window.matchMedia('(max-width: 639px)').matches) return; // điện thoại: đóng bằng nền mờ / nút Xong
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
     }
     document.addEventListener('mousedown', onClickOutside);
@@ -52,9 +71,19 @@ export function MultiSelectPopover({
     if (open) {
       setQuery('');
       // Tự động focus ô tìm khi mở popover (theo đặc tả).
-      setTimeout(() => searchRef.current?.focus(), 0);
+      if (!mobile) setTimeout(() => searchRef.current?.focus(), 0);
     }
   }, [open]);
+
+  // Esc đóng bảng (máy tính).
+  useEffect(() => {
+    if (!open) return;
+    const f = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('keydown', f);
+    return () => document.removeEventListener('keydown', f);
+  }, [open]);
+  // Vuốt xuống ở thanh tiêu đề để đóng ngăn kéo.
+  const dragY = useRef<number | null>(null);
 
   const filteredGroups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -65,13 +94,21 @@ export function MultiSelectPopover({
       : groups;
     if (!q) return base;
     return base
-      .map((g) => ({ ...g, options: g.options.filter((o) => o.toLowerCase().includes(q)) }))
+      .map((g) => ({ ...g, options: rankOptions(g.options.map((o) => ({ label: o })), q).map((x) => x.label) }))
       .filter((g) => g.options.length > 0);
   }, [groups, query, pins?.list]);
 
-  function toggle(value: string) {
+  function toggle(value: string, fromList = false) {
     if (selected.includes(value)) onChange(selected.filter((v) => v !== value));
-    else onChange([...selected, value]);
+    else {
+      onChange([...selected, value]);
+      haptic(10);
+      // Điện thoại: chọn xong thu bảng lại ngay để không che màn hình/bấm nhầm.
+      if (fromList && mobile) {
+        dismissKeyboard();
+        setOpen(false);
+      }
+    }
   }
 
   return (
@@ -87,10 +124,10 @@ export function MultiSelectPopover({
           <span className="text-ink-faint flex-1">{placeholder}</span>
         ) : (
           <div className="flex-1 flex flex-wrap gap-1 py-0.5">
-            {selected.map((v) => (
+            {(mobile ? selected.slice(0, 2) : selected.slice(0, 4)).map((v) => (
               <span
                 key={v}
-                className="inline-flex items-center gap-1 rounded-full bg-primary-tint px-2 py-0.5 text-[11px] font-semibold text-primary"
+                className="inline-flex items-center gap-1 rounded-full bg-primary-tint px-2 py-0.5 text-[11px] font-semibold text-primary max-w-[48vw] sm:max-w-[160px] truncate"
               >
                 {v}
                 <span
@@ -106,22 +143,58 @@ export function MultiSelectPopover({
                 </span>
               </span>
             ))}
+            {selected.length > (mobile ? 2 : 4) && (
+              <span className="inline-flex items-center rounded-full bg-surface-alt px-2 py-0.5 text-[11px] font-bold text-ink-muted">
+                +{selected.length - (mobile ? 2 : 4)}
+              </span>
+            )}
           </div>
         )}
         <span className="text-ink-faint shrink-0">⌄</span>
       </button>
 
+      {open && mobile && <div className="fixed inset-0 z-[70] bg-black/40" onClick={() => { dismissKeyboard(); setOpen(false); }} aria-hidden />}
       {open && (
-        <div className="absolute z-40 mt-1.5 w-[min(360px,90vw)] max-h-[380px] rounded-xl border border-border bg-white shadow-lg flex flex-col overflow-hidden">
+        <div
+          className={
+            mobile
+              ? 'fixed inset-x-0 bottom-0 z-[71] max-h-[78vh] rounded-t-2xl border-t border-border bg-white shadow-2xl flex flex-col overflow-hidden'
+              : 'absolute z-40 mt-1.5 w-[min(360px,90vw)] max-h-[380px] rounded-xl border border-border bg-white shadow-lg flex flex-col overflow-hidden'
+          }
+          style={mobile ? { paddingBottom: 'env(safe-area-inset-bottom, 0px)' } : undefined}
+        >
           <div className="sticky top-0 bg-white border-b border-border px-3 pt-3 pb-2.5 flex flex-col gap-2">
-            <div className="text-xs font-extrabold text-ink">{label}</div>
+            {mobile && <div className="mx-auto h-1 w-10 rounded-full bg-border-strong -mt-1" aria-hidden />}
+            <div
+              className="flex items-center justify-between"
+              onTouchStart={(e) => { dragY.current = e.touches[0].clientY; }}
+              onTouchEnd={(e) => {
+                if (dragY.current !== null && e.changedTouches[0].clientY - dragY.current > 70) { dismissKeyboard(); setOpen(false); }
+                dragY.current = null;
+              }}
+            >
+              <div className="text-xs max-sm:text-[15px] font-extrabold text-ink">{label}</div>
+              {mobile && (
+                <button type="button" onClick={() => { dismissKeyboard(); setOpen(false); }} className="h-9 px-4 rounded-full bg-primary text-white font-bold text-[13px]">
+                  Xong
+                </button>
+              )}
+            </div>
             <div className="relative">
               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint text-xs">🔎</span>
               <input
                 ref={searchRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Tìm kiếm"
+                placeholder="Gõ để tìm (không cần dấu)"
+                enterKeyHint="search"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const first = filteredGroups[0]?.options[0];
+                    if (first && query.trim()) { toggle(first, true); setQuery(''); }
+                  }
+                }}
                 className="tvl-input !pl-7 text-xs"
               />
             </div>
@@ -154,29 +227,41 @@ export function MultiSelectPopover({
             </div>
           </div>
 
-          <div className="overflow-y-auto flex-1 py-1">
+          <div className="overflow-y-auto overscroll-contain flex-1 py-1">
             {filteredGroups.length === 0 && (
               <div className="text-center text-ink-faint text-xs py-6">Không tìm thấy kết quả</div>
             )}
             {filteredGroups.map((g, gi) => (
               <div key={g.label ?? gi}>
                 {g.label && (
-                  <div className="px-3 pt-2 pb-1 text-[10.5px] font-bold uppercase tracking-wide text-ink-faint">
-                    {g.label}
+                  <div className="px-3 pt-2 pb-1 flex items-center justify-between text-[10.5px] font-bold uppercase tracking-wide text-ink-faint">
+                    <span>{g.label}</span>
+                    {!query.trim() && g.options.length > 1 && !g.label.startsWith('📌') && (() => {
+                      const all = g.options.every((o) => selected.includes(o));
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => onChange(all ? selected.filter((v) => !g.options.includes(v)) : Array.from(new Set([...selected, ...g.options])))}
+                          className="normal-case text-[11.5px] max-sm:text-[13px] font-bold text-primary hover:underline"
+                        >
+                          {all ? 'Bỏ cả nhóm' : 'Chọn cả nhóm'}
+                        </button>
+                      );
+                    })()}
                   </div>
                 )}
                 {g.options.map((opt) => {
                   const checked = selected.includes(opt);
                   return (
                     <div key={opt} className="flex items-center hover:bg-surface-alt">
-                      <label className="flex-1 min-w-0 flex items-center gap-2.5 pl-3 py-2 cursor-pointer">
+                      <label className="flex-1 min-w-0 flex items-center gap-2.5 pl-3 py-2 max-sm:py-3 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={checked}
-                          onChange={() => toggle(opt)}
-                          className="h-3.5 w-3.5 accent-primary shrink-0"
+                          onChange={() => toggle(opt, true)}
+                          className="h-3.5 w-3.5 max-sm:h-5 max-sm:w-5 accent-primary shrink-0"
                         />
-                        <span className={`text-[12.5px] leading-snug ${checked ? 'font-bold text-primary' : 'text-ink-muted'}`}>
+                        <span className={`text-[12.5px] max-sm:text-[15px] leading-snug ${checked ? 'font-bold text-primary' : 'text-ink-muted'}`}>
                           {opt}
                         </span>
                       </label>
@@ -187,7 +272,7 @@ export function MultiSelectPopover({
                           aria-pressed={pins.list.includes(opt)}
                           aria-label={pins.list.includes(opt) ? `Bỏ ghim ${opt}` : `Ghim ${opt}`}
                           title={pins.list.includes(opt) ? 'Bỏ ghim' : `Ghim lên đầu (tối đa ${pins.max})`}
-                          className={`shrink-0 px-2.5 py-2 text-[14px] leading-none ${pins.list.includes(opt) ? 'opacity-100' : 'opacity-35 hover:opacity-100'}`}
+                          className={`shrink-0 px-3 py-2 max-sm:py-3 text-[14px] leading-none ${pins.list.includes(opt) ? 'opacity-100' : 'opacity-35 hover:opacity-100'}`}
                         >
                           📌
                         </button>

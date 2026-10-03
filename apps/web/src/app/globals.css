@@ -370,3 +370,33 @@ html[data-theme='dark'] [data-keep-color] { filter: invert(1) hue-rotate(180deg)
 @media (pointer: coarse) {
   .tvl-btn-primary, .tvl-btn-accent, .tvl-btn-ghost { min-height: 44px; }
 }
+
+/* ===== Đợt 163 — rà soát điện thoại + máy tính ===== */
+/* Chống tràn ngang toàn trang: ảnh/video/iframe không vượt khung; chữ/URL dài tự xuống dòng. */
+html, body { max-width: 100%; overflow-x: clip; }
+img, video, canvas, iframe, svg { max-width: 100%; }
+main, article, section, li, td, th, h1, h2, h3, h4, p, a, label { overflow-wrap: break-word; }
+/* Danh sách cuộn trong bảng chọn không kéo trang phía sau; thanh cuộn mảnh trên máy tính. */
+.overscroll-contain { overscroll-behavior: contain; }
+@media (hover: hover) and (pointer: fine) {
+  .overflow-y-auto { scrollbar-width: thin; scrollbar-color: #c7ced9 transparent; }
+}
+/* Chạm: bỏ trễ 300ms/đúp-chạm phóng to, bỏ ánh nền xám khi chạm, có phản hồi lún nhẹ. */
+a, button, summary, label, select, input, [role='button'] { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+@media (pointer: coarse) {
+  button:not(:disabled):active, a[href]:active, [role='button']:active { opacity: .78; }
+  /* Vùng đệm cuối trang để thanh điều hướng dưới/nút nổi không che nội dung. */
+  body { scroll-padding-bottom: 96px; }
+}
+/* Bàn phím: viền focus rõ ràng cho mọi nút/liên kết/ô nhập (chỉ khi dùng phím Tab). */
+:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.tvl-input:focus-visible { outline: none; }
+/* Neo (#...) và cuộn tới ô nhập không bị thanh đầu trang dính che. */
+html { scroll-padding-top: 64px; }
+[id] { scroll-margin-top: 64px; }
+/* In tin tuyển dụng gọn: ẩn đầu/cuối trang, thanh điều hướng, nút nổi. */
+@media print {
+  header, footer, nav, .no-print, [data-no-print] { display: none !important; }
+  body { background: #fff !important; }
+  a[href^='http']:after { content: ' (' attr(href) ')'; font-size: 10px; color: #555; }
+}

@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { dismissKeyboard } from '@/lib/mobile-ui';
 import SearchHints from '@/components/SearchHints';
 import { rememberSearch } from '@/lib/search-hints';
 import { nearestProvince, saveHome } from '@/lib/geo';
@@ -35,6 +36,7 @@ export function FilterBar({
   searchValue,
   onSearchChange,
   onSearchSubmit,
+  resultCount,
 }: {
   value: JobListParams;
   onChange: (patch: Partial<JobListParams>) => void;
@@ -45,6 +47,7 @@ export function FilterBar({
   searchValue?: string;
   onSearchChange?: (v: string) => void;
   onSearchSubmit?: (e: React.FormEvent) => void;
+  resultCount?: number;
 }) {
   const hasAnyFilter =
     (value.provinces?.length ?? 0) > 0 ||
@@ -68,6 +71,7 @@ export function FilterBar({
     <div className="rounded-xl border border-border bg-white p-3.5 flex flex-col gap-3">
       <form
         onSubmit={(e) => {
+          dismissKeyboard();
           if (showSearchField) rememberSearch(searchValue ?? '');
           (onSearchSubmit ?? ((ev: React.FormEvent) => ev.preventDefault()))(e);
         }}
@@ -75,12 +79,23 @@ export function FilterBar({
       >
         {showSearchField && (
           <div className="flex gap-2 sm:flex-[1.4] min-w-0">
-            <input
-              className="tvl-input min-w-0"
-              placeholder="Chức danh, kỹ năng, tên công ty"
-              value={searchValue}
-              onChange={(e) => onSearchChange?.(e.target.value)}
-            />
+            <div className="relative flex-1 min-w-0">
+              <input
+                id="tvl-main-search"
+                type="search"
+                enterKeyHint="search"
+                autoComplete="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                className="tvl-input min-w-0 !pr-9 [&::-webkit-search-cancel-button]:hidden"
+                placeholder="Chức danh, kỹ năng, tên công ty  ( / )"
+                value={searchValue}
+                onChange={(e) => onSearchChange?.(e.target.value)}
+              />
+              {!!searchValue && (
+                <button type="button" aria-label="Xóa từ khóa" onClick={() => { onSearchChange?.(''); document.getElementById('tvl-main-search')?.focus(); }} className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full text-ink-faint hover:text-ink">✕</button>
+              )}
+            </div>
             <VoiceSearchButton onText={(t) => onSearchChange?.(t)} />
           </div>
         )}
@@ -132,6 +147,25 @@ export function FilterBar({
       </form>
       {showSearchField && <SearchHints q={searchValue ?? ''} onPick={(v) => { onSearchChange?.(v); rememberSearch(v); }} onPickIndustry={(i) => { onSearchChange?.(''); onChange({ industries: [i], q: '' }); }} />}
 
+      {extraCount > 0 && (
+        <div className="flex flex-wrap gap-1.5 -mt-1" aria-label="Bộ lọc đang dùng">
+          {[
+            value.salaryTier ? { k: 'sal', t: SALARY_TIERS.find((t) => t.value === value.salaryTier)?.label ?? 'Mức lương', off: () => onChange({ salaryTier: undefined }) } : null,
+            value.level ? { k: 'lv', t: value.level, off: () => onChange({ level: undefined }) } : null,
+            value.postedWithin ? { k: 'pw', t: POSTED_WITHIN_OPTIONS.find((o) => o.value === value.postedWithin)?.label ?? 'Thời gian đăng', off: () => onChange({ postedWithin: undefined }) } : null,
+            value.employmentType ? { k: 'et', t: value.employmentType, off: () => onChange({ employmentType: undefined }) } : null,
+            value.experienceLevel ? { k: 'ex', t: value.experienceLevel, off: () => onChange({ experienceLevel: undefined }) } : null,
+            value.urgentOnly ? { k: 'ug', t: '⚡ Khẩn cấp', off: () => onChange({ urgentOnly: undefined }) } : null,
+            value.featuredEmployerOnly ? { k: 'fe', t: '⭐ DN yêu thích', off: () => onChange({ featuredEmployerOnly: undefined }) } : null,
+          ].filter((x): x is { k: string; t: string; off: () => void } => !!x).map((c) => (
+            <button key={c.k} type="button" onClick={c.off} title="Bấm để bỏ lọc này" className="inline-flex items-center gap-1 rounded-full bg-primary-tint text-primary text-[12px] font-semibold pl-2.5 pr-2 py-1 max-w-full">
+              <span className="truncate">{c.t}</span><span aria-hidden>✕</span>
+            </button>
+          ))}
+          <button type="button" onClick={onClear} className="text-[12px] font-bold text-ink-muted hover:text-primary px-1">Xóa tất cả</button>
+        </div>
+      )}
+
       <button
         type="button"
         onClick={() => setSheet(true)}
@@ -151,7 +185,7 @@ export function FilterBar({
       {sheet && (
         <div className="flex items-center justify-between sm:hidden">
           <div className="font-extrabold text-[16px]">Bộ lọc</div>
-          <button type="button" onClick={() => setSheet(false)} className="h-10 px-4 rounded-full bg-primary text-white font-bold text-[14px]">Xong</button>
+          <button type="button" onClick={() => setSheet(false)} className="h-10 px-4 rounded-full bg-primary text-white font-bold text-[14px]">{typeof resultCount === 'number' ? `Xem ${resultCount.toLocaleString('vi-VN')} việc` : 'Xong'}</button>
         </div>
       )}
       <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2">
