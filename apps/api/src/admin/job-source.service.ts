@@ -149,6 +149,11 @@ export class JobSourceService implements OnModuleInit, OnModuleDestroy {
   }
 
   async setSiteEnabled(site: string, enabled: boolean) {
+    // `site` để trống = áp dụng cho tất cả nguồn.
+    if (!site) {
+      const r = await this.repo.createQueryBuilder().update(JobSource).set({ enabled }).execute();
+      return { updated: r.affected ?? 0 };
+    }
     const res = await this.repo.update({ site }, { enabled });
     return { updated: res.affected ?? 0 };
   }
@@ -165,31 +170,39 @@ export class JobSourceService implements OnModuleInit, OnModuleDestroy {
     return r;
   }
 
-  // Tìm công ty theo tên trên trang nguồn: trả về vài công ty khớp để Admin bấm chọn (không tự chọn thay Admin).
+  // Tìm công ty theo tên trên MỌI trang nguồn có hỗ trợ tìm kiếm (không cần chọn trang): trả về các công ty khớp để
+  // Admin bấm chọn (không tự chọn thay Admin). `site` để trống = tìm ở tất cả các trang.
   async searchCompany(site: string, q: string) {
     const name = (q || '').trim();
     if (name.length < 2) throw new BadRequestException('Nhập ít nhất 2 ký tự tên công ty');
-    const ad = adapterById(site);
-    if (!ad.searchUrl) throw new BadRequestException('Trang này chưa hỗ trợ tìm theo tên — hãy dán link công ty.');
-    const { html, finalUrl } = await this.fetchOrFail(ad.searchUrl(name));
-    const p = ad.parseList(html, finalUrl);
+    const ads = site ? [adapterById(site)] : ADAPTERS.filter((a) => !!a.searchUrl);
+    if (!ads.length || ads.some((a) => !a.searchUrl)) throw new BadRequestException('Chưa có trang nào hỗ trợ tìm theo tên — hãy dán link công ty.');
     const tokens = normalizeSearchText(name).split(/\s+/).filter((t) => t.length > 1);
     const score = (n: string) => {
       const x = normalizeSearchText(n);
       return tokens.filter((t) => x.includes(t)).length;
     };
-    const items = p.employers
-      .map((e) => ({ ...e, score: score(e.name) }))
-      .filter((e) => e.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 10)
-      .map((e) => {
-        const d = this.detect(e.url);
-        return { name: e.name, url: e.url, listingUrl: d.listingUrl };
-      });
+    const items: { name: string; url: string; listingUrl: string; score: number }[] = [];
+    let lastErr = '';
+    for (const ad of ads) {
+      try {
+        const { html, finalUrl } = await fetchHtml(ad.searchUrl!(name));
+        const p = ad.parseList(html, finalUrl);
+        for (const e of p.employers) {
+          const sc = score(e.name);
+          if (sc <= 0) continue;
+          const d = this.detect(e.url);
+          if (!items.some((x) => x.listingUrl === d.listingUrl)) items.push({ name: e.name, url: e.url, listingUrl: d.listingUrl, score: sc });
+        }
+      } catch (e) {
+        lastErr = (e as Error).message || 'Không tải được trang nguồn';
+      }
+    }
+    if (!items.length && lastErr) throw new BadRequestException(lastErr);
+    items.sort((a, b) => b.score - a.score);
     return {
-      items,
-      note: items.length ? undefined : 'Không thấy công ty nào khớp tên này trên trang nguồn (công ty có thể chưa đăng tin). Thử tên ngắn hơn, hoặc dán link công ty.',
+      items: items.slice(0, 10).map(({ name, url, listingUrl }) => ({ name, url, listingUrl })),
+      note: items.length ? undefined : 'Không thấy công ty nào khớp tên này (công ty có thể chưa đăng tin). Thử tên ngắn hơn, hoặc dán link công ty.',
     };
   }
 

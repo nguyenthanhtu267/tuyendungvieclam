@@ -11,6 +11,14 @@ import { SourceLink } from '@/components/ui/SourceLink';
 // hệ thống đọc hết tin, đưa vào "Hộp nhập tin từ link" (Chờ xem) và tự quét lại mỗi ngày để lấy tin mới.
 const KIND_LABEL: Record<string, string> = { company: 'Công ty', category: 'Ngành nghề', keyword: 'Từ khoá', list: 'Danh sách' };
 
+function hostOf(u: string) {
+  try {
+    return new URL(u).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
 function errText(e: unknown) {
   return e instanceof ApiError ? e.message : (e as Error)?.message || 'Có lỗi xảy ra';
 }
@@ -107,7 +115,7 @@ export function SourcesPanel({ token }: { token: string }) {
     setFound(null);
     setBusy(true);
     try {
-      const r = await adminApi.sourcesSearchCompany(token, site, name.trim());
+      const r = await adminApi.sourcesSearchCompany(token, '', name.trim());
       setFound(r.items);
       if (r.note) setMsg({ ok: false, text: r.note });
     } catch (e) {
@@ -167,7 +175,6 @@ export function SourcesPanel({ token }: { token: string }) {
     await load();
   }
 
-  const siteIds = Array.from(new Set((rows ?? []).map((r) => r.site)));
   const inp = 'tvl-input !py-1.5 text-sm';
   const status = (r: JobSourceRow) => {
     if (runningId === r.id) return <span className="font-bold text-info">Đang quét…</span>;
@@ -211,11 +218,8 @@ export function SourcesPanel({ token }: { token: string }) {
               </div>
             ) : (
               <div className="flex gap-2 flex-wrap">
-                <select id="src-site" aria-label="Trang tuyển dụng" className={`${inp} !w-auto`} value={site} onChange={(e) => setSite(e.target.value)}>
-                  {sites.filter((s) => s.canSearch).map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
-                </select>
                 <input id="src-name" aria-label="Tên công ty" className={`${inp} flex-1 min-w-[14rem]`} placeholder="Tên công ty cần tìm" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim().length > 1) doSearch(); }} />
-                <button type="button" disabled={busy || name.trim().length < 2 || !site} onClick={doSearch} className="rounded-md bg-info-tint text-info font-bold text-xs px-3 py-2 disabled:opacity-50">{busy ? 'Đang tìm…' : '🔎 Tìm'}</button>
+                <button type="button" disabled={busy || name.trim().length < 2} onClick={doSearch} className="rounded-md bg-info-tint text-info font-bold text-xs px-3 py-2 disabled:opacity-50">{busy ? 'Đang tìm…' : '🔎 Tìm'}</button>
               </div>
             )}
             <label className="inline-flex items-center gap-2 text-xs font-semibold text-ink-muted">
@@ -258,61 +262,59 @@ export function SourcesPanel({ token }: { token: string }) {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-left text-ink-faint bg-surface-alt whitespace-nowrap">
-                      <SortTh s={ss} k="label" className="py-2.5 px-3 font-semibold">Nguồn</SortTh>
-                      <SortTh s={ss} k="site" className="py-2.5 px-3 font-semibold">Trang</SortTh>
-                      <SortTh s={ss} k="kind" className="py-2.5 px-3 font-semibold">Loại</SortTh>
-                      <SortTh s={ss} k="total" align="right" className="py-2.5 px-3 font-semibold">Tổng ở nguồn</SortTh>
-                      <SortTh s={ss} k="found" align="right" className="py-2.5 px-3 font-semibold">Đã thấy mới</SortTh>
-                      <SortTh s={ss} k="added" align="right" className="py-2.5 px-3 font-semibold">Đã nhập</SortTh>
-                      <SortTh s={ss} k="queued" align="right" className="py-2.5 px-3 font-semibold">Chờ nhập</SortTh>
-                      <SortTh s={ss} k="lastScan" className="py-2.5 px-3 font-semibold">Quét gần nhất</SortTh>
-                      <SortTh s={ss} k="lastAdded" align="right" className="py-2.5 px-3 font-semibold">Lần đó +</SortTh>
-                      <th className="py-2.5 px-3 font-semibold">Trạng thái</th>
-                      <th className="py-2.5 px-3 font-semibold">Bật</th>
-                      <th className="py-2.5 px-3 font-semibold">Tự đăng</th>
-                      <th className="py-2.5 px-3" />
+                      <SortTh s={ss} k="label" className="py-2.5 px-2.5 font-semibold">Nguồn</SortTh>
+                      <SortTh s={ss} k="kind" className="py-2.5 px-2.5 font-semibold">Loại</SortTh>
+                      <SortTh s={ss} k="total" align="right" className="py-2.5 px-2.5 font-semibold">Tổng ở nguồn</SortTh>
+                      <SortTh s={ss} k="added" align="right" className="py-2.5 px-2.5 font-semibold">Đã nhập</SortTh>
+                      <SortTh s={ss} k="queued" align="right" className="py-2.5 px-2.5 font-semibold">Chờ nhập</SortTh>
+                      <SortTh s={ss} k="lastScan" className="py-2.5 px-2.5 font-semibold">Quét gần nhất</SortTh>
+                      <th className="py-2.5 px-2.5 font-semibold">Trạng thái</th>
+                      <th className="py-2.5 px-2 font-semibold">Bật</th>
+                      <th className="py-2.5 px-2 font-semibold">Tự đăng</th>
+                      <th className="py-2.5 px-2.5 font-semibold">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
                     {ss.rows.map((r) => (
                       <tr key={r.id} className="border-t border-border align-top">
-                        <td className="py-2.5 px-3 min-w-[200px]">
+                        <td className="py-2.5 px-3 min-w-[170px] max-w-[250px]">
                           <div className="font-bold break-words">{r.label}</div>
-                          <SourceLink url={r.originalUrl || r.url} />
+                          <div className="flex items-center gap-2 flex-wrap text-[11px] text-ink-faint">
+                            <span>{hostOf(r.originalUrl || r.url)}</span>
+                            <SourceLink url={r.originalUrl || r.url} />
+                          </div>
                         </td>
-                        <td className="py-2.5 px-3 whitespace-nowrap">{SL(r.site)}</td>
                         <td className="py-2.5 px-3 whitespace-nowrap">{KIND_LABEL[r.kind]}</td>
                         <td className="py-2.5 px-3 text-right tabular-nums">{r.siteTotal != null ? formatNumber(r.siteTotal) : '—'}</td>
-                        <td className="py-2.5 px-3 text-right tabular-nums">{formatNumber(r.totalFound)}</td>
                         <td className="py-2.5 px-3 text-right tabular-nums font-bold">{formatNumber(r.totalAdded)}</td>
                         <td className="py-2.5 px-3 text-right tabular-nums">{formatNumber(r.queued ?? 0)}</td>
-                        <td className="py-2.5 px-3 whitespace-nowrap tabular-nums text-ink-muted">{r.lastScanAt ? formatTimeDate(r.lastScanAt) : '—'}</td>
-                        <td className="py-2.5 px-3 text-right tabular-nums">{r.lastScanAt ? r.lastAdded : '—'}</td>
-                        <td className="py-2.5 px-3 min-w-[120px]">{status(r)}{r.lastError && <div className="text-critical mt-0.5 break-words max-w-[200px]">{r.lastError}</div>}</td>
-                        <td className="py-2.5 px-3"><input type="checkbox" aria-label={`Bật theo dõi ${r.label}`} checked={r.enabled} onChange={(e) => patch(r.id, { enabled: e.target.checked })} /></td>
-                        <td className="py-2.5 px-3"><input type="checkbox" aria-label={`Cho tự đăng ${r.label}`} checked={r.autoPublish} onChange={(e) => patch(r.id, { autoPublish: e.target.checked })} /></td>
-                        <td className="py-2.5 px-3 whitespace-nowrap text-right">
-                          <button type="button" disabled={running || stepping === r.id} onClick={() => step(r)} className="mr-1.5 rounded-md bg-success-tint text-success font-bold px-2.5 py-1.5 disabled:opacity-50">{stepping === r.id ? 'Đang quét…' : `Quét trang ${r.manualPage ?? 1} ▶`}</button>
-                          {(r.manualPage ?? 1) > 1 && <button type="button" disabled={running} onClick={() => step(r, true)} title="Đưa về trang 1" className="mr-1.5 rounded-md border border-border-strong bg-white font-bold px-2 py-1.5">↺ Trang 1</button>}
-                          <button type="button" disabled={running} onClick={() => runNow(r.id)} className="mr-1.5 rounded-md bg-primary-tint text-primary font-bold px-2.5 py-1.5 disabled:opacity-50">Quét ngay</button>
-                          <button type="button" onClick={() => remove(r)} className="rounded-md bg-critical-tint text-critical font-bold px-2.5 py-1.5">Xoá</button>
+                        <td className="py-2.5 px-3 whitespace-nowrap tabular-nums text-ink-muted">
+                          {r.lastScanAt ? formatTimeDate(r.lastScanAt) : '—'}
+                          {r.lastScanAt && <div className="text-[11px]">lần đó +{r.lastAdded}</div>}
+                        </td>
+                        <td className="py-2.5 px-2 min-w-[100px]">{status(r)}{r.lastError && <div className="text-critical mt-0.5 break-words max-w-[200px]">{r.lastError}</div>}</td>
+                        <td className="py-2.5 px-2"><input type="checkbox" aria-label={`Bật theo dõi ${r.label}`} checked={r.enabled} onChange={(e) => patch(r.id, { enabled: e.target.checked })} /></td>
+                        <td className="py-2.5 px-2"><input type="checkbox" aria-label={`Cho tự đăng ${r.label}`} checked={r.autoPublish} onChange={(e) => patch(r.id, { autoPublish: e.target.checked })} /></td>
+                        <td className="py-2.5 px-3">
+                          <div className="flex flex-col gap-1.5 items-stretch w-[136px]">
+                            <button type="button" disabled={running || stepping === r.id} onClick={() => step(r)} className="rounded-md bg-success-tint text-success font-bold px-2.5 py-2 disabled:opacity-50 whitespace-nowrap">{stepping === r.id ? 'Đang quét…' : `Quét trang ${r.manualPage ?? 1} ▶`}</button>
+                            <div className="flex gap-1.5">
+                              <button type="button" disabled={running} onClick={() => runNow(r.id)} className="flex-1 rounded-md bg-primary-tint text-primary font-bold px-2 py-1.5 disabled:opacity-50 whitespace-nowrap">Quét ngay</button>
+                              <button type="button" onClick={() => remove(r)} className="rounded-md bg-critical-tint text-critical font-bold px-2.5 py-1.5">Xoá</button>
+                            </div>
+                            {(r.manualPage ?? 1) > 1 && <button type="button" disabled={running} onClick={() => step(r, true)} className="rounded-md border border-border-strong bg-white font-bold px-2 py-1.5 whitespace-nowrap">↺ Về trang 1</button>}
+                          </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              {siteIds.length > 0 && (
-                <div className="flex items-center gap-2 flex-wrap px-3 py-2 border-t border-border text-xs bg-surface-alt">
-                  <span className="text-ink-faint font-semibold">Bật/tắt cả trang:</span>
-                  {siteIds.map((s) => (
-                    <span key={s} className="inline-flex gap-1">
-                      <button type="button" onClick={() => siteSwitch(s, true)} className="rounded-md border border-border-strong bg-white font-bold px-2 py-1">Bật {SL(s)}</button>
-                      <button type="button" onClick={() => siteSwitch(s, false)} className="rounded-md border border-border-strong bg-white font-bold px-2 py-1 text-critical">Tắt {SL(s)}</button>
-                    </span>
-                  ))}
-                </div>
-              )}
+              <div className="flex items-center gap-2 flex-wrap px-3 py-2 border-t border-border text-xs bg-surface-alt">
+                <span className="text-ink-faint font-semibold">Tất cả nguồn:</span>
+                <button type="button" onClick={() => siteSwitch('', true)} className="rounded-md border border-border-strong bg-white font-bold px-3 py-1.5">Bật tất cả</button>
+                <button type="button" onClick={() => siteSwitch('', false)} className="rounded-md border border-border-strong bg-white font-bold px-3 py-1.5 text-critical">Tắt tất cả</button>
+              </div>
             </div>
           ) : (
             rows && <div className="text-center text-ink-faint text-sm py-4">Chưa theo dõi nguồn nào.</div>

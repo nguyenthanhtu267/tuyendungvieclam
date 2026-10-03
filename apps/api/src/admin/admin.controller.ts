@@ -257,7 +257,7 @@ export class AdminController {
 
   @Get('job-sources/search-company')
   sourcesSearchCompany(@Query('site') site: string, @Query('q') q: string) {
-    return this.sources.searchCompany(String(site || 'careerviet'), String(q || ''));
+    return this.sources.searchCompany(String(site || ''), String(q || ''));
   }
 
   @Post('job-sources')
