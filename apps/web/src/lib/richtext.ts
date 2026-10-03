@@ -1,5 +1,3 @@
-import DOMPurify from 'isomorphic-dompurify';
-
 // Đợt 12n (21/09/2026) — Mô tả công việc / Yêu cầu ứng viên (NTD) và các ô mô tả dài trong hồ sơ
 // CV (ứng viên) chuyển từ textarea thường sang trình soạn thảo có định dạng (RichTextEditor.tsx),
 // lưu nội dung dạng HTML thay vì text thuần. Các hàm dưới đây dùng chung ở cả 2 chiều nhập/hiển thị:
@@ -31,11 +29,28 @@ const ALLOWED_TAGS = [
   'h3',
 ];
 
+// Đợt 155 — tự viết bộ khử độc KHÔNG cần DOM/jsdom: thư viện isomorphic-dompurify kéo jsdom → gói ESM (@exodus/bytes) bị lỗi
+// ERR_REQUIRE_ESM trên Node của Vercel khiến máy chủ không dựng được nội dung mô tả tin. Cách làm: chỉ phát ra các thẻ nằm trong
+// danh sách cho phép, KHÔNG BAO GIỜ giữ thuộc tính; mọi chữ còn lại được thoát ký tự → không thể chèn mã.
+const TAG_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g;
+const esc = (t: string) => t.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 export function sanitizeRichHtml(html: string): string {
-  return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR: [],
-  });
+  const src = String(html ?? '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(script|style|iframe|object|embed|noscript|template)\b[\s\S]*?<\/\1\s*>/gi, '');
+  let out = '';
+  let last = 0;
+  let m: RegExpExecArray | null;
+  TAG_RE.lastIndex = 0;
+  while ((m = TAG_RE.exec(src))) {
+    out += esc(src.slice(last, m.index).replace(/&(?!(?:[a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);)/g, '&amp;'));
+    const name = m[2].toLowerCase();
+    if (ALLOWED_TAGS.includes(name)) out += name === 'br' ? '<br>' : `<${m[1]}${name}>`;
+    last = m.index + m[0].length;
+  }
+  out += esc(src.slice(last).replace(/&(?!(?:[a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);)/g, '&amp;'));
+  return out;
 }
 
 // Rỗng thật sự? Tiptap trả về "<p></p>" cho ô trống — coi như không có nội dung.

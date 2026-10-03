@@ -1,6 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { INTER_LATIN_400, INTER_LATIN_700, INTER_VIETNAMESE_400, INTER_VIETNAMESE_700 } from '@/assets/fonts/inter-data';
 import { presetById, svgDataUri } from '@/lib/share-presets';
 
 // Đợt 153 — ảnh xem trước khi dán link tin vào Facebook / Zalo (1200×630): tên web, tiêu đề, công ty, lương, địa điểm,
@@ -12,8 +11,12 @@ export const dynamic = 'force-dynamic';
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 const SIZE = { width: 1200, height: 630 };
 
+const FONTS: Record<string, string> = {
+  'inter-latin-400': INTER_LATIN_400, 'inter-latin-700': INTER_LATIN_700,
+  'inter-vietnamese-400': INTER_VIETNAMESE_400, 'inter-vietnamese-700': INTER_VIETNAMESE_700,
+};
 const font = async (n: string) => {
-  const b = await readFile(join(process.cwd(), 'src', 'assets', 'fonts', `${n}.woff`));
+  const b = Buffer.from(FONTS[n], 'base64');
   return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
 };
 
@@ -35,7 +38,10 @@ const Icon = ({ k }: { k: 'phone' | 'mail' | 'pin' }) => (
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
-    return await render(req, params.id.replace(/\.png$/i, ''));
+    // ImageResponse vẽ ảnh lúc đọc dữ liệu → đọc hết ngay trong try để lỗi vẽ cũng rơi vào ảnh dự phòng.
+    const res = await render(req, params.id.replace(/\.png$/i, ''));
+    const buf = await res.arrayBuffer();
+    return new Response(buf, { headers: res.headers });
   } catch {
     // Mọi lỗi (font, API...) → ảnh mặc định tĩnh, không bao giờ để khung xem trước trống.
     return Response.redirect(new URL('/og-default.png', req.url), 302);

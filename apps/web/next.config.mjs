@@ -14,10 +14,6 @@ const nextConfig = {
   // Đợt 94 — BỘ ĐỆM BIÊN VERCEL (tuỳ chọn, 0 đồng): đặt biến môi trường NEXT_PUBLIC_EDGE_CACHE=1 trên Vercel thì các lệnh GET công khai
   // (trang chủ, danh sách việc, bộ lọc...) đi qua `/_c/...` của chính web → Vercel giữ bản sao theo `s-maxage` do API gửi, hàng nghìn
   // người cùng xem chỉ tốn 1 lần gọi tới máy chủ Render. Mặc định TẮT (không đặt biến = hành vi như cũ).
-  // Đợt 153 — ảnh chia sẻ /chia-se/[id] đọc font từ src/assets/fonts: bắt buộc đưa vào gói chạy trên Vercel.
-  experimental: {
-    outputFileTracingIncludes: { '/chia-se/[id]': ['./src/assets/fonts/**'] },
-  },
   async rewrites() {
     const api = process.env.NEXT_PUBLIC_API_URL;
     if (process.env.NEXT_PUBLIC_EDGE_CACHE !== '1' || !api) return [];
