@@ -125,7 +125,7 @@ export function FilterBar({
           />
         </div>
         {showSearchField && (
-          <button type="submit" className="tvl-btn-primary !w-auto px-6 shrink-0">
+          <button type="submit" className="tvl-btn-primary !w-auto px-7 max-sm:px-8 shrink-0 self-stretch min-h-[48px] text-[15px]">
             🔎 Tìm
           </button>
         )}

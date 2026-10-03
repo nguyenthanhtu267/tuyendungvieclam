@@ -121,9 +121,19 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
   // Đợt 90 — 8 tin đầu được máy chủ dựng sẵn (initial) → danh sách hiện ngay khi mở trang.
   const initialHit = useRef(initial && initial.key === searchParams.toString() ? initial.data : null);
   const [result, setResult] = useState<JobListResponse | null>(initialHit.current);
-  const matchMap = useMatches(result?.items.map((j) => j.id) ?? []);
+  // Đợt 148 — cuộn là bung trang kế tiếp: các trang tải thêm nối vào sau `result.items` (không bấm nút).
+  const [more, setMore] = useState<JobListResponse['items']>([]);
+  const [lastPage, setLastPage] = useState(page);
+  const [moreLoading, setMoreLoading] = useState(false);
+  const autoLoaded = useRef(0);
+  const sentinel = useRef<HTMLDivElement | null>(null);
+  const allItems = (() => {
+    const seen = new Set<string>();
+    return [...(result?.items ?? []), ...more].filter((j) => (seen.has(j.id) ? false : (seen.add(j.id), true)));
+  })();
+  const matchMap = useMatches(allItems.map((j) => j.id));
   const sortedItems = (() => {
-    const items = result?.items ?? [];
+    const items = allItems;
     if (!sortMatch) return items;
     return [...items].sort((a, b) => (matchMap[b.id]?.score ?? -1) - (matchMap[a.id]?.score ?? -1));
   })();
@@ -191,6 +201,9 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
   useEffect(() => {
     const pre = initialHit.current;
     initialHit.current = null; // chỉ dùng cho lần mở đầu tiên
+    setMore([]);
+    setLastPage(page);
+    autoLoaded.current = 0;
     const ckey = searchParams.toString();
     const cached = pre ? null : readCachedList<JobListResponse>(ckey);
     setListErr(null);
@@ -295,7 +308,7 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
   // Đợt 75 — A/B tiêu đề: tin đang thử nghiệm hiện ngẫu nhiên (ổn định theo khách) tiêu đề A hoặc B.
   const [ab, setAb] = useState<Record<string, { testId: string; variant: 'a' | 'b'; title: string }>>({});
   useEffect(() => {
-    const ids = (result?.items ?? []).map((j) => j.id);
+    const ids = allItems.map((j) => j.id);
     if (!ids.length) { setAb({}); return; }
     let off = false;
     smartApi5.publicTests(ids).then((r) => {
@@ -419,6 +432,41 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
     router.push(`/viec-lam?${params.toString()}`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+
+  const totalPagesAll = result?.totalPages ?? 1;
+  const hasMore = !!result && lastPage < totalPagesAll;
+  const AUTO_PAGES = 6; // tự bung tối đa 6 trang liên tiếp (~48 tin) rồi mới cần bấm "Xem thêm" — để còn chạm được chân trang
+  async function loadMore() {
+    if (moreLoading || !hasMore) return;
+    setMoreLoading(true);
+    try {
+      const next = lastPage + 1;
+      const r = await jobsApi.list({ ...filters, page: next, pageSize: JOB_PAGE_SIZE });
+      setMore((m) => [...m, ...r.items]);
+      setLastPage(next);
+      autoLoaded.current += 1;
+    } catch {
+      autoLoaded.current = AUTO_PAGES; // lỗi mạng: dừng tự bung, để người dùng bấm "Xem thêm" thử lại
+    } finally {
+      setMoreLoading(false);
+    }
+  }
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(
+      (es) => {
+        if (!es[0]?.isIntersecting) return;
+        if (autoLoaded.current >= AUTO_PAGES || detectWeakNet() || readSaver()) return; // mạng yếu / tiết kiệm dữ liệu: chỉ tải khi bấm
+        void loadMoreRef.current();
+      },
+      { rootMargin: '700px 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [lastPage, hasMore, loading, moreLoading, result]);
 
   const heading = qInput ? `Kết quả tìm kiếm cho "${qInput}"` : 'Tất cả việc làm';
 
@@ -627,6 +675,11 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
               </div>
             )}
 
+            {page > 1 && (
+              <button type="button" onClick={() => goToPage(1)} className="self-start mb-3 rounded-lg border border-border-strong bg-white font-bold text-[13px] px-3 h-10">
+                ↑ Xem từ tin đầu tiên
+              </button>
+            )}
             <div className="flex flex-col gap-3">
               {/* Đợt 24 — banner xen giữa danh sách: sau tin thứ 5 (ít hơn 5 tin thì sau tin cuối). */}
               {visibleItems.map((job, i, arr) => (
@@ -672,7 +725,7 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
                 <div className="rounded-xl bg-white border border-border-strong shadow-lg p-2 flex items-center gap-2">
                   <div className="flex-1 text-[13.5px] font-bold pl-1">Đã chọn {picked.size}/15 tin</div>
                   <button type="button" onClick={() => { setPickMode(false); setPicked(new Set()); }} className="h-11 px-3 rounded-lg border border-border-strong text-[13.5px] font-bold">Hủy</button>
-                  <button type="button" disabled={picked.size === 0} onClick={() => { setBulkJobs((result?.items ?? []).filter((j) => picked.has(j.id)).map((j) => ({ id: j.id, jobPostingId: j.id, createdAt: j.createdAt, jobPosting: j }))); setBulkOpen(true); }} className="h-11 px-4 rounded-lg bg-accent text-white text-[14px] font-extrabold disabled:opacity-50">⚡ Nộp {picked.size} tin</button>
+                  <button type="button" disabled={picked.size === 0} onClick={() => { setBulkJobs(allItems.filter((j) => picked.has(j.id)).map((j) => ({ id: j.id, jobPostingId: j.id, createdAt: j.createdAt, jobPosting: j }))); setBulkOpen(true); }} className="h-11 px-4 rounded-lg bg-accent text-white text-[14px] font-extrabold disabled:opacity-50">⚡ Nộp {picked.size} tin</button>
                 </div>
               </div>
             )}
@@ -697,40 +750,24 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
             <AdSlot slot="jobs-bottom" className="mt-3" />
 
             {result && result.totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-6">
-                {/* Đợt 13 (24/09/2026) — thêm nút "Đầu tiên"/"Cuối cùng" để nhảy nhanh 2 đầu danh
-                    sách phân trang, theo yêu cầu người dùng. */}
-                <button
-                  disabled={page <= 1}
-                  onClick={() => goToPage(1)}
-                  className="tvl-btn-ghost !w-auto px-4 py-1.5 text-xs disabled:text-ink-faint disabled:bg-white"
-                >
-                  Đầu tiên
-                </button>
-                <button
-                  disabled={page <= 1}
-                  onClick={() => goToPage(page - 1)}
-                  className="tvl-btn-ghost !w-auto px-4 py-1.5 text-xs disabled:text-ink-faint disabled:bg-white"
-                >
-                  ← Trước
-                </button>
-                <span className="text-xs text-ink-muted px-2 py-1 rounded-lg bg-white">
-                  Trang {result.page} / {result.totalPages}
-                </span>
-                <button
-                  disabled={page >= result.totalPages}
-                  onClick={() => goToPage(page + 1)}
-                  className="tvl-btn-ghost !w-auto px-4 py-1.5 text-xs disabled:text-ink-faint disabled:bg-white"
-                >
-                  Sau →
-                </button>
-                <button
-                  disabled={page >= result.totalPages}
-                  onClick={() => goToPage(result.totalPages)}
-                  className="tvl-btn-ghost !w-auto px-4 py-1.5 text-xs disabled:text-ink-faint disabled:bg-white"
-                >
-                  Cuối cùng
-                </button>
+              <div className="mt-5 flex flex-col items-center gap-2" aria-live="polite">
+                <div className="text-xs text-ink-muted rounded-lg bg-white px-3 py-1.5">
+                  Đang hiện <b>{formatNumber(allItems.length)}</b> / {formatNumber(result.total)} tin
+                </div>
+                {hasMore ? (
+                  <>
+                    <div ref={sentinel} className="h-1 w-full" aria-hidden />
+                    {moreLoading ? (
+                      <div className="text-[13px] text-ink-muted py-2">⟳ Đang tải thêm tin…</div>
+                    ) : (
+                      <button type="button" onClick={() => { autoLoaded.current = 0; void loadMore(); }} className="tvl-btn-ghost !w-full sm:!w-72 !h-12 text-[14px]">
+                        Xem thêm tin
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-[12.5px] text-ink-faint py-1">Đã hiện hết kết quả.</div>
+                )}
               </div>
             )}
           </div>

@@ -2,7 +2,8 @@
 
 import { Combobox } from '@/components/ui/Combobox';
 import Link from '@/components/SmartLink';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { detectWeakNet, readSaver } from '@/lib/data-saver';
 import { useRouter, useSearchParams } from 'next/navigation';
 import SiteHeader from '@/components/SiteHeader';
 import { LaborJobList } from '@/components/labor/LaborJobList';
@@ -35,6 +36,11 @@ function LaborJobsInner() {
   const [sort, setSort] = useState<'near' | 'match' | 'new'>('near');
   const [hideFilled, setHideFilled] = useState(true);
   const [page, setPage] = useState(1);
+  // Đợt 148 — cuộn là bung trang kế tiếp: các trang sau nối vào danh sách, không cần bấm Trước/Sau.
+  const [acc, setAcc] = useState<WorkerJobCard[]>([]);
+  const [moreBusy, setMoreBusy] = useState(false);
+  const autoPages = useRef(0);
+  const sentinel = useRef<HTMLDivElement | null>(null);
   const [provinces, setProvinces] = useState<string[]>([]);
   const [data, setData] = useState<{ items: WorkerJobCard[]; totalPages: number; total: number } | null>(null);
   const [flex, setFlex] = useState(false);
@@ -56,7 +62,11 @@ function LaborJobsInner() {
   const precise = jo.origin ? isPrecise(jo.origin) : !!snap && !!(snap.oldDistrict || snap.newWardCode);
   const originText = jo.origin ? jo.origin.label : snap ? `nơi ở trong hồ sơ (${[snap.oldDistrict, snap.province].filter(Boolean).join(', ')})` : '';
   useEffect(() => {
-    setData(null);
+    if (page === 1) {
+      setData(null);
+      setAcc([]);
+      autoPages.current = 0;
+    } else setMoreBusy(true);
     const base = { ...snapParams(snap), ...originParams(jo.origin) };
     // Sinh viên: "tìm gần trường" ghi đè vị trí xếp hạng gần/xa bằng khu vực trường đã chọn
     const near = kind === 'student' && schoolArea.province && (schoolArea.oldDistrict || schoolArea.newWardCode);
@@ -68,10 +78,32 @@ function LaborJobsInner() {
         hideFilled: hideFilled ? '1' : undefined, flex: kind === 'student' && flex ? '1' : undefined, page: String(page), pageSize: '20', sort: hasOrigin || (kind === 'student' && schoolArea.province && (schoolArea.oldDistrict || schoolArea.newWardCode)) ? sort : sort === 'near' ? 'new' : sort,
         ...base,
       })
-      .then((r) => setData(r))
-      .catch(() => setData({ items: [], total: 0, totalPages: 1 }));
+      .then((r) => {
+        setData(r);
+        setAcc((a) => (page === 1 ? r.items : [...a, ...r.items.filter((x) => !a.some((y) => y.id === x.id))]));
+      })
+      .catch(() => {
+        if (page === 1) setData({ items: [], total: 0, totalPages: 1 });
+        autoPages.current = 99; // lỗi mạng khi tải thêm: dừng tự bung, chờ người dùng bấm "Xem thêm"
+      })
+      .finally(() => setMoreBusy(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, province, group, qApplied, perks, sort, hideFilled, page, snapKey, flex, schoolArea, shifts, radius, originKey]);
+
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || typeof IntersectionObserver === 'undefined' || !data || page >= data.totalPages) return;
+    const io = new IntersectionObserver(
+      (es) => {
+        if (!es[0]?.isIntersecting || moreBusy || autoPages.current >= 6 || detectWeakNet() || readSaver()) return;
+        autoPages.current += 1;
+        setPage((p) => p + 1);
+      },
+      { rootMargin: '700px 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [data, page, moreBusy, acc.length]);
 
   const savedKey = saved.ids.join(',');
   useEffect(() => {
@@ -226,13 +258,23 @@ function LaborJobsInner() {
       ) : data === null ? (
         <div className="rounded-xl border border-border bg-white p-4 text-[14px] text-ink-muted">Đang tải…</div>
       ) : (
-        <LaborJobList jobs={data.items} who={whoOf(w)} onApply={(id) => w.apply(id)} emptyText="Chưa có tin phù hợp bộ lọc. Hãy điền thông tin để nhà tuyển dụng chủ động liên hệ bạn." />
+        <LaborJobList jobs={acc} who={whoOf(w)} onApply={(id) => w.apply(id)} emptyText="Chưa có tin phù hợp bộ lọc. Hãy điền thông tin để nhà tuyển dụng chủ động liên hệ bạn." />
       )}
       {!showSaved && data && data.totalPages > 1 && (
-        <div className="flex justify-center gap-2">
-          <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="rounded-lg border border-border-strong bg-white px-3 py-1.5 font-bold disabled:text-ink-faint">‹ Trước</button>
-          <span className="rounded-lg bg-white px-3 py-1.5 font-bold">{page}/{data.totalPages}</span>
-          <button type="button" disabled={page >= data.totalPages} onClick={() => setPage(page + 1)} className="rounded-lg border border-border-strong bg-white px-3 py-1.5 font-bold disabled:text-ink-faint">Sau ›</button>
+        <div className="flex flex-col items-center gap-2" aria-live="polite">
+          <div className="text-xs text-ink-muted rounded-lg bg-white px-3 py-1.5">Đang hiện <b>{acc.length}</b> / {data.total} tin</div>
+          {page < data.totalPages ? (
+            <>
+              <div ref={sentinel} className="h-1 w-full" aria-hidden />
+              {moreBusy ? (
+                <div className="text-[13px] text-ink-muted py-2">⟳ Đang tải thêm tin…</div>
+              ) : (
+                <button type="button" onClick={() => { autoPages.current = 0; setPage((p) => p + 1); }} className="rounded-lg border border-border-strong bg-white font-bold text-[14px] w-full sm:w-72 h-12">Xem thêm tin</button>
+              )}
+            </>
+          ) : (
+            <div className="text-[12.5px] text-ink-faint py-1">Đã hiện hết kết quả.</div>
+          )}
         </div>
       )}
     </div>

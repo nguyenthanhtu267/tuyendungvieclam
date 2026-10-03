@@ -92,7 +92,7 @@ export function LaborJobList({
                 </Link>
                 {j.distance && <span className="shrink-0 rounded-lg bg-success-tint text-success font-extrabold text-[12.5px] px-2 py-0.5">{j.distance.label}</span>}
               </div>
-              <div className="text-[13px] font-bold text-ink uppercase truncate">{j.company?.name}</div>
+              <div className="text-[14px] font-bold text-ink uppercase truncate py-1.5 -my-1.5">{j.company?.name}</div>
               {j.trust && <div><TrustBadge t={j.trust} /></div>}
               {(j.warnings ?? []).length > 0 && (
                 <div role="alert" className="rounded-lg border border-critical bg-critical-tint px-2 py-1 text-[12.5px] font-bold text-critical">
@@ -158,7 +158,7 @@ export function LaborJobList({
                       type="button"
                       disabled={st === 'busy' || st === 'done' || st === 'already'}
                       onClick={() => apply(j.id)}
-                      className="rounded-lg bg-accent text-white font-extrabold text-[13px] px-3 py-1.5 disabled:bg-success"
+                      className="rounded-lg bg-accent text-white font-extrabold text-[14px] px-4 py-2 min-h-[42px] disabled:bg-success"
                     >
                       {st === 'done' ? 'Đã ứng tuyển ✓' : st === 'already' ? 'Bạn đã ứng tuyển' : st === 'busy' ? 'Đang gửi…' : 'Ứng tuyển nhanh'}
                     </button>
@@ -168,12 +168,12 @@ export function LaborJobList({
                   type="button"
                   aria-pressed={saved.has(j.id)}
                   onClick={() => saved.toggle(j.id)}
-                  className={`rounded-lg border font-bold text-[13px] px-2.5 py-1.5 ${saved.has(j.id) ? 'border-critical bg-critical-tint text-critical' : 'border-border-strong bg-white text-ink'}`}
+                  className={`rounded-lg border font-bold text-[14px] px-3 py-2 min-h-[42px] ${saved.has(j.id) ? 'border-critical bg-critical-tint text-critical' : 'border-border-strong bg-white text-ink'}`}
                 >
                   {saved.has(j.id) ? '♥ Đã lưu' : '♡ Lưu tin'}
                 </button>
                 {compare && (
-                  <label className={`flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[13px] font-bold cursor-pointer ${picked.some((x) => x.id === j.id) ? 'border-primary bg-primary-tint text-primary' : 'border-border-strong bg-white text-ink'}`} htmlFor={`cmp-${j.id}`}>
+                  <label className={`flex items-center gap-1 rounded-lg border px-3 py-2 min-h-[42px] text-[14px] font-bold cursor-pointer ${picked.some((x) => x.id === j.id) ? 'border-primary bg-primary-tint text-primary' : 'border-border-strong bg-white text-ink'}`} htmlFor={`cmp-${j.id}`}>
                     <input id={`cmp-${j.id}`} type="checkbox" className="w-4 h-4" checked={picked.some((x) => x.id === j.id)} disabled={!picked.some((x) => x.id === j.id) && picked.length >= 3} onChange={() => togglePick(j)} />
                     So sánh
                   </label>

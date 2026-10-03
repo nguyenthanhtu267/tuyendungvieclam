@@ -191,7 +191,7 @@ export function WorkerCredsBox({ w, slug, jobId, hideFill }: { w: ReturnType<typ
           <div className="grid sm:grid-cols-[1fr_1.4fr_auto] gap-2">
             <input id="wc-phone" aria-label="Số điện thoại" className="tvl-input" inputMode="tel" placeholder="Số điện thoại" value={phone} onChange={(e) => setPhone(e.target.value)} />
             <DateSelect value={birth} onChange={setBirth} idPrefix="wc-bd" />
-            <button type="button" onClick={confirm} disabled={busy} className="rounded-lg bg-primary text-white font-bold text-[14px] px-4 py-2">Xác nhận</button>
+            <button type="button" onClick={confirm} disabled={busy} className="rounded-lg bg-primary text-white font-bold text-[15px] px-8 min-w-[9rem] max-sm:w-full min-h-[44px] py-2">Xác nhận</button>
           </div>
           {err && <div className="text-[13.5px] text-critical font-bold">{err}</div>}
         </div>

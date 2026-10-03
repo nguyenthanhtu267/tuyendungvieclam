@@ -1,3 +1,4 @@
+import { normalizeSearchText } from '../common/search-text.util';
 import { SQL_MILLIONS, toMillions } from '../common/job-normalize';
 import { countByColumn } from '../common/count-by';
 import { PROVINCE_ZONES } from '../common/province-info';
@@ -244,19 +245,61 @@ export class JobsService {
       throw new NotFoundException('Không tìm thấy tin tuyển dụng');
     }
 
-    const related = await this.jobRepo
+    // Đợt 148 — "Các công việc tương tự" chấm điểm thay vì bắt buộc trùng ngành: cùng ngành (mạnh nhất), cùng cấp bậc,
+    // tên chức danh giống nhau, cùng tỉnh (CHỈ cộng điểm — khác tỉnh vẫn có thể hiện để gợi ý nhiều hơn), tin mới hơn nhỉnh hơn.
+    // Luôn cùng kênh (văn phòng / công nhân / sinh viên / thực tập) để không lẫn loại việc.
+    const provs = (job.provinces ?? []).filter(Boolean);
+    const qb = this.jobRepo
       .createQueryBuilder('job')
       .leftJoinAndSelect('job.company', 'company')
-      .where('job.approvalStatus = :status', {
-        status: JobApprovalStatus.APPROVED,
-      })
+      .where('job.approvalStatus = :status', { status: JobApprovalStatus.APPROVED })
       .andWhere('job.isPaused = false')
       .andWhere('job.id != :id', { id })
-      .andWhere('job.channel = :ch', { ch: job.channel ?? 'office' })
-      .andWhere('job.industry = :industry', { industry: job.industry ?? '' })
-      .orderBy('job.createdAt', 'DESC')
-      .take(3)
-      .getMany();
+      .andWhere("COALESCE(job.channel, 'office') = :ch", { ch: job.channel ?? 'office' });
+    const orConds: string[] = [];
+    const orParams: Record<string, unknown> = {};
+    if (job.industry) {
+      orConds.push('job.industry = :industry');
+      orParams.industry = job.industry;
+    }
+    if (job.level) {
+      orConds.push('job.level = :level');
+      orParams.level = job.level;
+    }
+    if (provs.length) {
+      orConds.push('job.provinces && ARRAY[:...provs]::text[]');
+      orParams.provs = provs;
+    }
+    if (orConds.length) qb.andWhere(`(${orConds.join(' OR ')})`, orParams);
+    const pool = await qb.orderBy('job.createdAt', 'DESC').take(120).getMany();
+    const words = (t?: string) =>
+      new Set(
+        normalizeSearchText(t ?? '')
+          .split(/[^a-z0-9]+/)
+          .filter((w) => w.length > 2),
+      );
+    const myWords = words(job.title);
+    const now = Date.now();
+    const scored = pool.map((r) => {
+      let sc = 0;
+      if (job.industry && r.industry === job.industry) sc += 50;
+      if (job.level && r.level === job.level) sc += 20;
+      if (provs.length && (r.provinces ?? []).some((p) => provs.includes(p))) sc += 12;
+      const rw = words(r.title);
+      let hit = 0;
+      myWords.forEach((w) => {
+        if (rw.has(w)) hit++;
+      });
+      if (myWords.size) sc += Math.round((hit / myWords.size) * 18);
+      if (r.companyId && r.companyId === job.companyId) sc += 2;
+      const ageDays = Math.max(0, (now - new Date(r.createdAt).getTime()) / 86_400_000);
+      sc += Math.max(0, 6 - ageDays / 10); // tin trong ~60 ngày gần đây được cộng nhẹ
+      return { r, sc };
+    });
+    const related = scored
+      .sort((a, b) => b.sc - a.sc || new Date(b.r.createdAt).getTime() - new Date(a.r.createdAt).getTime())
+      .slice(0, 8)
+      .map((x) => x.r);
     this.applyLogoFallback([job, ...related]);
 
     // Đợt 12p (21/09/2026) — mỗi lượt xem trang chi tiết công khai +1 view_count (dùng cho thống kê

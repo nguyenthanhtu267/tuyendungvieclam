@@ -365,3 +365,8 @@ html[data-theme='dark'] [data-keep-color] { filter: invert(1) hue-rotate(180deg)
 .tvl-richtext-view img, .tvl-richtext-view video, .tvl-richtext-view iframe { max-width: 100%; height: auto; }
 .tvl-richtext-view table { display: block; max-width: 100%; overflow-x: auto; }
 .tvl-richtext-view pre { max-width: 100%; overflow-x: auto; white-space: pre-wrap; }
+
+/* Đợt 148 — màn cảm ứng: nút chính tối thiểu 44px để chạm dễ */
+@media (pointer: coarse) {
+  .tvl-btn-primary, .tvl-btn-accent, .tvl-btn-ghost { min-height: 44px; }
+}
