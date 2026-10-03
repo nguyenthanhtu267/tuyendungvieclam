@@ -415,3 +415,8 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   /* Nút/ô nhập không vượt khung cha. */
   input, select, textarea, button { max-width: 100%; }
 }
+
+/* Đợt 165 — lưới 1 cột trên điện thoại: ô con không bị nội dung không xuống dòng (truncate, nút) kéo giãn quá màn hình. */
+@media (max-width: 767px) {
+  .grid > * { min-width: 0; }
+}

@@ -79,6 +79,17 @@ export function Combobox({
   const box = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Đợt 165 — điện thoại: danh sách gợi ý là khung nổi nằm NGAY TRÊN bàn phím ảo (không bị bàn phím che, không tràn mép), chọn xong thu lại.
+  const [kb, setKb] = useState<number | null>(null);
+  useEffect(() => {
+    if (!open || !isTouchDevice() || !window.visualViewport) { setKb(null); return; }
+    const vv = window.visualViewport;
+    const f = () => setKb(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)));
+    f();
+    vv.addEventListener('resize', f);
+    vv.addEventListener('scroll', f);
+    return () => { vv.removeEventListener('resize', f); vv.removeEventListener('scroll', f); };
+  }, [open]);
   const opts = useMemo(() => options.map(norm), [options]);
   const current = opts.find((o) => o.value === value);
   const shown = useMemo(() => {
@@ -177,7 +188,8 @@ export function Combobox({
       ) : null}
       <span aria-hidden className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-ink-faint">▾</span>
       {open && (
-        <ul ref={listRef} id={listId} role="listbox" className="absolute z-50 left-0 right-0 mt-1 max-h-64 overflow-auto rounded-lg border border-border-strong bg-white shadow-lg text-[14px] font-normal text-ink">
+        <ul ref={listRef} id={listId} role="listbox" style={kb !== null ? { bottom: `calc(${kb}px + 8px + env(safe-area-inset-bottom, 0px))`, maxHeight: `min(46dvh, calc(100dvh - ${kb}px - 5rem))` } : undefined}
+          className={`overscroll-contain overflow-auto rounded-lg border border-border-strong bg-white shadow-lg text-[14px] font-normal text-ink ${kb !== null ? 'fixed z-[80] inset-x-2 mx-auto max-w-[460px] !rounded-2xl shadow-2xl [&>li]:min-h-[44px] [&>li]:items-center' : 'absolute z-50 left-0 right-0 mt-1 max-h-64'}`}>
           {shown.length === 0 ? (
             <li className="px-3 py-2 text-ink-faint">{emptyText} “{q}”</li>
           ) : (

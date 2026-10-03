@@ -77,12 +77,12 @@ export function LaborJobList({
   if (!jobs.length) return <div className="rounded-xl border border-border bg-white p-4 text-[14px] text-ink-muted">{emptyText}</div>;
   return (
     <>
-    <div className="grid md:grid-cols-2 gap-2">
+    <div className="grid grid-cols-[minmax(0,1fr)] md:grid-cols-2 gap-2">
       {jobs.map((j) => {
         const st = state[j.id];
         const perks = (j.perks ?? []).filter((p) => p !== 'no_fee');
         return (
-          <article key={j.id} className={`rounded-xl border bg-white p-3 flex gap-3 ${j.filled ? 'border-border opacity-100' : 'border-border'}`}>
+          <article key={j.id} className={`min-w-0 rounded-xl border bg-white p-3 flex gap-3 ${j.filled ? 'border-border opacity-100' : 'border-border'}`}>
             <CompanyLogo name={j.company?.name ?? ''} logoUrl={j.company?.logoUrl ?? undefined} size={48} />
             <div className="min-w-0 flex-1 flex flex-col gap-1">
               <div className="flex items-start justify-between gap-2">
