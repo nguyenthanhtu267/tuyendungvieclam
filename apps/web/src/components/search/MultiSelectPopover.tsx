@@ -24,6 +24,7 @@ export function MultiSelectPopover({
   emptyText,
   topAction,
   pins,
+  max,
 }: {
   label: string;
   placeholder: string;
@@ -34,6 +35,8 @@ export function MultiSelectPopover({
   // Đợt 66 — mục đặt trên cùng danh sách (VD "Dùng vị trí của tôi").
   // Đợt 74 — ghim tối đa N mục hay chọn (chỉ khi đã đăng nhập).
   pins?: PinsApi;
+  /** Số mục chọn tối đa (vd 3). Chọn đủ → các mục còn lại mờ đi, bỏ bớt một mục để chọn thêm. */
+  max?: number;
   topAction?: { label: string; onClick: () => Promise<string | void> | string | void };
 }) {
   const [actionMsg, setActionMsg] = useState('');
@@ -75,6 +78,17 @@ export function MultiSelectPopover({
     }
   }, [open]);
 
+  // Ngăn kéo luôn nằm TRÊN bàn phím ảo (iOS/Android): đo khoảng bị bàn phím che bằng visualViewport.
+  const [kb, setKb] = useState(0);
+  useEffect(() => {
+    if (!(open && mobile) || !window.visualViewport) { setKb(0); return; }
+    const vv = window.visualViewport;
+    const f = () => setKb(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)));
+    f();
+    vv.addEventListener('resize', f);
+    vv.addEventListener('scroll', f);
+    return () => { vv.removeEventListener('resize', f); vv.removeEventListener('scroll', f); };
+  }, [open, mobile]);
   // Esc đóng bảng (máy tính).
   useEffect(() => {
     if (!open) return;
@@ -100,11 +114,13 @@ export function MultiSelectPopover({
 
   function toggle(value: string, fromList = false) {
     if (selected.includes(value)) onChange(selected.filter((v) => v !== value));
-    else {
+    else if (max && selected.length >= max) {
+      setPinMsg(`Chọn tối đa ${max} mục — bỏ bớt một mục để chọn thêm.`);
+    } else {
       onChange([...selected, value]);
       haptic(10);
       // Điện thoại: chọn xong thu bảng lại ngay để không che màn hình/bấm nhầm.
-      if (fromList && mobile) {
+      if (fromList && (mobile || (max && selected.length + 1 >= max))) {
         dismissKeyboard();
         setOpen(false);
       }
@@ -137,7 +153,7 @@ export function MultiSelectPopover({
                     e.stopPropagation();
                     toggle(v);
                   }}
-                  className="text-primary/70 hover:text-primary"
+                  className="text-primary/70 hover:text-primary max-sm:hidden"
                 >
                   ✕
                 </span>
@@ -158,10 +174,10 @@ export function MultiSelectPopover({
         <div
           className={
             mobile
-              ? 'fixed inset-x-0 bottom-0 z-[71] max-h-[78vh] rounded-t-2xl border-t border-border bg-white shadow-2xl flex flex-col overflow-hidden'
+              ? 'fixed inset-x-2 z-[71] mx-auto max-w-[460px] max-h-[min(78dvh,calc(100dvh-5rem))] rounded-2xl border border-border bg-white shadow-2xl flex flex-col overflow-hidden'
               : 'absolute z-40 mt-1.5 w-[min(360px,90vw)] max-h-[380px] rounded-xl border border-border bg-white shadow-lg flex flex-col overflow-hidden'
           }
-          style={mobile ? { paddingBottom: 'env(safe-area-inset-bottom, 0px)' } : undefined}
+          style={mobile ? { bottom: `calc(${kb}px + 8px + env(safe-area-inset-bottom, 0px))`, maxHeight: kb ? `calc(100dvh - ${kb}px - 1rem)` : undefined } : undefined}
         >
           <div className="sticky top-0 bg-white border-b border-border px-3 pt-3 pb-2.5 flex flex-col gap-2">
             {mobile && <div className="mx-auto h-1 w-10 rounded-full bg-border-strong -mt-1" aria-hidden />}
@@ -212,12 +228,21 @@ export function MultiSelectPopover({
                 📍 {topAction.label}
               </button>
             )}
+            {mobile && selected.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {selected.map((v) => (
+                  <button key={v} type="button" onClick={() => toggle(v)} className="inline-flex items-center gap-1 rounded-full bg-primary-tint px-2.5 py-1 text-[12.5px] font-semibold text-primary max-w-full">
+                    <span className="truncate">{v}</span><span aria-hidden>✕</span>
+                  </button>
+                ))}
+              </div>
+            )}
             {actionMsg && <div className="text-[11.5px] text-critical">{actionMsg}</div>}
             {pinMsg && <div className="text-[11.5px] text-critical">{pinMsg}</div>}
             {pins && !pinMsg && <div className="text-[11px] text-ink-faint">Bấm 📌 cạnh mục hay tìm để ghim lên đầu (tối đa {pins.max}).</div>}
             <div className="flex items-center justify-between text-[11px]">
               <span className="text-ink-faint">
-                {selected.length === 0 ? emptyText : `${selected.length} ${label.toLowerCase()} đã chọn`}
+                {selected.length === 0 ? emptyText : max ? `Đã chọn ${selected.length}/${max}` : `${selected.length} ${label.toLowerCase()} đã chọn`}
               </span>
               {selected.length > 0 && (
                 <button type="button" onClick={() => onChange([])} className="font-bold text-primary hover:underline">
@@ -236,7 +261,7 @@ export function MultiSelectPopover({
                 {g.label && (
                   <div className="px-3 pt-2 pb-1 flex items-center justify-between text-[10.5px] font-bold uppercase tracking-wide text-ink-faint">
                     <span>{g.label}</span>
-                    {!query.trim() && g.options.length > 1 && !g.label.startsWith('📌') && (() => {
+                    {!max && !query.trim() && g.options.length > 1 && !g.label.startsWith('📌') && (() => {
                       const all = g.options.every((o) => selected.includes(o));
                       return (
                         <button
@@ -252,8 +277,9 @@ export function MultiSelectPopover({
                 )}
                 {g.options.map((opt) => {
                   const checked = selected.includes(opt);
+                  const locked = !!max && !checked && selected.length >= max;
                   return (
-                    <div key={opt} className="flex items-center hover:bg-surface-alt">
+                    <div key={opt} className={`flex items-center hover:bg-surface-alt ${locked ? 'opacity-45' : ''}`}>
                       <label className="flex-1 min-w-0 flex items-center gap-2.5 pl-3 py-2 max-sm:py-3 cursor-pointer">
                         <input
                           type="checkbox"

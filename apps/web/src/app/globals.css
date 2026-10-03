@@ -400,3 +400,18 @@ html { scroll-padding-top: 64px; }
   body { background: #fff !important; }
   a[href^='http']:after { content: ' (' attr(href) ')'; font-size: 10px; color: #555; }
 }
+
+/* ===== Đợt 164 — điện thoại: nội dung nằm gọn trong khung màn hình ===== */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+@media (max-width: 639px) {
+  /* Màn hình xoay ngang/tai thỏ: chừa vùng an toàn hai bên để chữ không sát mép/bị che. */
+  body { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+  /* Hàng chip cuộn ngang: bắt dính từng chip, không tràn trang. */
+  .no-scrollbar { scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
+  .no-scrollbar > * { scroll-snap-align: start; }
+  /* Bảng/khối rộng nằm trong khung cuộn riêng thay vì đẩy cả trang. */
+  main table { display: block; max-width: 100%; overflow-x: auto; }
+  main pre, main code { white-space: pre-wrap; word-break: break-word; }
+  /* Nút/ô nhập không vượt khung cha. */
+  input, select, textarea, button { max-width: 100%; }
+}

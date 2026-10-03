@@ -106,7 +106,8 @@ export function FilterBar({
             groups={PROVINCE_GROUPS}
             selected={value.provinces ?? []}
             onChange={(v) => onChange({ provinces: v })}
-            emptyText="Chọn địa điểm"
+            emptyText="Chọn tối đa 3 địa điểm"
+            max={3}
             pins={provincePins}
             topAction={{
               label: 'Dùng vị trí của tôi',
@@ -135,7 +136,8 @@ export function FilterBar({
             groups={INDUSTRY_GROUPS}
             selected={value.industries ?? []}
             onChange={(v) => onChange({ industries: v })}
-            emptyText="Vui lòng chọn ngành nghề"
+            emptyText="Chọn tối đa 3 ngành nghề"
+            max={3}
             pins={industryPins}
           />
         </div>
@@ -177,10 +179,10 @@ export function FilterBar({
       <div
         className={
           sheet
-            ? 'flex flex-col gap-3 fixed inset-x-0 bottom-0 z-[61] max-h-[80vh] overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl sm:contents'
+            ? 'flex flex-col gap-3 fixed inset-x-2 bottom-2 z-[61] mx-auto max-w-[460px] max-h-[calc(100dvh-5rem)] overflow-y-auto overscroll-contain rounded-2xl border border-border bg-white p-4 shadow-2xl sm:contents'
             : 'hidden sm:contents'
         }
-        style={sheet ? { paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))' } : undefined}
+        style={sheet ? { marginBottom: 'env(safe-area-inset-bottom, 0px)' } : undefined}
       >
       {sheet && (
         <div className="flex items-center justify-between sm:hidden">

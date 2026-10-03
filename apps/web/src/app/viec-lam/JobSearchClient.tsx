@@ -114,7 +114,11 @@ function JobSearchPage({ initial, initialFacets, seed = 0 }: { initial: { key: s
   const pendRef = useRef<Partial<JobListParams>>({});
   const pendTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const urlFilters: JobListParams = parseJobFilters((k) => searchParams.get(k));
-  const filters: JobListParams = { ...urlFilters, ...pend };
+  // Đợt 164 — chọn nhanh nhiều mục khi mạng chậm: URL cập nhật chậm hơn thao tác, nên giữ lựa chọn "lạc quan" tới khi URL bắt kịp (trước đây lần chọn thứ 2 có thể làm mất lần thứ 1).
+  const [opt, setOpt] = useState<Partial<JobListParams>>({});
+  const urlKey = searchParams.toString();
+  useEffect(() => { setOpt({}); }, [urlKey]);
+  const filters: JobListParams = { ...urlFilters, ...opt, ...pend };
   const page = Number(searchParams.get('page') ?? '1');
 
   const [qInput, setQInput] = useState(filters.q ?? '');
@@ -383,6 +387,7 @@ function JobSearchPage({ initial, initialFacets, seed = 0 }: { initial: { key: s
     );
     params.delete('page');
     try { if (params.toString()) localStorage.setItem('tvl_last_search', params.toString()); } catch { /* bỏ qua */ }
+    setOpt((o) => ({ ...o, ...next }));
     router.push(`/viec-lam?${params.toString()}`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -810,7 +815,7 @@ function JobSearchPage({ initial, initialFacets, seed = 0 }: { initial: { key: s
           {quick && sel ? (
             <>
               <div className="lg:hidden fixed inset-0 z-[60] bg-black/40" onClick={() => setSel(null)} aria-hidden />
-              <div className="lg:hidden fixed inset-x-0 bottom-0 z-[61] max-h-[85vh] rounded-t-2xl overflow-hidden shadow-2xl bg-white" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+              <div className="lg:hidden fixed inset-x-2 bottom-2 z-[61] mx-auto max-w-[520px] max-h-[calc(100dvh-5rem)] rounded-2xl border border-border overflow-hidden shadow-2xl bg-white" style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}>
                 <JobQuickView jobId={sel} onClose={() => setSel(null)} sheet />
               </div>
             </>
