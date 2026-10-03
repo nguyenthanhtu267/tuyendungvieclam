@@ -15,9 +15,21 @@ export interface ShareBgConfig {
   fixedId: string;
   presets: string[];
   custom: { id: string; name: string; dataUrl: string }[];
+  /** Chữ cố định in trên ảnh (Admin sửa được). Chữ theo từng tin (tiêu đề, công ty, lương, liên hệ...) luôn lấy từ tin. */
+  texts: ShareTexts;
 }
+export interface ShareTexts { brand: string; tagline: string; urgent: string; fallback: string }
+export const DEFAULT_TEXTS: ShareTexts = { brand: 'VIỆC LÀM NGAY', tagline: 'vieclamngay.vn · Ứng tuyển miễn phí', urgent: 'TUYỂN GẤP', fallback: 'Bấm vào liên kết để xem chi tiết và ứng tuyển' };
+const cleanTexts = (t: Partial<ShareTexts> | undefined): ShareTexts => {
+  const o = { ...DEFAULT_TEXTS };
+  (Object.keys(o) as (keyof ShareTexts)[]).forEach((k) => {
+    const v = t?.[k];
+    if (typeof v === 'string' && v.trim()) o[k] = v.trim().slice(0, k === 'brand' ? 24 : 70);
+  });
+  return o;
+};
 
-const DEFAULT_CFG: ShareBgConfig = { mode: 'daily', fixedId: 'p1', presets: [...SHARE_PRESET_IDS], custom: [] };
+const DEFAULT_CFG: ShareBgConfig = { mode: 'daily', fixedId: 'p1', presets: [...SHARE_PRESET_IDS], custom: [], texts: { ...DEFAULT_TEXTS } };
 
 @Injectable()
 export class ShareBgService implements OnModuleInit {
@@ -37,6 +49,7 @@ export class ShareBgService implements OnModuleInit {
         fixedId: typeof v.fixedId === 'string' ? v.fixedId : DEFAULT_CFG.fixedId,
         presets: Array.isArray(v.presets) ? v.presets.filter((x) => SHARE_PRESET_IDS.includes(x)) : [...SHARE_PRESET_IDS],
         custom: Array.isArray(v.custom) ? v.custom : [],
+        texts: cleanTexts(v.texts),
       };
     } catch {
       return { ...DEFAULT_CFG };
@@ -56,11 +69,12 @@ export class ShareBgService implements OnModuleInit {
     return { ...c, custom: c.custom.map((x) => ({ id: x.id, name: x.name, dataUrl: x.dataUrl })) };
   }
 
-  async update(b: { mode?: string; fixedId?: string; presets?: string[] }) {
+  async update(b: { mode?: string; fixedId?: string; presets?: string[]; texts?: Partial<ShareTexts> }) {
     const c = await this.get();
     if (b.mode === 'daily' || b.mode === 'fixed') c.mode = b.mode;
     if (typeof b.fixedId === 'string') c.fixedId = b.fixedId;
     if (Array.isArray(b.presets)) c.presets = b.presets.filter((x) => SHARE_PRESET_IDS.includes(x));
+    if (b.texts) c.texts = cleanTexts(b.texts);
     const ids = [...SHARE_PRESET_IDS, ...c.custom.map((x) => x.id)];
     if (!ids.includes(c.fixedId)) c.fixedId = 'p1';
     if (!c.presets.length && !c.custom.length) throw new BadRequestException('Cần giữ ít nhất một nền trong vòng đổi theo ngày');
@@ -87,8 +101,13 @@ export class ShareBgService implements OnModuleInit {
   }
 
   /** Nền áp dụng cho một ngày (yyyy-mm-dd, giờ Việt Nam). `only` = xem thử một nền cụ thể. */
-  async pick(date?: string, only?: string): Promise<{ type: 'preset' | 'image'; id: string; dataUrl?: string }> {
+  async pick(date?: string, only?: string): Promise<{ type: 'preset' | 'image'; id: string; dataUrl?: string; texts?: ShareTexts }> {
     const c = await this.get();
+    const r = await this.pickBg(c, date, only);
+    return { ...r, texts: c.texts };
+  }
+
+  private async pickBg(c: ShareBgConfig, date?: string, only?: string): Promise<{ type: 'preset' | 'image'; id: string; dataUrl?: string }> {
     const find = (id: string) => {
       const cu = c.custom.find((x) => x.id === id);
       if (cu) return { type: 'image' as const, id: cu.id, dataUrl: cu.dataUrl };

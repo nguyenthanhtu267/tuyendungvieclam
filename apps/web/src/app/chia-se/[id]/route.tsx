@@ -37,7 +37,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const only = new URL(req.url).searchParams.get('bg') || '';
   const [b1, b2, r1, r2] = await Promise.all([font('inter-latin-700'), font('inter-vietnamese-700'), font('inter-latin-400'), font('inter-vietnamese-400')]);
   let j: Meta | null = null;
-  let bg: { type: 'preset' | 'image'; id: string; dataUrl?: string } = { type: 'preset', id: 'p1' };
+  let bg: { type: 'preset' | 'image'; id: string; dataUrl?: string; texts?: { brand: string; tagline: string; urgent: string; fallback: string } } = { type: 'preset', id: 'p1' };
   const [mRes, bRes] = await Promise.allSettled([
     fetch(`${API}/jobs/${encodeURIComponent(params.id)}/share-meta`, { next: { revalidate: 300 }, signal: AbortSignal.timeout(6000) }),
     fetch(`${API}/public/share-bg?d=${vnToday()}${only ? `&only=${encodeURIComponent(only)}` : ''}`, { cache: 'no-store', signal: AbortSignal.timeout(6000) }),
@@ -49,6 +49,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     if (bRes.status === 'fulfilled' && bRes.value.ok) bg = await bRes.value.json();
   } catch { /* nền mặc định */ }
 
+  const tx = { brand: 'VIỆC LÀM NGAY', tagline: 'vieclamngay.vn · Ứng tuyển miễn phí', urgent: 'TUYỂN GẤP', fallback: 'Bấm vào liên kết để xem chi tiết và ứng tuyển', ...(bg.texts ?? {}) };
   const bgSrc = bg.type === 'image' && bg.dataUrl ? bg.dataUrl : svgDataUri(presetById(bg.id).svg);
   const title = (j?.title ?? 'Tin tuyển dụng').slice(0, 110);
   const tSize = title.length <= 38 ? 68 : title.length <= 64 ? 58 : 48;
@@ -70,11 +71,11 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <div style={{ width: 58, height: 58, borderRadius: 14, background: 'white', color: '#173B7A', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 16, fontSize: 34, fontWeight: 700 }}>V</div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', fontSize: 34, fontWeight: 700, letterSpacing: 1 }}>VIỆC LÀM NGAY</div>
-                <div style={{ display: 'flex', fontSize: 21, fontWeight: 400, color: '#D5E1F7' }}>vieclamngay.vn · Ứng tuyển miễn phí</div>
+                <div style={{ display: 'flex', fontSize: 34, fontWeight: 700, letterSpacing: 1 }}>{tx.brand}</div>
+                <div style={{ display: 'flex', fontSize: 21, fontWeight: 400, color: '#D5E1F7' }}>{tx.tagline}</div>
               </div>
             </div>
-            {j?.urgent && <div style={{ display: 'flex', background: '#E5484D', fontSize: 26, fontWeight: 700, padding: '8px 20px', borderRadius: 12 }}>TUYỂN GẤP</div>}
+            {j?.urgent && <div style={{ display: 'flex', background: '#E5484D', fontSize: 26, fontWeight: 700, padding: '8px 20px', borderRadius: 12 }}>{tx.urgent}</div>}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -96,7 +97,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
                 </div>
               ))
             ) : (
-              <div style={{ display: 'flex', fontSize: 28, fontWeight: 400, color: '#D5E1F7' }}>Bấm vào liên kết để xem chi tiết và ứng tuyển</div>
+              <div style={{ display: 'flex', fontSize: 28, fontWeight: 400, color: '#D5E1F7' }}>{tx.fallback}</div>
             )}
           </div>
         </div>

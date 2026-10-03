@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, jobsApi } from '@/lib/api';
-import { adminApi, type ShareBgAdmin } from '@/lib/api-admin';
+import { adminApi, type ShareBgAdmin, type ShareTexts } from '@/lib/api-admin';
 import { SHARE_PRESETS, presetById, svgDataUri } from '@/lib/share-presets';
 
 // Đợt 153 — Admin chọn nền cho ảnh xem trước khi dán link tin tuyển dụng lên Facebook/Zalo.
@@ -25,11 +25,13 @@ function readFile(f: File): Promise<string> {
 export function ShareBgPanel({ token }: { token: string }) {
   const [cfg, setCfg] = useState<ShareBgAdmin | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
-  const [prev, setPrev] = useState('');
+  const [prev, setPrev] = useState('p1');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [name, setName] = useState('');
   const [stamp, setStamp] = useState(0);
+  const [tx, setTx] = useState<ShareTexts | null>(null);
+  useEffect(() => { if (cfg && !tx) setTx(cfg.texts); }, [cfg, tx]);
 
   useEffect(() => {
     adminApi.shareBgGet(token).then(setCfg).catch((e) => setNote({ ok: false, text: msg(e) }));
@@ -100,6 +102,22 @@ export function ShareBgPanel({ token }: { token: string }) {
         {cfg.mode === 'fixed' && (
           <div className="text-xs text-ink-muted">Bấm “Dùng làm nền cố định” dưới nền muốn chọn. Nền đang cố định: <b>{all.find((a) => a.id === cfg.fixedId)?.name ?? presetById(cfg.fixedId).name}</b></div>
         )}
+      </div>
+
+      <div className="rounded-lg border border-border bg-white p-3 space-y-2">
+        <div className="font-bold text-sm">Chữ cố định trên ảnh</div>
+        <p className="text-xs text-ink-muted">Chỉ gồm chữ không đổi giữa các tin. Tiêu đề, công ty, lương, địa điểm, số điện thoại, email, địa chỉ luôn tự lấy từ từng tin tuyển dụng.</p>
+        {tx && (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {([['brand', 'Tên web (góc trên)'], ['tagline', 'Dòng giới thiệu dưới tên web'], ['urgent', 'Nhãn tin gấp'], ['fallback', 'Câu hiện khi tin không có thông tin liên hệ']] as [keyof ShareTexts, string][]).map(([k, l]) => (
+              <label key={k} className="text-xs font-bold space-y-1 block">
+                {l}
+                <input id={`sbt-${k}`} className="tvl-input !text-sm" value={tx[k]} maxLength={k === 'brand' ? 24 : 70} onChange={(e) => setTx({ ...tx, [k]: e.target.value })} />
+              </label>
+            ))}
+          </div>
+        )}
+        <button className={btnP} disabled={busy || !tx} onClick={() => tx && run(() => adminApi.shareBgSet(token, { texts: tx }), 'Đã lưu chữ cố định.').then(() => setStamp(Date.now()))}>Lưu chữ cố định</button>
       </div>
 
       <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
