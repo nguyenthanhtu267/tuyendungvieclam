@@ -1,7 +1,7 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { text } from 'express';
+import { json, text } from 'express';
 import { AppModule } from './app.module';
 import { resolveCorsOrigins } from './config/env-guard';
 import { requestLogger } from './common/request-logger.middleware';
@@ -37,6 +37,10 @@ async function bootstrap() {
   app.use(httpCache);
   // Đợt 19 (26/09/2026) — bộ ghi truy cập gửi lô dữ liệu bằng navigator.sendBeacon dạng text/plain (loại
   // "simple request" nên không cần preflight CORS, vẫn gửi được lúc người dùng đóng tab).
+  // Đợt 153 — ảnh nền chia sẻ tự tải lên (base64, tối đa ~650KB) cần giới hạn thân lớn hơn mặc định 100KB.
+  // (bọc trong hàm riêng: Nest nhận ra middleware tên "jsonParser" và sẽ KHÔNG đăng ký bộ đọc JSON mặc định cho cả API.)
+  const bigJson = json({ limit: '1.5mb' });
+  app.use('/admin/share-bg/custom', (req: any, res: any, next: any) => bigJson(req, res, next));
   app.use('/analytics/collect', text({ type: 'text/plain', limit: '100kb' }));
   // Đợt 93 — số đo tốc độ thật (Web Vitals) cũng gửi bằng sendBeacon text/plain.
   app.use('/analytics/vitals', text({ type: 'text/plain', limit: '4kb' }));

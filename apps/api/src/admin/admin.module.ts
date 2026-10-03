@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdminService } from './admin.service';
-import { AdminController, PublicSettingsController, MailScanCronController, SourceScanCronController, EmailUnsubController } from './admin.controller';
+import { AdminController, PublicSettingsController, MailScanCronController, SourceScanCronController, EmailUnsubController, ShareBgPublicController } from './admin.controller';
 import { Company } from '../database/entities/company.entity';
 import { CompanyUser } from '../database/entities/company-user.entity';
 import { JobPosting } from '../database/entities/job-posting.entity';
@@ -19,6 +19,7 @@ import { JobImport } from '../database/entities/job-import.entity';
 import { JobSource } from '../database/entities/job-source.entity';
 import { JobSourceService } from './job-source.service';
 import { SupportMailService } from './support-mail.service';
+import { ShareBgService } from './share-bg.service';
 import { JobImportService } from './job-import.service';
 import { MailScanService } from './mail-scan.service';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -44,8 +45,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ]),
     NotificationsModule,
   ],
-  controllers: [AdminController, PublicSettingsController, MailScanCronController, SourceScanCronController, EmailUnsubController],
-  providers: [AdminService, JobImportService, MailScanService, JobSourceService, SupportMailService],
+  controllers: [AdminController, PublicSettingsController, MailScanCronController, SourceScanCronController, EmailUnsubController, ShareBgPublicController],
+  providers: [AdminService, JobImportService, MailScanService, JobSourceService, SupportMailService, ShareBgService],
   exports: [AdminService, JobImportService],
 })
 export class AdminModule {}

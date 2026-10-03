@@ -20,6 +20,7 @@ import { JobWizardSteps, JOB_WIZARD_INITIAL, type JobWizardFormState } from '@/c
 import { INDUSTRIES, PROVINCES } from '@/lib/catalogs';
 import { SortTh, useSort } from '@/components/ui/SortTh';
 import { MailCenter } from '@/components/admin/MailCenter';
+import { ShareBgPanel } from '@/components/admin/ShareBgPanel';
 
 // Đợt 93 — mỗi tab Admin nạp RIÊNG khi được mở (trước đây cả 9 bảng ~230KB JS tải ngay khi vào trang). Có `loading` riêng để
 // không làm ranh giới Suspense ở trên cùng hiện lại khung xương (xem DeferredWidgets).
@@ -67,6 +68,8 @@ const NAV_ITEMS = [
   { id: 'ads', label: '📢 Banner quảng cáo' },
   // Đợt 29 (30/09/2026) — nền vector toàn website (15 mẫu, cố định hoặc tự đổi mỗi 2 giờ).
   { id: 'background', label: '🎨 Nền giao diện' },
+  // Đợt 153 — ảnh xem trước khi dán link tin lên Facebook/Zalo.
+  { id: 'share', label: '🖼️ Ảnh chia sẻ' },
   // Đợt 63 — tin trùng / đáng ngờ / chất lượng thấp.
   { id: 'quality', label: '🧹 Chất lượng dữ liệu' },
   { id: 'audit-log', label: '📜 Nhật ký thao tác' },
@@ -1030,6 +1033,8 @@ export default function AdminDashboardPage() {
           <SourcedTabs token={token} />
         ) : tab === 'mailbox' ? (
           <MailCenter token={token} />
+        ) : tab === 'share' ? (
+          <ShareBgPanel token={token} />
         ) : tab === 'ads' ? (
           <AdsPanel token={token} />
         ) : tab === 'quality' ? (

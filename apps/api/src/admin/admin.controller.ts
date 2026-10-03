@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
   Res,
@@ -32,6 +33,7 @@ import { JobImportService } from './job-import.service';
 import { MailScanService } from './mail-scan.service';
 import { JobSourceService } from './job-source.service';
 import { SupportMailService } from './support-mail.service';
+import { ShareBgService } from './share-bg.service';
 import { ExtractJobUrlDto } from './dto/extract-job-url.dto';
 import { UpdatePromoBadgeDto } from './dto/promo-badge.dto';
 
@@ -56,6 +58,7 @@ export class AdminController {
     private readonly mailScan: MailScanService,
     private readonly sources: JobSourceService,
     private readonly support: SupportMailService,
+    private readonly shareBg: ShareBgService,
   ) {}
 
   @Get('dashboard')
@@ -293,6 +296,24 @@ export class AdminController {
   @Delete('job-sources/:id')
   sourcesRemove(@Param('id') id: string) {
     return this.sources.remove(id);
+  }
+
+  // ===== Đợt 153 — nền ảnh chia sẻ tin tuyển dụng =====
+  @Get('share-bg')
+  shareBgGet() {
+    return this.shareBg.adminView();
+  }
+  @Put('share-bg')
+  shareBgSet(@Body() b: { mode?: string; fixedId?: string; presets?: string[] }) {
+    return this.shareBg.update(b ?? {});
+  }
+  @Post('share-bg/custom')
+  shareBgAdd(@Body() b: { name?: string; dataUrl: string }) {
+    return this.shareBg.addCustom(String(b?.name || ''), String(b?.dataUrl || ''));
+  }
+  @Delete('share-bg/custom/:id')
+  shareBgRemove(@Param('id') id: string) {
+    return this.shareBg.removeCustom(id);
   }
 
   // ===== Đợt 150 — Hộp thư (thư hỗ trợ, mẫu email, danh sách email, chiến dịch) =====
@@ -742,5 +763,16 @@ export class EmailUnsubController {
   async unsub(@Query('e') e: string, @Query('t') t: string, @Res() res: Response) {
     const html = await this.support.unsubscribe(String(e || ''), String(t || ''));
     res.type('html').send(html);
+  }
+}
+
+// Đợt 153 — web (máy chủ Vercel) hỏi nền ảnh chia sẻ của ngày hôm nay.
+@Controller('public/share-bg')
+export class ShareBgPublicController {
+  constructor(private readonly shareBg: ShareBgService) {}
+
+  @Get()
+  pick(@Query('d') d?: string, @Query('only') only?: string) {
+    return this.shareBg.pick(d, only);
   }
 }

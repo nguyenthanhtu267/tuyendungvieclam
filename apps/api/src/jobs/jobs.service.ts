@@ -229,6 +229,11 @@ export class JobsService {
       salaryMax: job.salaryMax ?? null,
       location: job.provinces?.[0] ?? job.location ?? '',
       urgent: !!job.isUrgent,
+      // Đợt 153 — thông tin liên hệ công khai của tin (đã hiển thị trên trang tin) để in lên ảnh chia sẻ.
+      contactPhone: job.contactPhone ?? null,
+      contactEmail: job.contactEmail ?? null,
+      address: job.address || job.company?.address || null,
+      deadline: job.deadline ?? null,
     };
   }
 
