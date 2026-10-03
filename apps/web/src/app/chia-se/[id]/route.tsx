@@ -254,7 +254,7 @@ async function render(req: Request, rawId: string) {
     {
       width: W,
       height: H,
-      headers: { 'Cache-Control': preview ? 'no-store' : 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400' },
+      headers: { 'Cache-Control': preview ? 'no-store' : 'public, max-age=300, s-maxage=600, stale-while-revalidate=3600' },
       fonts: [
         { name: 'InterL', data: b1, weight: 700, style: 'normal' },
         { name: 'InterV', data: b2, weight: 700, style: 'normal' },

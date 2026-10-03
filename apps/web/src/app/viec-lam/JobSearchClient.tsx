@@ -576,7 +576,7 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
                   type="button"
                   onClick={() => { setQuick((v) => !v); setSel(null); }}
                   aria-pressed={quick}
-                  className={`hidden lg:inline-flex items-center h-9 px-3 rounded-full border text-[13px] font-bold ${quick ? 'bg-primary text-white border-primary' : 'border-border-strong text-ink'}`}
+                  className={`inline-flex items-center h-9 px-3 rounded-full border text-[13px] font-bold ${quick ? 'bg-primary text-white border-primary' : 'border-border-strong text-ink'}`}
                 >
                   👁 Xem nhanh
                 </button>
@@ -713,7 +713,7 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
                     id={`jc-${job.id}`}
                     className={quick && sel === job.id ? 'rounded-xl ring-2 ring-primary' : undefined}
                     onClickCapture={(e) => {
-                      if (!quick || pickMode || !window.matchMedia('(min-width: 1024px)').matches) return;
+                      if (!quick || pickMode) return;
                       if ((e.target as HTMLElement).closest('button, input, select, a[href^="tel:"]')) return;
                       e.preventDefault();
                       e.stopPropagation();
@@ -804,6 +804,15 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
             <div className="hidden lg:block lg:self-stretch">
               <JobQuickView jobId={sel} onClose={() => setSel(null)} />
             </div>
+          ) : null}
+          {/* Đợt 161 — điện thoại / máy tính bảng dọc: "Xem nhanh" hiện dạng bảng trượt từ dưới lên (trước đây chỉ máy tính có). */}
+          {quick && sel ? (
+            <>
+              <div className="lg:hidden fixed inset-0 z-[60] bg-black/40" onClick={() => setSel(null)} aria-hidden />
+              <div className="lg:hidden fixed inset-x-0 bottom-0 z-[61] max-h-[85vh] rounded-t-2xl overflow-hidden shadow-2xl bg-white" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+                <JobQuickView jobId={sel} onClose={() => setSel(null)} sheet />
+              </div>
+            </>
           ) : null}
           <div className={`flex flex-col gap-3.5 lg:self-stretch ${quick && sel ? 'lg:hidden' : ''}`}>
             <div className="rounded-xl bg-primary p-[18px] flex flex-col gap-2">

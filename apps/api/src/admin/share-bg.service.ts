@@ -23,6 +23,38 @@ export interface ShareBgConfig {
   format: ShareFormat;
   /** Đợt 159 — hình người do Admin tự tải lên (nam / nữ) + chỉnh to nhỏ, lật trái–phải. */
   cast: ShareCast;
+  /** Đợt 161 — lịch đổi nền: mỗi N giờ/ngày, lần lượt hoặc ngẫu nhiên không lặp trong một vòng. */
+  rotate: ShareRotate;
+  rotV?: number;
+}
+export interface ShareRotate { every: number; unit: 'hour' | 'day'; order: 'sequential' | 'random' }
+export const cleanRotate = (r: unknown): ShareRotate => {
+  const x = (r && typeof r === 'object' ? r : {}) as Partial<ShareRotate>;
+  const unit = x.unit === 'hour' ? 'hour' : 'day';
+  return { unit, every: num(x.every, 1, unit === 'hour' ? 168 : 60, 1), order: x.order === 'random' ? 'random' : 'sequential' };
+};
+const VN_MS = 7 * 3600_000;
+function shuffled(n: number, cycle: number): number[] {
+  let a = (cycle * 2654435761 + n * 97 + 12345) >>> 0;
+  const rnd = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const arr = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+  return arr;
+}
+/** Chỉ số nền (trong danh sách n nền) ở ô thời gian `slot`. Ngẫu nhiên: mỗi vòng n ô xáo trộn 1 lần → không lặp trong vòng, và không trùng nền liền kề giữa 2 vòng. */
+export function slotIndex(n: number, slot: number, order: 'sequential' | 'random'): number {
+  if (n <= 1) return 0;
+  if (order === 'sequential' || n === 2) return ((slot % n) + n) % n; // 2 nền: luân phiên là cách duy nhất không trùng liền kề
+  const cycle = Math.floor(slot / n);
+  const pos = ((slot % n) + n) % n;
+  const cur = shuffled(n, cycle);
+  if (pos === 0) {
+    const prevLast = shuffled(n, cycle - 1)[n - 1];
+    if (cur[0] === prevLast) [cur[0], cur[1]] = [cur[1], cur[0]];
+  } else if (pos === 1 && cur[0] === shuffled(n, cycle - 1)[n - 1]) {
+    [cur[0], cur[1]] = [cur[1], cur[0]];
+  }
+  return cur[pos];
 }
 export interface CastPerson { dataUrl: string; w: number; h: number; scale: number; flip: boolean }
 export interface ShareCast { source: 'vector' | 'upload'; male: CastPerson; female: CastPerson }
@@ -95,7 +127,7 @@ const cleanTexts = (t: Partial<ShareTexts> | undefined): ShareTexts => {
   return o;
 };
 
-const DEFAULT_CFG: ShareBgConfig = { mode: 'daily', fixedId: 'p1', presets: [...SHARE_PRESET_IDS], custom: [], texts: { ...DEFAULT_TEXTS }, style: cleanStyle({}), people: 'none', format: 'wide', cast: cleanCast({}) };
+const DEFAULT_CFG: ShareBgConfig = { mode: 'daily', fixedId: 'p1', presets: [...SHARE_PRESET_IDS], custom: [], texts: { ...DEFAULT_TEXTS }, style: cleanStyle({}), people: 'none', format: 'wide', cast: cleanCast({}), rotate: cleanRotate({}), rotV: 2 };
 
 @Injectable()
 export class ShareBgService implements OnModuleInit {
@@ -113,8 +145,16 @@ export class ShareBgService implements OnModuleInit {
       return {
         mode: v.mode === 'fixed' ? 'fixed' : 'daily',
         fixedId: typeof v.fixedId === 'string' ? v.fixedId : DEFAULT_CFG.fixedId,
-        presets: Array.isArray(v.presets) ? v.presets.filter((x) => SHARE_PRESET_IDS.includes(x)) : [...SHARE_PRESET_IDS],
-        custom: Array.isArray(v.custom) ? v.custom : [],
+        ...(() => {
+          const custom = Array.isArray(v.custom) ? v.custom : [];
+          const cids = custom.map((x) => x.id);
+          let presets = Array.isArray(v.presets) ? v.presets.filter((x) => SHARE_PRESET_IDS.includes(x) || cids.includes(x)) : [...SHARE_PRESET_IDS];
+          // Bản cũ: ảnh tự tải luôn nằm trong vòng đổi → giữ nguyên hành vi khi nâng cấp
+          if ((v as { rotV?: number }).rotV !== 2) presets = [...presets.filter((x) => !cids.includes(x)), ...cids];
+          return { custom, presets };
+        })(),
+        rotate: cleanRotate((v as { rotate?: unknown }).rotate),
+        rotV: 2,
         texts: cleanTexts(v.texts),
         style: cleanStyle((v as { style?: unknown }).style),
         people: cleanPeople((v as { people?: unknown }).people),
@@ -136,14 +176,15 @@ export class ShareBgService implements OnModuleInit {
   // Cho Admin: trả về cấu hình, ảnh tự tải lên rút gọn (không kèm dữ liệu ảnh) để danh sách nhẹ.
   async adminView() {
     const c = await this.get();
-    return { ...c, custom: c.custom.map((x) => ({ id: x.id, name: x.name, dataUrl: x.dataUrl })) };
+    return { ...c, custom: c.custom.map((x) => ({ id: x.id, name: x.name, dataUrl: x.dataUrl })), schedule: this.schedule(c) };
   }
 
-  async update(b: { mode?: string; fixedId?: string; presets?: string[]; texts?: Partial<ShareTexts>; style?: unknown; people?: string; format?: string; cast?: { source?: string; male?: Partial<CastPerson>; female?: Partial<CastPerson> } }) {
+  async update(b: { mode?: string; fixedId?: string; presets?: string[]; texts?: Partial<ShareTexts>; style?: unknown; people?: string; format?: string; cast?: { source?: string; male?: Partial<CastPerson>; female?: Partial<CastPerson> }; rotate?: Partial<ShareRotate> }) {
     const c = await this.get();
     if (b.mode === 'daily' || b.mode === 'fixed') c.mode = b.mode;
     if (typeof b.fixedId === 'string') c.fixedId = b.fixedId;
-    if (Array.isArray(b.presets)) c.presets = b.presets.filter((x) => SHARE_PRESET_IDS.includes(x));
+    if (Array.isArray(b.presets)) c.presets = b.presets.filter((x) => SHARE_PRESET_IDS.includes(x) || c.custom.some((y) => y.id === x));
+    if (b.rotate) c.rotate = cleanRotate({ ...c.rotate, ...b.rotate });
     if (b.texts) c.texts = cleanTexts(b.texts);
     if (b.style) c.style = cleanStyle(b.style);
     if (b.people) c.people = cleanPeople(b.people);
@@ -158,7 +199,7 @@ export class ShareBgService implements OnModuleInit {
     }
     const ids = [...SHARE_PRESET_IDS, ...c.custom.map((x) => x.id)];
     if (!ids.includes(c.fixedId)) c.fixedId = 'p1';
-    if (!c.presets.length && !c.custom.length) throw new BadRequestException('Cần giữ ít nhất một nền trong vòng đổi theo ngày');
+    if (!c.presets.length) throw new BadRequestException('Cần giữ ít nhất một nền trong vòng đổi theo ngày');
     await this.save(c);
     return this.adminView();
   }
@@ -194,7 +235,9 @@ export class ShareBgService implements OnModuleInit {
     if (dataUrl.length > MAX_DATA_URL) throw new BadRequestException('Ảnh quá nặng (tối đa khoảng 650KB). Hãy thu nhỏ ảnh về 1200×630 rồi tải lại.');
     const c = await this.get();
     if (c.custom.length >= MAX_CUSTOM) throw new BadRequestException(`Tối đa ${MAX_CUSTOM} ảnh tự tải lên — hãy xoá bớt ảnh cũ.`);
-    c.custom.push({ id: `c${randomBytes(4).toString('hex')}`, name: (name || 'Ảnh nền').trim().slice(0, 60), dataUrl });
+    const nid = `c${randomBytes(4).toString('hex')}`;
+    c.custom.push({ id: nid, name: (name || 'Ảnh nền').trim().slice(0, 60), dataUrl });
+    c.presets.push(nid); // ảnh mới tải lên mặc định nằm trong vòng đổi (bỏ tick được)
     await this.save(c);
     return this.adminView();
   }
@@ -202,6 +245,8 @@ export class ShareBgService implements OnModuleInit {
   async removeCustom(id: string) {
     const c = await this.get();
     c.custom = c.custom.filter((x) => x.id !== id);
+    c.presets = c.presets.filter((x) => x !== id);
+    if (!c.presets.length) c.presets = ['p1'];
     if (c.fixedId === id) c.fixedId = 'p1';
     await this.save(c);
     return this.adminView();
@@ -226,10 +271,30 @@ export class ShareBgService implements OnModuleInit {
       if (x) return x;
     }
     if (c.mode === 'fixed') return find(c.fixedId) ?? { type: 'preset', id: 'p1' };
-    const pool = [...c.presets.map((id) => ({ type: 'preset' as const, id })), ...c.custom.map((x) => ({ type: 'image' as const, id: x.id, dataUrl: x.dataUrl }))];
+    const pool = this.poolOf(c);
     if (!pool.length) return { type: 'preset', id: 'p1' };
-    const d = /^\d{4}-\d{2}-\d{2}$/.test(date || '') ? new Date(`${date}T00:00:00Z`) : new Date();
-    const day = Math.floor(d.getTime() / 86400000);
-    return pool[day % pool.length];
+    return find(pool[slotIndex(pool.length, this.slotAt(c, Date.now()), c.rotate.order)]) ?? { type: 'preset', id: 'p1' };
+  }
+
+  /** Danh sách nền trong vòng đổi, theo thứ tự hiển thị (nền có sẵn trước, ảnh tự tải sau). */
+  private poolOf(c: ShareBgConfig): string[] {
+    return [...SHARE_PRESET_IDS, ...c.custom.map((x) => x.id)].filter((id) => c.presets.includes(id));
+  }
+  private stepMs(c: ShareBgConfig) {
+    return (c.rotate.unit === 'hour' ? 3600_000 : 86_400_000) * c.rotate.every;
+  }
+  private slotAt(c: ShareBgConfig, now: number) {
+    return Math.floor((now + VN_MS) / this.stepMs(c)); // ô thời gian tính theo giờ Việt Nam (đổi lúc 0h khi theo ngày)
+  }
+  /** Cho Admin: nền đang dùng, lúc đổi tiếp và lịch vài lần đổi sắp tới. */
+  schedule(c: ShareBgConfig) {
+    if (c.mode === 'fixed') return { currentId: c.fixedId, nextAt: null as number | null, upcoming: [] as { id: string; at: number }[] };
+    const pool = this.poolOf(c);
+    const now = Date.now();
+    const slot = this.slotAt(c, now);
+    const step = this.stepMs(c);
+    const at = (k: number) => k * step - VN_MS;
+    const idAt = (k: number) => pool[slotIndex(pool.length, k, c.rotate.order)] ?? 'p1';
+    return { currentId: idAt(slot), nextAt: at(slot + 1), upcoming: Array.from({ length: Math.min(7, Math.max(2, pool.length)) }, (_, i) => ({ id: idAt(slot + 1 + i), at: at(slot + 1 + i) })) };
   }
 }

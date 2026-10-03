@@ -9,7 +9,7 @@ import { CompanyLogo } from '@/components/CompanyLogo';
 
 // Đợt 107 — "Xem nhanh" (máy tính bảng ngang / màn hình ≥1024px): bấm 1 tin ở danh sách → chi tiết rút gọn hiện ngay cột bên phải, không rời trang
 // danh sách. Bấm ✕ (hoặc Esc) để quay lại thanh bên cũ. Chỉ tải khi chọn tin.
-export default function JobQuickView({ jobId, onClose }: { jobId: string; onClose: () => void }) {
+export default function JobQuickView({ jobId, onClose, sheet = false }: { jobId: string; onClose: () => void; sheet?: boolean }) {
   const [job, setJob] = useState<JobPosting | null | undefined>(undefined);
   useEffect(() => {
     let alive = true;
@@ -23,9 +23,9 @@ export default function JobQuickView({ jobId, onClose }: { jobId: string; onClos
     };
   }, [jobId]);
   return (
-    <aside className="rounded-xl border border-border bg-white lg:sticky lg:top-14 max-h-[calc(100vh-72px)] overflow-y-auto" aria-label="Xem nhanh tin tuyển dụng">
+    <aside className={sheet ? 'bg-white max-h-[85vh] overflow-y-auto' : 'rounded-xl border border-border bg-white lg:sticky lg:top-14 max-h-[calc(100vh-72px)] overflow-y-auto'} aria-label="Xem nhanh tin tuyển dụng">
       <div className="sticky top-0 z-10 bg-white border-b border-border px-3 py-2 flex items-center justify-between gap-2">
-        <span className="text-[12.5px] font-bold text-ink-muted">Xem nhanh · phím J/K chuyển tin · Esc đóng</span>
+        <span className="text-[12.5px] font-bold text-ink-muted">{sheet ? 'Xem nhanh' : 'Xem nhanh · phím J/K chuyển tin · Esc đóng'}</span>
         <button type="button" onClick={onClose} aria-label="Đóng xem nhanh" className="w-10 h-10 text-lg text-ink-faint">✕</button>
       </div>
       {job === undefined && <div className="p-4 text-sm text-ink-faint">Đang tải…</div>}

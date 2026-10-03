@@ -305,8 +305,8 @@ export class AdminController {
     return this.shareBg.adminView();
   }
   @Put('share-bg')
-  shareBgSet(@Body() b: { mode?: string; fixedId?: string; presets?: string[]; texts?: Record<string, string>; style?: unknown; people?: string; format?: string; cast?: { source?: string; male?: { scale?: number; flip?: boolean }; female?: { scale?: number; flip?: boolean } } }) {
-    return this.shareBg.update(b ?? {});
+  shareBgSet(@Body() b: { mode?: string; fixedId?: string; presets?: string[]; texts?: Record<string, string>; style?: unknown; people?: string; format?: string; cast?: { source?: string; male?: { scale?: number; flip?: boolean }; female?: { scale?: number; flip?: boolean } }; rotate?: { every?: number; unit?: string; order?: string } }) {
+    return this.shareBg.update((b ?? {}) as never);
   }
   @Post('share-bg/custom')
   shareBgAdd(@Body() b: { name?: string; dataUrl: string }) {

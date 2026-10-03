@@ -89,11 +89,12 @@ export function ShareBgPanel({ token }: { token: string }) {
     ...SHARE_PRESETS.map((p) => ({ id: p.id, name: p.name, src: svgDataUri(p.svg(1200, 630)), custom: false })),
     ...cfg.custom.map((c) => ({ id: c.id, name: c.name, src: c.dataUrl, custom: true })),
   ];
-  const inRotation = (id: string) => (cfg.presets.includes(id) || cfg.custom.some((c) => c.id === id)) && true;
+  const inRotation = (id: string) => cfg.presets.includes(id);
+  const nameOf = (id: string) => all.find((a) => a.id === id)?.name ?? presetById(id).name;
+  const fmtAt = (ms: number) => { const d = new Date(ms); const p = (n: number) => String(n).padStart(2, '0'); return `${p(d.getHours())}:${p(d.getMinutes())} ${p(d.getDate())}/${p(d.getMonth() + 1)}`; };
   const toggle = (id: string, isCustom: boolean) => {
-    if (isCustom) return; // ảnh tự tải luôn nằm trong vòng đổi theo ngày; muốn bỏ thì xoá
     const next = cfg.presets.includes(id) ? cfg.presets.filter((x) => x !== id) : [...cfg.presets, id];
-    run(() => adminApi.shareBgSet(token, { presets: next }), 'Đã lưu vòng đổi nền theo ngày.');
+    run(() => adminApi.shareBgSet(token, { presets: next }), 'Đã lưu danh sách nền trong vòng đổi.');
   };
   const shareLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/s/${jobId ?? '<mã tin>'}`;
   const pv = encodeURIComponent(JSON.stringify({ style: st ?? undefined, people: pp, format: fm, cast: ct ?? undefined }));
@@ -134,15 +135,50 @@ export function ShareBgPanel({ token }: { token: string }) {
       <div className="rounded-lg border border-border bg-white p-3 space-y-2">
         <div className="font-bold text-sm">Cách đổi nền</div>
         <label className="flex items-center gap-2 text-sm min-h-[36px]">
-          <input type="radio" name="sbmode" checked={cfg.mode === 'daily'} disabled={busy} onChange={() => run(() => adminApi.shareBgSet(token, { mode: 'daily' }), 'Đã chọn đổi nền theo ngày.')} />
-          Tự đổi mỗi ngày (xoay vòng các nền được tick bên dưới)
+          <input type="radio" name="sbmode" checked={cfg.mode === 'daily'} disabled={busy} onChange={() => run(() => adminApi.shareBgSet(token, { mode: 'daily' }), 'Đã bật tự đổi nền theo lịch.')} />
+          Tự đổi nền theo lịch (xoay vòng các nền được tick bên dưới)
         </label>
+        {cfg.mode === 'daily' && (
+          <div className="ml-6 space-y-2 rounded-md bg-surface-muted p-2">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              Cứ mỗi
+              <input id="sb-every" type="number" min={1} max={cfg.rotate.unit === 'hour' ? 168 : 60} className="tvl-input !w-20 !text-sm" value={cfg.rotate.every} disabled={busy}
+                onChange={(e) => { const v = Math.max(1, Math.floor(Number(e.target.value) || 1)); setCfg({ ...cfg, rotate: { ...cfg.rotate, every: v } }); }}
+                onBlur={() => run(() => adminApi.shareBgSet(token, { rotate: cfg.rotate }), 'Đã lưu lịch đổi nền.')} />
+              <select id="sb-unit" className="tvl-input !w-28 !text-sm" value={cfg.rotate.unit} disabled={busy}
+                onChange={(e) => run(() => adminApi.shareBgSet(token, { rotate: { unit: e.target.value as 'hour' | 'day', every: cfg.rotate.every } }), 'Đã lưu lịch đổi nền.')}>
+                <option value="hour">giờ</option>
+                <option value="day">ngày</option>
+              </select>
+              đổi nền một lần
+            </div>
+            <div className="flex flex-wrap gap-x-4">
+              <label className="flex items-center gap-1.5 text-sm min-h-[36px]"><input type="radio" name="sborder" checked={cfg.rotate.order === 'sequential'} disabled={busy} onChange={() => run(() => adminApi.shareBgSet(token, { rotate: { order: 'sequential' } }), 'Đã chọn đổi lần lượt theo thứ tự.')} /> Lần lượt theo thứ tự bên dưới</label>
+              <label className="flex items-center gap-1.5 text-sm min-h-[36px]"><input type="radio" name="sborder" checked={cfg.rotate.order === 'random'} disabled={busy} onChange={() => run(() => adminApi.shareBgSet(token, { rotate: { order: 'random' } }), 'Đã chọn đổi ngẫu nhiên.')} /> Ngẫu nhiên (hết một vòng mới lặp lại)</label>
+            </div>
+            <div className="text-xs text-ink-muted">Theo ngày: đổi lúc 0 giờ (giờ Việt Nam). Theo giờ: đổi đúng đầu mỗi chu kỳ. Chỉ các nền được tick “Trong vòng đổi” mới được dùng.</div>
+          </div>
+        )}
         <label className="flex items-center gap-2 text-sm min-h-[36px]">
           <input type="radio" name="sbmode" checked={cfg.mode === 'fixed'} disabled={busy} onChange={() => run(() => adminApi.shareBgSet(token, { mode: 'fixed' }), 'Đã chọn nền cố định.')} />
           Dùng một nền cố định
         </label>
         {cfg.mode === 'fixed' && (
           <div className="text-xs text-ink-muted">Bấm “Dùng làm nền cố định” dưới nền muốn chọn. Nền đang cố định: <b>{all.find((a) => a.id === cfg.fixedId)?.name ?? presetById(cfg.fixedId).name}</b></div>
+        )}
+        {cfg.mode === 'daily' && (
+          <div className="text-xs space-y-1" role="status">
+            <div>Đang dùng: <b>{nameOf(cfg.schedule.currentId)}</b>{cfg.schedule.nextAt ? <> · đổi tiếp lúc <b>{fmtAt(cfg.schedule.nextAt)}</b></> : null}</div>
+            {cfg.schedule.upcoming.length > 0 && (
+              <div className="text-ink-muted">Lịch sắp tới: {cfg.schedule.upcoming.map((u) => `${fmtAt(u.at)} → ${nameOf(u.id)}`).join(' · ')}</div>
+            )}
+            <div className="flex flex-wrap gap-2 pt-1">
+              <button type="button" className={btn} disabled={busy} onClick={() => run(() => adminApi.shareBgSet(token, { presets: all.map((a) => a.id) }), 'Đã chọn tất cả nền vào vòng đổi.')}>Chọn tất cả</button>
+              <button type="button" className={btn} disabled={busy} onClick={() => run(() => adminApi.shareBgSet(token, { presets: [cfg.schedule.currentId] }), 'Đã bỏ chọn — chỉ giữ nền đang dùng, hãy tick thêm các nền muốn xoay vòng.')}>Bỏ chọn hết</button>
+              <button type="button" className={btn} disabled={busy} onClick={() => run(() => adminApi.shareBgSet(token, { presets: SHARE_PRESETS.filter((p) => p.tone === 'light').map((p) => p.id) }), 'Đã chọn các nền sáng.')}>Chỉ nền sáng</button>
+              <button type="button" className={btn} disabled={busy} onClick={() => run(() => adminApi.shareBgSet(token, { presets: SHARE_PRESETS.filter((p) => p.tone === 'dark').map((p) => p.id) }), 'Đã chọn các nền tối.')}>Chỉ nền tối</button>
+            </div>
+          </div>
         )}
       </div>
 
@@ -182,8 +218,8 @@ export function ShareBgPanel({ token }: { token: string }) {
             <div className="text-xs font-bold truncate">{a.name}{a.custom ? ' (ảnh của bạn)' : ''}{cfg.mode === 'fixed' && cfg.fixedId === a.id ? ' · đang cố định' : ''}</div>
             <div className="flex flex-wrap gap-2 items-center">
               <label className="flex items-center gap-1.5 text-xs min-h-[36px]">
-                <input type="checkbox" checked={inRotation(a.id)} disabled={busy || a.custom} onChange={() => toggle(a.id, a.custom)} />
-                Trong vòng theo ngày
+                <input type="checkbox" checked={inRotation(a.id)} disabled={busy} onChange={() => toggle(a.id, a.custom)} />
+                Trong vòng đổi
               </label>
               <button className={btn} disabled={!jobId} onClick={() => { setPrev(a.id); setStamp(Date.now()); }}>Xem thử</button>
               <button className={btn} disabled={busy} onClick={() => run(() => adminApi.shareBgSet(token, { mode: 'fixed', fixedId: a.id }), 'Đã dùng làm nền cố định.')}>Dùng làm nền cố định</button>

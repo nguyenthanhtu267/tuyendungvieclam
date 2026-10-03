@@ -2,7 +2,8 @@
 import { API_URL, ApiError, qs, request, requestForm, authHeaders } from './api';
 import type { MailStatus, MailMsgRow, MailMsgFull, MailTemplate, MailContact, MailCampaign, JobSourceList, JobSourcePreview, JobSourceRow, MailScanStatus, JobImportRow, AdCampaignInput, AdCampaignRow, AdStats, AdminAuditLogResponse, AdminCandidateDetail, AdminCandidateQuery, AdminCandidateRow, AdminDashboard, AdminPersonDetail, AdminPersonRow, AdminStatsPoint, AnalyticsBehavior, AnalyticsContent, AnalyticsHeatmap, AnalyticsOverview, AnalyticsRealtime, BulkActionResult, CandidateDraft, ClaimCompanyPayload, Company, CompanyClaimRequestRow, CompanyClaimRequestStatus, CreateDraftCompanyPayload, CreateJobPayload, CvCardDraftResponse, CvQueueResponse, CvShareStatus, DraftAccountInfo, ExtractJobUrlResult, ImpersonateResult, JobPosting, Order, ProfileRequestRow, ProfileVisibility, PromoBadgeSetting, SourcedProfileRow, StorageStatus, SuggestedJob } from './api';
 import type { BgImage, BgSetting } from './bg-themes';
-export type ShareBgAdmin = { mode: 'daily' | 'fixed'; fixedId: string; presets: string[]; custom: { id: string; name: string; dataUrl: string }[]; texts: ShareTexts; style: ShareStyle; people: SharePeople; format: ShareFormat; cast: ShareCast };
+export type ShareBgAdmin = { mode: 'daily' | 'fixed'; fixedId: string; presets: string[]; custom: { id: string; name: string; dataUrl: string }[]; texts: ShareTexts; style: ShareStyle; people: SharePeople; format: ShareFormat; cast: ShareCast; rotate: ShareRotate; schedule: { currentId: string; nextAt: number | null; upcoming: { id: string; at: number }[] } };
+export type ShareRotate = { every: number; unit: 'hour' | 'day'; order: 'sequential' | 'random' };
 export type CastPerson = { dataUrl: string; w: number; h: number; scale: number; flip: boolean };
 export type ShareCast = { source: 'vector' | 'upload'; male: CastPerson; female: CastPerson };
 export type ShareCastIn = { source?: 'vector' | 'upload'; male?: { scale: number; flip: boolean }; female?: { scale: number; flip: boolean } };
@@ -220,7 +221,7 @@ export const adminApi = {
     request<{ page: number; found: number; added: number; hasNext: boolean; already?: number; reset?: boolean; remaining?: number; note?: string }>(`/admin/job-sources/${id}/step`, { method: 'POST', headers: authHeaders(token), body: JSON.stringify(b) }),
   // Đợt 153 — nền ảnh chia sẻ tin tuyển dụng (Facebook/Zalo)
   shareBgGet: (token: string) => request<ShareBgAdmin>('/admin/share-bg', { headers: authHeaders(token) }),
-  shareBgSet: (token: string, b: { mode?: 'daily' | 'fixed'; fixedId?: string; presets?: string[]; texts?: Partial<ShareTexts>; style?: ShareStyle; people?: SharePeople; format?: ShareFormat; cast?: ShareCastIn }) =>
+  shareBgSet: (token: string, b: { mode?: 'daily' | 'fixed'; fixedId?: string; presets?: string[]; texts?: Partial<ShareTexts>; style?: ShareStyle; people?: SharePeople; format?: ShareFormat; cast?: ShareCastIn; rotate?: Partial<ShareRotate> }) =>
     request<ShareBgAdmin>('/admin/share-bg', { method: 'PUT', headers: { ...authHeaders(token), 'Content-Type': 'application/json' }, body: JSON.stringify(b) }),
   shareBgAdd: (token: string, b: { name: string; dataUrl: string }) =>
     request<ShareBgAdmin>('/admin/share-bg/custom', { method: 'POST', headers: { ...authHeaders(token), 'Content-Type': 'application/json' }, body: JSON.stringify(b) }),

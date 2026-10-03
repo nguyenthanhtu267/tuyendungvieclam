@@ -161,7 +161,7 @@ export function JobCard({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5 text-[11.5px] text-ink-faint">
           {locationText && <span className="whitespace-nowrap">📍 {locationText}</span>}
           {dist && <span className="whitespace-nowrap text-primary" title="Ước tính từ nơi ở của bạn">🚗 {dist}</span>}
-          <span className="whitespace-nowrap max-sm:hidden">Cập nhật: {formatDate(job.updatedAt ?? job.createdAt)}</span>
+          <span className="whitespace-nowrap">Cập nhật: {formatDate(job.updatedAt ?? job.createdAt)}</span>
           {job.deadline && <span className="whitespace-nowrap">Hạn nộp: {formatDate(job.deadline)}</span>}
           {(() => {
             // Đợt 101 — nhãn đỏ "Còn N ngày" khi tin sắp hết hạn nộp (≤ 3 ngày), để người xem biết cần nộp sớm.
@@ -185,7 +185,7 @@ export function JobCard({
                 if (pv) qs.set('provinces', pv);
                 router.push(`/viec-lam?${qs.toString()}`);
               }}
-              className="tap-slop relative whitespace-nowrap text-primary font-semibold hover:underline max-sm:hidden"
+              className="tap-slop relative whitespace-nowrap text-primary font-semibold hover:underline"
             >
               ≈ Việc tương tự
             </button>
@@ -195,7 +195,7 @@ export function JobCard({
         {myNote && (myNote.pinned || myNote.note) && <div className="mt-1.5 text-[12px] font-semibold text-ink bg-warning-tint rounded px-2 py-1">📌 {myNote.note || 'Đã ghim'}</div>}
 
         {/* Đợt 100 — điện thoại: 1 dòng "vì sao hợp với bạn" (lý do đầu tiên của độ phù hợp) thay cho ngày cập nhật / việc tương tự. */}
-        {match?.reasons?.[0] && <div className="sm:hidden mt-1.5 text-[12px] text-primary font-semibold truncate">✔ {match.reasons[0]}</div>}
+        {match?.reasons?.[0] && <div className="mt-1.5 text-[12px] text-primary font-semibold truncate">✔ {match.reasons[0]}</div>}
 
         {/* Đợt 15 (25/09/2026) — mục 17 danh sách lỗi: bỏ hẳn khối chip "Phúc lợi" khỏi thẻ tin (theo
             yêu cầu người dùng: "Phần phúc lợi không cần hiển thị ở đây để bảng thông tin của công ty
