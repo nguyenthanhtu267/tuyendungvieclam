@@ -1,6 +1,9 @@
 'use client';
 
-import { Combobox } from '@/components/ui/Combobox';
+import { MultiSelectPopover } from '@/components/search/MultiSelectPopover';
+import { usePins } from '@/lib/pins';
+import { nearestProvince, saveHome } from '@/lib/geo';
+import { PINNED_PROVINCES, PROVINCE_REGIONS } from '@/lib/catalogs';
 import Link from '@/components/SmartLink';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { blockAutoLoad } from '@/lib/data-saver';
@@ -50,7 +53,12 @@ function LaborJobsInner() {
   const saved = useSavedJobs();
   const w = useWorkerApply();
   const snap = w.snap && w.snap.kind === kind ? w.snap : null;
-  const guessed = guessGroups(q, kind).filter((g) => g !== group);
+  const provList = province ? province.split('|').filter(Boolean) : [];
+  const groupList = group ? group.split('|').filter(Boolean) : [];
+  const provincePins = usePins('provinces');
+  const groupPins = usePins('labor_groups');
+  const provinceGroups = [{ label: undefined as string | undefined, options: PINNED_PROVINCES }, ...PROVINCE_REGIONS.map((r) => ({ label: r.region as string | undefined, options: r.provinces }))];
+  const guessed = guessGroups(q, kind).filter((g) => !groupList.includes(g));
 
   useEffect(() => {
     workersApi.catalog().then((c) => setProvinces(c.provinces)).catch(() => undefined);
@@ -174,15 +182,56 @@ function LaborJobsInner() {
           }}
         >
           <input id="lj-q" aria-label="Tìm công việc" className="tvl-input !w-auto flex-1 min-w-[180px] !py-2" placeholder={kind === 'worker' ? 'Gõ công việc: đứng máy, bốc vác, phụ hồ…' : 'Gõ công việc hoặc tên công ty…'} value={q} onChange={(e) => setQ(e.target.value)} />
-          <Combobox id="lj-prov" ariaLabel="Tỉnh/thành" className="min-w-[11rem] flex-1 sm:flex-none sm:w-56" inputClassName="!py-2" value={province} options={provinces} allLabel="Tất cả tỉnh/thành" onChange={(v) => { setProvince(v); setPage(1); }} />
-          <Combobox id="lj-group" ariaLabel="Nhóm việc" className="min-w-[11rem] flex-1 sm:flex-none sm:w-56" inputClassName="!py-2" value={group} options={LABOR_GROUPS[kind]} allLabel="Tất cả nhóm việc" onChange={(v) => { setGroup(v); setPage(1); }} />
+          <div className="min-w-[11rem] flex-1 sm:flex-none sm:w-60">
+            <MultiSelectPopover
+              label="Tỉnh, Thành Phố"
+              placeholder="Tất cả tỉnh/thành"
+              groups={provinceGroups}
+              selected={provList}
+              onChange={(v) => { setProvince(v.join('|')); setPage(1); }}
+              emptyText="Chọn tối đa 3 địa điểm"
+              max={3}
+              pins={provincePins}
+              topAction={{
+                label: 'Dùng vị trí của tôi',
+                onClick: () =>
+                  new Promise<string | void>((resolve) => {
+                    if (!navigator.geolocation) return resolve('Trình duyệt không hỗ trợ định vị');
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => {
+                        const lat = Math.round(pos.coords.latitude * 100) / 100;
+                        const lon = Math.round(pos.coords.longitude * 100) / 100;
+                        saveHome({ lat, lon });
+                        setProvince(nearestProvince(lat, lon));
+                        setPage(1);
+                        resolve();
+                      },
+                      () => resolve('Không lấy được vị trí, hãy chọn tỉnh thủ công'),
+                      { timeout: 8000 },
+                    );
+                  }),
+              }}
+            />
+          </div>
+          <div className="min-w-[11rem] flex-1 sm:flex-none sm:w-60">
+            <MultiSelectPopover
+              label="Nhóm việc"
+              placeholder="Tất cả nhóm việc"
+              groups={[{ options: LABOR_GROUPS[kind] }]}
+              selected={groupList}
+              onChange={(v) => { setGroup(v.join('|')); setPage(1); }}
+              emptyText="Chọn tối đa 3 nhóm việc"
+              max={3}
+              pins={groupPins}
+            />
+          </div>
           <button type="submit" className="rounded-lg bg-accent text-white font-bold text-[14px] px-4 py-2">Tìm</button>
         </form>
         {guessed.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 text-[13px] text-ink">
             Có phải bạn tìm nhóm:
             {guessed.map((g) => (
-              <button key={g} type="button" onClick={() => { setGroup(g); setQ(''); setQApplied(''); setPage(1); }} className="rounded-full border border-success bg-success-tint text-success font-bold px-2.5 py-1">{g}</button>
+              <button key={g} type="button" onClick={() => { setGroup(Array.from(new Set([...groupList, g])).slice(0, 3).join('|')); setQ(''); setQApplied(''); setPage(1); }} className="rounded-full border border-success bg-success-tint text-success font-bold px-2.5 py-1">{g}</button>
             ))}
           </div>
         )}

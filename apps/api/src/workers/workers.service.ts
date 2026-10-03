@@ -428,8 +428,16 @@ export class WorkersService {
       .andWhere('job.isPaused = false')
       .andWhere('job.channel = :kind', { kind })
       .andWhere('(job.deadline IS NULL OR job.deadline >= CURRENT_DATE)');
-    if (q.province) qb.andWhere('(job.provinces ILIKE :pv OR job.work_place ->> \'province\' = :pv2)', { pv: `%${q.province}%`, pv2: q.province });
-    if (q.group) qb.andWhere('job.laborGroup = :g', { g: q.group });
+    // Đợt 166 — chọn tối đa 3 tỉnh / 3 nhóm việc: các giá trị cách nhau bằng "|" (giá trị đơn vẫn chạy như cũ).
+    const pvs = (q.province ?? '').split('|').map((x) => x.trim()).filter(Boolean).slice(0, 5);
+    if (pvs.length) {
+      const ors = pvs.map((_, i) => `(job.provinces ILIKE :pv${i} OR job.work_place ->> 'province' = :pw${i})`).join(' OR ');
+      const prm: Record<string, string> = {};
+      pvs.forEach((v, i) => { prm[`pv${i}`] = `%${v}%`; prm[`pw${i}`] = v; });
+      qb.andWhere(`(${ors})`, prm);
+    }
+    const grs = (q.group ?? '').split('|').map((x) => x.trim()).filter(Boolean).slice(0, 5);
+    if (grs.length) qb.andWhere('job.laborGroup IN (:...grs)', { grs });
     if (q.q?.trim()) qb.andWhere('(job.title ILIKE :t OR company.name ILIKE :t)', { t: `%${q.q.trim()}%` });
     for (const perk of (q.perks ?? '').split(',').filter((x) => PERKS.includes(x))) qb.andWhere(`(',' || job.labor_perks || ',') LIKE :pk_${perk}`, { [`pk_${perk}`]: `%,${perk},%` });
     if (q.hideFilled === '1') qb.andWhere('job.filledAt IS NULL');

@@ -43,38 +43,38 @@ const AdsPanel = dynamic(() => import('@/components/admin/AdsPanel').then((m) =>
 // dùng chức năng "Người dùng → Đặt lại mật khẩu (tạm)" để tự đặt lại cho chính mình (mật khẩu
 // ngẫu nhiên hệ thống sinh ra) — vẫn dùng được để khoá ngay mật khẩu mẫu, nhưng không tự chọn
 // được mật khẩu mong muốn như mục này.
-const NAV_ITEMS = [
-  { id: 'overview', label: '📊 Tổng quan' },
-  { id: 'jobs', label: '🗂 Duyệt tin' },
-  { id: 'companies', label: '🏢 Duyệt công ty' },
-  // Đợt 12q (21/09/2026) — Batch 5: 4 mục Admin mới.
-  { id: 'featured', label: '🌟 DN yêu thích' },
-  // Đợt 17 (25/09/2026) — "Nguồn ngoài / Tin tổng hợp" (mô hình "labeled aggregator").
-  { id: 'sourced', label: '🏷️ Nguồn ngoài' },
-  // Đợt 150 — Hộp thư: thư hỗ trợ, mẫu email, danh sách email, chiến dịch.
-  { id: 'mailbox', label: '✉️ Hộp thư' },
-  // Đợt 19 (26/09/2026) — phân tích truy cập THẬT: lượt xem, thời gian ở lại, click, nguồn, bản đồ nhiệt.
-  { id: 'analytics', label: '🔎 Phân tích truy cập' },
-  { id: 'stats', label: '📈 Thống kê' },
-  { id: 'orders', label: '💰 Đơn hàng' },
-  // Đợt 18e/18f (26/09/2026) — "Người dùng" sửa được mọi tài khoản + "Ứng viên" quản lý thông minh.
-  { id: 'users', label: '👤 Người dùng' },
-  { id: 'candidates', label: '🧑‍💼 Ứng viên' },
-  // Đợt 20 (27/09/2026) — lưu file lên Google Drive.
-  { id: 'storage', label: '🗄️ Lưu trữ file' },
-  // Đợt 23 (29/09/2026) — nhãn quảng bá nhấp nháy cạnh logo (chữ + link mở tab mới).
-  { id: 'promo', label: '📣 Nhãn logo' },
-  // Đợt 24 (29/09/2026) — banner quảng cáo (chiến dịch + khu vực).
-  { id: 'ads', label: '📢 Banner quảng cáo' },
-  // Đợt 29 (30/09/2026) — nền vector toàn website (15 mẫu, cố định hoặc tự đổi mỗi 2 giờ).
-  { id: 'background', label: '🎨 Nền giao diện' },
-  // Đợt 153 — ảnh xem trước khi dán link tin lên Facebook/Zalo.
-  { id: 'share', label: '🖼️ Ảnh chia sẻ' },
-  // Đợt 63 — tin trùng / đáng ngờ / chất lượng thấp.
-  { id: 'quality', label: '🧹 Chất lượng dữ liệu' },
-  { id: 'audit-log', label: '📜 Nhật ký thao tác' },
-  { id: 'settings', label: '🔒 Đổi mật khẩu' },
+// Đợt 166 — thứ tự theo NHÓM chức năng: Tổng quan đầu tiên, Đổi mật khẩu cuối cùng, các mục liên quan nằm sát nhau.
+const NAV_GROUPS: { title: string; ids: string[] }[] = [
+  { title: 'Tổng quan', ids: ['overview'] },
+  { title: 'Duyệt & nội dung', ids: ['jobs', 'companies', 'featured', 'sourced', 'quality'] },
+  { title: 'Người dùng', ids: ['users', 'candidates', 'mailbox'] },
+  { title: 'Số liệu & doanh thu', ids: ['analytics', 'stats', 'orders'] },
+  { title: 'Quảng cáo & giao diện', ids: ['ads', 'promo', 'background', 'share'] },
+  { title: 'Hệ thống', ids: ['storage', 'audit-log'] },
+  { title: 'Tài khoản', ids: ['settings'] },
 ];
+const NAV_LABELS: Record<string, string> = {
+  'overview': '📊 Tổng quan',
+  'jobs': '🗂 Duyệt tin',
+  'companies': '🏢 Duyệt công ty',
+  'featured': '🌟 DN yêu thích',
+  'sourced': '🏷️ Nguồn ngoài',
+  'mailbox': '✉️ Hộp thư',
+  'analytics': '🔎 Phân tích truy cập',
+  'stats': '📈 Thống kê',
+  'orders': '💰 Đơn hàng',
+  'users': '👤 Người dùng',
+  'candidates': '🧑‍💼 Ứng viên',
+  'storage': '🗄️ Lưu trữ file',
+  'promo': '📣 Nhãn logo',
+  'ads': '📢 Banner quảng cáo',
+  'background': '🎨 Nền giao diện',
+  'share': '🖼️ Ảnh chia sẻ',
+  'quality': '🧹 Chất lượng dữ liệu',
+  'audit-log': '📜 Nhật ký thao tác',
+  'settings': '🔒 Đổi mật khẩu',
+};
+const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.ids.map((id) => ({ id, label: NAV_LABELS[id], group: g.title })));
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -471,19 +471,24 @@ export default function AdminDashboardPage() {
             <span aria-hidden>←</span> Trang chủ
           </a>
         </div>
-        {NAV_ITEMS.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setTab(item.id)}
-            className={`text-left px-2.5 py-2 rounded-lg text-xs font-bold ${
-              tab === item.id ? 'bg-white/15 text-white' : 'text-white/95 hover:text-white'
-            }`}
-          >
-            {item.label}
-            {item.id === 'jobs' && dashboard ? ` (${formatNumber(dashboard.pendingJobsCount)})` : ''}
-            {item.id === 'companies' && dashboard ? ` (${formatNumber(dashboard.pendingCompaniesCount)})` : ''}
-            {item.id === 'orders' ? ` (${formatNumber(pendingOrders.length)})` : ''}
-          </button>
+        {NAV_ITEMS.map((item, idx) => (
+          <div key={item.id} className="contents">
+            {(idx === 0 || NAV_ITEMS[idx - 1].group !== item.group) && idx > 0 && (
+              <div className="px-2.5 pt-2.5 pb-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white/55">{item.group}</div>
+            )}
+            <button
+              onClick={() => setTab(item.id)}
+              className={`text-left px-2.5 py-2 rounded-lg text-xs font-bold ${
+                tab === item.id ? 'bg-white/15 text-white' : 'text-white/95 hover:text-white'
+              }`}
+            >
+              <span className="inline-block w-7 whitespace-nowrap text-white/55 font-semibold tabular-nums">{idx + 1}.</span>
+              {item.label}
+              {item.id === 'jobs' && dashboard ? ` (${formatNumber(dashboard.pendingJobsCount)})` : ''}
+              {item.id === 'companies' && dashboard ? ` (${formatNumber(dashboard.pendingCompaniesCount)})` : ''}
+              {item.id === 'orders' ? ` (${formatNumber(pendingOrders.length)})` : ''}
+            </button>
+          </div>
         ))}
         <button onClick={logout} className="mt-auto text-left px-2.5 py-2 rounded-lg text-xs font-bold text-white/95 hover:text-white">
           Đăng xuất

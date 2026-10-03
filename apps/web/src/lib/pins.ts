@@ -6,7 +6,7 @@ import { useAuth } from './auth-context';
 // Đợt 74 — "Ghim" tối đa 3 lĩnh vực và 3 địa điểm hay tìm: mục đã ghim luôn nằm trên cùng danh sách chọn.
 // Lưu theo tài khoản trên trình duyệt này (localStorage, khoá theo id người dùng); chỉ dành cho người đã đăng nhập.
 export const MAX_PINS = 3;
-export type PinKind = 'industries' | 'provinces';
+export type PinKind = 'industries' | 'provinces' | 'labor_groups';
 
 export interface PinsApi {
   list: string[];
