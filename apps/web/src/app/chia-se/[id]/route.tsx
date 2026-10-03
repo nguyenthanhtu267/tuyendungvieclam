@@ -34,6 +34,16 @@ const Icon = ({ k }: { k: 'phone' | 'mail' | 'pin' }) => (
 );
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
+  try {
+    return await render(req, params.id.replace(/\.png$/i, ''));
+  } catch {
+    // Mọi lỗi (font, API...) → ảnh mặc định tĩnh, không bao giờ để khung xem trước trống.
+    return Response.redirect(new URL('/og-default.png', req.url), 302);
+  }
+}
+
+async function render(req: Request, rawId: string) {
+  const params = { id: rawId };
   const only = new URL(req.url).searchParams.get('bg') || '';
   const [b1, b2, r1, r2] = await Promise.all([font('inter-latin-700'), font('inter-vietnamese-700'), font('inter-latin-400'), font('inter-vietnamese-400')]);
   let j: Meta | null = null;

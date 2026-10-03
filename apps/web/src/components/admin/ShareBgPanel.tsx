@@ -69,6 +69,7 @@ export function ShareBgPanel({ token }: { token: string }) {
     const next = cfg.presets.includes(id) ? cfg.presets.filter((x) => x !== id) : [...cfg.presets, id];
     run(() => adminApi.shareBgSet(token, { presets: next }), 'Đã lưu vòng đổi nền theo ngày.');
   };
+  const shareLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/s/${jobId ?? '<mã tin>'}`;
   const previewSrc = jobId && prev ? `/chia-se/${jobId}?bg=${prev}&t=${stamp}` : '';
 
   const onFile = async (f?: File | null) => {
@@ -102,6 +103,18 @@ export function ShareBgPanel({ token }: { token: string }) {
         {cfg.mode === 'fixed' && (
           <div className="text-xs text-ink-muted">Bấm “Dùng làm nền cố định” dưới nền muốn chọn. Nền đang cố định: <b>{all.find((a) => a.id === cfg.fixedId)?.name ?? presetById(cfg.fixedId).name}</b></div>
         )}
+      </div>
+
+      <div className="rounded-lg border border-border bg-white p-3 space-y-2">
+        <div className="font-bold text-sm">Link chia sẻ qua hệ thống</div>
+        <p className="text-xs text-ink-muted">
+          Mọi nút Chia sẻ / Sao chép link / Facebook trên web đều tạo link dạng <b>/s/&lt;mã tin&gt;</b>. Dán link này vào Facebook/Zalo, bên dưới bài đăng sẽ hiện ảnh nền + chữ theo tin; người bấm vào được chuyển thẳng sang trang tin. Dán link trang tin (/viec-lam/…) cũng có ảnh, nhưng nên dùng link chia sẻ.
+        </p>
+        <input id="sb-link" readOnly className="tvl-input !text-sm" value={shareLink} onFocus={(e) => e.currentTarget.select()} />
+        <div className="flex flex-wrap gap-2">
+          <button className={btn} disabled={!jobId} onClick={() => { navigator.clipboard?.writeText(shareLink).then(() => setNote({ ok: true, text: 'Đã sao chép link chia sẻ mẫu.' })).catch(() => undefined); }}>Sao chép link</button>
+          <a className={`${btn} inline-flex items-center`} target="_blank" rel="noopener noreferrer" href={`https://developers.facebook.com/tools/debug/?q=${encodeURIComponent(shareLink)}`}>Làm mới trên Facebook (Sharing Debugger)</a>
+        </div>
       </div>
 
       <div className="rounded-lg border border-border bg-white p-3 space-y-2">

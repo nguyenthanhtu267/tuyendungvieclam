@@ -54,8 +54,8 @@ export function fmtDateTime(iso: string) {
   return `${d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${d.toLocaleDateString('vi-VN')}`;
 }
 export function laborShareUrl(jobId: string) {
-  const base = process.env.NEXT_PUBLIC_SITE_URL ?? (typeof window !== 'undefined' ? window.location.origin : 'https://tuyendungvieclam.vercel.app');
-  return `${base}/viec-lam/${jobId}`;
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? (typeof window !== 'undefined' ? window.location.origin : 'https://www.vieclamngay.vn');
+  return `${base}/s/${jobId}`;
 }
 
 // ---------------- Đợt 80 ----------------

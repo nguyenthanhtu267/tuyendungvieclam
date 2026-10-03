@@ -4,11 +4,12 @@
 // kể cả của Facebook) — cách hợp lệ duy nhất còn lại là mở Hộp thoại Chia sẻ (Share Dialog) để
 // chính người dùng tự bấm "Đăng" (1 cú nhấp), không cần đăng nhập/App ID/App Review.
 export function getSiteUrl(): string {
-  return process.env.NEXT_PUBLIC_SITE_URL ?? 'https://tuyendungvieclam.vercel.app';
+  return process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.vieclamngay.vn';
 }
 
 export function jobShareUrl(jobId: string): string {
-  return `${getSiteUrl()}/viec-lam/${jobId}`;
+  // Đợt 154 — link chia sẻ đi qua hệ thống (/s/<mã>) để Facebook/Zalo luôn hiện ảnh + chữ theo tin.
+  return `${getSiteUrl()}/s/${jobId}`;
 }
 
 export function openFacebookShare(url: string) {

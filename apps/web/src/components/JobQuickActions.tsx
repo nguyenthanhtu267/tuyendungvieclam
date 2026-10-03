@@ -8,7 +8,8 @@ import { JobNoteButton } from '@/components/JobNote';
 export function JobQuickActions({ jobId, title, company, phone, light = false }: { jobId?: string; title: string; company: string; phone?: string; light?: boolean }) {
   const [msg, setMsg] = useState('');
   async function share() {
-    const url = window.location.href;
+    const base = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
+    const url = jobId ? `${base}/s/${jobId}` : window.location.href;
     const nav = navigator as Navigator & { share?: (d: { title: string; text: string; url: string }) => Promise<void> };
     try {
       if (nav.share) {

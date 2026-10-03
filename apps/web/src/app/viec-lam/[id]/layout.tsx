@@ -8,13 +8,13 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   try {
     // Đợt 90 — lưu đệm 5 phút + tối đa 2,5 giây: máy chủ API đang thức dậy không được làm treo cả trang.
     const res = await fetch(`${API}/jobs/${params.id}/share-meta`, { next: { revalidate: 300 }, signal: AbortSignal.timeout(2500) });
-    if (!res.ok) return {};
+    if (!res.ok) return fallbackMeta(params.id);
     const j = (await res.json()) as { title: string; company: string; salaryMin: number | null; salaryMax: number | null; location: string };
     const salary = j.salaryMax ? `${j.salaryMin ? j.salaryMin + ' – ' : ''}${j.salaryMax} triệu` : 'Lương thỏa thuận';
     const title = `${j.title} - ${j.company}`;
     const description = `${salary}${j.location ? ' · ' + j.location : ''} · Ứng tuyển miễn phí trên Tuyển Dụng Việc Làm`;
     // Đợt 153 — ảnh chia sẻ có địa chỉ tuyệt đối cố định theo tên miền chính (trước đây phụ thuộc địa chỉ tự suy ra).
-    const img = `${SITE}/chia-se/${encodeURIComponent(params.id)}`;
+    const img = `${SITE}/chia-se/${encodeURIComponent(params.id)}.png`;
     return {
       title,
       description,
@@ -22,8 +22,17 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
       twitter: { card: 'summary_large_image', title, description, images: [img] },
     };
   } catch {
-    return {};
+    return fallbackMeta(params.id);
   }
+}
+
+// API đang thức dậy / lỗi tạm: vẫn trả thẻ ảnh xem trước (ảnh tự vẽ có cơ chế dự phòng riêng).
+function fallbackMeta(id: string): Metadata {
+  const img = `${SITE}/chia-se/${encodeURIComponent(id)}.png`;
+  return {
+    openGraph: { type: 'website', locale: 'vi_VN', siteName: 'Việc Làm Ngay', images: [{ url: img, width: 1200, height: 630 }] },
+    twitter: { card: 'summary_large_image', images: [img] },
+  };
 }
 
 export default function JobLayout({ children }: { children: React.ReactNode }) {
