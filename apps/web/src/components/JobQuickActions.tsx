@@ -1,4 +1,5 @@
 'use client';
+import { shareDeviceQuery } from '@/lib/social';
 
 import { useState } from 'react';
 import { JobNoteButton } from '@/components/JobNote';
@@ -9,7 +10,7 @@ export function JobQuickActions({ jobId, title, company, phone, light = false }:
   const [msg, setMsg] = useState('');
   async function share() {
     const base = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
-    const url = jobId ? `${base}/s/${jobId}` : window.location.href;
+    const url = jobId ? `${base}/s/${jobId}${shareDeviceQuery()}` : window.location.href;
     const nav = navigator as Navigator & { share?: (d: { title: string; text: string; url: string }) => Promise<void> };
     try {
       if (nav.share) {

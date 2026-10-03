@@ -140,6 +140,8 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
   const [fromCache, setFromCache] = useState<number | null>(null);
   const [loadTry, setLoadTry] = useState(0);
   const [loadFailed, setLoadFailed] = useState(false);
+  // Máy chủ miễn phí vừa "ngủ dậy" thường mất 20–50 giây: tự thử lại vài lần (4, 8, 12, 16 giây) trước khi báo lỗi.
+  const [autoTry, setAutoTry] = useState(0);
   useEffect(() => {
     if (fromServer && loadTry === 0) {
       cacheJob(fromServer.job, fromServer.related);
@@ -171,6 +173,14 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
         } else setLoadFailed(true);
       });
   }, [params.id, loadTry]);
+  useEffect(() => {
+    if (!loadFailed || autoTry >= 4) return;
+    const t = setTimeout(() => {
+      setAutoTry((n) => n + 1);
+      setLoadTry((n) => n + 1);
+    }, (autoTry + 1) * 4000);
+    return () => clearTimeout(t);
+  }, [loadFailed, autoTry]);
   useEffect(() => {
     if (fromCache == null && !loadFailed) return;
     const on = () => setLoadTry((n) => n + 1);
@@ -334,8 +344,8 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
       <main className="min-h-screen">
         <SiteHeader />
         <div className="max-w-xl mx-auto px-4 py-10 text-center rounded-2xl border border-border bg-white my-6">
-          <div className="text-ink-muted text-sm mb-3">📶 Chưa tải được tin này — mạng đang yếu.</div>
-          <button type="button" onClick={() => setLoadTry((n) => n + 1)} className="tvl-btn-primary !w-auto px-5">Thử lại</button>
+          <div className="text-ink-muted text-sm mb-3">{autoTry < 4 ? '⏳ Máy chủ đang khởi động — đang tự thử lại, bạn đợi giây lát…' : '📶 Chưa tải được tin này — mạng đang yếu.'}</div>
+          <button type="button" onClick={() => { setAutoTry(0); setLoadTry((n) => n + 1); }} className="tvl-btn-primary !w-auto px-5">Thử lại</button>
         </div>
       </main>
     );

@@ -7,9 +7,16 @@ export function getSiteUrl(): string {
   return process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.vieclamngay.vn';
 }
 
+// Đợt 158 — ?f=m|d cho biết người bấm chia sẻ đang dùng điện thoại hay máy tính (chỉ có tác dụng khi admin chọn khổ "tự chọn").
+export function shareDeviceQuery(): string {
+  if (typeof navigator === 'undefined') return '';
+  const mobile = /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent) || (typeof window !== 'undefined' && window.innerWidth < 768);
+  return `?f=${mobile ? 'm' : 'd'}`;
+}
+
 export function jobShareUrl(jobId: string): string {
   // Đợt 154 — link chia sẻ đi qua hệ thống (/s/<mã>) để Facebook/Zalo luôn hiện ảnh + chữ theo tin.
-  return `${getSiteUrl()}/s/${jobId}`;
+  return `${getSiteUrl()}/s/${jobId}${shareDeviceQuery()}`;
 }
 
 export function openFacebookShare(url: string) {

@@ -2,7 +2,12 @@
 import { API_URL, ApiError, qs, request, requestForm, authHeaders } from './api';
 import type { MailStatus, MailMsgRow, MailMsgFull, MailTemplate, MailContact, MailCampaign, JobSourceList, JobSourcePreview, JobSourceRow, MailScanStatus, JobImportRow, AdCampaignInput, AdCampaignRow, AdStats, AdminAuditLogResponse, AdminCandidateDetail, AdminCandidateQuery, AdminCandidateRow, AdminDashboard, AdminPersonDetail, AdminPersonRow, AdminStatsPoint, AnalyticsBehavior, AnalyticsContent, AnalyticsHeatmap, AnalyticsOverview, AnalyticsRealtime, BulkActionResult, CandidateDraft, ClaimCompanyPayload, Company, CompanyClaimRequestRow, CompanyClaimRequestStatus, CreateDraftCompanyPayload, CreateJobPayload, CvCardDraftResponse, CvQueueResponse, CvShareStatus, DraftAccountInfo, ExtractJobUrlResult, ImpersonateResult, JobPosting, Order, ProfileRequestRow, ProfileVisibility, PromoBadgeSetting, SourcedProfileRow, StorageStatus, SuggestedJob } from './api';
 import type { BgImage, BgSetting } from './bg-themes';
-export type ShareBgAdmin = { mode: 'daily' | 'fixed'; fixedId: string; presets: string[]; custom: { id: string; name: string; dataUrl: string }[]; texts: ShareTexts };
+export type ShareBgAdmin = { mode: 'daily' | 'fixed'; fixedId: string; presets: string[]; custom: { id: string; name: string; dataUrl: string }[]; texts: ShareTexts; style: ShareStyle; people: SharePeople; format: ShareFormat };
+export type ShareElKey = 'brand' | 'tagline' | 'badge' | 'title' | 'company' | 'salary' | 'meta' | 'contact';
+export type ShareEl = { color: string; scale: number; bold: boolean; italic: boolean };
+export type ShareStyle = { els: Record<ShareElKey, ShareEl>; show: { salary: boolean; location: boolean; deadline: boolean; contact: boolean }; scrim: number };
+export type SharePeople = 'none' | 'male' | 'female' | 'both';
+export type ShareFormat = 'wide' | 'square' | 'auto';
 export type ShareTexts = { brand: string; tagline: string; urgent: string; fallback: string };
 export const adminApi = {
   getBackground: (token: string) => request<BgSetting>('/admin/settings/background', { headers: authHeaders(token) }),
@@ -209,10 +214,10 @@ export const adminApi = {
     request<{ started: boolean; reason?: string }>(id ? `/admin/job-sources/${id}/run` : '/admin/job-sources/run', { method: 'POST', headers: authHeaders(token) }),
   // Đợt 150 — Hộp thư
   sourcesStep: (token: string, id: string, b: { reset?: boolean; page?: number } = {}) =>
-    request<{ page: number; found: number; added: number; hasNext: boolean; already?: number; reset?: boolean }>(`/admin/job-sources/${id}/step`, { method: 'POST', headers: authHeaders(token), body: JSON.stringify(b) }),
+    request<{ page: number; found: number; added: number; hasNext: boolean; already?: number; reset?: boolean; remaining?: number; note?: string }>(`/admin/job-sources/${id}/step`, { method: 'POST', headers: authHeaders(token), body: JSON.stringify(b) }),
   // Đợt 153 — nền ảnh chia sẻ tin tuyển dụng (Facebook/Zalo)
   shareBgGet: (token: string) => request<ShareBgAdmin>('/admin/share-bg', { headers: authHeaders(token) }),
-  shareBgSet: (token: string, b: { mode?: 'daily' | 'fixed'; fixedId?: string; presets?: string[]; texts?: Partial<ShareTexts> }) =>
+  shareBgSet: (token: string, b: { mode?: 'daily' | 'fixed'; fixedId?: string; presets?: string[]; texts?: Partial<ShareTexts>; style?: ShareStyle; people?: SharePeople; format?: ShareFormat }) =>
     request<ShareBgAdmin>('/admin/share-bg', { method: 'PUT', headers: { ...authHeaders(token), 'Content-Type': 'application/json' }, body: JSON.stringify(b) }),
   shareBgAdd: (token: string, b: { name: string; dataUrl: string }) =>
     request<ShareBgAdmin>('/admin/share-bg/custom', { method: 'POST', headers: { ...authHeaders(token), 'Content-Type': 'application/json' }, body: JSON.stringify(b) }),

@@ -541,6 +541,7 @@ export function ImportInbox({ token }: { token: string }) {
                   <td className="px-2 py-2 font-bold max-w-[22rem]">
                     {chanOf(r) !== 'office' && <span className="mr-1.5 inline-block rounded bg-warning-tint text-[#7A4A00] text-[10.5px] font-extrabold px-1.5 py-0.5 align-middle">{CHANNEL_ICON[chanOf(r)]} {CHANNEL_LABEL[chanOf(r)]}{d.laborGroup ? ` · ${d.laborGroup}` : ''}</span>}
                     {d.title || '(chưa đọc được chức danh)'}
+                    {typeof d.deletedWarning === 'string' && <div className="mt-0.5 text-[11px] font-bold text-critical">⚠ {d.deletedWarning}</div>}
                   </td>
                   <td className="px-2 py-2 max-w-[16rem]">{d.companyName || '—'}</td>
                   <td className="px-2 py-2 max-w-[11rem]">{d.location || '—'}</td>

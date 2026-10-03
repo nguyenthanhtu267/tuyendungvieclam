@@ -8,6 +8,7 @@
 // Admin tự nhập tay — KHÔNG coi đây là lỗi cứng.
 
 import { assertPublicHttpUrl } from './public-url.util';
+import { BOT_UA, PoliteBlockError, politeGate, politeReport } from './polite-crawl.util';
 import { inferIndustry } from './job-industry.util';
 import { inferChannel } from './job-channel.util';
 
@@ -245,7 +246,7 @@ function findJobPostingNode(json: unknown): Record<string, unknown> | undefined 
   return candidates.find(isJobPosting) as Record<string, unknown> | undefined;
 }
 
-export async function extractJobFromUrl(url: string): Promise<ExtractJobUrlResult> {
+export async function extractJobFromUrl(url: string, opts: { auto?: boolean } = {}): Promise<ExtractJobUrlResult> {
   let html: string;
   let finalUrl: string | undefined;
   try {
@@ -254,6 +255,8 @@ export async function extractJobFromUrl(url: string): Promise<ExtractJobUrlResul
     if (!target) return { found: false, data: {}, warning: 'Link không hợp lệ hoặc không phải trang web công khai.' };
     let res: Response | null = null;
     for (let hop = 0; hop < 5; hop++) {
+      // Đợt 157 — lần tải TỰ ĐỘNG (quét nguồn) đi qua cổng lịch sự: robots.txt, giãn cách, giới hạn ngày, dừng khi bị từ chối.
+      if (opts.auto) await politeGate(target);
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
       try {
@@ -263,8 +266,9 @@ export async function extractJobFromUrl(url: string): Promise<ExtractJobUrlResul
           headers: {
             // Vài trang chặn user-agent mặc định của fetch/bot — giả lập trình duyệt thường để tăng khả
             // năng tải được trang (không phải để né bất kỳ cơ chế xác thực/đăng nhập nào).
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+            'User-Agent': opts.auto
+              ? BOT_UA
+              : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
             Accept: 'text/html,application/xhtml+xml',
           },
         });
@@ -278,13 +282,15 @@ export async function extractJobFromUrl(url: string): Promise<ExtractJobUrlResul
       res = null;
     }
     if (!res) return { found: false, data: {}, warning: 'Trang chuyển hướng quá nhiều lần — vui lòng nhập tay.' };
+    if (opts.auto) await politeReport(target, res.status);
     if (!res.ok) {
       return { found: false, data: {}, warning: `Không tải được trang (mã lỗi ${res.status}) — vui lòng nhập tay.` };
     }
     finalUrl = target.toString();
     const buf = await res.arrayBuffer();
     html = Buffer.from(buf.slice(0, MAX_HTML_BYTES)).toString('utf-8');
-  } catch {
+  } catch (e) {
+    if (e instanceof PoliteBlockError) return { found: false, data: {}, warning: e.message };
     return { found: false, data: {}, warning: 'Không tải được trang này (có thể do chặn truy cập tự động) — vui lòng nhập tay.' };
   }
 

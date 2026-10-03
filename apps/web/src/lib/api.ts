@@ -2773,6 +2773,7 @@ export interface ProvinceInsights {
 // Đợt 119 — mục trong "Hộp nhập tin từ link" (Admin) và đề xuất tin cho nhà tuyển dụng.
 export interface JobImportData {
   title?: string;
+  deletedWarning?: string;
   companyName?: string;
   companyWebsite?: string;
   companyLogo?: string;

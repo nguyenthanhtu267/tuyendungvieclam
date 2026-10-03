@@ -5,6 +5,7 @@
 
 import { assertPublicHttpUrl } from './public-url.util';
 import { normalizeSearchText } from './search-text.util';
+import { BOT_UA, PoliteBlockError, politeGate, politeReport } from './polite-crawl.util';
 
 export type SourceKind = 'company' | 'category' | 'keyword' | 'list';
 
@@ -37,7 +38,6 @@ export interface SiteAdapter {
   searchUrl?(q: string): string;
 }
 
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_HTML_BYTES = 3 * 1024 * 1024;
 
@@ -189,7 +189,69 @@ const generic: SiteAdapter = {
   },
 };
 
-export const ADAPTERS: SiteAdapter[] = [careerviet, generic];
+// ===================== Các trang tuyển dụng phổ biến (Đợt 157) =====================
+// Mẫu link tin: joboko (/viec-lam-<tên>-xvi<số>), careerlink (/tim-viec-lam/<tên>/<số>), vietnamworks (…-<số>-jv) đã đối chiếu với
+// trang thật; topcv, jobsgo, vieclam24h theo mẫu thường gặp — nếu một trang đổi cấu trúc thì "Đọc thử" sẽ báo không thấy tin,
+// khi đó dùng được adapter "Trang khác (tự nhận)". Một số trang (TopCV, VietnamWorks…) có thể từ chối truy cập tự động: hệ thống
+// sẽ dừng và báo rõ lý do, không cố lách.
+function siteAdapter(o: { id: string; name: string; host: RegExp; detail: RegExp; pageParam?: string }): SiteAdapter {
+  const param = o.pageParam ?? 'page';
+  const clean = (u: string) => u.split('#')[0].split('?')[0];
+  return {
+    id: o.id,
+    name: o.name,
+    match: (h) => o.host.test(h),
+    detect(u) {
+      const listing = new URL(u.toString());
+      listing.searchParams.delete(param);
+      const comp = u.pathname.match(/^\/(?:cong-ty|nha-tuyen-dung|company|employer)\/([^/]+)/i);
+      return { site: o.id, kind: comp ? 'company' : 'list', listingUrl: listing.toString(), label: comp ? comp[1].replace(/\.html?$/i, '').replace(/-/g, ' ') : undefined };
+    },
+    pageUrl(listingUrl, page) {
+      if (page <= 1) return listingUrl;
+      const x = new URL(listingUrl);
+      x.searchParams.set(param, String(page));
+      return x.toString();
+    },
+    parseList(html, baseUrl) {
+      const host = new URL(baseUrl).hostname.replace(/^www\./, '');
+      const jobs = new Set<string>();
+      for (const m of html.matchAll(/href\s*=\s*["']([^"']+)["']/gi)) {
+        const a = abs(m[1], baseUrl);
+        if (!a) continue;
+        let u: URL;
+        try {
+          u = new URL(a);
+        } catch {
+          continue;
+        }
+        if (!u.hostname.replace(/^www\./, '').endsWith(host.split('.').slice(-2).join('.'))) continue;
+        if (o.detail.test(u.pathname)) jobs.add(clean(a));
+      }
+      const pageLinks = new Map<number, string>();
+      let lastPage = 0;
+      const re = new RegExp(`href\\s*=\\s*["']([^"']*[?&]${param}=(\\d+)[^"']*)["']`, 'gi');
+      for (const m of html.matchAll(re)) {
+        const n = Number(m[2]);
+        const a = abs(m[1], baseUrl);
+        if (a && n > 1) {
+          pageLinks.set(n, a);
+          lastPage = Math.max(lastPage, n);
+        }
+      }
+      return { jobs: Array.from(jobs), total: parseTotal(stripTags(html.slice(0, 200_000))), lastPage: lastPage || undefined, pageLinks, employers: [], title: pageTitle(html) };
+    },
+  };
+}
+
+const joboko = siteAdapter({ id: 'joboko', name: 'Joboko', host: /(^|\.)joboko\.com$/i, detail: /^\/viec-lam-[^/]+-xvi\d+$/i, pageParam: 'p' });
+const careerlink = siteAdapter({ id: 'careerlink', name: 'CareerLink', host: /(^|\.)careerlink\.vn$/i, detail: /^\/tim-viec-lam\/[^/]+\/\d+$/i });
+const topcv = siteAdapter({ id: 'topcv', name: 'TopCV', host: /(^|\.)topcv\.vn$/i, detail: /^\/viec-lam\/[^/]+\/\d+\.html$/i });
+const jobsgo = siteAdapter({ id: 'jobsgo', name: 'JobsGO', host: /(^|\.)jobsgo\.vn$/i, detail: /^\/viec-lam\/[^/]+-\d+\.html$/i });
+const vieclam24h = siteAdapter({ id: 'vieclam24h', name: 'Vieclam24h', host: /(^|\.)vieclam24h\.vn$/i, detail: /-id\d+\.html$/i });
+const vietnamworks = siteAdapter({ id: 'vietnamworks', name: 'VietnamWorks', host: /(^|\.)vietnamworks\.com$/i, detail: /-\d+-jv$/i });
+
+export const ADAPTERS: SiteAdapter[] = [careerviet, joboko, careerlink, topcv, jobsgo, vieclam24h, vietnamworks, generic];
 
 export function adapterFor(host: string): SiteAdapter {
   return ADAPTERS.find((a) => a.id !== 'generic' && a.match(host)) ?? generic;
@@ -205,15 +267,17 @@ export function detectSource(raw: string): Detected & { adapter: SiteAdapter } {
 }
 
 /** Tải một trang HTML công khai (chặn mạng nội bộ). Ném lỗi có thông điệp tiếng Việt. */
-export async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string }> {
+export async function fetchHtml(url: string, opts: { minMs?: number } = {}): Promise<{ html: string; finalUrl: string }> {
   let target: URL = await assertPublicHttpUrl(url);
   for (let hop = 0; hop < 5; hop++) {
+    await politeGate(target, opts); // robots.txt + giãn cách + giới hạn ngày (Đợt 157)
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
     let res: Response;
     try {
-      res = await fetch(target, { signal: ctl.signal, redirect: 'manual', headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml', 'Accept-Language': 'vi,en;q=0.8' } });
-    } catch {
+      res = await fetch(target, { signal: ctl.signal, redirect: 'manual', headers: { 'User-Agent': BOT_UA, Accept: 'text/html,application/xhtml+xml', 'Accept-Language': 'vi,en;q=0.8' } });
+    } catch (e) {
+      if (e instanceof PoliteBlockError) throw e;
       throw new Error('Không tải được trang (mạng chậm hoặc trang chặn truy cập tự động).');
     } finally {
       clearTimeout(timer);
@@ -223,7 +287,10 @@ export async function fetchHtml(url: string): Promise<{ html: string; finalUrl: 
       target = await assertPublicHttpUrl(new URL(loc, target).toString());
       continue;
     }
-    if (res.status === 403 || res.status === 429 || res.status === 503) throw new Error(`Trang nguồn từ chối truy cập tự động (mã ${res.status}).`);
+    if (res.status === 403 || res.status === 429 || res.status === 503) {
+      await politeReport(target, res.status);
+      throw new Error(`Trang nguồn từ chối truy cập tự động (mã ${res.status}) — hệ thống dừng và nghỉ vài giờ, không cố truy cập lại.`);
+    }
     if (!res.ok) throw new Error(`Không tải được trang (mã lỗi ${res.status}).`);
     const buf = await res.arrayBuffer();
     return { html: Buffer.from(buf.slice(0, MAX_HTML_BYTES)).toString('utf-8'), finalUrl: target.toString() };

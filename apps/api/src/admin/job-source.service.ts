@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { setPoliteStore } from '../common/polite-crawl.util';
 import { JobSource, JobSourceKind } from '../database/entities/job-source.entity';
 import { JobImport } from '../database/entities/job-import.entity';
 import { JobPosting } from '../database/entities/job-posting.entity';
@@ -14,10 +16,12 @@ import { normalizeSearchText } from '../common/search-text.util';
 //   3) Lấy tối đa BATCH tin từ hàng đợi → "Hộp nhập tin từ link" (Chờ xem). Phần còn lại để lần sau — chạy được trên Render miễn phí.
 const EVERY_MS = 10 * 60 * 1000;
 const REDISCOVER_MS = 20 * 60 * 60 * 1000;
-const PAGES_PER_RUN = 6;
-const BATCH = 20;
-const PAGE_DELAY_MS = 900;
-const JOB_DELAY_MS = 600;
+// Đợt 157 — lấy ÍT mỗi lần, chia nhiều đợt: mỗi lượt chạy (10 phút) tối đa 2 trang danh sách + 10 tin; khoảng giãn cách giữa các lần tải do cổng lịch sự lo.
+const PAGES_PER_RUN = 2;
+const BATCH = 10;
+const PAGE_DELAY_MS = 0;
+const JOB_DELAY_MS = 0;
+const STEP_MAX_ITEMS = 15;
 const RUN_BUDGET_MS = 110_000;
 const MAX_QUEUE = 3000;
 
@@ -33,10 +37,12 @@ export class JobSourceService implements OnModuleInit, OnModuleDestroy {
     @InjectRepository(JobImport) private readonly impRepo: Repository<JobImport>,
     @InjectRepository(JobPosting) private readonly jobRepo: Repository<JobPosting>,
     private readonly imports: JobImportService,
+    @InjectDataSource() private readonly ds: DataSource,
   ) {}
 
   onModuleInit() {
     if (process.env.NODE_ENV === 'test') return;
+    setPoliteStore(this.ds).catch(() => undefined);
     this.timer = setInterval(() => {
       this.runDue().catch(() => undefined);
     }, EVERY_MS);
@@ -207,11 +213,13 @@ export class JobSourceService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ---- Quét ----
-  private async known(urls: string[]): Promise<Set<string>> {
+  async known(urls: string[]): Promise<Set<string>> {
     if (!urls.length) return new Set();
     const out = new Set<string>();
     const imp: { u: string }[] = await this.impRepo.query(
-      `SELECT source_url AS u FROM job_imports WHERE source_url = ANY($1) UNION SELECT data->>'rawUrl' AS u FROM job_imports WHERE data->>'rawUrl' = ANY($1)`,
+      // Tin đã đăng nhưng sau đó bị xoá (job_id không còn) thì KHÔNG tính là "đã có" → cho phép đưa lại (kèm cảnh báo).
+      `SELECT i.source_url AS u FROM job_imports i WHERE i.source_url = ANY($1) AND NOT (i.status IN ('published','accepted') AND NOT EXISTS (SELECT 1 FROM job_postings j WHERE j.id = i.job_id))
+       UNION SELECT i.data->>'rawUrl' AS u FROM job_imports i WHERE i.data->>'rawUrl' = ANY($1) AND NOT (i.status IN ('published','accepted') AND NOT EXISTS (SELECT 1 FROM job_postings j WHERE j.id = i.job_id))`,
       [urls],
     );
     for (const r of imp) out.add(r.u);
@@ -267,10 +275,13 @@ export class JobSourceService implements OnModuleInit, OnModuleDestroy {
         } else {
           src.cursorPage = page + 1;
         }
-        if (src.cursorPage > 0) await sleep(PAGE_DELAY_MS);
+        src.queue = Array.from(queue);
+        await this.repo.save(src); // lưu tiến độ ngay sau MỖI trang: dừng/khởi động lại vẫn làm tiếp đúng chỗ
+        if (src.cursorPage > 0 && PAGE_DELAY_MS) await sleep(PAGE_DELAY_MS);
       }
 
       // Nhập một lô từ hàng đợi.
+      let done = 0;
       const batch = Array.from(queue).slice(0, BATCH);
       for (const u of batch) {
         if (Date.now() >= deadline) break;
@@ -282,12 +293,22 @@ export class JobSourceService implements OnModuleInit, OnModuleDestroy {
             meta: { sourceId: src.id, ...(src.autoPublish ? {} : { noAuto: true }) },
           });
           if (r.result === 'new') added++;
+          if (r.result === 'failed' && /tạm nghỉ|giới hạn/.test(r.message ?? '')) {
+            // Trang nguồn đang nghỉ / hết lượt hôm nay: giữ lại tin này, dừng lô, làm tiếp ở lượt sau.
+            queue.add(u);
+            error = r.message;
+            break;
+          }
         } catch {
           /* bỏ qua tin lỗi, vòng đọc sau sẽ thấy lại nếu còn */
         }
-        await sleep(JOB_DELAY_MS);
+        // Lưu hàng đợi sau mỗi 3 tin: đã nhập đến đâu nhớ đến đó.
+        if (++done % 3 === 0) {
+          src.queue = Array.from(queue);
+          await this.repo.save(src);
+        }
       }
-      src.lastError = null;
+      src.lastError = error ? error.slice(0, 500) : null;
     } catch (e) {
       error = (e as Error).message;
       src.lastError = error.slice(0, 500);
@@ -335,7 +356,10 @@ export class JobSourceService implements OnModuleInit, OnModuleDestroy {
       const known = await this.known(urls);
       const fresh = urls.filter((u) => !known.has(u));
       let added = 0;
-      for (const u of fresh.slice(0, 40)) {
+      // Lấy ÍT mỗi lần bấm (nhẹ cho trang nguồn): tối đa STEP_MAX_ITEMS tin; còn dư thì bấm tiếp vẫn ở trang này.
+      const todo = fresh.slice(0, STEP_MAX_ITEMS);
+      let stopMsg: string | undefined;
+      for (const u of todo) {
         try {
           const r = await this.imports.addOne(u, {
             quiet: true,
@@ -343,20 +367,24 @@ export class JobSourceService implements OnModuleInit, OnModuleDestroy {
             meta: { sourceId: src.id, ...(src.autoPublish ? {} : { noAuto: true }) },
           });
           if (r.result === 'new') added++;
+          if (r.result === 'failed' && /tạm nghỉ|giới hạn/.test(r.message ?? '')) {
+            stopMsg = r.message;
+            break;
+          }
         } catch {
           /* bỏ qua tin lỗi */
         }
-        await sleep(JOB_DELAY_MS);
       }
+      const remaining = Math.max(0, fresh.length - todo.length);
       const hasNext = urls.length > 0 && !(p.lastPage && page >= p.lastPage && !Array.from(p.pageLinks.keys()).some((n) => n > page));
-      src.manualPage = hasNext ? page + 1 : 1;
+      src.manualPage = remaining > 0 || stopMsg ? page : hasNext ? page + 1 : 1;
       src.totalFound += fresh.length;
       src.totalAdded += added;
       src.lastAdded = added;
       src.lastScanAt = new Date();
       src.lastError = null;
       await this.repo.save(src);
-      return { page, found: urls.length, added, hasNext, already: urls.length - fresh.length };
+      return { page, found: urls.length, added, hasNext: hasNext || remaining > 0, already: urls.length - fresh.length, remaining, ...(stopMsg ? { note: stopMsg } : {}) };
     } finally {
       this.running = false;
       this.runningId = null;

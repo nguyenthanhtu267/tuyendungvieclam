@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, jobsApi } from '@/lib/api';
-import { adminApi, type ShareBgAdmin, type ShareTexts } from '@/lib/api-admin';
+import { adminApi, type ShareBgAdmin, type ShareElKey, type SharePeople, type ShareStyle, type ShareFormat, type ShareTexts } from '@/lib/api-admin';
 import { SHARE_PRESETS, presetById, svgDataUri } from '@/lib/share-presets';
 
 // Đợt 153 — Admin chọn nền cho ảnh xem trước khi dán link tin tuyển dụng lên Facebook/Zalo.
@@ -31,6 +31,11 @@ export function ShareBgPanel({ token }: { token: string }) {
   const [name, setName] = useState('');
   const [stamp, setStamp] = useState(0);
   const [tx, setTx] = useState<ShareTexts | null>(null);
+  const [st, setSt] = useState<ShareStyle | null>(null);
+  const [pp, setPp] = useState<SharePeople>('none');
+  const [fm, setFm] = useState<ShareFormat>('wide');
+  const [pf, setPf] = useState<'wide' | 'square'>('wide');
+  useEffect(() => { if (cfg && !st) { setSt(cfg.style); setPp(cfg.people); setFm(cfg.format); } }, [cfg, st]);
   useEffect(() => { if (cfg && !tx) setTx(cfg.texts); }, [cfg, tx]);
 
   useEffect(() => {
@@ -60,7 +65,7 @@ export function ShareBgPanel({ token }: { token: string }) {
   if (!cfg) return <div className="text-sm text-ink-muted">{note ? note.text : 'Đang tải…'}</div>;
 
   const all = [
-    ...SHARE_PRESETS.map((p) => ({ id: p.id, name: p.name, src: svgDataUri(p.svg), custom: false })),
+    ...SHARE_PRESETS.map((p) => ({ id: p.id, name: p.name, src: svgDataUri(p.svg(1200, 630)), custom: false })),
     ...cfg.custom.map((c) => ({ id: c.id, name: c.name, src: c.dataUrl, custom: true })),
   ];
   const inRotation = (id: string) => (cfg.presets.includes(id) || cfg.custom.some((c) => c.id === id)) && true;
@@ -70,7 +75,10 @@ export function ShareBgPanel({ token }: { token: string }) {
     run(() => adminApi.shareBgSet(token, { presets: next }), 'Đã lưu vòng đổi nền theo ngày.');
   };
   const shareLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/s/${jobId ?? '<mã tin>'}`;
-  const previewSrc = jobId && prev ? `/chia-se/${jobId}?bg=${prev}&t=${stamp}` : '';
+  const pv = encodeURIComponent(JSON.stringify({ style: st ?? undefined, people: pp, format: fm }));
+  const previewSrc = jobId && prev ? `/chia-se/${jobId}?bg=${prev}&fmt=${pf}&pv=${pv}&t=${stamp}` : '';
+  const ELS: [ShareElKey, string][] = [['brand', 'Tên web'], ['tagline', 'Dòng giới thiệu'], ['badge', 'Nhãn tin gấp'], ['title', 'Tiêu đề tin'], ['company', 'Tên công ty'], ['salary', 'Mức lương'], ['meta', 'Địa điểm / hạn nộp'], ['contact', 'Liên hệ']];
+  const setEl = (k: ShareElKey, patch: Partial<ShareStyle['els'][ShareElKey]>) => st && setSt({ ...st, els: { ...st.els, [k]: { ...st.els[k], ...patch } } });
 
   const onFile = async (f?: File | null) => {
     if (!f) return;
@@ -164,11 +172,82 @@ export function ShareBgPanel({ token }: { token: string }) {
         </div>
       </div>
 
+      {st && (
+        <div className="rounded-lg border border-border bg-white p-3 space-y-3">
+          <div className="font-bold text-sm">Kích thước ảnh & nhân vật</div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="text-xs font-bold space-y-1 block">
+              Khổ ảnh
+              <select id="sb-format" className="tvl-input !text-sm" value={fm} onChange={(e) => setFm(e.target.value as ShareFormat)}>
+                <option value="wide">Ngang 1200×630 (khuyên dùng, Facebook/Zalo hiện đầy đủ)</option>
+                <option value="square">Vuông 1080×1080 (hợp điện thoại, Facebook có thể thu nhỏ)</option>
+                <option value="auto">Tự chọn theo thiết bị người bấm chia sẻ</option>
+              </select>
+            </label>
+            <div className="text-xs font-bold space-y-1">
+              Nhân vật làm việc văn phòng
+              <div className="flex flex-wrap gap-2">
+                {([['none', 'Không hiện'], ['male', 'Nam'], ['female', 'Nữ'], ['both', 'Nam + Nữ']] as [SharePeople, string][]).map(([v, l]) => (
+                  <label key={v} className="flex items-center gap-1.5 text-xs font-normal min-h-[36px]">
+                    <input type="radio" name="sbpeople" checked={pp === v} onChange={() => setPp(v)} /> {l}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <p className="text-xs text-ink-muted">“Tự chọn” dựa vào thiết bị của người bấm chia sẻ (máy tính → ngang, điện thoại → vuông); Facebook/Zalo không cho web biết người xem dùng thiết bị gì.</p>
+
+          <div className="font-bold text-sm">Chữ trên ảnh: màu, cỡ, đậm, nghiêng</div>
+          <div className="space-y-2">
+            {ELS.map(([k, l]) => {
+              const e = st.els[k];
+              return (
+                <div key={k} className="grid grid-cols-[1fr_auto] sm:grid-cols-[150px_auto_1fr_auto_auto] gap-2 items-center border-b border-border pb-2">
+                  <span className="text-xs font-bold">{l}</span>
+                  <span className="flex items-center gap-1">
+                    <input id={`sbc-${k}`} type="color" aria-label={`Màu ${l}`} className="h-9 w-10 p-0 border border-border-strong rounded" value={e.color || '#12284f'} onChange={(ev) => setEl(k, { color: ev.target.value })} />
+                    <button type="button" className={btn} onClick={() => setEl(k, { color: '' })} disabled={!e.color}>Tự động</button>
+                  </span>
+                  <label className="flex items-center gap-2 text-xs col-span-2 sm:col-span-1">
+                    Cỡ {e.scale}%
+                    <input id={`sbs-${k}`} type="range" min={60} max={170} step={5} value={e.scale} onChange={(ev) => setEl(k, { scale: Number(ev.target.value) })} className="flex-1" />
+                  </label>
+                  <label className="flex items-center gap-1 text-xs min-h-[36px]"><input type="checkbox" checked={e.bold} onChange={(ev) => setEl(k, { bold: ev.target.checked })} /> Đậm</label>
+                  <label className="flex items-center gap-1 text-xs min-h-[36px]"><input type="checkbox" checked={e.italic} onChange={(ev) => setEl(k, { italic: ev.target.checked })} /> Nghiêng</label>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="font-bold text-sm">Thông tin hiển thị</div>
+          <div className="flex flex-wrap gap-x-4">
+            {([['salary', 'Lương'], ['location', 'Địa điểm'], ['deadline', 'Hạn nộp'], ['contact', 'Liên hệ']] as [keyof ShareStyle['show'], string][]).map(([k, l]) => (
+              <label key={k} className="flex items-center gap-1.5 text-xs min-h-[36px]">
+                <input type="checkbox" checked={st.show[k]} onChange={(ev) => setSt({ ...st, show: { ...st.show, [k]: ev.target.checked } })} /> {l}
+              </label>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 text-xs">
+            Độ tối phủ lên ảnh tự tải {st.scrim}%
+            <input id="sb-scrim" type="range" min={0} max={85} step={5} value={st.scrim} onChange={(ev) => setSt({ ...st, scrim: Number(ev.target.value) })} className="flex-1 max-w-xs" />
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button className={btnP} disabled={busy} onClick={() => run(() => adminApi.shareBgSet(token, { style: st, people: pp, format: fm }), 'Đã lưu kiểu chữ, nhân vật và khổ ảnh.').then(() => setStamp(Date.now()))}>Lưu thiết kế</button>
+            <button className={btn} disabled={busy} onClick={() => { setSt(null); run(() => adminApi.shareBgSet(token, { style: { els: {}, show: {}, scrim: 40 } as never, people: 'none', format: 'wide' }), 'Đã đặt lại mặc định.').then(() => setStamp(Date.now())); }}>Đặt lại mặc định</button>
+          </div>
+        </div>
+      )}
+
       {previewSrc && (
         <div className="rounded-lg border border-border bg-white p-3 space-y-2">
-          <div className="font-bold text-sm">Xem thử với tin mới nhất</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="font-bold text-sm mr-auto">Xem thử với tin mới nhất (chưa cần lưu)</div>
+            <button className={pf === 'wide' ? btnP : btn} onClick={() => setPf('wide')}>Máy tính (ngang)</button>
+            <button className={pf === 'square' ? btnP : btn} onClick={() => setPf('square')}>Điện thoại (vuông)</button>
+            <button className={btn} onClick={() => setStamp(Date.now())}>Vẽ lại</button>
+          </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={previewSrc} alt="Xem thử ảnh chia sẻ" className="w-full max-w-[600px] aspect-[1200/630] rounded-md border border-border bg-surface-muted" />
+          <img src={previewSrc} alt="Xem thử ảnh chia sẻ" className={`w-full rounded-md border border-border bg-surface-muted ${pf === 'wide' ? 'max-w-[600px] aspect-[1200/630]' : 'max-w-[420px] aspect-square'}`} />
         </div>
       )}
       {note && <div role="status" className={`text-xs font-bold ${note.ok ? 'text-success' : 'text-critical'}`}>{note.text}</div>}

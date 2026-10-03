@@ -29,8 +29,17 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       desc = `${salary}${j.location ? ' · ' + j.location : ''} · Ứng tuyển miễn phí trên Việc Làm Ngay`;
     }
   } catch { /* dùng chữ mặc định, ảnh vẫn có */ }
-  const img = `${SITE}/chia-se/${encodeURIComponent(id)}.png`;
-  const share = `${SITE}/s/${encodeURIComponent(id)}`;
+  // Đợt 158 — khổ ảnh theo cấu hình admin: ngang 1200×630, vuông 1080×1080, hoặc tự chọn theo thiết bị người chia sẻ (?f=m|d)
+  const f = new URL(req.url).searchParams.get('f');
+  let fmt: 'wide' | 'square' | 'auto' = 'wide';
+  try {
+    const r = await fetch(`${API}/public/share-bg?only=${encodeURIComponent(id)}`, { next: { revalidate: 120 }, signal: AbortSignal.timeout(5000) });
+    if (r.ok) { const c = (await r.json()) as { format?: string }; if (c.format === 'square' || c.format === 'auto') fmt = c.format; }
+  } catch { /* mặc định ngang */ }
+  const square = fmt === 'square' || (fmt === 'auto' && f === 'm');
+  const [W, H] = square ? [1080, 1080] : [1200, 630];
+  const img = `${SITE}/chia-se/${encodeURIComponent(id)}.png${fmt === 'auto' && (f === 'm' || f === 'd') ? `?f=${f}` : ''}`;
+  const share = `${SITE}/s/${encodeURIComponent(id)}${f === 'm' || f === 'd' ? `?f=${f}` : ''}`;
   const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>${esc(title)}</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="description" content="${esc(desc)}">
@@ -38,7 +47,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 <meta property="og:type" content="website"><meta property="og:locale" content="vi_VN"><meta property="og:site_name" content="Việc Làm Ngay">
 <meta property="og:url" content="${esc(share)}"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}">
 <meta property="og:image" content="${esc(img)}"><meta property="og:image:secure_url" content="${esc(img)}"><meta property="og:image:type" content="image/png">
-<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="${esc(title)}">
+<meta property="og:image:width" content="${W}"><meta property="og:image:height" content="${H}"><meta property="og:image:alt" content="${esc(title)}">
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(title)}"><meta name="twitter:description" content="${esc(desc)}"><meta name="twitter:image" content="${esc(img)}">
 <meta http-equiv="refresh" content="0;url=${esc(target)}"></head>
 <body><p><a href="${esc(target)}">${esc(title)}</a></p></body></html>`;

@@ -304,7 +304,7 @@ export class AdminController {
     return this.shareBg.adminView();
   }
   @Put('share-bg')
-  shareBgSet(@Body() b: { mode?: string; fixedId?: string; presets?: string[]; texts?: Record<string, string> }) {
+  shareBgSet(@Body() b: { mode?: string; fixedId?: string; presets?: string[]; texts?: Record<string, string>; style?: unknown; people?: string; format?: string }) {
     return this.shareBg.update(b ?? {});
   }
   @Post('share-bg/custom')

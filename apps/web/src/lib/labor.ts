@@ -1,3 +1,4 @@
+import { shareDeviceQuery } from './social';
 // Đợt 79 — kênh lao động phổ thông. Bản sao của apps/api/src/workers/labor-groups.ts (giữ giống hệt).
 import type { WorkerKind } from './api';
 
@@ -55,7 +56,7 @@ export function fmtDateTime(iso: string) {
 }
 export function laborShareUrl(jobId: string) {
   const base = process.env.NEXT_PUBLIC_SITE_URL ?? (typeof window !== 'undefined' ? window.location.origin : 'https://www.vieclamngay.vn');
-  return `${base}/s/${jobId}`;
+  return `${base}/s/${jobId}${shareDeviceQuery()}`;
 }
 
 // ---------------- Đợt 80 ----------------

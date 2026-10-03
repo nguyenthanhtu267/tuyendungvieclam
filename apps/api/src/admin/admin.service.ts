@@ -1149,6 +1149,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const applicationCount = await this.applicationRepo.count({
       where: { jobPostingId: id },
     });
+    // Đợt 157 — ghi dấu "Admin đã xoá" vào mục nhập tương ứng để lần quét sau biết (cho đăng lại kèm cảnh báo).
+    await this.jobRepo
+      .query(`UPDATE job_imports SET data = data || $2::jsonb WHERE job_id = $1`, [id, JSON.stringify({ deletedBy: 'admin', deletedAt: new Date().toISOString() })])
+      .catch(() => undefined);
     await this.jobRepo.remove(job);
     await this.logAction(
       admin,

@@ -5,7 +5,7 @@ import { randomBytes } from 'crypto';
 
 // Đợt 153 — "Ảnh chia sẻ tin tuyển dụng" (khung xem trước khi dán link tin vào Facebook / Zalo): nền ảnh do Admin chọn.
 // Có sẵn một bộ mẫu vector (vẽ trong web, mã p1..p8) + ảnh Admin tự tải lên. Chế độ: đổi mỗi ngày (xoay vòng) hoặc cố định.
-export const SHARE_PRESET_IDS = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8'];
+export const SHARE_PRESET_IDS = Array.from({ length: 18 }, (_, i) => `p${i + 1}`);
 const KEY = 'share_bg';
 const MAX_CUSTOM = 8;
 const MAX_DATA_URL = 900_000; // ~650KB ảnh
@@ -17,7 +17,43 @@ export interface ShareBgConfig {
   custom: { id: string; name: string; dataUrl: string }[];
   /** Chữ cố định in trên ảnh (Admin sửa được). Chữ theo từng tin (tiêu đề, công ty, lương, liên hệ...) luôn lấy từ tin. */
   texts: ShareTexts;
+  /** Đợt 158 — kiểu chữ từng phần, hiện/ẩn thông tin, người minh hoạ, khổ ảnh. */
+  style: ShareStyle;
+  people: SharePeople;
+  format: ShareFormat;
 }
+export const EL_KEYS = ['brand', 'tagline', 'badge', 'title', 'company', 'salary', 'meta', 'contact'] as const;
+export type ShareEl = (typeof EL_KEYS)[number];
+export interface ElStyle { color: string; scale: number; bold: boolean; italic: boolean }
+export interface ShareStyle { els: Record<ShareEl, ElStyle>; show: { salary: boolean; location: boolean; deadline: boolean; contact: boolean }; scrim: number }
+export type SharePeople = 'none' | 'male' | 'female' | 'both';
+export type ShareFormat = 'wide' | 'square' | 'auto';
+const defEl = (bold = true): ElStyle => ({ color: '', scale: 100, bold, italic: false });
+export const DEFAULT_STYLE: ShareStyle = {
+  els: { brand: defEl(), tagline: defEl(false), badge: defEl(), title: defEl(), company: defEl(), salary: defEl(), meta: defEl(), contact: defEl() },
+  show: { salary: true, location: true, deadline: true, contact: true },
+  scrim: 55,
+};
+const num = (v: unknown, lo: number, hi: number, d: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.round(v))) : d);
+export function cleanStyle(raw: unknown): ShareStyle {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as { els?: Record<string, Partial<ElStyle>>; show?: Record<string, unknown>; scrim?: unknown };
+  const els = {} as Record<ShareEl, ElStyle>;
+  for (const k of EL_KEYS) {
+    const d = DEFAULT_STYLE.els[k];
+    const x = r.els?.[k] ?? {};
+    els[k] = {
+      color: typeof x.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(x.color) ? x.color : '',
+      scale: num(x.scale, 60, 170, d.scale),
+      bold: typeof x.bold === 'boolean' ? x.bold : d.bold,
+      italic: typeof x.italic === 'boolean' ? x.italic : d.italic,
+    };
+  }
+  const sh = r.show ?? {};
+  const b = (k: string) => (typeof sh[k] === 'boolean' ? (sh[k] as boolean) : true);
+  return { els, show: { salary: b('salary'), location: b('location'), deadline: b('deadline'), contact: b('contact') }, scrim: num(r.scrim, 0, 85, DEFAULT_STYLE.scrim) };
+}
+const cleanPeople = (v: unknown): SharePeople => (v === 'male' || v === 'female' || v === 'both' ? v : 'none');
+const cleanFormat = (v: unknown): ShareFormat => (v === 'square' || v === 'auto' ? v : 'wide');
 export interface ShareTexts { brand: string; tagline: string; urgent: string; fallback: string }
 export const DEFAULT_TEXTS: ShareTexts = { brand: 'VIỆC LÀM NGAY', tagline: 'vieclamngay.vn · Ứng tuyển miễn phí', urgent: 'TUYỂN GẤP', fallback: 'Bấm vào liên kết để xem chi tiết và ứng tuyển' };
 const cleanTexts = (t: Partial<ShareTexts> | undefined): ShareTexts => {
@@ -29,7 +65,7 @@ const cleanTexts = (t: Partial<ShareTexts> | undefined): ShareTexts => {
   return o;
 };
 
-const DEFAULT_CFG: ShareBgConfig = { mode: 'daily', fixedId: 'p1', presets: [...SHARE_PRESET_IDS], custom: [], texts: { ...DEFAULT_TEXTS } };
+const DEFAULT_CFG: ShareBgConfig = { mode: 'daily', fixedId: 'p1', presets: [...SHARE_PRESET_IDS], custom: [], texts: { ...DEFAULT_TEXTS }, style: cleanStyle({}), people: 'none', format: 'wide' };
 
 @Injectable()
 export class ShareBgService implements OnModuleInit {
@@ -50,6 +86,9 @@ export class ShareBgService implements OnModuleInit {
         presets: Array.isArray(v.presets) ? v.presets.filter((x) => SHARE_PRESET_IDS.includes(x)) : [...SHARE_PRESET_IDS],
         custom: Array.isArray(v.custom) ? v.custom : [],
         texts: cleanTexts(v.texts),
+        style: cleanStyle((v as { style?: unknown }).style),
+        people: cleanPeople((v as { people?: unknown }).people),
+        format: cleanFormat((v as { format?: unknown }).format),
       };
     } catch {
       return { ...DEFAULT_CFG };
@@ -69,12 +108,15 @@ export class ShareBgService implements OnModuleInit {
     return { ...c, custom: c.custom.map((x) => ({ id: x.id, name: x.name, dataUrl: x.dataUrl })) };
   }
 
-  async update(b: { mode?: string; fixedId?: string; presets?: string[]; texts?: Partial<ShareTexts> }) {
+  async update(b: { mode?: string; fixedId?: string; presets?: string[]; texts?: Partial<ShareTexts>; style?: unknown; people?: string; format?: string }) {
     const c = await this.get();
     if (b.mode === 'daily' || b.mode === 'fixed') c.mode = b.mode;
     if (typeof b.fixedId === 'string') c.fixedId = b.fixedId;
     if (Array.isArray(b.presets)) c.presets = b.presets.filter((x) => SHARE_PRESET_IDS.includes(x));
     if (b.texts) c.texts = cleanTexts(b.texts);
+    if (b.style) c.style = cleanStyle(b.style);
+    if (b.people) c.people = cleanPeople(b.people);
+    if (b.format) c.format = cleanFormat(b.format);
     const ids = [...SHARE_PRESET_IDS, ...c.custom.map((x) => x.id)];
     if (!ids.includes(c.fixedId)) c.fixedId = 'p1';
     if (!c.presets.length && !c.custom.length) throw new BadRequestException('Cần giữ ít nhất một nền trong vòng đổi theo ngày');
@@ -101,10 +143,10 @@ export class ShareBgService implements OnModuleInit {
   }
 
   /** Nền áp dụng cho một ngày (yyyy-mm-dd, giờ Việt Nam). `only` = xem thử một nền cụ thể. */
-  async pick(date?: string, only?: string): Promise<{ type: 'preset' | 'image'; id: string; dataUrl?: string; texts?: ShareTexts }> {
+  async pick(date?: string, only?: string): Promise<{ type: 'preset' | 'image'; id: string; dataUrl?: string; texts?: ShareTexts; style?: ShareStyle; people?: SharePeople; format?: ShareFormat }> {
     const c = await this.get();
     const r = await this.pickBg(c, date, only);
-    return { ...r, texts: c.texts };
+    return { ...r, texts: c.texts, style: c.style, people: c.people, format: c.format };
   }
 
   private async pickBg(c: ShareBgConfig, date?: string, only?: string): Promise<{ type: 'preset' | 'image'; id: string; dataUrl?: string }> {

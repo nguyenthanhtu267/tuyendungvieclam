@@ -111,14 +111,21 @@ export class JobImportService {
       const job = await this.jobRepo.findOne({ where: { sourceUrl: u }, select: { id: true } });
       return job ? { job } : null;
     };
+    // Đợt 157 — tin ĐÃ ĐĂNG nhưng sau đó bị xoá (Admin hoặc nhà tuyển dụng) thì không còn là "đã có": cho đưa lại, kèm cảnh báo.
+    const gone = async (i: JobImport) => ['published', 'accepted'].includes(i.status) && (!i.jobId || !(await this.jobRepo.findOne({ where: { id: i.jobId }, select: { id: true } })));
+    let revive: JobImport | null = null;
     let dup = await isDup(url);
+    if (dup?.imp && (await gone(dup.imp))) {
+      revive = dup.imp;
+      dup = null;
+    }
     // Link từng lỗi (không đọc được) thì cho thử lại khi Admin dán tay — xoá bản cũ rồi đọc lại.
     if (dup?.imp?.status === 'failed' && !opts.quiet) {
       await this.repo.delete(dup.imp.id);
       dup = null;
     }
     if (dup) return { url, result: 'duplicate', id: dup.imp?.id, message: dup.imp ? 'Link này đã nhập trước đó' : 'Đã có tin đăng từ link này' };
-    const ex = await extractJobFromUrl(url);
+    const ex = await extractJobFromUrl(url, { auto: !!opts.quiet });
     let finalUrl = url;
     if (ex.finalUrl) {
       try {
@@ -128,7 +135,11 @@ export class JobImportService {
       }
     }
     if (finalUrl !== url) {
-      const d2 = await isDup(finalUrl);
+      let d2 = await isDup(finalUrl);
+      if (d2?.imp && (await gone(d2.imp))) {
+        revive = revive ?? d2.imp;
+        d2 = null;
+      }
       if (d2) return { url: finalUrl, result: 'duplicate', id: d2.imp?.id, message: 'Tin này đã có (link nguồn trùng)' };
     }
     // Trùng nội dung: cùng chức danh + cùng công ty (+ cùng địa điểm) dù khác link — tránh 1 tin hiện 2 lần.
@@ -140,12 +151,30 @@ export class JobImportService {
           .where("i.status <> 'failed'")
           .andWhere(`${unaccentSql("(i.data->>'title')")} = :t AND ${unaccentSql("(i.data->>'companyName')")} = :c`, { t: key.t, c: key.c })
           .getMany();
-        if (sameImp.some((x) => this.contentKey(x.data)?.l === key.l)) return { url: finalUrl, result: 'duplicate', id: sameImp[0].id, message: 'Tin trùng nội dung (cùng chức danh, công ty, địa điểm)' };
+        const alive: JobImport[] = [];
+        for (const x of sameImp) if (x.id !== revive?.id && !(await gone(x))) alive.push(x);
+        if (alive.some((x) => this.contentKey(x.data)?.l === key.l)) return { url: finalUrl, result: 'duplicate', id: sameImp[0].id, message: 'Tin trùng nội dung (cùng chức danh, công ty, địa điểm)' };
       }
     }
     if (!ex.found && opts.quiet) return { url: finalUrl, result: 'failed', message: ex.warning };
     const data = { ...(ex.data as Record<string, unknown>), ...(finalUrl !== url ? { rawUrl: url } : {}), ...(opts.meta ?? {}) };
     const match = ex.found ? await this.matchCompany(ex.data.companyName, ex.data.companyWebsite) : null;
+    if (revive && ex.found) {
+      // Dùng lại đúng dòng cũ (không tạo dòng trùng), luôn chờ Admin xem lại (không tự đăng) và ghi rõ ai đã xoá.
+      const prev = (revive.data ?? {}) as Record<string, unknown>;
+      const by = prev.deletedBy === 'admin' ? 'Admin đã xoá' : 'Nhà tuyển dụng hoặc quản trị đã xoá';
+      const when = typeof prev.deletedAt === 'string' ? ` lúc ${new Date(prev.deletedAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}` : '';
+      const warn = `CẢNH BÁO: tin này từng được đăng nhưng đã bị xoá (${by}${when}). Kiểm tra kỹ trước khi đăng lại.`;
+      revive.data = { ...data, noAuto: true, deletedWarning: warn, deletedBy: prev.deletedBy ?? null, deletedAt: prev.deletedAt ?? null };
+      revive.status = (match && this.hasOwner(match.company) ? 'owner_review' : 'pending') as JobImportStatus;
+      revive.jobId = null as never;
+      revive.matchedCompanyId = match?.company.id ?? null;
+      revive.matchKind = match?.kind ?? null;
+      revive.companyHasOwner = match ? this.hasOwner(match.company) : false;
+      revive.note = warn;
+      await this.repo.save(revive);
+      return { url: finalUrl, result: 'new', id: revive.id, message: warn };
+    }
     const row = await this.repo.save(
       this.repo.create({
         sourceUrl: finalUrl,

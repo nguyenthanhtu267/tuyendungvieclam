@@ -144,7 +144,18 @@ export function SourcesPanel({ token }: { token: string }) {
       setMsg(
         x.reset
           ? { ok: true, text: `Đã đưa "${r.label}" về trang 1.` }
-          : { ok: true, text: `Trang ${x.page}: thấy ${x.found} tin, nhập mới ${x.added}${x.already ? `, đã có sẵn ${x.already}` : ''}. ${x.hasNext ? `Bấm "Quét trang ${x.page + 1}" để đi tiếp.` : 'Đã hết trang — lần bấm sau quay lại trang 1.'}` },
+          : {
+              ok: !x.note,
+              text: `Trang ${x.page}: thấy ${x.found} tin, nhập mới ${x.added}${x.already ? `, đã có sẵn ${x.already}` : ''}. ${
+                x.note
+                  ? `${x.note} Bấm lại sau để làm tiếp đúng trang này.`
+                  : x.remaining
+                    ? `Còn ${x.remaining} tin mới ở trang này — bấm tiếp để lấy nốt (mỗi lần lấy ít để nhẹ cho trang nguồn).`
+                    : x.hasNext
+                      ? `Bấm "Quét trang ${x.page + 1}" để đi tiếp.`
+                      : 'Đã hết trang — lần bấm sau quay lại trang 1.'
+              }`,
+            },
       );
       await load();
     } catch (e) {
