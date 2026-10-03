@@ -107,7 +107,7 @@ export class Smart5Service {
            ${base} ${extra}`,
         params,
       );
-    let [s] = industry ? await stat(`AND $1 = ANY(p.desired_industries)`, [industry]) : [undefined as never];
+    let [s] = industry ? await stat(`AND $1 = ANY(string_to_array(p.desired_industries, ','))`, [industry]) : [undefined as never];
     let scope = industry ?? 'toàn website';
     if (!s || Number(s.n) < 10) { [s] = await stat('', []); scope = 'toàn website'; }
     const n = Number(s?.n ?? 0);

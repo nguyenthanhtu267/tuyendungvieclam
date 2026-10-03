@@ -3,7 +3,7 @@ import { SQL_MILLIONS, toMillions } from '../common/job-normalize';
 import { countByColumn } from '../common/count-by';
 import { PROVINCE_ZONES } from '../common/province-info';
 import { oldDistricts } from '../workers/vn-geo';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, MoreThanOrEqual, Repository, SelectQueryBuilder } from 'typeorm';
 import {
@@ -57,6 +57,7 @@ function clamp(n: number, min = 0, max = 100): number {
 
 @Injectable()
 export class JobsService {
+  private readonly logger = new Logger('JobsService');
   constructor(
     @InjectRepository(JobPosting)
     private readonly jobRepo: Repository<JobPosting>,
@@ -237,23 +238,12 @@ export class JobsService {
     };
   }
 
-  async findOne(id: string, countView = true) {
-    const job = await this.jobRepo.findOne({
-      where: { id },
-      relations: { company: true },
-    });
-    if (
-      !job ||
-      job.approvalStatus !== JobApprovalStatus.APPROVED ||
-      job.isPaused
-    ) {
-      throw new NotFoundException('Không tìm thấy tin tuyển dụng');
-    }
-
+  /** Đợt 160 — gợi ý tin tương tự (tách riêng để lỗi không lan ra trang chi tiết). Trả bản gọn, không kèm mô tả dài. */
+  private async relatedFor(job: JobPosting, id: string): Promise<JobPosting[]> {
     // Đợt 148 — "Các công việc tương tự" chấm điểm thay vì bắt buộc trùng ngành: cùng ngành (mạnh nhất), cùng cấp bậc,
     // tên chức danh giống nhau, cùng tỉnh (CHỈ cộng điểm — khác tỉnh vẫn có thể hiện để gợi ý nhiều hơn), tin mới hơn nhỉnh hơn.
     // Luôn cùng kênh (văn phòng / công nhân / sinh viên / thực tập) để không lẫn loại việc.
-    const provs = (job.provinces ?? []).filter(Boolean);
+    const provs = (Array.isArray(job.provinces) ? job.provinces : []).filter(Boolean);
     const qb = this.jobRepo
       .createQueryBuilder('job')
       .leftJoinAndSelect('job.company', 'company')
@@ -272,8 +262,11 @@ export class JobsService {
       orParams.level = job.level;
     }
     if (provs.length) {
-      orConds.push('job.provinces && ARRAY[:...provs]::text[]');
-      orParams.provs = provs;
+      // Đợt 160 — SỬA LỖI GỐC: cột provinces là chuỗi (simple-array lưu "A,B"), toán tử mảng `&&` gây lỗi 500 cho MỌI tin có tỉnh/thành
+      // → trang chi tiết tin báo lỗi (web hiểu nhầm là "mạng yếu"). Dùng ILIKE theo từng tỉnh như các bộ lọc khác.
+      const likeParts = provs.slice(0, 6).map((_, i) => `job.provinces ILIKE :rprov${i}`);
+      provs.slice(0, 6).forEach((pv, i) => { orParams[`rprov${i}`] = `%${String(pv).replace(/[\\%_]/g, '\\$&')}%`; });
+      orConds.push(`(${likeParts.join(' OR ')})`);
     }
     if (orConds.length) qb.andWhere(`(${orConds.join(' OR ')})`, orParams);
     const pool = await qb.orderBy('job.createdAt', 'DESC').take(120).getMany();
@@ -289,7 +282,7 @@ export class JobsService {
       let sc = 0;
       if (job.industry && r.industry === job.industry) sc += 50;
       if (job.level && r.level === job.level) sc += 20;
-      if (provs.length && (r.provinces ?? []).some((p) => provs.includes(p))) sc += 12;
+      if (provs.length && (Array.isArray(r.provinces) ? r.provinces : []).some((p) => provs.includes(p))) sc += 12;
       const rw = words(r.title);
       let hit = 0;
       myWords.forEach((w) => {
@@ -305,7 +298,37 @@ export class JobsService {
       .sort((a, b) => b.sc - a.sc || new Date(b.r.createdAt).getTime() - new Date(a.r.createdAt).getTime())
       .slice(0, 8)
       .map((x) => x.r);
-    this.applyLogoFallback([job, ...related]);
+    for (const r of related) {
+      // thẻ tin tương tự không cần nội dung dài → payload nhẹ, tải nhanh hơn trên máy chủ yếu
+      const x = r as unknown as Record<string, unknown>;
+      x.description = ''; x.requirements = ''; x.benefits = ''; x.screeningQuestions = null; x.contactNote = null;
+    }
+    return related;
+
+  }
+
+  async findOne(id: string, countView = true) {
+    const job = await this.jobRepo.findOne({
+      where: { id },
+      relations: { company: true },
+    });
+    if (
+      !job ||
+      job.approvalStatus !== JobApprovalStatus.APPROVED ||
+      job.isPaused
+    ) {
+      throw new NotFoundException('Không tìm thấy tin tuyển dụng');
+    }
+
+    // Đợt 160 — "tin tương tự" chỉ là phần PHỤ: lỗi ở đây (dữ liệu lạ của một tin khác trong nhóm...) KHÔNG được làm hỏng cả trang tin.
+    let related: JobPosting[] = [];
+    try {
+      related = await this.relatedFor(job, id);
+      this.applyLogoFallback([job, ...related]);
+    } catch (e) {
+      this.logger.warn(`Không tính được tin tương tự cho ${id}: ${(e as Error)?.message}`);
+      try { this.applyLogoFallback([job]); } catch { /* bỏ qua */ }
+    }
 
     // Đợt 12p (21/09/2026) — mỗi lượt xem trang chi tiết công khai +1 view_count (dùng cho thống kê
     // "Lượt xem"/"Tỷ lệ chuyển đổi" của NTD). Không await trước khi trả kết quả để không làm chậm
@@ -315,7 +338,9 @@ export class JobsService {
       job.viewCount = (job.viewCount ?? 0) + 1;
     }
 
-    if (job.screeningQuestions) (job as { screeningQuestions?: unknown }).screeningQuestions = job.screeningQuestions.map((x) => ({ q: x.q }));
+    // Đợt 160 — dữ liệu nhập từ nguồn ngoài có thể không đúng dạng mảng → không để lỗi 500.
+    const sq = (job as { screeningQuestions?: unknown }).screeningQuestions;
+    (job as { screeningQuestions?: unknown }).screeningQuestions = Array.isArray(sq) ? sq.map((x) => ({ q: String((x as { q?: unknown })?.q ?? '') })) : null;
     return { job, related };
   }
 

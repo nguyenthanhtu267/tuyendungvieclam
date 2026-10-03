@@ -667,13 +667,13 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
             )}
             {Object.keys(pend).length > 0 && (
               <div role="status" className="rounded-xl border border-border-strong bg-white px-3 py-2 text-[13px] flex items-center gap-2 flex-wrap">
-                ⏳ Mạng yếu — đang gom bộ lọc, sẽ tìm một lần.
+                ⏳ Đang gom bộ lọc, sẽ tìm một lần (máy chủ đang phản hồi chậm).
                 <button type="button" onClick={flushPending} className="tvl-btn-primary !w-auto px-4 !h-8 text-[12.5px]">Áp dụng ngay</button>
               </div>
             )}
             {listErr && (
               <div role="status" className="rounded-xl border border-warning bg-warning-tint px-3 py-2 text-[13px] font-semibold text-[#7A4A00] flex items-center gap-2 flex-wrap">
-                📶 {listErr.stale ? `Mạng yếu — đang hiện kết quả đã lưu (${agoText(listErr.stale)}).` : 'Chưa tải được danh sách vì mạng yếu.'}
+                📶 {listErr.stale ? `Máy chủ chưa trả lời kịp — đang hiện kết quả đã lưu (${agoText(listErr.stale)}).` : 'Chưa tải được danh sách: máy chủ chưa trả lời kịp (không phải do wifi của bạn).'}
                 <button type="button" onClick={() => setRetryN((n) => n + 1)} className="tvl-btn-primary !w-auto px-4 !h-8 text-[12.5px]">Thử lại (phím R)</button>
               </div>
             )}

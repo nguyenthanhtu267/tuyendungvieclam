@@ -140,6 +140,8 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
   const [fromCache, setFromCache] = useState<number | null>(null);
   const [loadTry, setLoadTry] = useState(0);
   const [loadFailed, setLoadFailed] = useState(false);
+  // Đợt 160 — nói ĐÚNG nguyên nhân (mạng / máy chủ chậm / lỗi máy chủ có mã tham chiếu), không gộp hết vào "mạng yếu".
+  const [loadErr, setLoadErr] = useState<{ status: number; message: string } | null>(null);
   // Máy chủ miễn phí vừa "ngủ dậy" thường mất 20–50 giây: tự thử lại vài lần (4, 8, 12, 16 giây) trước khi báo lỗi.
   const [autoTry, setAutoTry] = useState(0);
   useEffect(() => {
@@ -153,11 +155,15 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
     jobsApi
       .get(params.id)
       .then((res) => {
+        if (!res || !res.job) throw new ApiError('Máy chủ trả về dữ liệu rỗng', 502);
         setJob(res.job);
         setFromCache(null);
-        cacheJob(res.job, res.related);
-        pushRecentJob({ id: res.job.id, title: res.job.title, company: res.job.company?.name ?? '' });
-        setRelated(res.related);
+        setLoadErr(null);
+        setRelated(Array.isArray(res.related) ? res.related : []);
+        try {
+          cacheJob(res.job, res.related);
+          pushRecentJob({ id: res.job.id, title: res.job.title, company: res.job.company?.name ?? '' });
+        } catch { /* lưu bản offline lỗi không được làm hỏng việc hiển thị tin */ }
       })
       .catch((err) => {
         if (err instanceof ApiError && err.status === 404) {
@@ -165,6 +171,7 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
           return;
         }
         // Đợt 109 — lỗi mạng (không phải "tin không tồn tại"): cho xem bản đã lưu, hoặc báo lỗi + nút Thử lại.
+        setLoadErr(err instanceof ApiError ? { status: err.status, message: err.message } : { status: -1, message: String((err as Error)?.message ?? err) });
         const c = readCachedJob<JobPosting>(params.id);
         if (c) {
           setJob(c.job);
@@ -174,13 +181,15 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
       });
   }, [params.id, loadTry]);
   useEffect(() => {
-    if (!loadFailed || autoTry >= 4) return;
+    // Chỉ tự thử lại khi lỗi có thể TỰ KHỎI (máy chủ đang thức dậy / mạng chập chờn / quá tải). Lỗi 500 thật: thử 1 lần rồi báo rõ.
+    const transient = !loadErr || [0, 429, 502, 503, 504].includes(loadErr.status);
+    if (!loadFailed || autoTry >= (transient ? 4 : 1)) return;
     const t = setTimeout(() => {
       setAutoTry((n) => n + 1);
       setLoadTry((n) => n + 1);
     }, (autoTry + 1) * 4000);
     return () => clearTimeout(t);
-  }, [loadFailed, autoTry]);
+  }, [loadFailed, autoTry, loadErr]);
   useEffect(() => {
     if (fromCache == null && !loadFailed) return;
     const on = () => setLoadTry((n) => n + 1);
@@ -344,7 +353,21 @@ function JobDetailInner({ initial }: { initial: { job: JobPosting; related: JobP
       <main className="min-h-screen">
         <SiteHeader />
         <div className="max-w-xl mx-auto px-4 py-10 text-center rounded-2xl border border-border bg-white my-6">
-          <div className="text-ink-muted text-sm mb-3">{autoTry < 4 ? '⏳ Máy chủ đang khởi động — đang tự thử lại, bạn đợi giây lát…' : '📶 Chưa tải được tin này — mạng đang yếu.'}</div>
+          {(() => {
+            const st = loadErr?.status ?? 0;
+            const transient = [0, 429, 502, 503, 504].includes(st);
+            const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+            const trying = autoTry < (transient || !loadErr ? 4 : 1);
+            if (offline) return <div className="text-ink-muted text-sm mb-3">📵 Máy bạn đang mất kết nối mạng — kiểm tra wifi/4G, trang sẽ tự tải lại khi có mạng.</div>;
+            if (transient) return <div className="text-ink-muted text-sm mb-3">{trying ? '⏳ Máy chủ đang khởi động — đang tự thử lại, bạn đợi giây lát…' : '⏳ Máy chủ chưa trả lời kịp (máy chủ miễn phí cần ~1 phút để thức dậy) — không phải do wifi của bạn. Bấm “Thử lại” sau ít giây.'}</div>;
+            return (
+              <div className="text-sm mb-3 space-y-1">
+                <div className="text-ink font-bold">{trying ? '⏳ Đang thử tải lại tin này…' : 'Tin này đang gặp lỗi khi mở (không phải do mạng của bạn).'}</div>
+                {loadErr && !trying && <div className="text-ink-muted break-words">{loadErr.message}</div>}
+                {!trying && <div className="text-ink-muted">Bạn có thể bấm “Thử lại”, hoặc <a href="/viec-lam" className="text-primary font-bold underline">xem các việc làm khác</a>. Nếu lỗi lặp lại, đọc mã tham chiếu ở trên cho quản trị viên.</div>}
+              </div>
+            );
+          })()}
           <button type="button" onClick={() => { setAutoTry(0); setLoadTry((n) => n + 1); }} className="tvl-btn-primary !w-auto px-5">Thử lại</button>
         </div>
       </main>

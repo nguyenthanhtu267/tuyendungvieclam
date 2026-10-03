@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { API_URL } from '@/lib/api';
 import { detectWeakNet, readTextOnly, setTextOnly, useSavedKb } from '@/lib/data-saver';
 
 // Đợt 90 — khi API trả lời chậm (> 4 giây, thường do máy chủ miễn phí đang "thức dậy" sau thời gian không ai truy cập)
@@ -10,6 +11,8 @@ export default function ServerWaking() {
   const [offline, setOffline] = useState(false);
   // Đợt 109 — chỉ báo "Mạng yếu": theo trình duyệt báo (3G/độ trễ cao) HOẶC ≥2 lần API chậm trong 2 phút. Gợi ý bật "Chỉ chữ".
   const [weak, setWeak] = useState(false);
+  // Đợt 160 — phân biệt: mạng CỦA NGƯỜI DÙNG yếu (trình duyệt đo được) hay chỉ MÁY CHỦ phản hồi chậm (không liên quan wifi).
+  const [netWeak, setNetWeak] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [textOnly, setTO] = useState(false);
   const slowTimes = useRef<number[]>([]);
@@ -27,6 +30,7 @@ export default function ServerWaking() {
     try { setHidden(sessionStorage.getItem('tvl_weak_hide') === '1'); } catch { /* bỏ qua */ }
     setTO(readTextOnly());
     setWeak(detectWeakNet());
+    setNetWeak(detectWeakNet());
     const syncTO = () => setTO(readTextOnly());
     window.addEventListener('tvl-textonly', syncTO);
     const iv = window.setInterval(() => {
@@ -34,7 +38,12 @@ export default function ServerWaking() {
         slowTimes.current = [];
         setWeak(false);
       }
+      setNetWeak(detectWeakNet());
     }, 30_000);
+    // Đợt 160 — khi có người đang mở web, cứ ~4 phút gọi nhẹ /health/ping để máy chủ miễn phí không ngủ giữa chừng (ngủ sau ~15 phút).
+    const warm = window.setInterval(() => {
+      if (document.visibilityState === 'visible' && navigator.onLine !== false) fetch(`${API_URL}/health/ping`, { cache: 'no-store' }).catch(() => undefined);
+    }, 240_000);
     const net = () => setOffline(navigator.onLine === false);
     net();
     window.addEventListener('tvl-api-slow', onSlow);
@@ -46,14 +55,15 @@ export default function ServerWaking() {
       window.removeEventListener('offline', net);
       window.removeEventListener('tvl-textonly', syncTO);
       clearInterval(iv);
+      clearInterval(warm);
     };
   }, []);
   const chip =
     weak && !hidden && !offline ? (
       <div role="status" className="fixed bottom-3 right-3 z-[59] max-w-[300px] rounded-xl bg-white border border-border-strong shadow-lg px-3 py-2 text-[12.5px] text-ink flex items-center gap-2 flex-wrap max-sm:bottom-[76px]">
-        <span className="font-bold">📶 Mạng yếu</span>
-        {textOnly && savedKb > 0 && <span className="text-success font-semibold">Chỉ chữ: tiết kiệm ≈ {savedKb} KB</span>}
-        {!textOnly && (
+        <span className="font-bold">{netWeak ? '📶 Mạng yếu' : '⏳ Máy chủ đang chậm — không phải do mạng của bạn'}</span>
+        {netWeak && textOnly && savedKb > 0 && <span className="text-success font-semibold">Chỉ chữ: tiết kiệm ≈ {savedKb} KB</span>}
+        {netWeak && !textOnly && (
           <button type="button" onClick={() => setTextOnly(true)} className="rounded-md bg-primary text-white font-bold px-2.5 py-1">Bật chế độ chỉ chữ</button>
         )}
         <button

@@ -4,6 +4,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { json, text } from 'express';
 import { AppModule } from './app.module';
 import { resolveCorsOrigins } from './config/env-guard';
+import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { requestLogger } from './common/request-logger.middleware';
 import { httpCache } from './common/http-cache.middleware';
 import compression = require('compression');
@@ -48,6 +49,7 @@ async function bootstrap() {
   // Đợt 24 — lượt hiển thị/bấm banner quảng cáo cũng gửi bằng sendBeacon dạng text/plain.
   app.use('/public/ads/events', text({ type: 'text/plain', limit: '20kb' }));
   app.use('/public/promos/events', text({ type: 'text/plain', limit: '20kb' }));
+  app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   // CV / giấy tờ pháp lý nay lưu trong CSDL (bytea) và phục vụ qua FilesController — không còn
   // dùng ổ đĩa cục bộ (đợt 7, 18/09/2026: máy chủ miễn phí không có ổ đĩa cố định). Kế hoạch dài

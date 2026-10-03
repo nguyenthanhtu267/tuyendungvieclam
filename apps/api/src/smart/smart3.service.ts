@@ -113,7 +113,7 @@ export class Smart3Service {
     const scopes: { label: string; where: string[]; params: unknown[] }[] = [];
     const base = [`approval_status='approved'`, 'salary_max IS NOT NULL', 'salary_max > 0', 'salary_max < 150'];
     if (industry && p.desiredLevel && province)
-      scopes.push({ label: `${industry} · ${p.desiredLevel} · ${province}`, where: [...base, 'industry = $1', 'level = $2', '$3 = ANY(provinces)'], params: [industry, p.desiredLevel, province] });
+      scopes.push({ label: `${industry} · ${p.desiredLevel} · ${province}`, where: [...base, 'industry = $1', 'level = $2', "$3 = ANY(string_to_array(provinces, ','))"], params: [industry, p.desiredLevel, province] });
     if (industry && p.desiredLevel) scopes.push({ label: `${industry} · ${p.desiredLevel}`, where: [...base, 'industry = $1', 'level = $2'], params: [industry, p.desiredLevel] });
     if (industry) scopes.push({ label: industry, where: [...base, 'industry = $1'], params: [industry] });
     scopes.push({ label: 'toàn website', where: base, params: [] });

@@ -12,6 +12,7 @@ import {
   UseGuards,
   Res,
 } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import type { Response } from 'express';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -700,6 +701,7 @@ export class AdminController {
 
   @Get('users')
   findUserByEmail(@Query('email') email: string) {
+    if (!email || !String(email).trim()) throw new BadRequestException('Thiếu email cần tìm');
     return this.adminService.findUserByEmail(email);
   }
 
