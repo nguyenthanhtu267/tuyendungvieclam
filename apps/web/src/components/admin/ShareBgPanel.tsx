@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ApiError, jobsApi } from '@/lib/api';
 import { adminApi, type ShareBgAdmin, type ShareElKey, type SharePeople, type ShareStyle, type ShareFormat, type ShareCastIn, type ShareTexts } from '@/lib/api-admin';
 import { SHARE_PRESETS, presetById, svgDataUri } from '@/lib/share-presets';
+import { cutout, DEFAULT_CUTOUT, type CutoutOptions } from '@/lib/remove-bg';
 
 // Đợt 153 — Admin chọn nền cho ảnh xem trước khi dán link tin tuyển dụng lên Facebook/Zalo.
 // Nền đổi theo ngày (xoay vòng các nền đã tick) hoặc cố định một nền; có thể tải ảnh nền tự thiết kế (1200×630).
@@ -27,6 +28,29 @@ async function shrinkPerson(dataUrl: string): Promise<string> {
   }
   throw new Error('Ảnh quá phức tạp, hãy xuất ảnh nhỏ hơn rồi tải lại.');
 }
+
+// Đợt 162 — đọc ảnh, thu về tối đa 1000px, tách nền + cắt sát (xem lib/remove-bg.ts), trả PNG trong suốt.
+async function processPerson(src: string, o: Partial<CutoutOptions>): Promise<{ url: string; w: number; h: number; hadAlpha: boolean; keptRatio: number }> {
+  const img = new Image();
+  await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error('Không đọc được ảnh')); img.src = src; });
+  const k = Math.min(1, 1000 / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  if (!g) throw new Error('Trình duyệt không hỗ trợ xử lý ảnh');
+  g.drawImage(img, 0, 0, w, h);
+  const r = cutout(g.getImageData(0, 0, w, h).data, w, h, o);
+  const out = document.createElement('canvas');
+  out.width = r.width; out.height = r.height;
+  const og = out.getContext('2d');
+  if (!og) throw new Error('Trình duyệt không hỗ trợ xử lý ảnh');
+  const id = og.createImageData(r.width, r.height);
+  id.data.set(r.data);
+  og.putImageData(id, 0, 0);
+  return { url: out.toDataURL('image/png'), w: r.width, h: r.height, hadAlpha: r.hadAlpha, keptRatio: r.keptRatio };
+}
+const CHECKER = { backgroundImage: 'linear-gradient(45deg,#d9dde6 25%,transparent 25%),linear-gradient(-45deg,#d9dde6 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#d9dde6 75%),linear-gradient(-45deg,transparent 75%,#d9dde6 75%)', backgroundSize: '16px 16px', backgroundPosition: '0 0,0 8px,8px -8px,-8px 0', backgroundColor: '#fff' } as const;
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : (e as Error)?.message || 'Có lỗi xảy ra');
 
@@ -53,6 +77,18 @@ export function ShareBgPanel({ token }: { token: string }) {
   const [fm, setFm] = useState<ShareFormat>('wide');
   const [pf, setPf] = useState<'wide' | 'square'>('wide');
   const [ct, setCt] = useState<Required<ShareCastIn> | null>(null);
+  // Ảnh người vừa chọn, đang chờ tách nền / cắt sát trước khi lưu
+  const [stage, setStage] = useState<{ who: 'male' | 'female'; src: string; opt: CutoutOptions; result: { url: string; w: number; h: number; hadAlpha: boolean; keptRatio: number } | null; working: boolean } | null>(null);
+  useEffect(() => {
+    if (!stage) return;
+    let alive = true;
+    const t = setTimeout(() => {
+      processPerson(stage.src, stage.opt)
+        .then((r) => alive && setStage((s) => (s ? { ...s, result: r, working: false } : s)))
+        .catch((e) => { if (alive) { setNote({ ok: false, text: msg(e) }); setStage(null); } });
+    }, 150);
+    return () => { alive = false; clearTimeout(t); };
+  }, [stage?.src, stage?.opt.tolerance, stage?.opt.fillHoles, stage?.opt.cropOnly]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (cfg && !ct) setCt({ source: cfg.cast.source, male: { scale: cfg.cast.male.scale, flip: cfg.cast.male.flip }, female: { scale: cfg.cast.female.scale, flip: cfg.cast.female.flip } });
   }, [cfg, ct]);
@@ -104,11 +140,23 @@ export function ShareBgPanel({ token }: { token: string }) {
 
   const onPerson = async (who: 'male' | 'female', f?: File | null) => {
     if (!f) return;
-    if (!/^image\/(png|jpeg)$/.test(f.type)) return setNote({ ok: false, text: 'Chỉ nhận ảnh PNG hoặc JPG (nên dùng PNG nền trong suốt).' });
+    if (!/^image\/(png|jpeg)$/.test(f.type)) return setNote({ ok: false, text: 'Chỉ nhận ảnh PNG hoặc JPG.' });
     try {
-      const d = await shrinkPerson(await readFile(f));
-      await run(() => adminApi.shareBgPerson(token, who, d), `Đã tải ảnh ${who === 'male' ? 'nam' : 'nữ'}.`);
+      const src = await readFile(f);
+      setNote(null);
+      setStage({ who, src, opt: { ...DEFAULT_CUTOUT }, result: null, working: true });
+    } catch (e) {
+      setNote({ ok: false, text: msg(e) });
+    }
+  };
+  const saveStage = async () => {
+    if (!stage?.result) return;
+    const who = stage.who;
+    try {
+      const d = await shrinkPerson(stage.result.url);
+      await run(() => adminApi.shareBgPerson(token, who, d), `Đã lưu ảnh ${who === 'male' ? 'nam' : 'nữ'} (đã tách nền và cắt sát).`);
       setCt((c) => (c ? { ...c, source: 'upload' } : c));
+      setStage(null);
       setStamp(Date.now());
     } catch (e) {
       setNote({ ok: false, text: msg(e) });
@@ -280,7 +328,7 @@ export function ShareBgPanel({ token }: { token: string }) {
                       <div className="flex items-center gap-2">
                         {c.dataUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={c.dataUrl} alt={w === 'male' ? 'Ảnh nam' : 'Ảnh nữ'} className="h-20 w-20 object-contain rounded border border-border bg-white" style={{ transform: ct[w].flip ? 'scaleX(-1)' : undefined }} />
+                          <img src={c.dataUrl} alt={w === 'male' ? 'Ảnh nam' : 'Ảnh nữ'} className="h-20 w-20 object-contain rounded border border-border" style={{ ...CHECKER, transform: ct[w].flip ? 'scaleX(-1)' : undefined }} />
                         ) : (
                           <div className="h-20 w-20 rounded border border-dashed border-border-strong flex items-center justify-center text-[11px] text-ink-muted text-center">Chưa có</div>
                         )}
@@ -301,7 +349,41 @@ export function ShareBgPanel({ token }: { token: string }) {
                   );
                 })}
               </div>
-              <p className="text-xs text-ink-muted">Nên dùng ảnh PNG đã tách nền (nền trong suốt), người nhìn thẳng hoặc hơi nghiêng, cắt sát. Ảnh quá nặng sẽ được tự thu nhỏ. Cỡ/lật dùng cho cả hình vector lẫn ảnh tải lên; chọn “Nam + Nữ” thì nữ đứng bên trái, nam bên phải.</p>
+              {stage && (
+                <div className="rounded-md border border-primary p-2 space-y-2" role="group" aria-label="Tách nền ảnh">
+                  <div className="text-xs font-bold">Ảnh {stage.who === 'male' ? 'nam' : 'nữ'} — tách nền &amp; cắt sát</div>
+                  <div className="flex flex-wrap gap-3 items-start">
+                    <div className="rounded border border-border p-1" style={CHECKER}>
+                      {stage.result ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={stage.result.url} alt="Kết quả sau khi tách nền" className="max-h-48 max-w-[200px] object-contain" />
+                      ) : (
+                        <div className="h-32 w-32 flex items-center justify-center text-xs text-ink-muted">Đang xử lý…</div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-[200px] space-y-1.5">
+                      <label className="flex items-center gap-1.5 text-xs min-h-[32px]"><input id="sbcut-crop" type="checkbox" checked={stage.opt.cropOnly} onChange={(e) => setStage({ ...stage, working: true, opt: { ...stage.opt, cropOnly: e.target.checked } })} /> Ảnh đã tách nền sẵn — chỉ cắt sát</label>
+                      {!stage.opt.cropOnly && (
+                        <>
+                          <label className="flex items-center gap-2 text-xs">
+                            Độ nhạy {stage.opt.tolerance}
+                            <input id="sbcut-tol" type="range" min={5} max={100} step={1} value={stage.opt.tolerance} onChange={(e) => setStage({ ...stage, working: true, opt: { ...stage.opt, tolerance: Number(e.target.value) } })} className="flex-1" />
+                          </label>
+                          <label className="flex items-center gap-1.5 text-xs min-h-[32px]"><input id="sbcut-holes" type="checkbox" checked={stage.opt.fillHoles} onChange={(e) => setStage({ ...stage, working: true, opt: { ...stage.opt, fillHoles: e.target.checked } })} /> Xoá cả khoảng nền nằm giữa tay và thân</label>
+                        </>
+                      )}
+                      {stage.result && stage.result.hadAlpha && !stage.opt.cropOnly && <div className="text-xs text-success">Ảnh đã có nền trong suốt sẵn — chỉ cắt sát.</div>}
+                      {stage.result && stage.result.keptRatio < 0.03 && <div className="text-xs text-critical font-bold">Gần như xoá hết ảnh — hãy giảm độ nhạy hoặc bật “chỉ cắt sát”.</div>}
+                      <div className="text-xs text-ink-muted">Nền ô vuông = phần trong suốt. Kéo độ nhạy lên nếu còn sót nền, xuống nếu mất cả người.</div>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <button type="button" className={btnP} disabled={busy || !stage.result || stage.working} onClick={saveStage}>Dùng ảnh này</button>
+                        <button type="button" className={btn} onClick={() => setStage(null)}>Huỷ</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <p className="text-xs text-ink-muted">Chọn ảnh nam/nữ bất kỳ: hệ thống tự xoá nền (nền đơn sắc hoặc gần đơn sắc cho kết quả tốt nhất) và cắt sát khung người; bạn xem kết quả rồi bấm “Dùng ảnh này”. Ảnh PNG đã tách sẵn thì chọn “chỉ cắt sát”. Ảnh nặng được tự thu nhỏ. Cỡ/lật dùng cho cả hình vector lẫn ảnh tải lên; chọn “Nam + Nữ” thì nữ đứng bên trái, nam bên phải.</p>
             </div>
           )}
           <p className="text-xs text-ink-muted">“Tự chọn” dựa vào thiết bị của người bấm chia sẻ (máy tính → ngang, điện thoại → vuông); Facebook/Zalo không cho web biết người xem dùng thiết bị gì.</p>

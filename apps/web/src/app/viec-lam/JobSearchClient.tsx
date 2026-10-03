@@ -39,7 +39,7 @@ import { cacheJob, cacheList, readCachedList, agoText } from '@/lib/offline-cach
 // hàng chip quận/huyện khi chỉ chọn đúng 1 tỉnh/thành, danh sách JobCard kiểu careerviet.vn.
 
 
-function JobSearchPage({ initial, initialFacets }: { initial: { key: string; data: JobListResponse } | null; initialFacets: { key: string; data: JobFacets } | null }) {
+function JobSearchPage({ initial, initialFacets, seed = 0 }: { initial: { key: string; data: JobListResponse } | null; initialFacets: { key: string; data: JobFacets } | null; seed?: number }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { me, token } = useAuth();
@@ -213,7 +213,7 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
       setLoading(false);
       setRefreshing(true);
     } else setLoading(!pre);
-    (pre ? Promise.resolve(pre) : jobsApi.list({ ...filters, page, pageSize: JOB_PAGE_SIZE }))
+    (pre ? Promise.resolve(pre) : jobsApi.list({ ...filters, page, pageSize: JOB_PAGE_SIZE, seed }))
       .then((res) => {
         setResult(res);
         cacheList(ckey, res);
@@ -443,7 +443,7 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
     setMoreErr('');
     try {
       const next = lastPage + 1;
-      const r = await jobsApi.list({ ...filters, page: next, pageSize: JOB_PAGE_SIZE });
+      const r = await jobsApi.list({ ...filters, page: next, pageSize: JOB_PAGE_SIZE, seed });
       setMore((m) => [...m, ...r.items]);
       setLastPage(next);
       autoLoaded.current += 1;
@@ -891,10 +891,10 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
   );
 }
 
-export default function JobSearchClient({ initial, initialFacets }: { initial: { key: string; data: JobListResponse } | null; initialFacets: { key: string; data: JobFacets } | null }) {
+export default function JobSearchClient({ initial, initialFacets, seed }: { initial: { key: string; data: JobListResponse } | null; initialFacets: { key: string; data: JobFacets } | null; seed?: number }) {
   return (
     <Suspense fallback={null}>
-      <JobSearchPage initial={initial} initialFacets={initialFacets} />
+      <JobSearchPage initial={initial} initialFacets={initialFacets} seed={seed} />
     </Suspense>
   );
 }

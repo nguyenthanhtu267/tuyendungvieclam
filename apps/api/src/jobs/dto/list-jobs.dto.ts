@@ -86,6 +86,15 @@ export class ListJobsDto {
   @IsBoolean()
   urgentOnly?: boolean;
 
+  // Đợt 162 — "xáo" thứ tự trong nhóm tin URGENT (ưu tiên) mỗi lần tải lại trang: web gửi số ngẫu nhiên 0–11. Cùng số → cùng thứ tự
+  // (lật trang không bị trùng/sót tin), nhưng chỉ 12 biến thể nên bộ nhớ đệm danh sách vẫn dùng chung được.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(11)
+  seed?: number;
+
   // Đợt 79 — kênh tin: mặc định chỉ tin văn phòng; 'labor' = cả 3 kênh phổ thông.
   @IsOptional()
   @IsIn(['office', 'worker', 'student', 'intern', 'labor', 'all'])

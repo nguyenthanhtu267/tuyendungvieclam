@@ -19,7 +19,9 @@ export default async function ViecLamPage({ searchParams }: { searchParams: Reco
   // Đợt 93 — danh sách tin + bộ lọc (tỉnh/ngành kèm số lượng) lấy SONG SONG ở máy chủ web → bộ lọc hiện ngay,
   // không phải chờ thêm 1 vòng gọi API sau khi trang tải xong.
   const key = sp.toString();
-  const listQs = buildJobQuery({ ...filters, page, pageSize: JOB_PAGE_SIZE });
+  // Đợt 162 — mỗi lần tải lại trang (F5) một số khác 0–11 → thứ tự trong nhóm tin URGENT đổi; client dùng đúng số này cho các trang sau.
+  const seed = Math.floor(Math.random() * 12);
+  const listQs = buildJobQuery({ ...filters, page, pageSize: JOB_PAGE_SIZE, seed });
   const facetQs = buildJobQuery(filters);
   const [listRes, facetRes] = await Promise.allSettled([
     fetch(`${API}/jobs?${listQs}`, { next: { revalidate: 30 }, signal: AbortSignal.timeout(3500) }),
@@ -35,5 +37,5 @@ export default async function ViecLamPage({ searchParams }: { searchParams: Reco
   } catch {
     initialFacets = null;
   }
-  return <JobSearchClient initial={initial} initialFacets={initialFacets} />;
+  return <JobSearchClient initial={initial} initialFacets={initialFacets} seed={seed} />;
 }

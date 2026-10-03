@@ -202,8 +202,13 @@ export class JobsService {
 
     const qb = this.applyFilters(this.baseQuery(), query);
 
-    qb.orderBy('job.isUrgent', 'DESC')
-      .addOrderBy('job.createdAt', 'DESC')
+    qb.orderBy('job.isUrgent', 'DESC');
+    if (typeof query.seed === 'number') {
+      // Đợt 162 — nhóm URGENT vẫn nằm đầu, nhưng thứ tự BÊN TRONG nhóm đổi theo `seed` (mỗi lần F5 một thứ tự khác); nhóm thường theo tin mới nhất.
+      qb.addSelect("CASE WHEN job.isUrgent THEN md5(job.id::text || :seedv) END", 'urg_rank').setParameter('seedv', String(query.seed));
+      qb.addOrderBy('urg_rank', 'ASC', 'NULLS LAST');
+    }
+    qb.addOrderBy('job.createdAt', 'DESC')
       .skip((page - 1) * pageSize)
       .take(pageSize);
 

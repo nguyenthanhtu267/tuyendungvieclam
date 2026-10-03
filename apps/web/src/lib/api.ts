@@ -352,6 +352,8 @@ export interface JobListParams {
   employmentType?: string;
   experienceLevel?: string;
   urgentOnly?: boolean;
+  /** Đợt 162 — số 0–11 để xáo thứ tự trong nhóm tin URGENT mỗi lần tải lại trang. */
+  seed?: number;
   featuredEmployerOnly?: boolean;
   page?: number;
   pageSize?: number;
