@@ -25,4 +25,4 @@ export function parseJobFilters(get: (k: string) => string | null): JobListParam
     channel: ['office', 'worker', 'student', 'intern'].includes(get('channel') ?? '') ? (get('channel') as string) : 'all',
   };
 }
-export const JOB_PAGE_SIZE = 8;
+export const JOB_PAGE_SIZE = 12;

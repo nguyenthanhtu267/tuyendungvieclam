@@ -3,7 +3,7 @@
 import { Combobox } from '@/components/ui/Combobox';
 import Link from '@/components/SmartLink';
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { detectWeakNet, readSaver } from '@/lib/data-saver';
+import { blockAutoLoad } from '@/lib/data-saver';
 import { useRouter, useSearchParams } from 'next/navigation';
 import SiteHeader from '@/components/SiteHeader';
 import { LaborJobList } from '@/components/labor/LaborJobList';
@@ -95,7 +95,7 @@ function LaborJobsInner() {
     if (!el || typeof IntersectionObserver === 'undefined' || !data || page >= data.totalPages) return;
     const io = new IntersectionObserver(
       (es) => {
-        if (!es[0]?.isIntersecting || moreBusy || autoPages.current >= 6 || detectWeakNet() || readSaver()) return;
+        if (!es[0]?.isIntersecting || moreBusy || autoPages.current >= 6 || blockAutoLoad()) return;
         autoPages.current += 1;
         setPage((p) => p + 1);
       },

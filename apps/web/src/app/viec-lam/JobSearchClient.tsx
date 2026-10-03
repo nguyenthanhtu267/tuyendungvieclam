@@ -21,7 +21,7 @@ import { NearMe } from '@/components/search/NearMe';
 import { ProvinceInsights } from '@/components/search/ProvinceInsights';
 import { DistrictChips } from '@/components/search/DistrictChips';
 import { jobsApi, smartApi5, candidatesApi, applicationsApi, type JobFacets, type JobListParams, type JobListResponse, type DistrictFacet, type SavedJob } from '@/lib/api';
-import { detectWeakNet, isWeakNow, readSaver } from '@/lib/data-saver';
+import { detectWeakNet, isWeakNow, readSaver, blockAutoLoad } from '@/lib/data-saver';
 import { track } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth-context';
 import { formatNumber } from '@/lib/format';
@@ -459,7 +459,7 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
     const io = new IntersectionObserver(
       (es) => {
         if (!es[0]?.isIntersecting) return;
-        if (autoLoaded.current >= AUTO_PAGES || detectWeakNet() || readSaver()) return; // mạng yếu / tiết kiệm dữ liệu: chỉ tải khi bấm
+        if (autoLoaded.current >= AUTO_PAGES || blockAutoLoad()) return; // mạng yếu / tiết kiệm dữ liệu: chỉ tải khi bấm
         void loadMoreRef.current();
       },
       { rootMargin: '700px 0px' },

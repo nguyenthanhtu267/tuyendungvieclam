@@ -126,3 +126,14 @@ export function useSavedKb(): number {
   }, []);
   return kb;
 }
+
+// Đợt 149 — cuộn vô hạn chỉ dừng khi người dùng BẬT tiết kiệm dữ liệu (thủ công hoặc trình duyệt báo saveData).
+// Mạng yếu/chậm KHÔNG chặn nữa: dữ liệu tin chỉ là JSON nhỏ (logo đã có chế độ "Chỉ chữ" riêng).
+export function blockAutoLoad(): boolean {
+  try {
+    if ((navigator as any).connection?.saveData) return true;
+    return localStorage.getItem(SAVER_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
