@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { dismissKeyboard, isTouchDevice } from '@/lib/mobile-ui';
 
 // Đợt 135 — ô chọn DÙNG CHUNG toàn web cho danh sách dài (tỉnh/thành, quận/huyện, phường/xã, ngành nghề, nhóm việc,
 // tin tuyển dụng…): gõ thẳng vào ô để lọc (không cần dấu: "ke toan" → "Kế toán / Kiểm toán", "tdm" khớp chữ đầu
@@ -77,6 +78,7 @@ export function Combobox({
   const [hi, setHi] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const opts = useMemo(() => options.map(norm), [options]);
   const current = opts.find((o) => o.value === value);
   const shown = useMemo(() => {
@@ -110,6 +112,8 @@ export function Combobox({
     if (beforeOpen && beforeOpen() === false) return false;
     if (!open) {
       setOpen(true);
+      // Điện thoại: đưa ô lên gần đầu màn hình để danh sách không bị bàn phím che
+      if (isTouchDevice()) setTimeout(() => box.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 120);
       const idx = shown.findIndex((o) => o.value === value);
       setHi(idx >= 0 ? idx : 0);
     }
@@ -118,11 +122,14 @@ export function Combobox({
   function pick(v: string) {
     onChange(v);
     close();
+    // Điện thoại: chọn xong là thu gọn danh sách + hạ bàn phím ngay
+    dismissKeyboard(inputRef.current);
   }
 
   return (
     <div ref={box} className={`relative ${className}`}>
       <input
+        ref={inputRef}
         id={inputId}
         type="text"
         role="combobox"

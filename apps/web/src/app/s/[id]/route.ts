@@ -33,7 +33,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const f = new URL(req.url).searchParams.get('f');
   let fmt: 'wide' | 'square' | 'auto' = 'wide';
   try {
-    const r = await fetch(`${API}/public/share-bg?only=${encodeURIComponent(id)}`, { next: { revalidate: 120 }, signal: AbortSignal.timeout(5000) });
+    const r = await fetch(`${API}/public/share-bg?lite=1`, { next: { revalidate: 120 }, signal: AbortSignal.timeout(5000) });
     if (r.ok) { const c = (await r.json()) as { format?: string }; if (c.format === 'square' || c.format === 'auto') fmt = c.format; }
   } catch { /* mặc định ngang */ }
   const square = fmt === 'square' || (fmt === 'auto' && f === 'm');

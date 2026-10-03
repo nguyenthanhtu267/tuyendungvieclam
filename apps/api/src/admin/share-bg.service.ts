@@ -21,6 +21,36 @@ export interface ShareBgConfig {
   style: ShareStyle;
   people: SharePeople;
   format: ShareFormat;
+  /** Đợt 159 — hình người do Admin tự tải lên (nam / nữ) + chỉnh to nhỏ, lật trái–phải. */
+  cast: ShareCast;
+}
+export interface CastPerson { dataUrl: string; w: number; h: number; scale: number; flip: boolean }
+export interface ShareCast { source: 'vector' | 'upload'; male: CastPerson; female: CastPerson }
+const emptyPerson = (): CastPerson => ({ dataUrl: '', w: 0, h: 0, scale: 100, flip: false });
+export function cleanCast(raw: unknown): ShareCast {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as { source?: unknown; male?: Partial<CastPerson>; female?: Partial<CastPerson> };
+  const one = (x?: Partial<CastPerson>): CastPerson => {
+    const ok = typeof x?.dataUrl === 'string' && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(x.dataUrl) && x.dataUrl.length <= 900_000;
+    return { dataUrl: ok ? (x!.dataUrl as string) : '', w: ok ? num(x?.w, 1, 8000, 1) : 0, h: ok ? num(x?.h, 1, 8000, 1) : 0, scale: num(x?.scale, 40, 220, 100), flip: x?.flip === true };
+  };
+  return { source: r.source === 'upload' ? 'upload' : 'vector', male: one(r.male), female: one(r.female) };
+}
+/** Đọc kích thước ảnh PNG/JPEG từ base64 (không cần thư viện). */
+export function imageSize(dataUrl: string): { w: number; h: number } | null {
+  try {
+    const b = Buffer.from(dataUrl.split(',')[1] ?? '', 'base64');
+    if (b.length > 24 && b[0] === 0x89 && b[1] === 0x50) return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
+    if (b[0] === 0xff && b[1] === 0xd8) {
+      let i = 2;
+      while (i + 9 < b.length) {
+        if (b[i] !== 0xff) { i++; continue; }
+        const m = b[i + 1];
+        if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return { h: b.readUInt16BE(i + 5), w: b.readUInt16BE(i + 7) };
+        i += 2 + b.readUInt16BE(i + 2);
+      }
+    }
+  } catch { /* hỏng */ }
+  return null;
 }
 export const EL_KEYS = ['brand', 'tagline', 'badge', 'title', 'company', 'salary', 'meta', 'contact'] as const;
 export type ShareEl = (typeof EL_KEYS)[number];
@@ -65,7 +95,7 @@ const cleanTexts = (t: Partial<ShareTexts> | undefined): ShareTexts => {
   return o;
 };
 
-const DEFAULT_CFG: ShareBgConfig = { mode: 'daily', fixedId: 'p1', presets: [...SHARE_PRESET_IDS], custom: [], texts: { ...DEFAULT_TEXTS }, style: cleanStyle({}), people: 'none', format: 'wide' };
+const DEFAULT_CFG: ShareBgConfig = { mode: 'daily', fixedId: 'p1', presets: [...SHARE_PRESET_IDS], custom: [], texts: { ...DEFAULT_TEXTS }, style: cleanStyle({}), people: 'none', format: 'wide', cast: cleanCast({}) };
 
 @Injectable()
 export class ShareBgService implements OnModuleInit {
@@ -89,6 +119,7 @@ export class ShareBgService implements OnModuleInit {
         style: cleanStyle((v as { style?: unknown }).style),
         people: cleanPeople((v as { people?: unknown }).people),
         format: cleanFormat((v as { format?: unknown }).format),
+        cast: cleanCast((v as { cast?: unknown }).cast),
       };
     } catch {
       return { ...DEFAULT_CFG };
@@ -108,7 +139,7 @@ export class ShareBgService implements OnModuleInit {
     return { ...c, custom: c.custom.map((x) => ({ id: x.id, name: x.name, dataUrl: x.dataUrl })) };
   }
 
-  async update(b: { mode?: string; fixedId?: string; presets?: string[]; texts?: Partial<ShareTexts>; style?: unknown; people?: string; format?: string }) {
+  async update(b: { mode?: string; fixedId?: string; presets?: string[]; texts?: Partial<ShareTexts>; style?: unknown; people?: string; format?: string; cast?: { source?: string; male?: Partial<CastPerson>; female?: Partial<CastPerson> } }) {
     const c = await this.get();
     if (b.mode === 'daily' || b.mode === 'fixed') c.mode = b.mode;
     if (typeof b.fixedId === 'string') c.fixedId = b.fixedId;
@@ -117,11 +148,45 @@ export class ShareBgService implements OnModuleInit {
     if (b.style) c.style = cleanStyle(b.style);
     if (b.people) c.people = cleanPeople(b.people);
     if (b.format) c.format = cleanFormat(b.format);
+    if (b.cast) {
+      // chỉ nhận nguồn + cỡ + lật; dữ liệu ảnh chỉ đổi qua setPerson/removePerson
+      if (b.cast.source === 'upload' || b.cast.source === 'vector') c.cast.source = b.cast.source;
+      for (const k of ['male', 'female'] as const) {
+        const x = b.cast[k];
+        if (x) { c.cast[k].scale = num(x.scale, 40, 220, c.cast[k].scale); if (typeof x.flip === 'boolean') c.cast[k].flip = x.flip; }
+      }
+    }
     const ids = [...SHARE_PRESET_IDS, ...c.custom.map((x) => x.id)];
     if (!ids.includes(c.fixedId)) c.fixedId = 'p1';
     if (!c.presets.length && !c.custom.length) throw new BadRequestException('Cần giữ ít nhất một nền trong vòng đổi theo ngày');
     await this.save(c);
     return this.adminView();
+  }
+
+  async setPerson(who: string, dataUrl: string) {
+    if (who !== 'male' && who !== 'female') throw new BadRequestException('Chỉ có hình nam hoặc nữ.');
+    if (!/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(dataUrl || '')) throw new BadRequestException('Chỉ nhận ảnh PNG hoặc JPG (nên dùng PNG nền trong suốt).');
+    if (dataUrl.length > MAX_DATA_URL) throw new BadRequestException('Ảnh quá nặng (tối đa khoảng 650KB). Hãy thu nhỏ ảnh (cao khoảng 800px) rồi tải lại.');
+    const sz = imageSize(dataUrl);
+    if (!sz || sz.w < 1 || sz.h < 1) throw new BadRequestException('Không đọc được kích thước ảnh.');
+    const c = await this.get();
+    c.cast[who] = { ...c.cast[who], dataUrl, w: sz.w, h: sz.h };
+    await this.save(c);
+    return this.adminView();
+  }
+
+  async removePerson(who: string) {
+    if (who !== 'male' && who !== 'female') throw new BadRequestException('Chỉ có hình nam hoặc nữ.');
+    const c = await this.get();
+    c.cast[who] = { ...emptyPerson(), scale: c.cast[who].scale, flip: c.cast[who].flip };
+    if (!c.cast.male.dataUrl && !c.cast.female.dataUrl) c.cast.source = 'vector';
+    await this.save(c);
+    return this.adminView();
+  }
+
+  /** Chỉ khổ ảnh — cho trang /s (nhẹ, không kèm ảnh). */
+  async formatOnly() {
+    return { format: (await this.get()).format };
   }
 
   async addCustom(name: string, dataUrl: string) {
@@ -143,10 +208,10 @@ export class ShareBgService implements OnModuleInit {
   }
 
   /** Nền áp dụng cho một ngày (yyyy-mm-dd, giờ Việt Nam). `only` = xem thử một nền cụ thể. */
-  async pick(date?: string, only?: string): Promise<{ type: 'preset' | 'image'; id: string; dataUrl?: string; texts?: ShareTexts; style?: ShareStyle; people?: SharePeople; format?: ShareFormat }> {
+  async pick(date?: string, only?: string): Promise<{ type: 'preset' | 'image'; id: string; dataUrl?: string; texts?: ShareTexts; style?: ShareStyle; people?: SharePeople; format?: ShareFormat; cast?: ShareCast }> {
     const c = await this.get();
     const r = await this.pickBg(c, date, only);
-    return { ...r, texts: c.texts, style: c.style, people: c.people, format: c.format };
+    return { ...r, texts: c.texts, style: c.style, people: c.people, format: c.format, cast: c.cast };
   }
 
   private async pickBg(c: ShareBgConfig, date?: string, only?: string): Promise<{ type: 'preset' | 'image'; id: string; dataUrl?: string }> {

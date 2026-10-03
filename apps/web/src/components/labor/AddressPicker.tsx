@@ -1,5 +1,6 @@
 'use client';
 
+import { dismissKeyboard } from '@/lib/mobile-ui';
 import { Combobox } from '@/components/ui/Combobox';
 import { useEffect, useMemo, useState } from 'react';
 import { workersApi } from '@/lib/api';
@@ -170,6 +171,7 @@ export function AddressPicker({
                     onClick={() => {
                       set({ newWardCode: w.code, newWardName: w.name });
                       setOpen(false);
+                      dismissKeyboard();
                     }}
                     className="w-full text-left px-3 py-2 text-[14px] text-ink hover:bg-surface-alt"
                   >

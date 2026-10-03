@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, jobsApi } from '@/lib/api';
-import { adminApi, type ShareBgAdmin, type ShareElKey, type SharePeople, type ShareStyle, type ShareFormat, type ShareTexts } from '@/lib/api-admin';
+import { adminApi, type ShareBgAdmin, type ShareElKey, type SharePeople, type ShareStyle, type ShareFormat, type ShareCastIn, type ShareTexts } from '@/lib/api-admin';
 import { SHARE_PRESETS, presetById, svgDataUri } from '@/lib/share-presets';
 
 // Đợt 153 — Admin chọn nền cho ảnh xem trước khi dán link tin tuyển dụng lên Facebook/Zalo.
@@ -10,6 +10,23 @@ import { SHARE_PRESETS, presetById, svgDataUri } from '@/lib/share-presets';
 const MAX_BYTES = 650_000;
 const btn = 'rounded-md border border-border-strong bg-white font-bold text-xs px-3 min-h-[36px] disabled:opacity-50';
 const btnP = 'rounded-md bg-primary text-white font-bold text-xs px-3 min-h-[36px] disabled:opacity-50';
+
+// Thu nhỏ ảnh người (giữ nền trong suốt) để dưới ~650KB: cao tối đa 900px rồi giảm dần.
+async function shrinkPerson(dataUrl: string): Promise<string> {
+  if (dataUrl.length <= 880_000) return dataUrl;
+  const img = new Image();
+  await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error('Không đọc được ảnh')); img.src = dataUrl; });
+  for (const hMax of [900, 720, 560, 420]) {
+    const k = Math.min(1, hMax / img.naturalHeight);
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(img.naturalWidth * k));
+    c.height = Math.max(1, Math.round(img.naturalHeight * k));
+    c.getContext('2d')?.drawImage(img, 0, 0, c.width, c.height);
+    const out = c.toDataURL('image/png');
+    if (out.length <= 880_000) return out;
+  }
+  throw new Error('Ảnh quá phức tạp, hãy xuất ảnh nhỏ hơn rồi tải lại.');
+}
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : (e as Error)?.message || 'Có lỗi xảy ra');
 
@@ -35,6 +52,10 @@ export function ShareBgPanel({ token }: { token: string }) {
   const [pp, setPp] = useState<SharePeople>('none');
   const [fm, setFm] = useState<ShareFormat>('wide');
   const [pf, setPf] = useState<'wide' | 'square'>('wide');
+  const [ct, setCt] = useState<Required<ShareCastIn> | null>(null);
+  useEffect(() => {
+    if (cfg && !ct) setCt({ source: cfg.cast.source, male: { scale: cfg.cast.male.scale, flip: cfg.cast.male.flip }, female: { scale: cfg.cast.female.scale, flip: cfg.cast.female.flip } });
+  }, [cfg, ct]);
   useEffect(() => { if (cfg && !st) { setSt(cfg.style); setPp(cfg.people); setFm(cfg.format); } }, [cfg, st]);
   useEffect(() => { if (cfg && !tx) setTx(cfg.texts); }, [cfg, tx]);
 
@@ -75,11 +96,23 @@ export function ShareBgPanel({ token }: { token: string }) {
     run(() => adminApi.shareBgSet(token, { presets: next }), 'Đã lưu vòng đổi nền theo ngày.');
   };
   const shareLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/s/${jobId ?? '<mã tin>'}`;
-  const pv = encodeURIComponent(JSON.stringify({ style: st ?? undefined, people: pp, format: fm }));
+  const pv = encodeURIComponent(JSON.stringify({ style: st ?? undefined, people: pp, format: fm, cast: ct ?? undefined }));
   const previewSrc = jobId && prev ? `/chia-se/${jobId}?bg=${prev}&fmt=${pf}&pv=${pv}&t=${stamp}` : '';
   const ELS: [ShareElKey, string][] = [['brand', 'Tên web'], ['tagline', 'Dòng giới thiệu'], ['badge', 'Nhãn tin gấp'], ['title', 'Tiêu đề tin'], ['company', 'Tên công ty'], ['salary', 'Mức lương'], ['meta', 'Địa điểm / hạn nộp'], ['contact', 'Liên hệ']];
   const setEl = (k: ShareElKey, patch: Partial<ShareStyle['els'][ShareElKey]>) => st && setSt({ ...st, els: { ...st.els, [k]: { ...st.els[k], ...patch } } });
 
+  const onPerson = async (who: 'male' | 'female', f?: File | null) => {
+    if (!f) return;
+    if (!/^image\/(png|jpeg)$/.test(f.type)) return setNote({ ok: false, text: 'Chỉ nhận ảnh PNG hoặc JPG (nên dùng PNG nền trong suốt).' });
+    try {
+      const d = await shrinkPerson(await readFile(f));
+      await run(() => adminApi.shareBgPerson(token, who, d), `Đã tải ảnh ${who === 'male' ? 'nam' : 'nữ'}.`);
+      setCt((c) => (c ? { ...c, source: 'upload' } : c));
+      setStamp(Date.now());
+    } catch (e) {
+      setNote({ ok: false, text: msg(e) });
+    }
+  };
   const onFile = async (f?: File | null) => {
     if (!f) return;
     if (!/^image\/(png|jpeg)$/.test(f.type)) return setNote({ ok: false, text: 'Chỉ nhận ảnh PNG hoặc JPG.' });
@@ -195,6 +228,46 @@ export function ShareBgPanel({ token }: { token: string }) {
               </div>
             </div>
           </div>
+          {ct && (
+            <div className="rounded-md border border-border p-2 space-y-2">
+              <div className="text-xs font-bold">Hình nhân vật dùng cho ảnh</div>
+              <div className="flex flex-wrap gap-x-4">
+                <label className="flex items-center gap-1.5 text-xs min-h-[36px]"><input type="radio" name="sbsrc" checked={ct.source === 'vector'} onChange={() => setCt({ ...ct, source: 'vector' })} /> Hình vector có sẵn</label>
+                <label className="flex items-center gap-1.5 text-xs min-h-[36px]"><input type="radio" name="sbsrc" checked={ct.source === 'upload'} disabled={!cfg.cast.male.dataUrl && !cfg.cast.female.dataUrl} onChange={() => setCt({ ...ct, source: 'upload' })} /> Ảnh tôi tải lên {!cfg.cast.male.dataUrl && !cfg.cast.female.dataUrl ? '(tải ảnh bên dưới trước)' : ''}</label>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {(['male', 'female'] as const).map((w) => {
+                  const c = cfg.cast[w];
+                  return (
+                    <div key={w} className="rounded-md bg-surface-muted p-2 space-y-2">
+                      <div className="text-xs font-bold">{w === 'male' ? 'Ảnh nam' : 'Ảnh nữ'}</div>
+                      <div className="flex items-center gap-2">
+                        {c.dataUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={c.dataUrl} alt={w === 'male' ? 'Ảnh nam' : 'Ảnh nữ'} className="h-20 w-20 object-contain rounded border border-border bg-white" style={{ transform: ct[w].flip ? 'scaleX(-1)' : undefined }} />
+                        ) : (
+                          <div className="h-20 w-20 rounded border border-dashed border-border-strong flex items-center justify-center text-[11px] text-ink-muted text-center">Chưa có</div>
+                        )}
+                        <div className="flex flex-col gap-1.5">
+                          <label className={`${btnP} inline-flex items-center cursor-pointer`}>
+                            {c.dataUrl ? 'Đổi ảnh…' : 'Tải ảnh lên…'}
+                            <input id={`sbp-${w}`} type="file" accept="image/png,image/jpeg" className="sr-only" disabled={busy} onChange={(e) => { onPerson(w, e.target.files?.[0]); e.target.value = ''; }} />
+                          </label>
+                          {c.dataUrl && <button type="button" className={`${btn} !text-critical`} disabled={busy} onClick={() => run(() => adminApi.shareBgPersonRemove(token, w), 'Đã xoá ảnh.').then(() => setStamp(Date.now()))}>Xoá ảnh</button>}
+                        </div>
+                      </div>
+                      <label className="flex items-center gap-2 text-xs">
+                        Cỡ {ct[w].scale}%
+                        <input id={`sbz-${w}`} type="range" min={40} max={220} step={5} value={ct[w].scale} onChange={(e) => setCt({ ...ct, [w]: { ...ct[w], scale: Number(e.target.value) } })} className="flex-1" />
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs min-h-[36px]"><input id={`sbf-${w}`} type="checkbox" checked={ct[w].flip} onChange={(e) => setCt({ ...ct, [w]: { ...ct[w], flip: e.target.checked } })} /> Lật trái ↔ phải</label>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-ink-muted">Nên dùng ảnh PNG đã tách nền (nền trong suốt), người nhìn thẳng hoặc hơi nghiêng, cắt sát. Ảnh quá nặng sẽ được tự thu nhỏ. Cỡ/lật dùng cho cả hình vector lẫn ảnh tải lên; chọn “Nam + Nữ” thì nữ đứng bên trái, nam bên phải.</p>
+            </div>
+          )}
           <p className="text-xs text-ink-muted">“Tự chọn” dựa vào thiết bị của người bấm chia sẻ (máy tính → ngang, điện thoại → vuông); Facebook/Zalo không cho web biết người xem dùng thiết bị gì.</p>
 
           <div className="font-bold text-sm">Chữ trên ảnh: màu, cỡ, đậm, nghiêng</div>
@@ -232,8 +305,8 @@ export function ShareBgPanel({ token }: { token: string }) {
             <input id="sb-scrim" type="range" min={0} max={85} step={5} value={st.scrim} onChange={(ev) => setSt({ ...st, scrim: Number(ev.target.value) })} className="flex-1 max-w-xs" />
           </label>
           <div className="flex flex-wrap gap-2">
-            <button className={btnP} disabled={busy} onClick={() => run(() => adminApi.shareBgSet(token, { style: st, people: pp, format: fm }), 'Đã lưu kiểu chữ, nhân vật và khổ ảnh.').then(() => setStamp(Date.now()))}>Lưu thiết kế</button>
-            <button className={btn} disabled={busy} onClick={() => { setSt(null); run(() => adminApi.shareBgSet(token, { style: { els: {}, show: {}, scrim: 40 } as never, people: 'none', format: 'wide' }), 'Đã đặt lại mặc định.').then(() => setStamp(Date.now())); }}>Đặt lại mặc định</button>
+            <button className={btnP} disabled={busy} onClick={() => run(() => adminApi.shareBgSet(token, { style: st, people: pp, format: fm, cast: ct ?? undefined }), 'Đã lưu kiểu chữ, nhân vật và khổ ảnh.').then(() => setStamp(Date.now()))}>Lưu thiết kế</button>
+            <button className={btn} disabled={busy} onClick={() => { setSt(null); setCt(null); run(() => adminApi.shareBgSet(token, { style: { els: {}, show: {}, scrim: 40 } as never, people: 'none', format: 'wide', cast: { source: 'vector', male: { scale: 100, flip: false }, female: { scale: 100, flip: false } } }), 'Đã đặt lại mặc định.').then(() => setStamp(Date.now())); }}>Đặt lại mặc định</button>
           </div>
         </div>
       )}

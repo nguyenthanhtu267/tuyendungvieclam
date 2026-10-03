@@ -2,7 +2,10 @@
 import { API_URL, ApiError, qs, request, requestForm, authHeaders } from './api';
 import type { MailStatus, MailMsgRow, MailMsgFull, MailTemplate, MailContact, MailCampaign, JobSourceList, JobSourcePreview, JobSourceRow, MailScanStatus, JobImportRow, AdCampaignInput, AdCampaignRow, AdStats, AdminAuditLogResponse, AdminCandidateDetail, AdminCandidateQuery, AdminCandidateRow, AdminDashboard, AdminPersonDetail, AdminPersonRow, AdminStatsPoint, AnalyticsBehavior, AnalyticsContent, AnalyticsHeatmap, AnalyticsOverview, AnalyticsRealtime, BulkActionResult, CandidateDraft, ClaimCompanyPayload, Company, CompanyClaimRequestRow, CompanyClaimRequestStatus, CreateDraftCompanyPayload, CreateJobPayload, CvCardDraftResponse, CvQueueResponse, CvShareStatus, DraftAccountInfo, ExtractJobUrlResult, ImpersonateResult, JobPosting, Order, ProfileRequestRow, ProfileVisibility, PromoBadgeSetting, SourcedProfileRow, StorageStatus, SuggestedJob } from './api';
 import type { BgImage, BgSetting } from './bg-themes';
-export type ShareBgAdmin = { mode: 'daily' | 'fixed'; fixedId: string; presets: string[]; custom: { id: string; name: string; dataUrl: string }[]; texts: ShareTexts; style: ShareStyle; people: SharePeople; format: ShareFormat };
+export type ShareBgAdmin = { mode: 'daily' | 'fixed'; fixedId: string; presets: string[]; custom: { id: string; name: string; dataUrl: string }[]; texts: ShareTexts; style: ShareStyle; people: SharePeople; format: ShareFormat; cast: ShareCast };
+export type CastPerson = { dataUrl: string; w: number; h: number; scale: number; flip: boolean };
+export type ShareCast = { source: 'vector' | 'upload'; male: CastPerson; female: CastPerson };
+export type ShareCastIn = { source?: 'vector' | 'upload'; male?: { scale: number; flip: boolean }; female?: { scale: number; flip: boolean } };
 export type ShareElKey = 'brand' | 'tagline' | 'badge' | 'title' | 'company' | 'salary' | 'meta' | 'contact';
 export type ShareEl = { color: string; scale: number; bold: boolean; italic: boolean };
 export type ShareStyle = { els: Record<ShareElKey, ShareEl>; show: { salary: boolean; location: boolean; deadline: boolean; contact: boolean }; scrim: number };
@@ -217,10 +220,13 @@ export const adminApi = {
     request<{ page: number; found: number; added: number; hasNext: boolean; already?: number; reset?: boolean; remaining?: number; note?: string }>(`/admin/job-sources/${id}/step`, { method: 'POST', headers: authHeaders(token), body: JSON.stringify(b) }),
   // Đợt 153 — nền ảnh chia sẻ tin tuyển dụng (Facebook/Zalo)
   shareBgGet: (token: string) => request<ShareBgAdmin>('/admin/share-bg', { headers: authHeaders(token) }),
-  shareBgSet: (token: string, b: { mode?: 'daily' | 'fixed'; fixedId?: string; presets?: string[]; texts?: Partial<ShareTexts>; style?: ShareStyle; people?: SharePeople; format?: ShareFormat }) =>
+  shareBgSet: (token: string, b: { mode?: 'daily' | 'fixed'; fixedId?: string; presets?: string[]; texts?: Partial<ShareTexts>; style?: ShareStyle; people?: SharePeople; format?: ShareFormat; cast?: ShareCastIn }) =>
     request<ShareBgAdmin>('/admin/share-bg', { method: 'PUT', headers: { ...authHeaders(token), 'Content-Type': 'application/json' }, body: JSON.stringify(b) }),
   shareBgAdd: (token: string, b: { name: string; dataUrl: string }) =>
     request<ShareBgAdmin>('/admin/share-bg/custom', { method: 'POST', headers: { ...authHeaders(token), 'Content-Type': 'application/json' }, body: JSON.stringify(b) }),
+  shareBgPerson: (token: string, who: 'male' | 'female', dataUrl: string) =>
+    request<ShareBgAdmin>(`/admin/share-bg/person/${who}`, { method: 'POST', headers: { ...authHeaders(token), 'Content-Type': 'application/json' }, body: JSON.stringify({ dataUrl }) }),
+  shareBgPersonRemove: (token: string, who: 'male' | 'female') => request<ShareBgAdmin>(`/admin/share-bg/person/${who}`, { method: 'DELETE', headers: authHeaders(token) }),
   shareBgRemove: (token: string, id: string) => request<ShareBgAdmin>(`/admin/share-bg/custom/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
   mailStatus: (token: string) => request<MailStatus>('/admin/mail/status', { headers: authHeaders(token) }),
   mailSync: (token: string) => request<{ fetched: number; error?: string }>('/admin/mail/sync', { method: 'POST', headers: authHeaders(token) }),

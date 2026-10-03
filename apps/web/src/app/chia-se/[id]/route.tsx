@@ -62,7 +62,9 @@ const lum = (hex: string) => {
   const n = parseInt(hex.slice(1), 16);
   return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
 };
-type Bg = { type: 'preset' | 'image'; id: string; dataUrl?: string; texts?: { brand: string; tagline: string; urgent: string; fallback: string }; style?: unknown; people?: string; format?: string };
+type Bg = { type: 'preset' | 'image'; id: string; dataUrl?: string; texts?: { brand: string; tagline: string; urgent: string; fallback: string }; style?: unknown; people?: string; format?: string; cast?: CastIn };
+type CastPerson = { dataUrl?: string; w?: number; h?: number; scale?: number; flip?: boolean };
+type CastIn = { source?: string; male?: CastPerson; female?: CastPerson };
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
@@ -96,7 +98,7 @@ async function render(req: Request, rawId: string) {
     if (bRes.status === 'fulfilled' && bRes.value.ok) bg = await bRes.value.json();
   } catch { /* nền mặc định */ }
 
-  let pv: { style?: unknown; people?: string; format?: string } = {};
+  let pv: { style?: unknown; people?: string; format?: string; cast?: CastIn } = {};
   if (preview) {
     try { pv = JSON.parse(sp.get('pv') || '{}'); } catch { pv = {}; }
   }
@@ -157,9 +159,41 @@ async function render(req: Request, rawId: string) {
     if (j?.address) contacts.push({ k: 'pin', v: j.address.slice(0, square ? 60 : 70) });
   }
   const pad = square ? 64 : 52;
-  const imgW = people === 'none' ? 0 : people === 'both' ? (square ? 560 : 500) : square ? 470 : 410;
-  const imgH = Math.round((imgW * 420) / 520);
-  const textW = square ? W - pad * 2 : people === 'none' ? W - pad * 2 : W - pad * 2 - imgW + 40;
+  // Đợt 159 — hình người: vector có sẵn HOẶC ảnh Admin tự tải (nam/nữ riêng), chỉnh to nhỏ + lật trái–phải
+  const castCfg = (k: 'male' | 'female'): CastPerson => ({ ...(bg.cast?.[k] ?? {}), ...(preview ? pv.cast?.[k] ?? {} : {}), dataUrl: bg.cast?.[k]?.dataUrl ?? '', w: bg.cast?.[k]?.w, h: bg.cast?.[k]?.h });
+  const useUp = (preview ? pv.cast?.source : undefined) ?? bg.cast?.source ?? 'vector';
+  type Item = { src: string; w: number; h: number; flip: boolean };
+  const clampS = (v: number | undefined) => Math.min(220, Math.max(40, v ?? 100)) / 100;
+  const baseH = square ? 520 : 400; // chiều cao ảnh tải lên ở cỡ 100%
+  const mkOne = (k: 'male' | 'female'): Item => {
+    const c = castCfg(k);
+    if (useUp === 'upload' && c.dataUrl && c.w && c.h) {
+      const h = Math.round(baseH * clampS(c.scale));
+      return { src: c.dataUrl, w: Math.round((h * c.w) / c.h), h, flip: !!c.flip };
+    }
+    const w = Math.round((square ? 470 : 410) * clampS(c.scale));
+    const h = Math.round((w * 420) / 520);
+    return { src: svgDataUri(peopleSvg(k, w, h)), w, h, flip: !!c.flip };
+  };
+  const anyUp = useUp === 'upload' && (castCfg('male').dataUrl || castCfg('female').dataUrl);
+  let items: Item[] = [];
+  if (people === 'both') {
+    if (anyUp) items = [mkOne('female'), mkOne('male')];
+    else {
+      const s2 = (clampS(castCfg('male').scale) + clampS(castCfg('female').scale)) / 2;
+      const w = Math.round((square ? 560 : 500) * s2);
+      const h = Math.round((w * 420) / 520);
+      items = [{ src: svgDataUri(peopleSvg('both', w, h)), w, h, flip: !!(castCfg('male').flip || castCfg('female').flip) }];
+    }
+  } else if (people !== 'none') items = [mkOne(people)];
+  const OV = 36; // hai người đứng chồng nhẹ lên nhau cho tự nhiên
+  let totW = items.reduce((a, x) => a + x.w, 0) - OV * Math.max(0, items.length - 1);
+  const maxW = Math.round(W * 0.62);
+  const maxH = Math.round(H * (square ? 0.5 : 0.86));
+  const fit = Math.min(1, maxW / Math.max(1, totW), maxH / Math.max(1, ...items.map((x) => x.h), 1));
+  if (fit < 1) { items = items.map((x) => ({ ...x, w: Math.round(x.w * fit), h: Math.round(x.h * fit) })); totW = Math.round(totW * fit); }
+  const imgW = items.length ? totW : 0;
+  const textW = square ? W - pad * 2 : !items.length ? W - pad * 2 : Math.max(380, W - pad * 2 - imgW + 40);
   const stack = people !== 'none' || square; // liên hệ xếp dọc khi có hình người hoặc khổ vuông
   const contactW = square && people !== 'none' ? 500 : textW;
   const cSize = Math.round((st.els.contact.scale * (square ? 34 : 33)) / 100);
@@ -170,9 +204,13 @@ async function render(req: Request, rawId: string) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={bgSrc} width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, width: W, height: H }} alt="" />
         {isImg && <div style={{ position: 'absolute', top: 0, left: 0, width: W, height: H, display: 'flex', background: `linear-gradient(135deg, rgba(5,10,25,${st.scrim / 100}), rgba(5,10,25,${(st.scrim * 0.6) / 100}))` }} />}
-        {people !== 'none' && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={svgDataUri(peopleSvg(people, imgW, imgH))} width={imgW} height={imgH} style={{ position: 'absolute', right: square ? 8 : 24, bottom: 0, width: imgW, height: imgH }} alt="" />
+        {items.length > 0 && (
+          <div style={{ position: 'absolute', right: square ? 8 : 24, bottom: 0, display: 'flex', alignItems: 'flex-end' }}>
+            {items.map((x, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={i} src={x.src} width={x.w} height={x.h} style={{ width: x.w, height: x.h, marginLeft: i ? -OV : 0, ...(x.flip ? { transform: 'scaleX(-1)' } : {}) }} alt="" />
+            ))}
+          </div>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', width: W, height: H, padding: `${square ? 56 : 40}px ${pad}px ${square ? 56 : 38}px` }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: W - pad * 2 }}>

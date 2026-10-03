@@ -41,6 +41,7 @@ async function bootstrap() {
   // (bọc trong hàm riêng: Nest nhận ra middleware tên "jsonParser" và sẽ KHÔNG đăng ký bộ đọc JSON mặc định cho cả API.)
   const bigJson = json({ limit: '1.5mb' });
   app.use('/admin/share-bg/custom', (req: any, res: any, next: any) => bigJson(req, res, next));
+  app.use('/admin/share-bg/person', (req: any, res: any, next: any) => bigJson(req, res, next));
   app.use('/analytics/collect', text({ type: 'text/plain', limit: '100kb' }));
   // Đợt 93 — số đo tốc độ thật (Web Vitals) cũng gửi bằng sendBeacon text/plain.
   app.use('/analytics/vitals', text({ type: 'text/plain', limit: '4kb' }));

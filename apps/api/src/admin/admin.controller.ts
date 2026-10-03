@@ -304,12 +304,20 @@ export class AdminController {
     return this.shareBg.adminView();
   }
   @Put('share-bg')
-  shareBgSet(@Body() b: { mode?: string; fixedId?: string; presets?: string[]; texts?: Record<string, string>; style?: unknown; people?: string; format?: string }) {
+  shareBgSet(@Body() b: { mode?: string; fixedId?: string; presets?: string[]; texts?: Record<string, string>; style?: unknown; people?: string; format?: string; cast?: { source?: string; male?: { scale?: number; flip?: boolean }; female?: { scale?: number; flip?: boolean } } }) {
     return this.shareBg.update(b ?? {});
   }
   @Post('share-bg/custom')
   shareBgAdd(@Body() b: { name?: string; dataUrl: string }) {
     return this.shareBg.addCustom(String(b?.name || ''), String(b?.dataUrl || ''));
+  }
+  @Post('share-bg/person/:who')
+  shareBgPerson(@Param('who') who: string, @Body() b: { dataUrl: string }) {
+    return this.shareBg.setPerson(who, String(b?.dataUrl || ''));
+  }
+  @Delete('share-bg/person/:who')
+  shareBgPersonRemove(@Param('who') who: string) {
+    return this.shareBg.removePerson(who);
   }
   @Delete('share-bg/custom/:id')
   shareBgRemove(@Param('id') id: string) {
@@ -772,7 +780,7 @@ export class ShareBgPublicController {
   constructor(private readonly shareBg: ShareBgService) {}
 
   @Get()
-  pick(@Query('d') d?: string, @Query('only') only?: string) {
-    return this.shareBg.pick(d, only);
+  pick(@Query('d') d?: string, @Query('only') only?: string, @Query('lite') lite?: string) {
+    return lite ? this.shareBg.formatOnly() : this.shareBg.pick(d, only);
   }
 }
