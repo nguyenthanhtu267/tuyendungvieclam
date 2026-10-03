@@ -23,7 +23,10 @@ export default function Footer() {
     {!isAdmin && <AdSlot slot="footer-top" className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-3" />}
     <footer className="border-t border-border bg-white mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-ink-faint">
-        <div>© {year} {t('footer.rights')} — tuyendungvieclam</div>
+        <div className="text-center sm:text-left">
+          © {year} {t('footer.rights')} — tuyendungvieclam
+          <span className="block sm:inline sm:ml-3">Hỗ trợ: <a href="mailto:hotro@vieclamngay.vn" className="hover:text-primary font-semibold">hotro@vieclamngay.vn</a></span>
+        </div>
         <div className="flex items-center gap-x-4 gap-y-1 flex-wrap justify-center">
           <Link href="/dieu-khoan-su-dung" className="hover:text-primary font-semibold">
             {t('footer.terms')}

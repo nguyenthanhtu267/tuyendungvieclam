@@ -126,6 +126,7 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
   const [lastPage, setLastPage] = useState(page);
   const [moreLoading, setMoreLoading] = useState(false);
   const autoLoaded = useRef(0);
+  const [moreErr, setMoreErr] = useState('');
   const sentinel = useRef<HTMLDivElement | null>(null);
   const allItems = (() => {
     const seen = new Set<string>();
@@ -439,13 +440,15 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
   async function loadMore() {
     if (moreLoading || !hasMore) return;
     setMoreLoading(true);
+    setMoreErr('');
     try {
       const next = lastPage + 1;
       const r = await jobsApi.list({ ...filters, page: next, pageSize: JOB_PAGE_SIZE });
       setMore((m) => [...m, ...r.items]);
       setLastPage(next);
       autoLoaded.current += 1;
-    } catch {
+    } catch (e) {
+      setMoreErr((e as Error)?.message && (e as Error).message !== 'Failed to fetch' ? (e as Error).message : 'Không kết nối được máy chủ để tải thêm tin. Vui lòng thử lại.');
       autoLoaded.current = AUTO_PAGES; // lỗi mạng: dừng tự bung, để người dùng bấm "Xem thêm" thử lại
     } finally {
       setMoreLoading(false);
@@ -782,9 +785,12 @@ function JobSearchPage({ initial, initialFacets }: { initial: { key: string; dat
                     {moreLoading ? (
                       <div className="text-[13px] text-ink-muted py-2">⟳ Đang tải thêm tin…</div>
                     ) : (
-                      <button type="button" onClick={() => { autoLoaded.current = 0; void loadMore(); }} className="tvl-btn-ghost !w-full sm:!w-72 !h-12 text-[14px]">
-                        Xem thêm tin
-                      </button>
+                      <>
+                        {moreErr && <div role="alert" className="text-[13px] font-bold text-critical text-center">{moreErr}</div>}
+                        <button type="button" onClick={() => { autoLoaded.current = 0; void loadMore(); }} className="tvl-btn-ghost !w-full sm:!w-72 !h-12 text-[14px]">
+                          {moreErr ? 'Thử lại' : 'Xem thêm tin'}
+                        </button>
+                      </>
                     )}
                   </>
                 ) : (

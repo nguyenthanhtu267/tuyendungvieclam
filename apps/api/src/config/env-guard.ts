@@ -40,8 +40,15 @@ export function resolveCorsOrigins(value: string | undefined): string[] | true {
     );
   }
   if (!value) return true;
-  return value
+  const list = value
     .split(',')
-    .map((s) => s.trim())
+    .map((s) => s.trim().replace(/\/$/, ''))
     .filter(Boolean);
+  // Đợt 151 — tên miền chính thức luôn được phép (tránh quên cập nhật CORS_ORIGIN khi đổi tên miền);
+  // thêm tên miền khác bằng biến EXTRA_CORS_ORIGINS (phân tách bởi dấu phẩy).
+  const extra = (process.env.EXTRA_CORS_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+  return Array.from(new Set([...list, 'https://vieclamngay.vn', 'https://www.vieclamngay.vn', ...extra]));
 }
